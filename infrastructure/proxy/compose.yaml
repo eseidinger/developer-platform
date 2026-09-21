@@ -1,0 +1,15 @@
+services:
+  proxy:
+    image: caddy:2.10.2-alpine
+    restart: unless-stopped
+    ports: ["${EDGE_BIND_IP:-127.0.0.1}:80:80", "${EDGE_BIND_IP:-127.0.0.1}:443:443", "${EDGE_BIND_IP:-127.0.0.1}:443:443/udp"]
+    environment:
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
+      APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
+      TLS_EMAIL: ${TLS_EMAIL:-admin@example.com}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks: [platform]
+    mem_limit: 256m

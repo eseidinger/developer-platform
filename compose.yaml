@@ -1,0 +1,20 @@
+name: developer-platform
+include:
+  - infrastructure/proxy/compose.yaml
+  - persistence/compose.yaml
+  - infrastructure/monitoring/compose.yaml
+  - platform/compose.yaml
+networks:
+  platform:
+    name: developer-platform
+    ipam:
+      config:
+        - subnet: ${PLATFORM_SUBNET:-172.30.80.0/24}
+volumes:
+  postgres:
+  caddy_data:
+  caddy_config:
+  prometheus:
+  grafana:
+  loki:
+  alertmanager:

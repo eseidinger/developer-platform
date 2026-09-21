@@ -1,0 +1,13 @@
+[Unit]
+Description=Developer Platform external heartbeat
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/developer-platform/watchdog.env
+ExecStart=/usr/bin/python3 /opt/developer-platform/scripts/heartbeat.py
+DynamicUser=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true

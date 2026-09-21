@@ -1,0 +1,24 @@
+groups:
+  - name: infrastructure
+    rules:
+      - alert: ScrapeTargetDown
+        expr: up == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Monitoring target {{ $labels.job }} unavailable"
+      - alert: HostDiskAlmostFull
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes < 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Less than 10% free disk"
+      - alert: WorkloadUnavailable
+        expr: kube_deployment_status_replicas_unavailable{namespace=~"project-.*"} > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Project deployment has unavailable replicas"

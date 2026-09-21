@@ -1,0 +1,30 @@
+{
+	email {$TLS_EMAIL}
+	on_demand_tls {
+		ask http://platform-api:8000/internal/tls
+	}
+}
+{$PLATFORM_DOMAIN} {
+	reverse_proxy platform-api:8000
+}
+http://*.{$APPS_DOMAIN} {
+	@local host *.apps.localhost
+	handle @local {
+		reverse_proxy k3d-workloads-serverlb:80
+	}
+	handle {
+		redir https://{host}{uri} permanent
+	}
+}
+https:// {
+	tls {
+		on_demand
+	}
+	@apps host *.{$APPS_DOMAIN}
+	handle @apps {
+		reverse_proxy k3d-workloads-serverlb:80
+	}
+	handle {
+		respond 404
+	}
+}

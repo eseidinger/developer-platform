@@ -1,0 +1,30 @@
+services:
+  platform-api:
+    build: .
+    restart: unless-stopped
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
+      PLATFORM_TOKEN: ${PLATFORM_TOKEN:?Run scripts/init.py}
+      DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
+      APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
+      POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
+      KUBECONFIG: /run/platform/kubeconfig
+    volumes:
+      - ../.runtime/controller.kubeconfig:/run/platform/kubeconfig:ro
+    networks: [platform]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports: ["127.0.0.1:8000:8000"]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 512m
+    cpus: 1
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
