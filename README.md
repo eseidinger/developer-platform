@@ -31,6 +31,9 @@ deletion workflows, and an asynchronous provisioning worker are not yet implemen
 The admin API and its Kubernetes ServiceAccount are privileged infrastructure
 components. Never share the admin token with project users.
 
+See the [platform guide](platform/README.md) for API usage, project lifecycle,
+application requirements, configuration, and troubleshooting.
+
 ## Quick start on Ubuntu / WSL2
 
 Requirements: Docker Engine with Compose >= 2.20.3, Python >= 3.10, Bash,
