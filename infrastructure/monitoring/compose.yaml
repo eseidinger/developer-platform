@@ -1,6 +1,6 @@
 services:
   prometheus:
-    image: prom/prometheus:v3.5.0
+    image: prom/prometheus:v3.14.0
     restart: unless-stopped
     command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=4GB"]
     volumes:
@@ -11,7 +11,7 @@ services:
     networks: [platform]
     mem_limit: 1g
   grafana:
-    image: grafana/grafana:12.1.1
+    image: grafana/grafana:13.2.2
     restart: unless-stopped
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Run scripts/init.py}
@@ -23,7 +23,7 @@ services:
     networks: [platform]
     mem_limit: 512m
   loki:
-    image: grafana/loki:3.5.3
+    image: grafana/loki:3.7.8
     restart: unless-stopped
     command: ["-config.file=/etc/loki/config.yaml"]
     volumes:
@@ -32,7 +32,7 @@ services:
     networks: [platform]
     mem_limit: 768m
   alloy:
-    image: grafana/alloy:v1.10.2
+    image: grafana/alloy:v1.19.2
     restart: unless-stopped
     user: "0"
     command: ["run", "/etc/alloy/config.alloy"]
@@ -42,7 +42,7 @@ services:
     networks: [platform]
     mem_limit: 256m
   alertmanager:
-    image: prom/alertmanager:v0.28.1
+    image: prom/alertmanager:v0.34.1
     restart: unless-stopped
     volumes:
       - ./alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
@@ -50,7 +50,7 @@ services:
     networks: [platform]
     mem_limit: 128m
   node-exporter:
-    image: prom/node-exporter:v1.9.1
+    image: prom/node-exporter:v1.12.1
     restart: unless-stopped
     pid: host
     command: ["--path.rootfs=/host", "--path.procfs=/host/proc", "--path.sysfs=/host/sys"]

@@ -1,6 +1,6 @@
 services:
   proxy:
-    image: caddy:2.10.2-alpine
+    image: caddy:2.11.4-alpine
     restart: unless-stopped
     ports: ["${EDGE_BIND_IP:-127.0.0.1}:80:80", "${EDGE_BIND_IP:-127.0.0.1}:443:443", "${EDGE_BIND_IP:-127.0.0.1}:443:443/udp"]
     environment:

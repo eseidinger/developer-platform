@@ -22,7 +22,7 @@ def resources(name, image, port, domain, database_ip, password):
             "name": namespace, "labels": {
                 "platform.example/managed": "true",
                 "pod-security.kubernetes.io/enforce": "restricted",
-                "pod-security.kubernetes.io/enforce-version": "v1.35"}}},
+                "pod-security.kubernetes.io/enforce-version": "v1.36"}}},
         obj("v1", "ResourceQuota", "budget", spec={"hard": {
             "requests.cpu": "2", "requests.memory": "2Gi", "limits.cpu": "4",
             "limits.memory": "4Gi", "pods": "10", "services": "5",

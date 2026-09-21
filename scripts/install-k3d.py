@@ -4,7 +4,7 @@ import hashlib
 import platform
 import urllib.request
 from pathlib import Path
-version = "v5.8.3"
+version = "v5.9.0"
 arch = {"x86_64": "amd64", "aarch64": "arm64"}[platform.machine()]
 asset = "k3d-linux-" + arch
 url = "https://github.com/k3d-io/k3d/releases/download/" + version + "/"

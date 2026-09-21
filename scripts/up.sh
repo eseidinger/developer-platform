@@ -10,7 +10,8 @@ test -f .env || { echo "Run python3 scripts/init.py first" >&2; exit 1; }
 eval "$(python3 scripts/env.py)"
 umask 077
 mkdir -p .runtime
-docker compose up -d postgres
+echo "Starting PostgreSQL and waiting for it to become healthy..."
+docker compose up -d --wait --wait-timeout 120 postgres
 python3 scripts/cluster_config.py > .runtime/k3d.yaml
 if ! k3d cluster list -o json | python3 -c 'import json,sys; sys.exit(not any(c["name"] == "workloads" for c in json.load(sys.stdin)))'; then
   k3d cluster create --config .runtime/k3d.yaml
@@ -19,6 +20,7 @@ else
 fi
 k3d kubeconfig get workloads > .runtime/admin.kubeconfig
 export KUBECONFIG="$PWD/.runtime/admin.kubeconfig"
+echo "Waiting for Kubernetes nodes to become Ready (up to 180 seconds)..."
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
 kubectl apply -f infrastructure/kubernetes/controller.yaml
 kubectl apply -f infrastructure/kubernetes/metrics.yaml

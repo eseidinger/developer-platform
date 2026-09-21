@@ -1,6 +1,6 @@
 # External PHP/MySQL watchdog
 
-Requirements: independent web hosting, PHP >=8.1, PDO-MySQL, a cron job running
+Requirements: independent web hosting, PHP >=8.2, PDO-MySQL, a cron job running
 every minute, and working PHP mail() delivery; cURL for optional HTTPS checks.
 
 1. Upload the directory to the web host. Set DocumentRoot exclusively to

@@ -40,7 +40,7 @@ async def lifespan(app):
     runtime = dynamic.DynamicClient(ApiClient())
     yield
 
-app = FastAPI(title="Hybrid Developer Platform", lifespan=lifespan)
+app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 
 def admin(credentials: HTTPAuthorizationCredentials = Depends(auth)):
     if not hmac.compare_digest(credentials.credentials, os.environ["PLATFORM_TOKEN"]):

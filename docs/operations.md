@@ -43,3 +43,25 @@ Before changing versions, create a backup, validate images in a test installatio
 and run all smoke and isolation tests. Images are versioned but not fully pinned
 by digest; for reproducible releases, also pin digests and transitive Python
 dependencies.
+
+
+### Version refresh (September 2026)
+
+Fresh deployments use PostgreSQL 18.6, Python 3.14.7, PHP 8.5.10 for watchdog
+tests, MariaDB 13.0.2 for the watchdog test database, k3d 5.9.0, and k3s 1.36.4.
+The PostgreSQL volume mounts at `/var/lib/postgresql`; the PostgreSQL 18 image
+stores its data in `/var/lib/postgresql/18/docker`.
+
+The Kubernetes Python client 36.0.3 and kube-state-metrics 2.20.0 are their latest
+stable releases and target Kubernetes 1.36. The cluster version matches their target Kubernetes minor version.
+The example image remains hashicorp/http-echo 1.0.0, its latest release.
+
+Use the README quick start for a fresh installation. When recreating an existing
+lab, run `bash scripts/down.sh --volumes` first, then set `K3S_IMAGE` in
+`.env` to `rancher/k3s:v1.36.4-k3s1` before bootstrap. This discards existing lab
+data. Updating `.env.example` alone does not change an existing `.env`, and
+`up.sh` does not replace an existing cluster.
+
+The host's minimum Python and Compose requirements describe script and configuration
+compatibility, not pinned installations. The API container and CI use Python 3.14.7.
+External watchdog hosting requires PHP 8.2 or newer; PHP 8.5.10 is the tested runtime.

@@ -34,8 +34,8 @@ components. Never share the admin token with project users.
 
 ## Quick start on Ubuntu / WSL2
 
-Requirements: Docker Engine with Compose >= 2.20, Python >= 3.10, Bash,
-kubectl compatible with Kubernetes 1.35, and internet access. Suggested capacity:
+Requirements: Docker Engine with Compose >= 2.20.3, Python >= 3.10, Bash,
+kubectl 1.36.x (1.35.x–1.37.x are supported), and internet access. Suggested capacity:
 16 vCPUs and 32 GB RAM. Docker requires access to Linux cgroups and privileged
 k3d containers.
 
@@ -112,6 +112,11 @@ Production TLS has not been tested locally with real DNS names and ACME.
 - Stop without losing data: `docker compose stop` and
   `.runtime/bin/k3d cluster stop workloads`.
 - Restart: `bash scripts/up.sh`.
+- Tear down containers and the Kubernetes cluster: `bash scripts/down.sh`.
+  Persistent service data is retained; after bootstrap, reapply saved project specs
+  as described in [recovery](docs/operations.md).
+- Tear down and delete all lab service data: `bash scripts/down.sh --volumes`.
+  Both modes preserve `.env`, local backups, and installed tools.
 - Never delete Compose volumes or k3d resources if their data is still needed.
 - Store `.env`, especially `DATABASE_KEY`, securely with encryption.
   It is used to derive stable project passwords. Changing it requires coordinated
@@ -134,7 +139,7 @@ Production TLS has not been tested locally with real DNS names and ACME.
 docker compose config --quiet
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q platform scripts
-bash -n scripts/up.sh scripts/backup.sh
+bash -n scripts/up.sh scripts/down.sh scripts/backup.sh
 python3 scripts/smoke.py
 ```
 
@@ -149,7 +154,7 @@ no emails are sent.
 kube-router rules take effect. This installation is intended for trusted lab
 workloads, not untrusted multi-tenancy.
 
-With PHP >=8.1, PDO-MySQL, and optionally cURL, run:
+With PHP >=8.2, PDO-MySQL, and optionally cURL, run:
 `php tests/watchdog.php` and `php -l` for all PHP files.
 CI runs syntax/configuration checks and unit tests; the full integration test
 requires a Docker host with k3d.
