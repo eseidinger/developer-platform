@@ -10,7 +10,6 @@ Internet → Caddy (TLS)
               └─ k3d LoadBalancer → Traefik → project-* namespaces
                                               └─ PostgreSQL (Docker)
 Docker: Prometheus, Grafana, Loki, Alloy, Alertmanager, node-exporter
-External web hosting: PHP/MySQL watchdog ← systemd heartbeat from the host
 ```
 
 ## Features
@@ -24,7 +23,7 @@ External web hosting: PHP/MySQL watchdog ← systemd heartbeat from the host
 - Unprivileged workloads without Kubernetes API tokens, with read-only root
   filesystems and restricted network access.
 - Persistent project state; repeating a PUT repairs partial failures without deleting data.
-- Monitoring, Docker log collection, SQL backups, and an independent watchdog.
+- Monitoring, Docker log collection, and SQL backups.
 
 This is a working foundation for administration and lab use on a single host.
 A self-service portal, OIDC/Keycloak, tenant-specific user permissions, automated
@@ -98,7 +97,7 @@ compromised host/node; all components share the same Docker host.
 5. Run `python3 scripts/install-k3d.py` and `bash scripts/up.sh`.
 6. Access Grafana/Prometheus through an SSH tunnel, for example:
    `ssh -L 3000:127.0.0.1:3000 user@host`.
-7. Set up the watchdog and backups using the operations guides linked below.
+7. Set up backups using the operations guide linked below.
 
 Caddy obtains TLS certificates for the platform automatically. For workloads,
 the on-demand TLS endpoint authorizes certificates only for provisioned project
@@ -130,7 +129,6 @@ Production TLS has not been tested locally with real DNS names and ACME.
   same PUT request. Databases are never deleted automatically.
 
 [Backup and recovery](docs/operations.md) ·
-[Watchdog installation](watchdog/README.md) ·
 [Architecture decisions](docs/architecture.md)
 
 ## Validation
@@ -146,16 +144,11 @@ python3 scripts/smoke.py
 Additional live checks:
 `python3 scripts/isolation.py` tests PostgreSQL and network isolation after
 policies have converged; it retains the `isolation` test project.
-`python3 scripts/test-watchdog.py` starts temporary PHP/MariaDB containers and
-removes only that test project afterward. Email handoff is simulated;
-no emails are sent.
 
 **Observed limitation:** New pods may briefly have outbound network access before
 kube-router rules take effect. This installation is intended for trusted lab
 workloads, not untrusted multi-tenancy.
 
-With PHP >=8.2, PDO-MySQL, and optionally cURL, run:
-`php tests/watchdog.php` and `php -l` for all PHP files.
 CI runs syntax/configuration checks and unit tests; the full integration test
 requires a Docker host with k3d.
 
