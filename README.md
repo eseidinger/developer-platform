@@ -88,6 +88,9 @@ compromised host/node; all components share the same Docker host.
 
 ## Deploy to the existing Hetzner host
 
+For automated host setup and deployment, use the [Ansible playbook](ansible/README.md).
+The manual procedure is below.
+
 1. Copy the repository to `/opt/developer-platform` and install the prerequisites.
 2. Run `python3 scripts/init.py`, then configure `.env`:
    `PLATFORM_DOMAIN=platform.example.com`, `APPS_DOMAIN=apps.example.com`,

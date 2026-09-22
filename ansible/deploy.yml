@@ -1,0 +1,238 @@
+---
+- name: Deploy the developer platform
+  hosts: developer_platform
+  become: true
+  gather_facts: true
+  vars:
+    platform_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"
+    platform_settings:
+      PLATFORM_DOMAIN: "{{ platform_domain }}"
+      APPS_DOMAIN: "{{ platform_apps_domain }}"
+      TLS_EMAIL: "{{ platform_tls_email }}"
+      EDGE_BIND_IP: "{{ platform_edge_bind_ip }}"
+
+  pre_tasks:
+    - name: Apply defaults only when inventory has not configured them
+      ansible.builtin.set_fact:
+        platform_install_dir: "{{ platform_install_dir | default('/opt/developer-platform') }}"
+        platform_source_dir: "{{ platform_source_dir | default(playbook_dir ~ '/..') }}"
+        platform_domain: "{{ platform_domain | default('platform.localhost') }}"
+        platform_apps_domain: "{{ platform_apps_domain | default('apps.localhost') }}"
+        platform_tls_email: "{{ platform_tls_email | default('admin@example.com') }}"
+        platform_edge_bind_ip: "{{ platform_edge_bind_ip | default('127.0.0.1') }}"
+        platform_install_docker: "{{ platform_install_docker | default(true) }}"
+        platform_kubectl_version: "{{ platform_kubectl_version | default('v1.36.4') }}"
+
+    - name: Check supported host and configuration
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] is version('22.04', '>=')
+          - ansible_facts['architecture'] in ['x86_64', 'aarch64']
+          - platform_install_dir.startswith('/')
+          - platform_install_dir != '/'
+          - platform_kubectl_version is match('^v1\.(35|36|37)\.[0-9]+$')
+        fail_msg: Use Ubuntu 22.04 or newer on amd64/arm64 and kubectl compatible with Kubernetes 1.36.
+
+    - name: Validate environment values
+      ansible.builtin.assert:
+        that:
+          - item.value is match('^[A-Za-z0-9.@:_-]+$')
+        fail_msg: Platform settings must be nonempty single-line domain, email, or IP values.
+      loop: "{{ platform_settings | dict2items }}"
+
+  tasks:
+    - name: Install host prerequisites
+      ansible.builtin.apt:
+        name: [ca-certificates, python3, python3-apt, bash, tar]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Install Docker from its official Ubuntu repository
+      when: platform_install_docker | bool
+      block:
+        - name: Create APT key directory
+          ansible.builtin.file:
+            path: /etc/apt/keyrings
+            state: directory
+            mode: '0755'
+
+        - name: Download Docker repository key
+          ansible.builtin.get_url:
+            url: https://download.docker.com/linux/ubuntu/gpg
+            dest: /etc/apt/keyrings/docker.asc
+            mode: '0644'
+
+        - name: Configure Docker repository
+          ansible.builtin.copy:
+            dest: /etc/apt/sources.list.d/docker.sources
+            owner: root
+            group: root
+            mode: '0644'
+            content: |
+              Types: deb
+              URIs: https://download.docker.com/linux/ubuntu
+              Suites: {{ ansible_facts['distribution_release'] }}
+              Components: stable
+              Architectures: {{ platform_arch }}
+              Signed-By: /etc/apt/keyrings/docker.asc
+
+        - name: Install Docker Engine and Compose
+          ansible.builtin.apt:
+            name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+            state: present
+            update_cache: true
+
+    - name: Enable Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        enabled: true
+        state: started
+
+    - name: Check Compose version
+      ansible.builtin.command: docker compose version --short
+      register: platform_compose_version
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Require Compose include support
+      ansible.builtin.assert:
+        that: platform_compose_version.stdout | regex_replace('^v', '') is version('2.20.3', '>=')
+      when: not ansible_check_mode
+
+    - name: Create private installation directory
+      ansible.builtin.file:
+        path: "{{ platform_install_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Transfer deployment sources without local secrets or runtime data
+      when: not ansible_check_mode
+      block:
+        - name: Allocate local source archive
+          ansible.builtin.tempfile:
+            state: file
+            suffix: .tar.gz
+          delegate_to: localhost
+          become: false
+          register: platform_archive
+
+        - name: Package deployment files
+          ansible.builtin.command:
+            argv:
+              - tar
+              - --exclude=__pycache__
+              - --exclude=*.pyc
+              - -czf
+              - "{{ platform_archive.path }}"
+              - -C
+              - "{{ platform_source_dir }}"
+              - compose.yaml
+              - .env.example
+              - infrastructure
+              - persistence
+              - platform
+              - scripts
+          delegate_to: localhost
+          become: false
+          changed_when: true
+
+        - name: Extract deployment files on the host
+          ansible.builtin.unarchive:
+            src: "{{ platform_archive.path }}"
+            dest: "{{ platform_install_dir }}"
+            owner: root
+            group: root
+      always:
+        - name: Remove local source archive
+          ansible.builtin.file:
+            path: "{{ platform_archive.path }}"
+            state: absent
+          delegate_to: localhost
+          become: false
+          when: platform_archive.path is defined
+
+    - name: Configure and start the platform
+      when: not ansible_check_mode
+      block:
+        - name: Generate secrets only on first deployment
+          ansible.builtin.command:
+            argv: [python3, scripts/init.py]
+            chdir: "{{ platform_install_dir }}"
+            creates: "{{ platform_install_dir }}/.env"
+
+        - name: Configure deployment endpoints while preserving secrets
+          ansible.builtin.lineinfile:
+            path: "{{ platform_install_dir }}/.env"
+            regexp: "^{{ item.key }}="
+            line: "{{ item.key }}={{ item.value }}"
+            owner: root
+            group: root
+            mode: '0600'
+          loop: "{{ platform_settings | dict2items }}"
+          no_log: true
+          diff: false
+
+        - name: Create private runtime directory
+          ansible.builtin.file:
+            path: "{{ platform_install_dir }}/.runtime"
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+
+        - name: Install checksum-verified k3d using the repository installer
+          ansible.builtin.command:
+            argv: [python3, scripts/install-k3d.py]
+            chdir: "{{ platform_install_dir }}"
+          changed_when: true
+
+        - name: Install checksum-verified kubectl alongside k3d
+          ansible.builtin.get_url:
+            url: "https://dl.k8s.io/release/{{ platform_kubectl_version }}/bin/linux/{{ platform_arch }}/kubectl"
+            checksum: "sha256:https://dl.k8s.io/release/{{ platform_kubectl_version }}/bin/linux/{{ platform_arch }}/kubectl.sha256"
+            dest: "{{ platform_install_dir }}/.runtime/bin/kubectl"
+            mode: '0755'
+
+        - name: Create system-wide local binary directory
+          ansible.builtin.file:
+            path: /usr/local/bin
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Install kubectl for host administration
+          ansible.builtin.copy:
+            src: "{{ platform_install_dir }}/.runtime/bin/kubectl"
+            dest: /usr/local/bin/kubectl
+            remote_src: true
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Validate Compose configuration
+          ansible.builtin.command:
+            argv: [docker, compose, config, --quiet]
+            chdir: "{{ platform_install_dir }}"
+          changed_when: false
+
+        - name: Reconcile Compose services and Kubernetes cluster
+          ansible.builtin.command:
+            argv: [bash, scripts/up.sh]
+            chdir: "{{ platform_install_dir }}"
+          changed_when: true
+          # Bootstrap can emit Kubernetes token diagnostics on failure.
+          no_log: true
+
+        - name: Wait for the platform API
+          ansible.builtin.uri:
+            url: http://127.0.0.1:8000/healthz
+            status_code: 200
+          register: platform_health
+          until: platform_health.status | default(0) == 200
+          retries: 30
+          delay: 5

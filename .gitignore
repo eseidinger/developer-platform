@@ -4,3 +4,4 @@ __pycache__/
 *.pyc
 .venv/
 watchdog/config.local.php
+ansible/inventory.yml

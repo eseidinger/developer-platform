@@ -1,0 +1,13 @@
+---
+all:
+  children:
+    developer_platform:
+      hosts:
+        platform:
+          ansible_host: 192.0.2.10
+          ansible_user: ubuntu
+      vars:
+        platform_domain: platform.example.com
+        platform_apps_domain: apps.example.com
+        platform_tls_email: admin@example.com
+        platform_edge_bind_ip: 0.0.0.0
