@@ -59,8 +59,8 @@ Namespace quotas do not replace global admission control. With too many projects
 pods remain Pending; check capacity before accepting more projects.
 
 All components share the same failure domain. Multiple k3d nodes do not provide
-host high availability. Monitoring also runs on this host and is unavailable
-during a complete host outage.
+host high availability. The PHP watchdog therefore runs on independent web
+hosting. It detects missing heartbeats even during a complete Docker or host outage.
 
 ## Monitoring limitations
 
@@ -72,4 +72,5 @@ the mount must be adjusted. WSL does not require recursively propagated host mou
 PostgreSQL query metrics, container resource metrics through cAdvisor,
 Kubernetes application metrics, and dashboards are areas for future extension.
 Alertmanager includes a local receiver; SMTP/webhook configuration must be added
-for the deployment.
+for the deployment. The external watchdog already provides email notifications
+when status changes.

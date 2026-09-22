@@ -25,10 +25,17 @@ PVCs are not allowed by the initial project contract.
 4. Run `bash scripts/up.sh`. Retrieve stored projects using GET /projects
    and reapply each project's spec using PUT /projects/{name}.
    Kubernetes Secrets and workloads are recreated using the same `DATABASE_KEY`.
-5. Check application data, permissions, ingress, and monitoring.
+5. Check application data, permissions, ingress, and the watchdog.
 
 Losing the Kubernetes cluster therefore does not destroy the databases stored
 outside it. The project list in PostgreSQL serves as the recovery catalog.
+
+## Watchdog
+
+See [Watchdog](../watchdog/README.md). The systemd timer checks API readiness
+(database + Kubernetes) and Prometheus before sending a heartbeat.
+A failed timer or host results in an overdue heartbeat at the external watchdog.
+If the watchdog cron job fails, the status page also reports unavailable.
 
 ## Updates
 
@@ -40,7 +47,8 @@ dependencies.
 
 ### Version refresh (September 2026)
 
-Fresh deployments use PostgreSQL 18.6, Python 3.14.7, k3d 5.9.0, and k3s 1.36.4.
+Fresh deployments use PostgreSQL 18.6, Python 3.14.7, PHP 8.5.10 for watchdog
+tests, MariaDB 13.0.2 for the watchdog test database, k3d 5.9.0, and k3s 1.36.4.
 The PostgreSQL volume mounts at `/var/lib/postgresql`; the PostgreSQL 18 image
 stores its data in `/var/lib/postgresql/18/docker`.
 
@@ -56,3 +64,4 @@ data. Updating `.env.example` alone does not change an existing `.env`, and
 
 The host's minimum Python and Compose requirements describe script and configuration
 compatibility, not pinned installations. The API container and CI use Python 3.14.7.
+External watchdog hosting requires PHP 8.2 or newer; PHP 8.5.10 is the tested runtime.
