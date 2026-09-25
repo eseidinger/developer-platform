@@ -1,0 +1,30 @@
+# Product Vision
+
+Status: consolidated target vision.
+
+The Developer Platform allows developers to describe an application and its required resources, then provision it reproducibly. It connects the application lifecycle, standardized platform services, and traceable architectural decisions.
+
+The core promise is: **I describe what my application needs; the platform provisions compute, persistence, configuration, access, and observability.**
+
+## Users and value
+
+| User | Value |
+|---|---|
+| Developer | Deploy a web/API application with PostgreSQL without manual infrastructure configuration |
+| Platform engineer / operator | Operate shared infrastructure, inventory resources, and investigate failures |
+| Software architect | Evaluate implementation options through reproducible labs |
+| Tech lead | Understand project ownership, dependencies, and standards |
+
+The platform also serves as a cohesive reference and portfolio project. Python, Java/Quarkus, Angular, Docker, Kubernetes, and later AI demonstrate concrete responsibilities and justified decisions. Technology variety is not an acceptance criterion.
+
+## Product boundaries
+
+The first usable vertical slice covers a project/environment, a containerized and largely stateless HTTP application, PostgreSQL, secrets, routing, and basic operations. Infrastructure is provisioned once as the platform foundation; a new project creates resources on that foundation, not a new cluster.
+
+Labs comparing JSONB with MongoDB, relational with graph persistence, or pgvector with specialized vector stores remain extensions. They provide decision evidence but are not required MVP services.
+
+AI supports development, delivery, and operations. Its initial value is explaining applications and incidents using platform context. A general-purpose coding assistant or a complete AI hosting offering is outside the initial scope.
+
+## Success
+
+Success is demonstrated through the [vertical slice](use-cases.md) and [verifiable requirements](requirements.md): deploy an application, preserve its data, detect failures, apply a change, and remove resources deliberately. A second compute provider must use the same contract. Measure time to the first healthy application and recovery time; binding targets remain open.
