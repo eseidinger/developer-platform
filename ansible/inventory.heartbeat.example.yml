@@ -1,0 +1,14 @@
+---
+all:
+  hosts:
+    localhost:
+      ansible_connection: local
+      heartbeat_target: platform
+      heartbeat_url: https://status.example.com/heartbeat.php
+      # The playbook prompts privately for heartbeat_token.
+      # For automation, supply it using an Ansible Vault encrypted variables file.
+    platform:
+      ansible_connection: ssh
+      ansible_host: 192.0.2.10
+      ansible_user: ubuntu
+      # Use --ask-pass for SSH and --ask-become-pass for sudo authentication.

@@ -6,8 +6,6 @@ services:
       MARIADB_DATABASE: watchdog
       MARIADB_USER: watchdog
       MARIADB_PASSWORD: ${TEST_PASSWORD:?}
-    volumes:
-      - ../watchdog/schema.sql:/docker-entrypoint-initdb.d/schema.sql:ro
     healthcheck:
       test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
       interval: 2s
@@ -24,6 +22,9 @@ services:
     volumes:
       - ../watchdog/common.php:/app/common.php:ro
       - ../watchdog/cron.php:/app/cron.php:ro
+      - ../watchdog/mail.php:/app/mail.php:ro
+      - ../watchdog/import-schema.php:/app/import-schema.php:ro
+      - ../watchdog/schema.sql:/app/schema.sql:ro
       - ../watchdog/public:/app/public:ro
       - ./watchdog-config.php:/app/config.local.php:ro
     ports: ["127.0.0.1:18088:8080"]

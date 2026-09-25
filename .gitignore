@@ -5,3 +5,5 @@ __pycache__/
 .venv/
 watchdog/config.local.php
 ansible/inventory.yml
+ansible/inventory.watchdog.yml
+ansible/inventory.heartbeat.yml

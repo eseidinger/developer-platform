@@ -1,0 +1,117 @@
+---
+- name: Deploy the platform heartbeat from localhost
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars_prompt:
+    - name: heartbeat_token
+      prompt: Watchdog heartbeat token (same token as config.local.php)
+      private: true
+
+  pre_tasks:
+    - name: Apply heartbeat defaults
+      ansible.builtin.set_fact:
+        heartbeat_target: "{{ heartbeat_target | default('platform') }}"
+
+    - name: Validate target and watchdog URL
+      ansible.builtin.assert:
+        that:
+          - heartbeat_target in hostvars
+          - heartbeat_target not in ['localhost', '127.0.0.1', '::1']
+          - heartbeat_url | default('') is match('^https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9_./?=&%:~+-]*$')
+        fail_msg: Define a remote inventory host in heartbeat_target and set heartbeat_url to the HTTPS heartbeat.php endpoint.
+
+    - name: Validate token for the private systemd environment file
+      ansible.builtin.assert:
+        that:
+          - heartbeat_token | default('') is match('^[A-Za-z0-9_-]{32,}$')
+          - not (heartbeat_token | default('')).startswith('replace-')
+        fail_msg: Supply the watchdog token, containing at least 32 letters, digits, underscores, or hyphens.
+      no_log: true
+
+  tasks:
+    - name: Install heartbeat on the platform host
+      delegate_to: "{{ heartbeat_target }}"
+      become: true
+      block:
+        - name: Install Python and TLS trust certificates
+          ansible.builtin.apt:
+            name: [python3, ca-certificates]
+            state: present
+            update_cache: true
+            cache_valid_time: 3600
+
+        - name: Create a script directory readable by the dynamic service user
+          ansible.builtin.file:
+            path: /usr/local/lib/developer-platform
+            state: directory
+            owner: root
+            group: root
+            mode: '0755'
+
+        - name: Install heartbeat script
+          ansible.builtin.copy:
+            src: "{{ playbook_dir }}/../scripts/heartbeat.py"
+            dest: /usr/local/lib/developer-platform/heartbeat.py
+            owner: root
+            group: root
+            mode: '0644'
+
+        - name: Create private configuration directory
+          ansible.builtin.file:
+            path: /etc/developer-platform
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+
+        - name: Configure watchdog endpoint and authentication
+          ansible.builtin.copy:
+            dest: /etc/developer-platform/watchdog.env
+            owner: root
+            group: root
+            mode: '0600'
+            content: |
+              WATCHDOG_URL="{{ heartbeat_url }}"
+              WATCHDOG_TOKEN="{{ heartbeat_token }}"
+          no_log: true
+          diff: false
+
+        - name: Install heartbeat service with the readable script path
+          ansible.builtin.copy:
+            content: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../infrastructure/systemd/platform-heartbeat.service') | replace('/opt/developer-platform/scripts/heartbeat.py', '/usr/local/lib/developer-platform/heartbeat.py') }}\n"
+            dest: /etc/systemd/system/platform-heartbeat.service
+            owner: root
+            group: root
+            mode: '0644'
+          notify: Reload heartbeat units
+
+        - name: Install heartbeat timer
+          ansible.builtin.copy:
+            src: "{{ playbook_dir }}/../infrastructure/systemd/platform-heartbeat.timer"
+            dest: /etc/systemd/system/platform-heartbeat.timer
+            owner: root
+            group: root
+            mode: '0644'
+          notify: Reload heartbeat units
+
+        - name: Apply unit changes before enabling the timer
+          ansible.builtin.meta: flush_handlers
+
+        - name: Enable and start the heartbeat timer
+          ansible.builtin.systemd_service:
+            name: platform-heartbeat.timer
+            enabled: true
+            state: started
+          when: not ansible_check_mode
+
+  handlers:
+    - name: Reload heartbeat units
+      delegate_to: "{{ heartbeat_target }}"
+      become: true
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+        name: platform-heartbeat.timer
+        state: restarted
+      when: not ansible_check_mode

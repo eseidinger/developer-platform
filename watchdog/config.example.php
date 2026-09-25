@@ -10,4 +10,14 @@ return [
     'health_url' => null,
     'mail_to' => 'admin@example.com',
     'mail_from' => 'watchdog@example.com',
+    // Set to 'smtp' for authenticated SMTP, or 'mail' for the hosting mailer.
+    'mail_transport' => 'mail',
+    'smtp' => [
+        'host' => 'smtp.example.com',
+        'port' => 587,
+        // 'starttls' (usually port 587), or 'tls' for implicit TLS (usually 465).
+        'encryption' => 'starttls',
+        'username' => 'watchdog@example.com',
+        'password' => 'replace-with-smtp-password',
+    ],
 ];

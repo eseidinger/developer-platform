@@ -1,0 +1,132 @@
+---
+- name: Deploy the external watchdog via SCP from localhost
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  vars_prompt:
+    - name: watchdog_ssh_password
+      prompt: SSH password for the watchdog hosting account
+      private: true
+
+  pre_tasks:
+    - name: Require an SSH password
+      ansible.builtin.assert:
+        that:
+          - watchdog_ssh_password | default('') | length > 0
+        fail_msg: Supply watchdog_ssh_password or enter it at the prompt.
+      no_log: true
+
+    - name: Apply deployment defaults
+      ansible.builtin.set_fact:
+        watchdog_source_dir: "{{ watchdog_source_dir | default(playbook_dir ~ '/../watchdog') }}"
+        watchdog_config_file: "{{ watchdog_config_file | default('') }}"
+        watchdog_manage_cron: "{{ watchdog_manage_cron | default(false) }}"
+        watchdog_php_binary: "{{ watchdog_php_binary | default('/usr/bin/php') }}"
+        watchdog_ssh_port: "{{ watchdog_ssh_port | default(22) }}"
+
+    - name: Validate remote destination
+      ansible.builtin.assert:
+        that:
+          - watchdog_ssh_host | default('') is match('^[A-Za-z0-9][A-Za-z0-9.-]*$')
+          - watchdog_ssh_user | default('') is match('^[A-Za-z0-9_][A-Za-z0-9_-]*$')
+          - watchdog_install_dir | default('') is match('^/[A-Za-z0-9_./-]+$')
+          - watchdog_install_dir | default('/') != '/'
+          - "'..' not in (watchdog_install_dir | default('')).split('/')"
+          - watchdog_php_binary is match('^/[A-Za-z0-9_./-]+$')
+          - watchdog_ssh_port | int > 0
+          - watchdog_ssh_port | int < 65536
+        fail_msg: Configure the SSH host, user, port, and absolute private installation directory.
+
+    - name: Build local SSH and SCP commands
+      ansible.builtin.set_fact:
+        watchdog_remote: "{{ watchdog_ssh_user }}@{{ watchdog_ssh_host }}"
+        watchdog_ssh_command: "{{ ['sshpass', '-e', 'ssh', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'PubkeyAuthentication=no', '-p', watchdog_ssh_port | string] }}"
+        # OpenSSH 9+ otherwise uses SFTP even when invoking scp.
+        watchdog_scp_command: "{{ ['sshpass', '-e', 'scp', '-O', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'PubkeyAuthentication=no', '-P', watchdog_ssh_port | string] }}"
+
+    - name: Check local sshpass availability
+      ansible.builtin.command:
+        argv: [sshpass, -V]
+      changed_when: false
+      check_mode: false
+
+    - name: Check local release files and optional configuration
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop: "{{ [watchdog_source_dir ~ '/common.php', watchdog_source_dir ~ '/cron.php', watchdog_source_dir ~ '/mail.php', watchdog_source_dir ~ '/schema.sql', watchdog_source_dir ~ '/import-schema.php', watchdog_source_dir ~ '/config.example.php', watchdog_source_dir ~ '/public/index.php', watchdog_source_dir ~ '/public/heartbeat.php'] + ([watchdog_config_file] if watchdog_config_file | length > 0 else []) }}"
+      register: watchdog_local_files
+
+    - name: Require readable local files
+      ansible.builtin.assert:
+        that:
+          - item.stat.isreg | default(false)
+          - item.stat.readable | default(false)
+        fail_msg: "Missing or unreadable local file: {{ item.item }}"
+      loop: "{{ watchdog_local_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+  tasks:
+    - name: Upload and configure watchdog
+      when: not ansible_check_mode
+      environment:
+        SSHPASS: "{{ watchdog_ssh_password }}"
+      no_log: true
+      block:
+        - name: Require existing configuration when no local configuration is supplied
+          ansible.builtin.command:
+            argv: "{{ watchdog_ssh_command + [watchdog_remote, 'test -r ' ~ ((watchdog_install_dir ~ '/config.local.php') | quote)] }}"
+          changed_when: false
+          when: watchdog_config_file | length == 0
+
+        - name: Create remote directories through SSH
+          ansible.builtin.command:
+            argv: "{{ watchdog_ssh_command + [watchdog_remote, 'mkdir -p ' ~ ((watchdog_install_dir ~ '/public') | quote)] }}"
+          changed_when: true
+
+        - name: Transfer release files with local SCP
+          ansible.builtin.command:
+            argv: "{{ watchdog_scp_command + [watchdog_source_dir ~ '/' ~ item, watchdog_remote ~ ':' ~ watchdog_install_dir ~ '/' ~ item] }}"
+          loop:
+            - common.php
+            - cron.php
+            - mail.php
+            - schema.sql
+            - import-schema.php
+            - config.example.php
+            - public/index.php
+            - public/heartbeat.php
+          changed_when: true
+
+        - name: Prepare private remote configuration permissions before upload
+          ansible.builtin.command:
+            argv: "{{ watchdog_ssh_command + [watchdog_remote, 'umask 077; touch ' ~ ((watchdog_install_dir ~ '/config.local.php') | quote) ~ ' && chmod 600 ' ~ ((watchdog_install_dir ~ '/config.local.php') | quote)] }}"
+          when: watchdog_config_file | length > 0
+          changed_when: true
+
+        - name: Upload explicitly supplied private configuration with local SCP
+          ansible.builtin.command:
+            argv: "{{ watchdog_scp_command + [watchdog_config_file, watchdog_remote ~ ':' ~ watchdog_install_dir ~ '/config.local.php'] }}"
+          when: watchdog_config_file | length > 0
+          changed_when: true
+          no_log: true
+
+        - name: Schedule watchdog checks through SSH
+          ansible.builtin.command:
+            argv: "{{ watchdog_ssh_command + [watchdog_remote, 'sh -s'] }}"
+            stdin: |
+              set -eu
+              cron_file=$(mktemp)
+              trap 'rm -f "$cron_file" "$cron_file.old" "$cron_file.err"' EXIT
+              if ! crontab -l > "$cron_file.old" 2> "$cron_file.err"; then
+                if ! grep -qi 'no crontab' "$cron_file.err"; then
+                  cat "$cron_file.err" >&2
+                  exit 1
+                fi
+              fi
+              sed '\| # developer-platform-watchdog$|d' "$cron_file.old" > "$cron_file"
+              printf '%s\n' '* * * * * {{ watchdog_php_binary }} {{ watchdog_install_dir }}/cron.php # developer-platform-watchdog' >> "$cron_file"
+              crontab "$cron_file"
+          when: watchdog_manage_cron | bool
+          changed_when: true
