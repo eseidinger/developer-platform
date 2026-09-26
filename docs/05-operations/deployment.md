@@ -18,7 +18,7 @@ python3 scripts/install-k3d.py
 bash scripts/up.sh
 ```
 
-`init.py` preserves an existing `.env`. Before public installation, configure domains, DNS, firewall, bind address, and non-overlapping network settings as described in the [host setup](../../README.md#deploy-to-the-existing-hetzner-host), or use the [Ansible deployment guide](../../ansible/README.md). Current topology is Caddy at the edge, Traefik inside k3d, and one shared Docker network; the segmented topology remains a target design.
+`init.py` preserves an existing `.env`. Before public installation, configure domains, DNS, firewall, bind address, and non-overlapping network settings as described in the [host setup](../../README.md#deploy-to-the-existing-hetzner-host), or use the [Ansible deployment guide](../../ansible/README.md). The selected topology in [ADR-009](../03-decisions/ADR-009-edge-and-cluster-ingress.md) retains Caddy at the edge and Traefik inside k3d. The implementation uses one shared Docker network; segmentation remains separate target work.
 
 Check startup using the [runbook commands](runbook.md#inspect-the-current-installation). `/healthz` checks only the API process; `/readyz` checks PostgreSQL and Kubernetes. Neither proves an application's database write/read flow.
 
