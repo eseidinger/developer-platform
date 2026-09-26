@@ -8,7 +8,7 @@ Run deployment commands from the repository root.
 and CA certificates on the existing Ubuntu platform host. It configures a
 root-only restic command and verifies access to an encrypted S3 repository.
 It runs independently of `deploy.yml` and does not redeploy or stop the platform.
-The controller needs the same Ansible prerequisites described above.
+See the [platform Ansible prerequisites](../../ansible/README.md) for the controller requirements.
 
 The example uses the confirmed Hetzner destination:
 `s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform`, region
@@ -233,3 +233,444 @@ php operations/watchdog/tests/backup.php
 `--check` previews host installation without contacting the backup endpoint or
 repository, enabling timers, or executing backups. It still requires configured
 input values and an existing platform/restic setup. Do not treat it as live acceptance.
+
+## Local recovery VM in WSL 2
+
+Use [recovery-vm.py](scripts/recovery-vm.py) to create an empty Ubuntu 24.04
+amd64 guest with its own kernel, disk, systemd and Docker installation. This needs
+x86_64 WSL 2 with read/write access to `/dev/kvm`. Allocate enough memory to WSL
+for the guest plus your existing workloads; the defaults are 4 virtual CPUs,
+8192 MiB RAM and a sparse 100 GiB disk. Keep the VM in the WSL Linux filesystem.
+
+Install tools inside WSL:
+
+```bash
+sudo apt-get update
+sudo apt-get install qemu-system-x86 qemu-utils cloud-image-utils openssh-client
+```
+
+From the repository root in **WSL**, create a dedicated key if it does not
+already exist (keep the existing key if prompted about overwriting):
+
+```bash
+ssh-keygen -t ed25519 -f ~/.ssh/platform-recovery -C platform-recovery
+```
+
+Create the VM once using that SSH **public** key:
+
+```bash
+python3 operations/backup/scripts/recovery-vm.py create --public-key ~/.ssh/platform-recovery.pub
+python3 operations/backup/scripts/recovery-vm.py start
+```
+
+For an existing VM, run only `start`; `create` refuses to overwrite its disk.
+You can use another existing public key by changing `--public-key` and the matching
+`ssh -i` path in the commands below. Creation never copies the private key.
+It downloads Canonical's Ubuntu release image and checksum
+manifest over HTTPS and verifies SHA-256 before publishing the VM directory.
+This is checksum verification over HTTPS, not detached GPG signature verification.
+`image.json` records the exact source URL and digest; the release URL can change
+between new creations. Keep this metadata with restore-drill evidence.
+
+The start command stays in the foreground. Leave that terminal open. In another
+WSL terminal, inspect the serial console and connect after cloud-init provisions
+the user:
+
+```bash
+tail -n 40 .runtime/recovery-vm/console.log
+ssh -i ~/.ssh/platform-recovery -p 2222 recovery@127.0.0.1
+```
+
+Compare the SSH host-key fingerprint with the cloud-init console output on first
+connection. In the guest, wait for first-boot configuration:
+
+```bash
+sudo cloud-init status --wait
+```
+
+The `recovery` account has passwordless sudo for Ansible and password login is
+disabled. QEMU forwards only SSH, bound to WSL loopback. Guest outbound internet
+access is available for S3 and package/image downloads. This is a separate
+recovery installation, not an outbound network security boundary: do not launch
+restored production notifications, scheduled backups, or applications with live
+external side effects.
+
+For Ansible, use a separate inventory (never the production inventory):
+
+```yaml
+developer_platform:
+  hosts:
+    recovery:
+      ansible_host: 127.0.0.1
+      ansible_port: 2222
+      ansible_user: recovery
+      ansible_ssh_private_key_file: ~/.ssh/platform-recovery
+```
+
+Store it under `.runtime/`. The VM helper provisions only the operating system and
+SSH. Follow the [isolated recovery procedure](../../docs/05-operations/backup-recovery.md#restore-into-an-isolated-installation)
+for platform prerequisites, original credentials, SQL import, and acceptance;
+ordinary fresh-platform deployment is not a complete restore procedure. Configure
+restic with existing S3 credentials/password and **do not initialize a repository**.
+Leave heartbeat and scheduled backup deployment disabled in the recovery guest.
+
+For browser access to guest HTTPS, open a tunnel from WSL once Caddy is running:
+
+```bash
+ssh -i ~/.ssh/platform-recovery -N -p 2222 -L 8443:127.0.0.1:443 recovery@127.0.0.1
+```
+
+Use test-domain hostname mappings and the corresponding TLS trust configuration.
+Do not change production DNS. This drill verifies local recovery; public DNS/TLS
+and Hetzner replacement-host provisioning require separate acceptance.
+
+Shut down gracefully from another WSL terminal:
+
+```bash
+python3 operations/backup/scripts/recovery-vm.py stop
+```
+
+Alternatively, run `sudo shutdown -h now` inside the VM. The disk and restored
+platform are preserved. To resume later, run `start` from WSL and reconnect by SSH.
+
+Wait for the start terminal to exit before shutting down WSL or moving VM files.
+The stop command requests ACPI poweroff; it does not forcibly kill a stuck guest.
+Use the console log to diagnose shutdown problems. Guest reboot also exits QEMU;
+run `start` again to boot it. No delete/reset command is provided, and `create`
+refuses an existing destination. All disk, seed and log files are private under
+Git-ignored `.runtime/recovery-vm/`; restored secrets remain on that disk.
+
+Use `--cpus`, `--memory-mb` and `--ssh-port` on `start` to override resources;
+`--disk-gb` applies at creation. For multiple drills, choose a different
+`--directory` on all commands and a different SSH port on each running VM. Record
+elapsed preparation and restoration time against the four-hour RTO.
+
+References: [Ubuntu cloud images](https://cloud-images.ubuntu.com/releases/noble/release/),
+[QEMU invocation](https://www.qemu.org/docs/master/system/invocation.html),
+[cloud-init SSH configuration](https://cloudinit.readthedocs.io/en/stable/reference/yaml_examples/ssh.html).
+
+### Remove the recovery VM or start a fresh drill
+
+Run these commands in **WSL from the repository root**. First copy any test reports
+you want to keep to `.runtime/recovery-evidence/`, as described in the
+[test workflow](#run-tests-against-the-prepared-recovery-vm).
+
+If the VM is running, request shutdown:
+
+```bash
+python3 operations/backup/scripts/recovery-vm.py stop
+```
+
+Wait for the QEMU start terminal to exit before continuing. If the VM is already
+stopped, skip that command. Do not remove a disk while QEMU is using it.
+
+To permanently remove the default recovery VM:
+
+```bash
+rm -r -- .runtime/recovery-vm
+```
+
+This deletes the VM disk, restored databases and secrets, cloud-init seed, console
+log, and reports still stored inside the guest. It leaves separately copied
+`.runtime/recovery-evidence/`, your SSH key, the production host, and the S3 backup
+repository untouched. For a VM created with `--directory`, use that exact directory
+instead after checking its contents and confirming its QEMU process has exited.
+
+Alternatively, preserve the old VM before starting another drill:
+
+```bash
+mv .runtime/recovery-vm \
+  ".runtime/recovery-vm-$(date -u +%Y%m%dT%H%M%SZ)"
+```
+
+The archived directory still contains restored secrets and consumes disk space.
+Delete that specific directory with `rm -r --` when it is no longer needed.
+
+After removing or moving the old directory, create and start a clean VM:
+
+```bash
+python3 operations/backup/scripts/recovery-vm.py create \
+  --public-key ~/.ssh/platform-recovery.pub
+python3 operations/backup/scripts/recovery-vm.py start
+```
+
+In another WSL terminal, remove the old SSH host-key entry for this local forwarded
+port and connect to the new guest:
+
+```bash
+ssh-keygen -R '[127.0.0.1]:2222'
+ssh -i ~/.ssh/platform-recovery -p 2222 recovery@127.0.0.1
+```
+
+Verify the new host-key fingerprint against `.runtime/recovery-vm/console.log`.
+Only remove the old entry after intentionally replacing the VM. The fresh guest
+needs repository access and the full isolated restore procedure again; it does
+not inherit the previous installation.
+
+## Automated recovery acceptance checks
+
+[test-recovery.py](scripts/test-recovery.py) checks an already-restored, running
+installation. It does not restore files, import SQL, provision the VM, or reapply
+projects. It requires the restored `.env`, `scripts`/Compose files, working local
+API, and `.runtime/bin/kubectl` plus the regenerated admin kubeconfig. Recovery
+settings must be `EDGE_BIND_IP=127.0.0.1`, `PLATFORM_DOMAIN=platform.localhost`,
+and `APPS_DOMAIN=apps.localhost`. Leave production alert senders disabled.
+
+### Run tests against the prepared recovery VM
+
+1. **WSL, repository root:** start the existing VM if it is stopped. Leave this
+   terminal running; skip this command if QEMU is already running.
+
+   ```bash
+   python3 operations/backup/scripts/recovery-vm.py start
+   ```
+
+2. **Another WSL terminal, repository root:** copy the current helper and connect.
+   Repeat the copy after script updates; `/tmp` may be cleared when the VM reboots.
+
+   ```bash
+   scp -i ~/.ssh/platform-recovery -P 2222 \
+     operations/backup/scripts/test-recovery.py recovery@127.0.0.1:/tmp/test-recovery.py
+   ssh -i ~/.ssh/platform-recovery -p 2222 recovery@127.0.0.1
+   ```
+
+3. **Inside the recovery VM:** wait for boot configuration, then run the suite
+   against the already-restored `smoke` project and verified bundle. The script
+   prints the report path and exits nonzero on failure.
+
+   ```bash
+   sudo cloud-init status --wait
+   sudo python3 /tmp/test-recovery.py check \
+     --platform-dir /opt/developer-platform \
+     --bundle /root/platform-recovery/bundle \
+     --project smoke
+   ```
+
+   If this is a fresh VM, first complete the
+   [isolated restore and project reapply](../../docs/05-operations/backup-recovery.md#restore-into-an-isolated-installation).
+   For an existing restored VM, allow the services time to restart. The suite
+   retries API readiness and ingress, and allows up to 180 seconds per monitoring
+   check for Prometheus readiness, Grafana health, and scrape convergence. Persistent
+   failures identify the specific monitoring check in the report. Inspect `sudo docker compose -f /opt/developer-platform/compose.yaml ps -a`
+   if necessary, then rerun the suite once the cause is resolved.
+
+4. **Inside the VM:** inspect the exact report path printed by the runner:
+
+   ```bash
+   sudo cat /opt/developer-platform/.runtime/recovery/checks-REPLACE_WITH_ID.json
+   ```
+
+   A successful run reports `"result": "passed"`. Without a pre-backup marker,
+   `"historical_data_verified": false` is expected; it is not full data-recovery
+   acceptance. On failure, use `failed_stage` to investigate before rerunning.
+   Every run creates a separate report, preserving earlier evidence.
+
+5. **WSL, repository root:** save the report independently of the VM, replacing
+   the filename with the one printed by the runner:
+
+   ```bash
+   mkdir -p .runtime/recovery-evidence
+   (umask 077
+    ssh -i ~/.ssh/platform-recovery -p 2222 recovery@127.0.0.1 \
+      'sudo cat /opt/developer-platform/.runtime/recovery/checks-REPLACE_WITH_ID.json' \
+      > .runtime/recovery-evidence/checks-REPLACE_WITH_ID.json)
+   ```
+
+6. **WSL, repository root:** shut down the VM after collecting evidence:
+
+   ```bash
+   python3 operations/backup/scripts/recovery-vm.py stop
+   ```
+
+Wait for the QEMU terminal to exit. Start it again with the same `start` command
+for subsequent test runs; no recreation or reimport is needed.
+
+### Checks and report interpretation
+
+The suite verifies bundle checksums, API readiness/catalog membership, deployment
+rollout, HTTP ingress, Prometheus readiness/scrape health and Grafana database
+health. A temporary restricted pod uses the existing project database secret to
+verify the workload network path, database identity, transactional write/read,
+and absence of CONNECT privilege on the platform catalog. It pulls the configured
+PostgreSQL image directly; it does not use the failing k3d image-import path.
+The test table is temporary and rolled back. Successful pods are deleted. Failed pods are retained and their names recorded
+in the report for diagnosis; delete them after inspection. If the process is
+forcibly killed, inspect/remove any leftover
+`recovery-check-*` pod in the tested namespace.
+
+Every check run writes a new private JSON report under
+`/opt/developer-platform/.runtime/recovery/checks-<id>.json`, or the new file
+specified with `--report`. Exit status is nonzero on failure. Reports contain
+passed stages, failed stage, backup identity, and test start/end timestamps, but
+no credentials or raw command output. Each network/command wait is bounded.
+Image-pull/configuration failures fail early. The runner does not send alerts.
+
+### Verify data written before backup
+
+On the **source host**, explicitly seed a marker in an existing project's database
+before taking a new backup. This creates a uniquely named persistent table and
+one row, using that project's derived credentials through the API container:
+
+```bash
+sudo python3 /path/to/test-recovery.py seed-marker --project smoke \
+  --marker /root/smoke-marker.json
+sudo systemctl start platform-backup.service
+```
+
+Copy the marker receipt to independent storage and then to the recovery VM.
+Keep the original receipt outside the backup: it defines what must be recovered.
+A receipt with `seeded: false` is not valid evidence; a failed seeding run must be
+investigated. Seeding never overwrites a receipt. The marker table intentionally
+remains for backup; remove it only after completing the drill, using the exact
+name recorded in the receipt.
+
+Restore the **new** verified snapshot into a fresh isolated recovery installation,
+then run there:
+
+```bash
+sudo python3 /tmp/test-recovery.py check --project smoke \
+  --marker /root/smoke-marker.json
+```
+
+The pod must find the expected row and the backup capture must postdate the
+receipt. Missing table/row, a mismatched project, or invalid receipt fails the run.
+Without `--marker`, a passing report explicitly sets `historical_data_verified`
+to false. This marker proves SQL data survival, not a database-backed application's
+end-to-end transaction behavior. Network denial to other namespaces/internet,
+public DNS/TLS, live alert delivery, and full recovery-time/data-loss targets
+remain separate checks. Test duration is **not** total RTO; record VM preparation,
+restoration start and simulated failure timestamps separately.
+
+### Local tests for the prepared scripts
+
+Run these in **WSL from the repository root** to check the helpers themselves.
+They do not boot a VM, contact S3, or execute live recovery checks:
+
+```bash
+python3 -m unittest discover -s operations/backup/tests -v
+python3 -m compileall -q operations/backup/scripts
+python3 operations/backup/scripts/recovery-vm.py --help
+python3 operations/backup/scripts/test-recovery.py --help
+```
+
+The optional encrypted-restic integration test is skipped unless
+`RESTIC_TEST_BINARY` points to a local restic executable. Passing local tests does
+not replace running the acceptance suite inside the restored VM.
+
+## Restore a fresh recovery VM with Ansible
+
+[restore-recovery.yml](ansible/restore-recovery.yml) automates the restore procedure
+for the VM created by `recovery-vm.py`. Use a **fresh VM**: the playbook refuses an
+existing `/opt/developer-platform`, recovery staging directory, platform sender
+timers, or Docker containers/volumes. It targets only the `recovery` inventory
+group and requires Ubuntu 24.04+ amd64, hostname `platform-recovery`, and SSH at
+`127.0.0.1:2222`. It does not support production hosts or an in-place restore.
+
+In **WSL, repository root**, after creating/starting the VM and accepting its SSH
+host key:
+
+```bash
+cp operations/backup/ansible/inventory.recovery.example.yml \
+  operations/backup/ansible/inventory.recovery.yml
+```
+
+Edit the copied inventory: set `recovery_snapshot` to an explicit verified snapshot
+ID (for example, the full ID corresponding to `c03a2bcc` in the first drill), and
+select `recovery_projects`. The default is `[smoke]`. Review stored project images
+before selecting them: starting applications can cause external side effects.
+An optional `recovery_marker_file` is a controller-side path to the independently
+saved receipt; when using it, select only the matching project.
+
+Run from **WSL**:
+
+```bash
+ansible-playbook \
+  -i operations/backup/ansible/inventory.recovery.yml \
+  operations/backup/ansible/restore-recovery.yml
+```
+
+Enter S3 credentials and the **existing** repository password at the private
+prompts. There is no repository initialization, prune, or backup scheduling step.
+Repository/region can be overridden by inventory; defaults match the existing
+Hetzner repository. Snapshots must carry `developer-platform,verified` tags and
+belong to `node-01`. A short ID is resolved to exactly one full snapshot ID.
+
+The playbook installs restic and Docker, retrieves the bundle, verifies checksums,
+restores the original credentials, applies loopback/test domains, imports SQL,
+restores Caddy/Grafana volumes, installs pinned Kubernetes tooling, bootstraps the
+cluster, reapplies selected catalog specs, and runs `test-recovery.py` for each
+selected project. Caddy uses internal TLS for test domains; Grafana alerting/SMTP
+and Alertmanager delivery are disabled. Host service/config archives are preserved
+in the bundle but not installed, so production heartbeat and backup timers stay
+absent. PostgreSQL and workload image versions come from the restored files/specs.
+
+SQL import keeps private stdout/stderr under
+`/opt/developer-platform/.runtime/recovery/`. Only the known bootstrap duplicate
+errors for role `postgres` and database `platform` are accepted; any other
+nonempty diagnostic or repeated duplicate stops restoration. Service volumes may
+contain image-created directories but must contain no files/links before restore.
+The entire process is bounded by Ansible asynchronous task timeouts.
+
+Acceptance reports are fetched into the controller's Git-ignored
+`.runtime/recovery-evidence/<inventory-host>/<run-timestamp>/` directory, including
+reports from failed acceptance suites. Earlier restoration failures stop before
+acceptance and require inspection of the VM/private logs. The verified snapshot
+selection is recorded on the VM in `/root/platform-recovery/snapshot.json`.
+
+This is deliberately a **one-shot** restore. If restoration fails, inspect the
+cause, then [recreate the VM](#remove-the-recovery-vm-or-start-a-fresh-drill) before
+rerunning. It never automatically deletes partially restored data. Once restored,
+use the [check script](#run-tests-against-the-prepared-recovery-vm) for repeat tests.
+Without a marker receipt, passing checks do not establish historical data recovery.
+Record whole-drill start/completion separately from acceptance-test duration.
+
+Validate playbook syntax without connecting:
+
+```bash
+ansible-playbook \
+  -i operations/backup/ansible/inventory.recovery.example.yml \
+  operations/backup/ansible/restore-recovery.yml --syntax-check
+```
+
+`--check` is refused because a simulated restore cannot validate subsequent SQL,
+cluster or application checks. Local helper tests cover checksum/path safeguards
+and SQL diagnostic classification; they do not prove a live end-to-end restore.
+
+### Automate marker creation and the source backup
+
+The [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml) playbook runs
+against the **source host**, using the existing backup inventory and installed
+backup service. It creates one uniquely named table/row in the selected project,
+saves a separate marker receipt on the controller before backup, starts the managed
+backup service, and verifies that the successful capture occurred after marker
+commit. It does not need S3/password prompts because backup access is already
+configured on the source.
+
+From **WSL, repository root**:
+
+```bash
+ansible-playbook \
+  -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/prepare-recovery-test.yml \
+  -e recovery_test_project=smoke
+```
+
+The source project must exist and its platform API container must be running.
+Normal backup behavior applies, including brief Caddy/Grafana interruption and
+retention. Each run intentionally creates a new marker and private evidence
+directory; this is a test action, not an idempotent configuration playbook.
+The marker remains in the source database until explicitly cleaned up after the
+drill. No production data or backup is automatically deleted by the marker helper.
+
+The final output provides the full snapshot ID and controller marker path. Set
+`recovery_snapshot`, `recovery_projects: [smoke]`, and `recovery_marker_file` in the
+separate recovery inventory, then run `restore-recovery.yml` against a fresh VM.
+Use the absolute controller marker path. The acceptance report must show both
+`result: passed` and `historical_data_verified: true`.
+
+If a backup was already running before the marker commit, the timestamp check
+rejects it. Let it finish and run a new backup; do not accept the old snapshot as
+marker evidence. Source receipts and captured status remain available under
+`.runtime/recovery-evidence/<inventory-host>/recovery-test-<unique-id>/` for diagnosis.
+A pending notification may produce a nonzero service exit even with a verified
+backup; the playbook reports the service exit code separately from snapshot proof.

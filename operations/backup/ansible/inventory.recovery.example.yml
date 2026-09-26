@@ -1,0 +1,16 @@
+all:
+  children:
+    recovery:
+      hosts:
+        recovery_vm:
+          ansible_host: 127.0.0.1
+          ansible_port: 2222
+          ansible_user: recovery
+          ansible_ssh_private_key_file: ~/.ssh/platform-recovery
+      vars:
+        # Required: choose an explicit verified snapshot, never "latest".
+        recovery_snapshot: REPLACE_WITH_SNAPSHOT_ID
+        recovery_projects: [smoke]
+        # Optional controller path to an independent pre-backup marker receipt.
+        # With a marker, select only its matching project.
+        # recovery_marker_file: /absolute/private/path/smoke-marker.json

@@ -9,3 +9,4 @@ operations/watchdog/ansible/inventory.watchdog.yml
 operations/heartbeat/ansible/inventory.heartbeat.yml
 operations/backup/ansible/inventory.backup.yml
 operations/backup/ansible/backup-secrets.yml
+operations/backup/ansible/inventory.recovery.yml

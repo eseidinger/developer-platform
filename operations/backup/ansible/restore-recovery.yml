@@ -1,0 +1,222 @@
+---
+- name: Restore and verify a disposable local recovery VM
+  hosts: recovery
+  become: true
+  gather_facts: true
+  vars_prompt:
+    - name: backup_s3_access_key
+      prompt: S3 access key ID
+      private: true
+    - name: backup_s3_secret_key
+      prompt: S3 secret access key
+      private: true
+    - name: backup_restic_password
+      prompt: Existing restic repository password
+      private: true
+  vars:
+    recovery_work: /root/platform-recovery
+    backup_restic_repository: s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform
+    backup_s3_region: hel1
+    recovery_projects: [smoke]
+    recovery_kubectl_version: v1.36.4
+  pre_tasks:
+    - name: Require an explicitly isolated local Ubuntu VM and snapshot
+      ansible.builtin.assert:
+        that:
+          - not ansible_check_mode
+          - ansible_host == '127.0.0.1'
+          - ansible_port | int == 2222
+          - ansible_facts['hostname'] == 'platform-recovery'
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] is version('24.04', '>=')
+          - ansible_facts['architecture'] == 'x86_64'
+          - recovery_snapshot | default('') is match('^[a-f0-9]{8,64}$')
+          - recovery_projects | length > 0
+          - recovery_marker_file | default('') | length == 0 or recovery_projects | length == 1
+          - recovery_kubectl_version is match('^v1\.(35|36|37)\.[0-9]+$')
+        fail_msg: Use the disposable platform-recovery VM at 127.0.0.1:2222 and an explicit snapshot ID. Check mode is unsupported; use syntax-check.
+    - name: Validate selected projects
+      ansible.builtin.assert:
+        that: item is match('^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$')
+      loop: "{{ recovery_projects }}"
+    - name: Inspect recovery destination and production sender units
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /opt/developer-platform
+        - /root/platform-recovery
+        - /etc/systemd/system/platform-heartbeat.timer
+        - /etc/systemd/system/platform-backup.timer
+      register: recovery_paths
+    - name: Refuse previous installation or recovery attempt
+      ansible.builtin.assert:
+        that: not item.stat.exists
+        fail_msg: Use a fresh VM. This playbook never overwrites an existing installation or resumes a partial restore.
+      loop: "{{ recovery_paths.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+    - name: Validate repository settings and credentials privately
+      ansible.builtin.assert:
+        that:
+          - backup_restic_repository is match('^s3:https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._-]+/[A-Za-z0-9/_-]+$')
+          - backup_s3_region is match('^[A-Za-z0-9-]+$')
+          - backup_s3_access_key | length > 0
+          - backup_s3_secret_key | length > 0
+          - backup_restic_password | length >= 20
+      no_log: true
+    - name: Inspect existing Docker data before changing the host
+      ansible.builtin.shell: |
+        if command -v docker >/dev/null 2>&1; then
+          docker ps -aq
+          docker volume ls -q
+        fi
+      register: recovery_existing_docker
+      changed_when: false
+    - name: Require empty Docker daemon
+      ansible.builtin.assert:
+        that: recovery_existing_docker.stdout | trim | length == 0
+        fail_msg: Docker contains existing containers or volumes; use a fresh VM.
+  tasks:
+    - name: Install recovery prerequisites
+      ansible.builtin.apt:
+        name: [ca-certificates, python3, restic]
+        update_cache: true
+        state: present
+    - name: Create private recovery configuration and staging directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        mode: '0700'
+      loop:
+        - /etc/developer-platform/backup
+        - "{{ recovery_work }}"
+    - name: Store existing repository password
+      ansible.builtin.copy:
+        content: "{{ backup_restic_password }}\n"
+        dest: /etc/developer-platform/backup/restic-password
+        mode: '0600'
+        force: false
+      no_log: true
+    - name: Configure existing repository access
+      ansible.builtin.template:
+        src: backup-restic.env.j2
+        dest: /etc/developer-platform/backup/restic.env
+        mode: '0600'
+      no_log: true
+    - name: Install restic wrapper
+      ansible.builtin.copy:
+        src: files/platform-restic
+        dest: /usr/local/sbin/platform-restic
+        mode: '0700'
+    - name: Resolve explicitly selected verified source snapshot
+      ansible.builtin.command:
+        argv: [/usr/local/sbin/platform-restic, snapshots, --json, --host, node-01, --tag, 'developer-platform,verified', '{{ recovery_snapshot }}']
+      register: recovery_snapshots
+      changed_when: false
+      no_log: true
+    - name: Require exactly one verified snapshot
+      ansible.builtin.assert:
+        that: recovery_snapshots.stdout | from_json | length == 1
+    - name: Retain resolved snapshot identity
+      ansible.builtin.copy:
+        content: "{{ recovery_snapshots.stdout }}\n"
+        dest: "{{ recovery_work }}/snapshot.json"
+        mode: '0600'
+      no_log: true
+    - name: Retrieve recovery bundle without repository initialization or retention
+      ansible.builtin.command:
+        argv: [/usr/local/sbin/platform-restic, restore, '{{ (recovery_snapshots.stdout | from_json)[0].id }}', --target, '{{ recovery_work }}']
+      async: 3600
+      poll: 10
+      no_log: true
+    - name: Locate bundle manifest
+      ansible.builtin.find:
+        paths: "{{ recovery_work }}"
+        patterns: manifest.json
+        recurse: true
+      register: recovery_manifests
+    - name: Require exactly one bundle
+      ansible.builtin.assert:
+        that: recovery_manifests.matched == 1
+    - name: Set restored bundle path
+      ansible.builtin.set_fact:
+        recovery_bundle: "{{ recovery_manifests.files[0].path | dirname }}"
+    - name: Create Docker key directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+    - name: Download Docker repository key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+    - name: Configure Docker repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/docker.sources
+        mode: '0644'
+        content: |
+          Types: deb
+          URIs: https://download.docker.com/linux/ubuntu
+          Suites: {{ ansible_facts['distribution_release'] }}
+          Components: stable
+          Architectures: amd64
+          Signed-By: /etc/apt/keyrings/docker.asc
+    - name: Install Docker and Compose
+      ansible.builtin.apt:
+        name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+        update_cache: true
+        state: present
+    - name: Start Docker
+      ansible.builtin.systemd_service:
+        name: docker
+        enabled: true
+        state: started
+    - name: Install checksum-verified kubectl
+      ansible.builtin.get_url:
+        url: "https://dl.k8s.io/release/{{ recovery_kubectl_version }}/bin/linux/amd64/kubectl"
+        checksum: "sha256:https://dl.k8s.io/release/{{ recovery_kubectl_version }}/bin/linux/amd64/kubectl.sha256"
+        dest: /usr/local/bin/kubectl
+        mode: '0755'
+    - name: Install recovery helpers
+      ansible.builtin.copy:
+        src: "../scripts/{{ item }}"
+        dest: "{{ recovery_work }}/{{ item }}"
+        mode: '0700'
+      loop: [restore-recovery.py, test-recovery.py]
+    - name: Build explicit project arguments
+      ansible.builtin.set_fact:
+        recovery_project_args: "{{ recovery_projects | map('regex_replace', '^', '--project=') | list }}"
+    - name: Restore SQL, service volumes, cluster and selected projects
+      ansible.builtin.command:
+        argv: "{{ ['python3', recovery_work ~ '/restore-recovery.py', '--bundle', recovery_bundle] + recovery_project_args }}"
+      async: 3600
+      poll: 10
+      no_log: true
+    - name: Copy optional independent marker receipt
+      ansible.builtin.copy:
+        src: "{{ recovery_marker_file }}"
+        dest: "{{ recovery_work }}/marker.json"
+        mode: '0600'
+      when: recovery_marker_file | default('') | length > 0
+      no_log: true
+    - name: Run acceptance checks for each selected project
+      ansible.builtin.command:
+        argv: "{{ ['python3', recovery_work ~ '/test-recovery.py', 'check', '--bundle', recovery_bundle, '--project', item, '--report', recovery_work ~ '/checks-' ~ item ~ '.json'] + (['--marker', recovery_work ~ '/marker.json'] if recovery_marker_file | default('') | length > 0 else []) }}"
+      loop: "{{ recovery_projects }}"
+      register: recovery_checks
+      failed_when: false
+      changed_when: false
+    - name: Fetch private acceptance reports to controller
+      ansible.builtin.fetch:
+        src: "{{ recovery_work }}/checks-{{ item }}.json"
+        dest: "{{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/{{ ansible_facts['date_time']['iso8601_basic_short'] }}/"
+        flat: true
+      loop: "{{ recovery_projects }}"
+    - name: Require all acceptance suites to pass
+      ansible.builtin.assert:
+        that: item.rc == 0
+        fail_msg: Recovery check failed; inspect the fetched report. Do not rerun restoration over this VM.
+      loop: "{{ recovery_checks.results }}"
+      loop_control:
+        label: "{{ item.item }}"

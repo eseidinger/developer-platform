@@ -1,0 +1,100 @@
+---
+- name: Seed a recovery marker and create a verified source backup
+  hosts: developer_platform
+  become: true
+  gather_facts: false
+  vars:
+    recovery_test_project: smoke
+    recovery_test_platform_dir: /opt/developer-platform
+  pre_tasks:
+    - name: Validate source test settings
+      ansible.builtin.assert:
+        that:
+          - not ansible_check_mode
+          - recovery_test_project is match('^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$')
+          - recovery_test_platform_dir is match('^/[A-Za-z0-9_./-]+$')
+        fail_msg: Supply an existing source project. Check mode cannot seed or verify a backup.
+    - name: Require installed backup service
+      ansible.builtin.command:
+        argv: [systemctl, show, platform-backup.service, --property=LoadState, --value]
+      register: recovery_test_service
+      changed_when: false
+    - name: Require backup automation
+      ansible.builtin.assert:
+        that: recovery_test_service.stdout == 'loaded'
+  tasks:
+    - name: Allocate private unique source evidence directory
+      ansible.builtin.tempfile:
+        state: directory
+        path: /root
+        prefix: recovery-test-
+      register: recovery_test_directory
+    - name: Install current marker helper
+      ansible.builtin.copy:
+        src: ../scripts/test-recovery.py
+        dest: "{{ recovery_test_directory.path }}/test-recovery.py"
+        mode: '0700'
+    - name: Seed one persistent marker in the selected project database
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ recovery_test_directory.path }}/test-recovery.py"
+          - seed-marker
+          - --platform-dir
+          - "{{ recovery_test_platform_dir }}"
+          - --project
+          - "{{ recovery_test_project }}"
+          - --marker
+          - "{{ recovery_test_directory.path }}/marker.json"
+      no_log: true
+    - name: Preserve marker receipt independently before backup
+      ansible.builtin.fetch:
+        src: "{{ recovery_test_directory.path }}/marker.json"
+        dest: "{{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/{{ recovery_test_directory.path | basename }}/"
+        flat: true
+    - name: Record conservative earliest acceptable capture time after marker commit
+      ansible.builtin.command:
+        argv: [python3, -c, 'import math,time; print(math.ceil(time.time()))']
+      register: recovery_test_after
+      changed_when: false
+    - name: Wait past the timestamp boundary
+      ansible.builtin.command:
+        argv: [python3, -c, 'import time; time.sleep(2)']
+      changed_when: false
+    - name: Run managed backup and await completion
+      ansible.builtin.command:
+        argv: [systemctl, start, platform-backup.service]
+      async: 7500
+      poll: 10
+      register: recovery_test_backup
+      failed_when: false
+    - name: Preserve backup status independently
+      ansible.builtin.fetch:
+        src: /var/lib/developer-platform-backup/status.json
+        dest: "{{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/{{ recovery_test_directory.path | basename }}/backup-status.json"
+        flat: true
+    - name: Require completed verified capture after marker commit
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            import json,re,sys
+            from pathlib import Path
+            status=json.loads(Path('/var/lib/developer-platform-backup/status.json').read_text())
+            if (status.get('running') is not False or status.get('result') != 'success'
+                or status.get('last_verified_capture', 0) < int(sys.argv[1])
+                or not re.fullmatch('[a-f0-9]{64}', status.get('last_verified_snapshot', ''))):
+                raise SystemExit('No successful verified backup after marker commit. Inspect saved status; a pre-existing backup may have been running.')
+            print(status['last_verified_snapshot'])
+          - "{{ recovery_test_after.stdout }}"
+      register: recovery_test_snapshot
+      changed_when: false
+    - name: Report inputs for isolated recovery
+      ansible.builtin.debug:
+        msg:
+          - "Verified snapshot: {{ recovery_test_snapshot.stdout }}"
+          - "Project: {{ recovery_test_project }}"
+          - "Controller marker: {{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/{{ recovery_test_directory.path | basename }}/marker.json"
+          - "Set recovery_snapshot and recovery_marker_file to these values in the recovery inventory. Restore into a fresh VM."
+          - "Backup service exit code: {{ recovery_test_backup.rc }}. A nonzero result can indicate a pending notification; inspect saved status and source service journal."
