@@ -11,6 +11,20 @@ spec.loader.exec_module(vm)
 
 
 class RecoveryVMTests(unittest.TestCase):
+    def setUp(self):
+        # These unit tests mock execution/downloads; installed VM tools are irrelevant.
+        tools = patch.object(vm.shutil, 'which', side_effect=lambda name: '/mock/bin/' + name)
+        tools.start()
+        self.addCleanup(tools.stop)
+
+    def test_missing_tool_fails_before_download(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch.object(vm.shutil, 'which', return_value=None), \
+                 patch.object(vm, 'download') as download:
+                with self.assertRaisesRegex(RuntimeError, 'Missing required tool'):
+                    vm.create(SimpleNamespace(), Path(tmp) / 'vm')
+                download.assert_not_called()
+
     def test_existing_vm_is_never_overwritten(self):
         with tempfile.TemporaryDirectory() as tmp:
             disk = Path(tmp) / 'disk.qcow2'
