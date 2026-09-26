@@ -25,6 +25,10 @@ Status: consolidated requirements; prioritization and evidence are drafts. Manda
 | N-07 | Keep single-host operation within available resources | MVP | Load measurement including log growth, database, and reserve; no swap/disk exhaustion |
 | N-08 | Audit changes, role assignments, and provider operations | MVP | Correlate actor, target, revision, timestamp, result, and operation ID |
 
+## Delivery acceptance
+
+The [delivery backlog](../04-development/delivery-backlog.md) retains detailed DEV/OPS acceptance criteria. The [development plan crosswalk](../04-development/development-plan.md#backlog-delivery-commitments) assigns them to phases, including security-event notifications and project retirement as explicit extensions of these broad requirements. Single-image slices do not close deferred multi-component criteria.
+
 ## Boundaries and open operational targets
 
 The hybrid installation is a single-host lab with a shared failure domain. Multiple Kubernetes nodes in Docker do not provide host-level high availability. Namespaces and Docker networks alone do not guarantee strong tenant isolation.

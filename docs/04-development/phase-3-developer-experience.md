@@ -2,6 +2,8 @@
 
 Status: planned. Covers [F-09, F-10, and N-03](../01-product/requirements.md).
 
+Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
+
 ## Goal
 
 Offer the API-based lifecycle as understandable self-service. Angular is a portal technology candidate; the final selection remains open.
@@ -14,7 +16,9 @@ Offer the API-based lifecycle as understandable self-service. Angular is a porta
 - Automate OIDC clients and redirect URIs for hosted applications if ADR-004 is accepted.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
 - Make ownership, roles, and the distinction between application and platform permissions visible.
-- Add multi-component UI/API support only after a dedicated contract design; avoid hidden schema changes.
+- At phase entry, review the deferred multi-component backlog against a concrete use case and measured capacity. Design independent updates, per-component results/configuration/secrets and a versioned migration path before scheduling implementation. Record the scheduling decision or continued deferral and next review trigger in the development plan; avoid hidden schema changes.
+
+Entry requires the Phase 1 and Phase 2 backlog gates, including usable authorized diagnostics, recovery and retirement APIs. Portal completion cannot substitute for those API acceptance results.
 
 ## Acceptance
 

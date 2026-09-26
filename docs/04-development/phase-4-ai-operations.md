@@ -2,6 +2,10 @@
 
 Status: planned. Product focus is accepted; technical design is proposed. Covers [F-11 and F-12](../01-product/requirements.md).
 
+Entry requires demonstrated scoped telemetry, revision recovery, secret redaction and audit from the [delivery gates](development-plan.md#backlog-delivery-commitments). Link their evidence before enabling tools; AI interfaces do not close missing API-level story criteria.
+
+Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
+
 ## Goal and sequence
 
 | Stage | Usable flow | Prerequisite |

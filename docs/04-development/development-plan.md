@@ -47,6 +47,40 @@ flowchart LR
 
 Basic access enforcement, audit, secrets, and observability start in Phase 1. Phase 3 extends these capabilities rather than removing them from the MVP.
 
+## Backlog delivery commitments
+
+The [delivery backlog](delivery-backlog.md) preserves all 19 permanent DEV/OPS IDs and their acceptance criteria. Its [phase task index](delivery-backlog.md#phase-task-index) assigns independently checkable tasks to one gate each, including provider, developer-experience and AI work. Stories may span gates; task completion and story completion are recorded separately. This plan supersedes the former six-milestone plan. No story is dropped or marked complete by this amendment.
+
+Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Design and local implementation may overlap, but do not release expanded self-service before 1A and 1B pass. Phase 2 completes the retained single-image backlog and safe project retirement before the second-provider acceptance gate. Phase 3 and Phase 4 depend on those demonstrated outcomes.
+
+The table assigns delivery responsibility by role; named owners, dates, and capacity remain unassigned. Assign a named owner before starting each package. Every row is open. A single-image slice does not close criteria that require multiple components.
+
+| Story | Requirement mapping | Delivery gate and disposition | Accountable role |
+|---|---|---|---|
+| DEV-001 | F-02/F-07 extension | Deferred multi-component contract and implementation; Phase 3 design review, then explicit scheduling decision | Product / API |
+| DEV-002 | F-02, N-02 | 1C configuration CRUD/activation for one component; per-component extension deferred | API |
+| DEV-003 | N-03/N-04 | 1C secret CRUD/rotation/adoption; per-component extension deferred | API / security |
+| DEV-004 | F-06, N-03 | Phase 2 diagnostics: authorized search/follow, terminated-instance retention; basic logs in 1C | Observability |
+| DEV-005 | F-06, N-07 | Phase 2 diagnostics: inventory and usage/request/limit/quota comparisons | Observability |
+| DEV-006 | F-04/F-06 | 1C observed rollout/health for one component; multi-component reporting deferred | API |
+| DEV-007 | F-04/F-05, N-02 | 1C durable retry; Phase 2 retained-revision recovery and dependency checks | API |
+| DEV-008 | F-02/F-08, N-07 | Phase 2 scaling/quota/scheduling acceptance; per-component extension deferred | API / infrastructure |
+| DEV-009 | F-02/F-08, N-03 | Phase 2 public/private transitions, TLS and outbound policy; per-component extension deferred | Networking |
+| DEV-010 | F-03, N-03/N-05 | 1C binding/preservation; Phase 2 availability and tracked operator recovery requests | API / operations |
+| DEV-011 | F-05, N-02/N-08 | 1C confirmed application removal with retained data; multi-component preview extension deferred | API |
+| OPS-001 | N-08 | 1B durable audit, inspection, restricted filtering/export and retention | Security |
+| OPS-002 | N-06/N-08 extension | 1B configurable security alerts with evidence and tested delivery | Security / operations |
+| OPS-003 | N-07, F-06 | Phase 2 host/shared-service/project capacity views and alerts; baseline measurement in 1C | Operations |
+| OPS-004 | F-01, N-03/N-08 | 1B individual access, roles, revocation; recheck every new data surface | Security / API |
+| OPS-005 | F-08, N-03/N-07 | Phase 2 configurable quotas/policy, impact preview and aggregate admission | Infrastructure |
+| OPS-006 | N-05 | 1A scheduled encrypted off-host backups and measured isolated restoration; repeat as state grows | Operations |
+| OPS-007 | N-06, F-06 | 1A independent failure signals; Phase 2 full service coverage and project impact | Operations |
+| OPS-008 | F-01/F-05, N-02/N-08 extension | Phase 2 project retirement after reliable deletion, retention inventory and access revocation | API / operations |
+
+Multi-component support remains deferred from the single-image MVP and Phase 2 portability contract. At Phase 3 entry, review a concrete multi-component use case, capacity evidence, independent-update semantics, and a versioned migration design; the project owner then schedules implementation or records continued deferral with a next review trigger. Do not silently transform the existing schema or close affected stories based on single-image tests.
+
+Docker portability, human database access, hosted-application OIDC, and AI are additions to this backlog. Retain their phases, but review priority against open story criteria at each gate. No calendar or effort commitments are implied.
+
 ## Open decisions and ownership
 
 | Topic | Next step | Gate |
@@ -62,4 +96,4 @@ The project owner decides scope and ADRs; implementation and operations provide 
 
 ## Recording progress
 
-For each completed work package, record the date, repository revision, environment, test/demo results, and remaining limitations. Update the roadmap and ADR when scope changes. A requested or generated artifact alone does not prove an operational system.
+For each completed work package and story criterion, record the date, repository revision, environment, test/demo results, and remaining limitations. Link evidence from the delivery table before closing a story; all its acceptance criteria must pass, including any deferred component-specific criteria. Record partial slices separately. Recheck authorization/audit and backup coverage whenever new endpoints, secrets, identities, revisions, or inventories are introduced. Update the roadmap and ADR when scope changes. A requested or generated artifact alone does not prove an operational system.
