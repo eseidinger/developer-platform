@@ -1,5 +1,5 @@
 <?php
-require __DIR__ . '/../watchdog/common.php';
+require __DIR__ . '/../src/common.php';
 $now = strtotime('2026-09-21 10:00:00 UTC');
 $cases = [
     [null, false], ['2026-09-21 09:54:59', false],

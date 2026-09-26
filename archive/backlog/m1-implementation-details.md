@@ -25,8 +25,8 @@ The repository already provides:
   [heartbeat endpoint](../watchdog/public/heartbeat.php), and a public status page.
   Its cron checks freshness and optionally one fixed HTTPS target, and attempts
   email on state changes.
-- A [host sender](../scripts/heartbeat.py) and
-  [systemd timer](../infrastructure/systemd/platform-heartbeat.timer) that check
+- A [host sender](../watchdog/scripts/heartbeat.py) and
+  [systemd timer](../watchdog/systemd/platform-heartbeat.timer) that check
   local API and Prometheus readiness before sending the heartbeat.
 - A [backup script](../scripts/backup.sh) that atomically publishes a compressed
   `pg_dumpall` locally and a [manual restore procedure](../docs/operations.md).
@@ -125,8 +125,8 @@ Cron cannot notify about its own complete failure, and public status alone does
 not page an operator. Configure an independent observer of that page or a hosting
 scheduler failure service with a tested notification route.
 
-The existing [PHP freshness test](../tests/watchdog.php) covers boundary cases.
-The [disposable integration script](../scripts/test-watchdog.py) exercises missing
+The existing [PHP freshness test](../watchdog/tests/watchdog.php) covers boundary cases.
+The [disposable integration script](../watchdog/scripts/test-watchdog.py) exercises missing
 authentication, method checks, throttling, expiry, recovery, and stale-cron status.
 It disables public probing and substitutes `/bin/true` for email. Add wrong-token,
 mail-handoff failure/retry, public-probe failure, and host-sender failure tests;
@@ -425,7 +425,7 @@ Paths marked “new” are proposed artifacts, not files created by this design.
 | Path | Change |
 | --- | --- |
 | `watchdog/` | Existing foundation: deploy/verify it; extend schema/endpoints/cron with independent pipeline and backup signals, public GET/body probes, and associated tests. |
-| `scripts/heartbeat.py`, `infrastructure/systemd/platform-heartbeat.*` | Existing sender/units: retain platform-health behavior, verify installation and failed-dependency behavior; do not reuse the heartbeat for backup success. |
+| `watchdog/scripts/heartbeat.py`, `watchdog/systemd/platform-heartbeat.*` | Existing sender/units: retain platform-health behavior, verify installation and failed-dependency behavior; do not reuse the heartbeat for backup success. |
 | `infrastructure/monitoring/alertmanager.yaml` | Replace placeholder routing with validated deployment configuration and watchdog route. |
 | `infrastructure/monitoring/prometheus.yaml` | Scrape Alertmanager and preserve existing host collection. |
 | `infrastructure/monitoring/alerts.yaml` | Add backup age/failure/missing-state, delivery failure, and watchdog rules. |
@@ -435,7 +435,7 @@ Paths marked “new” are proposed artifacts, not files created by this design.
 | `scripts/restore-platform.py` (new) | Validate snapshot/target and coordinate the tested restore/reapply workflow. |
 | `infrastructure/backup/` (new) | Non-secret configuration examples, systemd service/timer templates, and retention settings. |
 | `watchdog/README.md`, `docs/m1-operations.md` (new) | Build on existing installation instructions; document live receipt evidence, responder procedure, independent observer, signal migration, key recovery, and restore exercises. |
-| `tests/`, `scripts/test-watchdog.py` | Extend existing watchdog checks with failure/retry and signal isolation; add wrapper failure tests, alert-rule tests, and disposable-stack restore exercises. |
+| `tests/`, `watchdog/scripts/test-watchdog.py` | Extend existing watchdog checks with failure/retry and signal isolation; add wrapper failure tests, alert-rule tests, and disposable-stack restore exercises. |
 | `.env.example`, `docs/operations.md`, `README.md` | Document operational setup and recovery; keep credentials out of tracked files. |
 
 Keep backup settings in an explicitly parsed configuration file. The current

@@ -13,7 +13,7 @@ all:
       watchdog_install_dir: /home/hosting-user/watchdog
       # PHP and cron must run as a user able to read the mode-0600 config.
       # Required on first deployment; omit later to preserve remote settings.
-      watchdog_config_file: "{{ playbook_dir }}/../watchdog/config.local.php"
+      watchdog_config_file: "{{ playbook_dir }}/../src/config.local.php"
       # Enable only if the hosting provider permits managing the user crontab.
       watchdog_manage_cron: false
       watchdog_php_binary: /usr/bin/php

@@ -5,13 +5,14 @@ every minute, and either working PHP mail() delivery or an SMTP account.
 PHP cURL with SMTP/SMTPS support and a working CA trust store is required for
 SMTP; cURL is also required for optional HTTPS checks.
 
-For hosting with SSH and SCP, the [Ansible deployment playbook](../ansible/README.md#external-watchdog-via-scp)
+For hosting with SSH and SCP, the [Ansible deployment playbook](ansible/README.md#external-watchdog-via-scp)
 automates the file upload, private configuration upload, and optional cron job.
 
-1. Upload the directory to the web host. Set DocumentRoot exclusively to
+1. Upload the contents of `watchdog/src/` to the web host’s `watchdog/` directory.
+   Set DocumentRoot exclusively to
    `watchdog/public/`. `common.php`, `config.local.php`, and `cron.php`
    must remain outside publicly accessible directories.
-2. Copy `config.example.php` to `config.local.php`. Configure a separate MySQL
+2. Copy `config.example.php` to `config.local.php` in the uploaded directory. Configure a separate MySQL
    user and database, and a token containing at least 32 random characters.
    Do not use the example values.
 3. Run `php /absolute/path/watchdog/import-schema.php` on the hosting server.
@@ -28,12 +29,12 @@ automates the file upload, private configuration upload, and optional cron job.
 6. On the Docker host, create `/etc/developer-platform/watchdog.env` with mode 0600:
    `WATCHDOG_URL=https://status.example.com/heartbeat.php` and
    `WATCHDOG_TOKEN=...`.
-7. Copy both units from `infrastructure/systemd/` to `/etc/systemd/system/`;
+7. Copy both units from `watchdog/systemd/` to `/etc/systemd/system/`;
    adjust the installation path in ExecStart if necessary.
    Run `systemctl daemon-reload` and
    `systemctl enable --now platform-heartbeat.timer`.
 
-Steps 6–7 can be automated with the [heartbeat Ansible playbook](../ansible/README.md#platform-heartbeat),
+Steps 6–7 can be automated with the [heartbeat Ansible playbook](ansible/README.md#platform-heartbeat),
 which also installs the sender script in a location readable by the systemd service.
 
 If schema import fails, the importer reports the failing stage, SQLSTATE, driver
@@ -70,3 +71,18 @@ hosts, error details, or secrets. Freshness is also checked when the page is vie
 After setup, test correct and incorrect tokens, rate limiting, heartbeat loss,
 recovery email, and a failed cron job. Without access to the hosting environment,
 actual email delivery and a public installation have not been tested.
+
+## Repository layout and tests
+
+The PHP application, configuration, and SQL schema live in `src/`; `ansible/` contains deployment
+playbooks and inventory examples, `scripts/` contains the heartbeat sender and
+integration runner, `systemd/` contains the host units, and `tests/` contains
+the PHP checks and disposable container stack.
+
+From the repository root:
+
+```bash
+php watchdog/tests/watchdog.php
+php -d curl.cainfo=/tmp/watchdog-smtp-cert.pem -d sendmail_path=/bin/true watchdog/tests/watchdog-mail.php
+python3 watchdog/scripts/test-watchdog.py
+```

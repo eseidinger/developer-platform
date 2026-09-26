@@ -15,6 +15,8 @@ As of September 25, 2026. This documentation covers the product, target architec
 
 ## Status and evidence
 
+The [implementation alignment report](04-development/implementation-alignment-report.md) reviews the code in this repository as of September 25, 2026, maps it to the requirements, and records verification limits. It supersedes the workspace-absence claim below; other status text here retains the original documentation baseline pending reconciliation.
+
 - **Confirmed requirement:** an established project constraint. These include a technology-independent API, the hybrid starting topology, and AI support for development and operations.
 - **Reported implementation:** an initial Python implementation and automatically generated database credentials stored as Kubernetes Secrets. Implementation code is not present in this documentation workspace, so its capabilities have not been verified here.
 - **Proposed:** an architectural approach that has not yet been accepted as a product decision.

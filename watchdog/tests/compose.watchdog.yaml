@@ -20,12 +20,12 @@ services:
       TEST_TOKEN: ${TEST_TOKEN:?}
     command: ["php", "-S", "0.0.0.0:8080", "-t", "public"]
     volumes:
-      - ../watchdog/common.php:/app/common.php:ro
-      - ../watchdog/cron.php:/app/cron.php:ro
-      - ../watchdog/mail.php:/app/mail.php:ro
-      - ../watchdog/import-schema.php:/app/import-schema.php:ro
-      - ../watchdog/schema.sql:/app/schema.sql:ro
-      - ../watchdog/public:/app/public:ro
+      - ../src/common.php:/app/common.php:ro
+      - ../src/cron.php:/app/cron.php:ro
+      - ../src/mail.php:/app/mail.php:ro
+      - ../src/import-schema.php:/app/import-schema.php:ro
+      - ../src/schema.sql:/app/schema.sql:ro
+      - ../src/public:/app/public:ro
       - ./watchdog-config.php:/app/config.local.php:ro
     ports: ["127.0.0.1:18088:8080"]
     depends_on:

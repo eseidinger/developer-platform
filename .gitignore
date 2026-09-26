@@ -3,7 +3,7 @@
 __pycache__/
 *.pyc
 .venv/
-watchdog/config.local.php
 ansible/inventory.yml
-ansible/inventory.watchdog.yml
-ansible/inventory.heartbeat.yml
+watchdog/src/config.local.php
+watchdog/ansible/inventory.watchdog.yml
+watchdog/ansible/inventory.heartbeat.yml

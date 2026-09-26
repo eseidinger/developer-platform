@@ -1,6 +1,6 @@
 <?php
 declare(strict_types=1);
-require __DIR__ . '/../watchdog/mail.php';
+require __DIR__ . '/../src/mail.php';
 
 function check(bool $ok, string $message): void {
     if (!$ok) throw new RuntimeException($message);

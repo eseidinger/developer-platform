@@ -152,7 +152,7 @@ python3 scripts/smoke.py
 Additional live checks:
 `python3 scripts/isolation.py` tests PostgreSQL and network isolation after
 policies have converged; it retains the `isolation` test project.
-`python3 scripts/test-watchdog.py` starts temporary PHP/MariaDB containers and
+`python3 watchdog/scripts/test-watchdog.py` starts temporary PHP/MariaDB containers and
 removes only that test project afterward. Email handoff is simulated;
 no emails are sent.
 
@@ -161,7 +161,7 @@ kube-router rules take effect. This installation is intended for trusted lab
 workloads, not untrusted multi-tenancy.
 
 With PHP >=8.2, PDO-MySQL, and optionally cURL, run:
-`php tests/watchdog.php` and `php -l` for all PHP files.
+`php watchdog/tests/watchdog.php` and `php -l` for all PHP files.
 CI runs syntax/configuration checks and unit tests; the full integration test
 requires a Docker host with k3d.
 

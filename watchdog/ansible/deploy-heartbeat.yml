@@ -80,7 +80,7 @@
 
         - name: Install heartbeat service with the readable script path
           ansible.builtin.copy:
-            content: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../infrastructure/systemd/platform-heartbeat.service') | replace('/opt/developer-platform/scripts/heartbeat.py', '/usr/local/lib/developer-platform/heartbeat.py') }}\n"
+            content: "{{ lookup('ansible.builtin.file', playbook_dir ~ '/../systemd/platform-heartbeat.service') | replace('/opt/developer-platform/watchdog/scripts/heartbeat.py', '/usr/local/lib/developer-platform/heartbeat.py') }}\n"
             dest: /etc/systemd/system/platform-heartbeat.service
             owner: root
             group: root
@@ -89,7 +89,7 @@
 
         - name: Install heartbeat timer
           ansible.builtin.copy:
-            src: "{{ playbook_dir }}/../infrastructure/systemd/platform-heartbeat.timer"
+            src: "{{ playbook_dir }}/../systemd/platform-heartbeat.timer"
             dest: /etc/systemd/system/platform-heartbeat.timer
             owner: root
             group: root

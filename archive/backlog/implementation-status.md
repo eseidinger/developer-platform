@@ -77,9 +77,9 @@ Operator implementation evidence:
   [monitoring services](../infrastructure/monitoring/compose.yaml).
 - [Backup script](../scripts/backup.sh), [recovery procedure](../docs/operations.md),
   [database service](../persistence/compose.yaml), and [lab teardown](../scripts/down.sh).
-- [Watchdog installation](../watchdog/README.md), [host sender](../scripts/heartbeat.py),
-  [service](../infrastructure/systemd/platform-heartbeat.service),
-  [timer](../infrastructure/systemd/platform-heartbeat.timer),
+- [Watchdog installation](../watchdog/README.md), [host sender](../watchdog/scripts/heartbeat.py),
+  [service](../watchdog/systemd/platform-heartbeat.service),
+  [timer](../watchdog/systemd/platform-heartbeat.timer),
   [external cron](../watchdog/cron.php), and [public status](../watchdog/public/index.php).
 
 ## Verification limits and cross-cutting gaps
@@ -91,8 +91,8 @@ and HTTP routing. The isolation script checks selected database and network
 boundaries after a convergence delay. None establishes complete coverage of a
 backlog story; this review did not run live checks or a recovery exercise.
 
-Watchdog evidence includes [freshness boundary tests](../tests/watchdog.php) and a
-[disposable PHP/MariaDB test](../scripts/test-watchdog.py) covering missing-token
+Watchdog evidence includes [freshness boundary tests](../watchdog/tests/watchdog.php) and a
+[disposable PHP/MariaDB test](../watchdog/scripts/test-watchdog.py) covering missing-token
 rejection, method validation, throttling, heartbeat expiry, recovery, and stale
 cron status. The disposable test substitutes `/bin/true` for mail delivery and
 disables the optional HTTPS probe. It does not verify real mail receipt,

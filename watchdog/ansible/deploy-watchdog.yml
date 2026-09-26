@@ -19,7 +19,7 @@
 
     - name: Apply deployment defaults
       ansible.builtin.set_fact:
-        watchdog_source_dir: "{{ watchdog_source_dir | default(playbook_dir ~ '/../watchdog') }}"
+        watchdog_source_dir: "{{ watchdog_source_dir | default(playbook_dir ~ '/../src') }}"
         watchdog_config_file: "{{ watchdog_config_file | default('') }}"
         watchdog_manage_cron: "{{ watchdog_manage_cron | default(false) }}"
         watchdog_php_binary: "{{ watchdog_php_binary | default('/usr/bin/php') }}"
