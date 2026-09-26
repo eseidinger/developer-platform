@@ -1,6 +1,6 @@
 # Phase 1 – Foundation and Usable Vertical Slice
 
-Status: planned; existing Python/Kubernetes functionality is reported only. Covers [F-01 through F-06, F-08, and N-02 through N-08](../01-product/requirements.md).
+Status: partially implemented; acceptance gate remains open. The inspected Python API, PostgreSQL/Kubernetes provisioning, hybrid infrastructure, monitoring, and watchdog tooling provide the foundation. The [implementation alignment report](implementation-alignment-report.md) records passing local checks and remaining source gaps; live application/database acceptance, failure recovery, isolated restore, and alert receipt remain unverified. Covers [F-01 through F-06, F-08, and N-02 through N-08](../01-product/requirements.md).
 
 ## Goal
 
@@ -8,7 +8,7 @@ Create, update, observe, and deliberately remove a web application with PostgreS
 
 ## Work packages
 
-1. Inventory the actual repository, Python entry points, configuration, and existing resources. Reproduce the working flow.
+1. Use the inspected repository baseline in the [alignment report](implementation-alignment-report.md), inventory live resources, and reproduce the application/database flow with recorded evidence.
 2. Define a reproducible hybrid profile with separate stacks, k3d, PostgreSQL outside k3d, edge routing, and persistent storage.
 3. Introduce or verify authentication and basic project/environment authorization.
 4. Implement database/role, secret binding, workload, route, and health as a resumable vertical slice. Use stable resource IDs and minimally separated provider ports from the start.

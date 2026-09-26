@@ -1,18 +1,20 @@
 # Implementation alignment report
 
-Assessment date: September 25, 2026. Source revision: `25c80743dc23991baeb5444444bbd79571bd93c3`.
+Assessment date: September 26, 2026. Source revision: `bbd509dd4bf3e3dbcb2094cfdaf92a35ab3100f8`.
 
 ## Assessment
 
 The repository implements an **administrator-operated hybrid lab foundation**. It substantially matches the selected infrastructure topology, but does **not yet satisfy the Phase 1 acceptance gate** or the documented self-service MVP. The largest gaps are scoped authorization, the application/environment domain model, persistent asynchronous operations, observed deployment health, controlled removal, and demonstrated recovery and alert delivery.
 
-The documentation also understates the existing implementation: several current documents say that this workspace contains no code or executable deployment scripts. Those statements are false for this checkout. Conversely, the presence of implementation and test scripts does not establish a working public installation or completion of the target requirements.
+The documentation index, development plan, deployment guide, software architecture, ADR-003, and Phase 1 now cite the inspected implementation and distinguish local verification from live acceptance. The presence of implementation and test scripts does not establish a working public installation or completion of the target requirements.
 
 The target documents generally label future interfaces and decisions appropriately. Missing proposed features below are planning gaps, not claims that the existing prototype violates an already implemented API contract. The accepted technology-independent API principle is only partially reflected in the prototype.
 
+Since the September 25 assessment, watchdog deployment automation, authenticated SMTP delivery, a CLI schema importer, and additional tests have been added, and watchdog sources have been consolidated under `watchdog/`. The platform API and workload provisioning implementation are unchanged from the previous source baseline. These additions improve operational tooling but do not close a requirement or phase acceptance gate.
+
 ## Scope and evidence
 
-Reviewed the product requirements, use cases, architecture and diagrams, eight ADRs, development phases, operational drafts, root/component guides, source, infrastructure configuration, deployment scripts, watchdog, and tests. Archived material provides historical context; the current `docs/` requirements and phases are the assessment baseline. In particular, the archived multi-component backlog must not override the current single-image MVP scope.
+Rechecked changes since source revision `25c80743dc23991baeb5444444bbd79571bd93c3`, including watchdog source, deployment playbooks, tests, CI, and guide updates; retained the unchanged implementation assessment below. The assessment covers the product requirements, use cases, architecture and diagrams, eight ADRs, development phases, operational drafts, root/component guides, source, infrastructure configuration, deployment scripts, watchdog, and tests. Archived material provides historical context; the current `docs/` requirements and phases are the assessment baseline. In particular, the archived multi-component backlog must not override the current single-image MVP scope.
 
 Evidence levels used here:
 
@@ -33,8 +35,8 @@ No deployment, live workload mutation, failure injection, or restore was perform
 | Workload hardening | [Manifests](../../platform/app/manifests.py) configure non-root execution, restricted Pod Security, dropped capabilities, read-only roots, no API token, quotas, and NetworkPolicy. | Trusted workloads only; the root guide records a policy-convergence egress window. No end-user authorization follows from namespace isolation. |
 | Edge routing | [Caddy](../../infrastructure/proxy/Caddyfile) fronts the API and k3d ingress, with project registration gating on-demand certificates. | Public DNS/ACME execution is unverified; the architecture proposes Traefik at the edge, while code uses Caddy there and Traefik inside k3d. |
 | Monitoring placement | [Monitoring stack](../../infrastructure/monitoring/compose.yaml) places Prometheus, Grafana, Loki, Alloy, and Alertmanager outside k3d. | Placement aligns; full application telemetry and delivered alerts do not yet follow. |
-| Independent watchdog | [Host sender](../../watchdog/scripts/heartbeat.py), [systemd timer](../../watchdog/systemd/platform-heartbeat.timer), and [PHP watchdog](../../watchdog/README.md) implement readiness-gated HTTPS heartbeats, expiry detection, and state-change email attempts. | Installation, scheduler reliability, public probes, and actual email receipt remain unverified. |
-| Reproducible setup | [Ansible](../../ansible/deploy.yml), bootstrap, configuration generation, and checksum-verified tool installation are concrete automation. | Ansible ends with process health, not the complete application/database acceptance flow; firewall, backups, and watchdog setup remain separate. |
+| Independent watchdog | [Host sender](../../watchdog/scripts/heartbeat.py), [systemd timer](../../watchdog/systemd/platform-heartbeat.timer), and [PHP watchdog](../../watchdog/README.md) implement readiness-gated HTTPS heartbeats, expiry detection, and state-change email attempts through PHP mail or authenticated SMTP with verified TLS. | Deployment playbooks and a CLI schema importer now exist; installation, scheduler reliability, public probes, and actual email receipt remain unverified. |
+| Reproducible setup | [Ansible](../../ansible/deploy.yml), bootstrap, configuration generation, checksum-verified tool installation, and separate [watchdog/heartbeat playbooks](../../watchdog/ansible/README.md) are concrete automation. | Platform Ansible ends with process health, not the complete application/database acceptance flow. Watchdog hosting, database setup/import, HTTPS, and mail configuration require separate steps; firewall and backups remain separate. |
 
 ## Requirements coverage
 
@@ -59,7 +61,7 @@ Statuses assess the entire requirement in [Requirements](../01-product/requireme
 | N-03 | Partial | Database CONNECT restrictions, network policy, and quotas provide infrastructure boundaries. The shared admin token accesses every project; no project/environment permission checks exist. |
 | N-04 | Partial | Generated database credentials use Secrets, normal responses omit them, errors are generic, and cluster configuration enables secret encryption. User secret references, rotation/reconnection workflow, and comprehensive redaction tests are absent. |
 | N-05 | Partial | Bootstrap, Ansible, and local SQL backups exist. Encrypted external backup automation, complete recovery bundle, and isolated restore evidence are missing. |
-| N-06 | Partial | Central monitoring is outside k3d; host and external watchdog code exists. Separate cluster/host failure exercises and notification receipt are not established. |
+| N-06 | Partial | Central monitoring is outside k3d; host and external watchdog code exists. Watchdog/heartbeat deployment playbooks and TLS SMTP transport exist. Separate cluster/host failure exercises and notification receipt are not established. |
 | N-07 | Partial | Container/cluster memory limits, workload quotas, and some retention settings exist. Representative load, total capacity, disk/log growth, and reserve measurements are absent. |
 | N-08 | Absent | No durable audit model recording actor, scope, action, revision, operation, result, or denied access. Latest project status and generic error logging are insufficient. |
 
@@ -91,7 +93,15 @@ All Compose services and k3d share the `developer-platform` Docker network, rath
 
 [Alert rules](../../infrastructure/monitoring/alerts.yaml) cover scrape-target failure, low disk, and unavailable workload replicas. [Alertmanager](../../infrastructure/monitoring/alertmanager.yaml) uses a `local-only` receiver without a notification integration. Rule evaluation therefore does not establish operational alert delivery.
 
-The host heartbeat checks API dependency readiness and Prometheus readiness, and stops sending when either fails. It relies on the external watchdog for notification; it is not a separate local alert-delivery service and does not check the Alertmanager delivery path, Grafana, Loki, backups, or an end-to-end application. The external watchdog supports authenticated POST, receipt-time freshness, throttling, an optional fixed HTTPS HEAD probe, notification deduplication, and retry after failed mail handoff. Expiring maintenance windows and an explicit token-rotation workflow are absent. A stale cron makes the status page unavailable, but no independent notifier monitors watchdog scheduler/hosting failure.
+The host heartbeat checks API dependency readiness and Prometheus readiness, and stops sending when either fails. It relies on the external watchdog for notification; it is not a separate local alert-delivery service and does not check the Alertmanager delivery path, Grafana, Loki, backups, or an end-to-end application. The external watchdog supports authenticated POST, receipt-time freshness, throttling, an optional fixed HTTPS HEAD probe, notification deduplication, and retry after failed mail handoff. The [mail transport](../../watchdog/src/mail.php) supports PHP `mail()` and authenticated SMTP using STARTTLS or implicit TLS with certificate verification; failed handoff leaves notification state retryable. The [cron entry point](../../watchdog/src/cron.php) reports failure stages without raw exception details. Expiring maintenance windows and an explicit token-rotation workflow are absent. A stale cron makes the status page unavailable, but no independent notifier monitors watchdog scheduler/hosting failure.
+
+### Watchdog deployment and setup
+
+The [heartbeat playbook](../../watchdog/ansible/deploy-heartbeat.yml) installs Python/CA certificates, the sender, a private systemd environment file, and the service/timer on the platform host. It places the sender where the dynamic service user can read it and enables the timer, but does not verify live heartbeat delivery.
+
+The [external watchdog playbook](../../watchdog/ansible/deploy-watchdog.yml) uploads an explicit release file list over SSH/SCP, optionally replaces private configuration, and optionally installs a minute-by-minute cron entry. It preserves SSH host-key checking and suppresses credential-bearing task output. Its check mode validates local inputs only; it does not inspect the remote installation. Database/user creation, the public document root, HTTPS, PHP extensions, and mail settings remain operator prerequisites. The [CLI schema importer](../../watchdog/src/import-schema.php) is uploaded but must be run separately; the integration script includes repeat-import preservation and credential-safe authentication-error checks.
+
+Neither playbook was deployed during this assessment. Their presence and successful syntax checks establish automation in source, not a functioning external failure detector.
 
 ### Backup and recovery
 
@@ -103,12 +113,12 @@ No backup scheduler, encrypted upload, remote retention, key/configuration backu
 
 | Priority | Finding | Required documentation action |
 | --- | --- | --- |
-| High | [Documentation index](../README.md) and [development plan](development-plan.md) say implementation code is absent; [deployment](../05-operations/deployment.md) says executable deployment scripts are absent. | Replace workspace-absence claims with the inspected baseline and separate source verification from live acceptance. Link this report. |
+| Resolved | [Documentation index](../README.md), [development plan](development-plan.md), and [deployment](../05-operations/deployment.md) now describe the inspected source baseline and link this report. | Keep source/local-check evidence separate from live acceptance when recording future progress. |
 | High | Root, platform, and Ansible guides still link to removed `docs/operations.md` and `docs/architecture.md`. The scan found nine broken link occurrences across those guides. | Restore discoverable executable operational guidance and retarget links to the current documents; carry forward useful archived restore commands with validation status. |
 | Medium | [Infrastructure](../02-architecture/infrastructure.md) proposes Traefik at the edge and separate Docker networks; implementation uses Caddy at the edge, cluster Traefik, and one shared Docker network. | Record the actual profile and the remaining segmentation decision; distinguish this from the target topology. |
-| Medium | Software architecture, ADR-003, and Phase 1 describe Python/database-secret behavior as reported only. | Cite the inspected implementation while retaining unverified deployment/acceptance labels. |
+| Resolved | Software architecture, ADR-003, and Phase 1 now cite inspected Python/database-secret behavior and this report. | Retain proposed design status and unverified live acceptance labels until evidence changes. |
 | Medium | Current runbooks discuss operation IDs, revision history, worker resumption, and audit records that the API cannot supply. | Keep target procedures clearly labeled and add current commands: inspect stored project status/Kubernetes, diagnose dependencies, and repeat PUT to repair. |
-| Medium | The root guide calls this a working foundation, whereas new docs treat all implementation as unavailable. | Use one evidence vocabulary: implemented in source, static checks passed, live results recorded with environment/date/revision. |
+| Resolved | Current baseline documents distinguish implemented source, passing local checks, and unverified live acceptance. | Record future live results with environment, date, revision, and outcome. |
 
 ADRs 002 and 006 fit the current direction: retain the hybrid topology and inspect/evolve Python before considering a rewrite. ADR-001 remains a valid accepted principle with substantial implementation work outstanding. ADRs 003–005 have partial foundations, but their detailed decisions remain proposed; code presence does not accept an ADR. ADR-007's single-image starting profile fits the workload shape, while the combined UI/API template remains absent. ADR-008 remains future product work.
 
@@ -128,21 +138,24 @@ UC-01 is partially supported for an administrator, without ApplicationSpec, prog
 | Check | Result | What it establishes |
 | --- | --- | --- |
 | `python3 -m unittest discover -s tests -v` | Passed: 3 tests. | Name validation, generated namespace/network structure, and selected workload hardening/quota settings. |
-| `python3 -m compileall -q platform scripts` | Passed. | Python syntax compilation; not dependency import or service execution. |
+| `python3 -m compileall -q platform scripts watchdog/scripts` | Passed. | Python syntax compilation; not dependency import or service execution. |
 | `bash -n scripts/up.sh scripts/down.sh scripts/backup.sh` | Passed. | Shell syntax. |
 | `docker compose config --quiet` | Passed. | Compose configuration resolves using this checkout's configuration; no services started. |
-| Local Markdown link scan | Nine broken occurrences in root/platform/Ansible guides; none in existing current `docs/` pages. | Relative file-target existence, excluding external URLs and fragment validation. |
-| `php watchdog/tests/watchdog.php` | Could not run: PHP is not installed in the review environment. | No fresh PHP test result. PHP lint was likewise not performed. |
+| Local Markdown link scan | Nine broken occurrences in root/platform/Ansible guides; none in current `docs/` or watchdog guides. | Relative file-target existence, excluding external URLs and fragment validation. |
+| `php watchdog/tests/watchdog.php` | Passed. | Heartbeat and scheduler freshness boundary checks. |
+| `php -d curl.cainfo=<unused temporary certificate path> -d sendmail_path=/bin/true watchdog/tests/watchdog-mail.php` | Passed: seven SMTP scenarios plus validation/legacy transport checks. | Local fixture verifies STARTTLS/implicit TLS, authentication/recipient/data failures, missing TLS, certificate mismatch, invalid settings, and simulated PHP mail handoff. No real email is sent. Expected failure cases emit diagnostic logs. |
+| `php -l` on tracked watchdog PHP source and tests | Passed: 10 files. | PHP syntax; excludes private local configuration and does not establish database integration. |
+| `ansible-playbook -i watchdog/ansible/inventory.<name>.example.yml watchdog/ansible/deploy-<name>.yml --syntax-check` for `watchdog` and `heartbeat` | Both passed. | Playbook syntax only; no remote connection, installation, or delivery verification. |
 
-[CI](../../.github/workflows/validate.yaml) defines syntax/configuration/unit checks, including PHP freshness tests, but no live smoke, isolation, or recovery acceptance. Its definition is not evidence that a particular remote run passed.
+[CI](../../.github/workflows/validate.yaml) defines syntax/configuration/unit checks, including PHP freshness and local SMTP transport tests, but no live smoke, isolation, or recovery acceptance. Its definition is not evidence that a particular remote run passed.
 
 The [smoke script](../../scripts/smoke.py) checks unauthenticated rejection, repeat provisioning, rollout, and HTTP routing. Its sample is `http-echo`; it does not write/read PostgreSQL through the application. The [isolation script](../../scripts/isolation.py) checks database connectivity, denied foreign database access, DNS, and selected blocked network connections after a convergence delay. Neither script was run during this review, and neither tests scoped end-user permissions, durable interrupted operations, or restore.
 
-The [watchdog integration script](../../watchdog/scripts/test-watchdog.py) exercises temporary PHP/MariaDB services, but substitutes successful mail handoff and disables the optional HTTPS probe. It cannot establish real notification receipt. It was inspected, not executed.
+The [watchdog integration script](../../watchdog/scripts/test-watchdog.py) exercises temporary PHP/MariaDB services, but substitutes successful mail handoff and disables the optional HTTPS probe. It also checks schema import, repeated import preservation, and credential-safe authentication failures. It cannot establish real notification receipt. It was inspected, not executed; the separate PHP freshness and SMTP fixture tests above were executed.
 
 ## Recommended sequence
 
-1. **Reconcile the documentation baseline.** Correct code-absence statements and broken links; publish actual versus target topology and current operational commands. Preserve proposed ADR status until explicitly decided.
+1. **Finish reconciling operational documentation.** Workspace-absence statements and reported-only baseline labels have been corrected and linked to this report. Repair the remaining broken links; publish actual versus target topology and current operational commands. Preserve proposed ADR status until explicitly decided.
 2. **Complete the Phase 1 domain and security foundation.** Introduce project/environment/application identity, scoped authorization and audit, strict input validation, and explicit supported profile constraints. Preserve the existing hardened workload and PostgreSQL path.
 3. **Make provisioning observable and resumable.** Persist revisions and operations, detect stale writes, reconcile observed readiness, and implement controlled removal with retained-data inventory. Test interruption after database creation and retry without resource duplication or data loss.
 4. **Close operational acceptance.** Configure real alert delivery, collect application/database signals, automate encrypted off-host backups, and demonstrate an isolated restore. Record cluster-failure and host-heartbeat outage/recovery results separately.

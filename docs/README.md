@@ -1,6 +1,6 @@
 # SaaS / Developer Platform Documentation
 
-As of September 25, 2026. This documentation covers the product, target architecture, architectural decisions, development sequence, and operations.
+As of September 26, 2026. This documentation covers the product, target architecture, architectural decisions, development sequence, and operations.
 
 ## Getting started
 
@@ -15,10 +15,12 @@ As of September 25, 2026. This documentation covers the product, target architec
 
 ## Status and evidence
 
-The [implementation alignment report](04-development/implementation-alignment-report.md) reviews the code in this repository as of September 25, 2026, maps it to the requirements, and records verification limits. It supersedes the workspace-absence claim below; other status text here retains the original documentation baseline pending reconciliation.
+The [implementation alignment report](04-development/implementation-alignment-report.md) records the September 26, 2026 source assessment at revision `bbd509dd4bf3e3dbcb2094cfdaf92a35ab3100f8`, requirements coverage, local verification results, and remaining acceptance gaps.
 
 - **Confirmed requirement:** an established project constraint. These include a technology-independent API, the hybrid starting topology, and AI support for development and operations.
-- **Reported implementation:** an initial Python implementation and automatically generated database credentials stored as Kubernetes Secrets. Implementation code is not present in this documentation workspace, so its capabilities have not been verified here.
+- **Implemented in source:** an administrator-operated Python API provisions PostgreSQL databases/logins and Kubernetes workloads with generated credentials in Secrets. Compose, bootstrap/Ansible automation, monitoring, backups, and watchdog tooling are present.
+- **Verified locally:** Python unit/syntax checks, shell syntax, Compose configuration, PHP freshness/SMTP fixture tests and lint, and watchdog/heartbeat Ansible syntax checks passed as recorded in the report.
+- **Unverified operationally:** live installation, application/database acceptance, scoped user isolation, failure recovery, isolated restore, and real notification receipt are not established by these checks. Phase 1 remains incomplete.
 - **Proposed:** an architectural approach that has not yet been accepted as a product decision.
 - **Specification draft:** details that make the contract consistent and the implementation verifiable. They do not imply an implemented interface or an accepted decision.
 

@@ -1,6 +1,8 @@
 # Deployment and Installation
 
-Status: **operational draft** for the hybrid installation. No installation or executable deployment scripts are present here. Add commands from the actual implementation; this procedure does not claim an existing CLI contract.
+Status: **operational draft** for the target hybrid installation. Executable [bootstrap](../../scripts/up.sh), [platform Ansible](../../ansible/deploy.yml), and [watchdog/heartbeat playbooks](../../watchdog/ansible/README.md) exist. Follow the [root setup guide](../../README.md) and [Ansible guide](../../ansible/README.md) for current commands.
+
+The [implementation alignment report](../04-development/implementation-alignment-report.md) records the inspected source baseline and passing local checks, including Compose configuration, shell syntax, and watchdog/heartbeat playbook syntax. No target-host deployment or live acceptance was performed in that assessment. The sequence below describes the target procedure; identity-provider setup, persistent workers, revision-aware reconciliation, and the complete acceptance flow remain implementation gaps.
 
 ## Define the installation profile first
 

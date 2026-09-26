@@ -13,4 +13,4 @@ Phase 1 already includes a minimal API/CLI. Phase 2 stabilizes that contract and
 
 The sequence follows the selected hybrid topology. A Docker-first implementation remains an alternative in [ADR-002](../03-decisions/ADR-002-docker-vs-kubernetes.md).
 
-Additional data-store labs, multi-component applications, providers, and a larger VM topology will be scheduled as needed. They require a concrete use case, capacity, and operational experience. Architectural evolution and reported implementation status are documented separately in the [development plan](../04-development/development-plan.md).
+Additional data-store labs, multi-component applications, providers, and a larger VM topology will be scheduled as needed. They require a concrete use case, capacity, and operational experience. Architectural evolution and inspected implementation status are documented separately in the [development plan](../04-development/development-plan.md).

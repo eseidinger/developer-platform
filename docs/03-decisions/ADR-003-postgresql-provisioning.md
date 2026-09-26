@@ -1,7 +1,7 @@
 # ADR-003 – Shared PostgreSQL Service with Separate Identities
 
 Created: September 25, 2026. Status: **Proposed**.
-Automatic database credentials and Kubernetes Secrets are reported as existing behavior.
+Source inspection confirms [database/login provisioning and credential derivation](../../platform/app/main.py) and [Kubernetes Secret bindings](../../platform/app/manifests.py). The runtime login currently owns its database; separate migration/owner and human identities remain proposed. See the [implementation alignment report](../04-development/implementation-alignment-report.md) for local verification and outstanding live isolation, rotation, and restore acceptance. This source evidence does not accept the proposed decision.
 
 ## Context
 

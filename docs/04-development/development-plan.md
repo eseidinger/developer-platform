@@ -1,6 +1,6 @@
 # Development Plan and Architectural Evolution
 
-As of September 25, 2026. Future phases are proposals without confirmed dates.
+As of September 26, 2026. Future phases are proposals without confirmed dates.
 
 ## Architectural evolution
 
@@ -18,9 +18,11 @@ As of September 25, 2026. Future phases are proposals without confirmed dates.
 
 ## Implementation status
 
-Reported baseline: an initial Python implementation and automatic database credentials exposed through Kubernetes Secrets. This workspace contains no implementation code. Installation, tests, and deployments are therefore **unverified**.
+The inspected baseline is an administrator-operated hybrid foundation: a Python API persists project specs/status, provisions PostgreSQL databases/logins, and applies hardened Kubernetes workloads and generated credential Secrets. Compose, bootstrap/Ansible deployment, monitoring, local SQL backups, and external watchdog/heartbeat tooling exist in this repository.
 
-The Markdown specification is the currently verifiable artifact. It does not mark any of the following phases as complete.
+The [implementation alignment report](implementation-alignment-report.md) records the September 26, 2026 assessment at revision `bbd509dd4bf3e3dbcb2094cfdaf92a35ab3100f8`. Python unit/syntax checks, shell syntax, Compose configuration, PHP freshness/SMTP fixture tests and lint, and watchdog/heartbeat Ansible syntax checks passed locally. These results establish source and local-check evidence; they do not establish a working target-host installation or live acceptance.
+
+Phase 1 remains incomplete. Scoped authorization, the project/environment/application model, durable operations, observed health, controlled removal, application/database write-read acceptance, isolated restore, and demonstrated alert receipt remain open. No phase is marked complete by this assessment.
 
 ## Work sequence and gates
 
@@ -49,7 +51,7 @@ Basic access enforcement, audit, secrets, and observability start in Phase 1. Ph
 
 | Topic | Next step | Gate |
 |---|---|---|
-| Actual prototype and operational state | Inventory repository and existing resources | Before implementation planning |
+| Operational state and acceptance | Use the inspected source baseline in the [alignment report](implementation-alignment-report.md); inventory live resources and record acceptance exercises | Phase 1 |
 | Python / Quarkus | Decide ADR-006 using code and effort analysis | Phase 2 |
 | Identity provider, roles, and realm model | Explicitly accept the detailed ADR-004 approach | Minimal IAM in Phase 1; expansion in Phase 3 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
