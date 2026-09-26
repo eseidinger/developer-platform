@@ -18,7 +18,7 @@ As of September 26, 2026. Future phases are proposals without confirmed dates.
 
 ## Implementation status
 
-The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation; no phase has acceptance evidence establishing completion. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment.
+The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation; no phase has acceptance evidence establishing completion. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment. Current Phase 1A criterion-level progress is recorded under [backup and recovery](delivery-backlog.md#current-backup-and-recovery-progress) and [monitoring](delivery-backlog.md#current-monitoring-progress); successful drills do not close their remaining acceptance gates.
 
 ## Work sequence and gates
 

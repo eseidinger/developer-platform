@@ -1,15 +1,70 @@
 # Backup and Recovery
 
-Status: current commands reviewed against the [backup runner](../../operations/backup/scripts/backup-platform.py), Compose, and the API at the source baseline in the [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions). The SQL restore/reapply sequence is carried forward from the archived operations guide and adapted to current paths. **No backup, SQL import, cluster recreation, or application recovery was executed for this documentation update.** Syntax checks do not establish recoverability.
+## Use the playbooks first
+
+The supported path is the [backup and recovery playbook workflow](../../operations/backup/README.md#start-with-the-playbooks).
+Run Ansible from WSL/the controller, using separate source and recovery inventories.
+
+| Goal | Start here |
+| --- | --- |
+| Configure encrypted repository access | [setup-backup.yml](../../operations/backup/ansible/setup-backup.yml) |
+| Deploy scheduled backups and independent alerts | [deploy-backup.yml](../../operations/backup/ansible/deploy-backup.yml) |
+| Create a known record and take a verified backup | [prepare-recovery-test.yml](../../operations/backup/ansible/prepare-recovery-test.yml) |
+| Restore a selected snapshot into a fresh VM and test it | [restore-recovery.yml](../../operations/backup/ansible/restore-recovery.yml) |
+
+For a marker-based drill, run these from the repository root:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/prepare-recovery-test.yml \
+  -e recovery_test_project=smoke
+```
+
+Copy the resulting snapshot ID and independent marker path into the recovery
+inventory. Prepare a [fresh recovery VM](../../operations/backup/README.md#local-recovery-vm-in-wsl-2),
+then run:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.recovery.yml \
+  operations/backup/ansible/restore-recovery.yml
+```
+
+See the [recovery playbook instructions](../../operations/backup/README.md#restore-a-fresh-recovery-vm-with-ansible)
+for inventory creation, private credential prompts, host restrictions, and report
+locations. Require `result: passed` and `historical_data_verified: true` for the
+marker drill. Repeat acceptance checks with the
+[prepared test script](../../operations/backup/README.md#run-tests-against-the-prepared-recovery-vm),
+not by rerunning restoration over existing data.
+
+## Evidence and limits
+
+On September 26, 2026, the operator reported successful automated restoration of
+snapshot `5ea9753aa32f362e351223154589489cf32b9188098da1f9d270030c1d39ed19`
+into a fresh local Ubuntu VM. The marker-enabled suite passed bundle checksums,
+platform readiness/catalog, project rollout, HTTP ingress, monitoring, Kubernetes
+project database authentication/write/read, catalog CONNECT-privilege denial, and
+verification of the independently recorded pre-backup SQL marker.
+
+The earlier manual drill took an operator-estimated 30–60 minutes against a
+four-hour RTO target; this is not a precisely timed automated recovery benchmark.
+The selected RPO is 24 hours. Measure it against a recorded simulated failure time,
+not the age of a backup at test completion. Public DNS/TLS recovery, live alert
+receipt, unavailable/corrupt backup and key failures, denied network destinations,
+and database-backed application transactions remain separate acceptance work.
+The [delivery backlog progress checklist](../04-development/delivery-backlog.md#current-backup-and-recovery-progress) owns task status;
+this guide explains execution and the scope of reported evidence.
+
+The following sections explain scope and manual fallback procedures. Use the
+playbooks above for routine drills.
 
 ## Current backup scope
 
 | Data | Current mechanism | Remaining responsibility |
 | --- | --- | --- |
-| Project databases, roles and password hashes | Local compressed `pg_dumpall` | Encrypt, copy off-host, define retention, and prove restore |
+| Project databases, roles and password hashes | Compressed `pg_dumpall` in encrypted restic bundle | Verify pre-backup data and application recovery |
 | Platform metadata | Same dump includes `platform.projects` with latest specs/status | No revision history, jobs, or audit records exist |
-| `.env`, especially `DATABASE_KEY` and `POSTGRES_PASSWORD` | Separate operator-managed copy | Encrypt and retain access independently of the platform host |
-| Caddy data/config and customized Grafana state | Compose volumes; not included in SQL dump | Separate backup/recreation procedure and validation |
+| `.env`, especially `DATABASE_KEY` and `POSTGRES_PASSWORD` | Deployment archive in encrypted bundle | Retain repository credentials/password independently of the host |
+| Caddy data/config and customized Grafana state | Stopped-service volume archives in encrypted bundle | Validate restored settings; disable production notifications in recovery |
 | Infrastructure, alert rules, workload image identities | Repository revision and external artifact storage | Retain compatible images and record versions/digests |
 | External watchdog MySQL/configuration | Separate hosting service | Back up through the hosting provider; PostgreSQL dump excludes it |
 
@@ -22,11 +77,13 @@ to install restic, configure private S3 credentials and a separately recoverable
 repository password, and explicitly initialize a new repository when needed.
 This prepares storage only. The separate [scheduled backup playbook](../../operations/backup/README.md#scheduled-backups-and-independent-backup-alerts)
 adds capture, exact-snapshot readback, retention and independent backup alerts;
-target-host execution and isolated application restore acceptance remain open. The confirmed policy and
+successful-path restore has operator-reported evidence; remaining acceptance is described above. The confirmed policy and
 implementation evidence are tracked under OPS-006 in the
 [delivery backlog](../04-development/delivery-backlog.md).
 
 ## Make a current backup
+
+For a drill, prefer [prepare-recovery-test.yml](../../operations/backup/ansible/prepare-recovery-test.yml), which seeds a marker, runs backup and saves evidence. For an ordinary backup without adding a marker, use the following manual trigger.
 
 After completing [backup deployment](../../operations/backup/README.md#scheduled-backups-and-independent-backup-alerts), start the managed backup service on the source host:
 
@@ -44,6 +101,8 @@ Confirm `result: success`, a recent capture timestamp, and the matching verified
 Follow [bundle retrieval](#retrieve-a-scheduled-recovery-bundle) to obtain the verified `postgres.sql.gz` and original `.env` for an isolated restore. Preserve the original `DATABASE_KEY`: generating a replacement produces credentials that do not match restored roles. Coordinate application writes if consistency across databases is required; the dump does not provide a single cross-database application transaction snapshot.
 
 ## Restore into an isolated installation
+
+Prefer [restore-recovery.yml](../../operations/backup/ansible/restore-recovery.yml) on a fresh recovery VM. The manual fallback below explains the underlying steps for diagnosis and environments outside that playbook’s supported scope.
 
 Use a separate host or Docker daemon with no existing platform data. A different checkout or Compose project name on the source host is insufficient isolation: the Docker network, k3d cluster name, and host ports are fixed. This is a whole-instance restore, not a procedure for overwriting one project in an active installation.
 
@@ -97,6 +156,8 @@ The API has no background reconciler. Bootstrap recreates cluster/controller cre
 
 ## Reapply restored projects
 
+The [recovery playbook](../../operations/backup/ansible/restore-recovery.yml) reapplies explicitly selected projects automatically. The following is a manual fallback.
+
 Use this after SQL restore, or after cluster recreation with intact PostgreSQL volumes. The following commands target only the local API. They apply every stored project's latest spec, so review the catalog before running the Python block and ensure this is the intended recovery installation.
 
 ```bash
@@ -146,6 +207,8 @@ An error stops the loop. Earlier projects may already have been applied; inspect
 
 ## Recovery verification and evidence
 
+The [recovery playbook](../../operations/backup/ansible/restore-recovery.yml) runs the acceptance suite and fetches its reports. For repeat checks, use [test-recovery.py](../../operations/backup/scripts/test-recovery.py); supplementary manual checks follow.
+
 For each project, use the [runbook](runbook.md#application-unhealthy-after-deployment) to inspect rollout and routing, then execute the application's own data checks. For `hello`, for example:
 
 ```bash
@@ -153,18 +216,20 @@ kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello rollout status d
 curl --fail-with-body -H 'Host: hello.apps.localhost' http://127.0.0.1/
 ```
 
-The echo example does not exercise PostgreSQL. Use a database-backed application with known pre-backup records: verify those records survived, then write and read a new record through the application. Verify database ownership, login permissions, and denied foreign-project access. Preserve private import logs and record source/target environments, code/image versions, backup ID/checksum, start/end times, data checks, errors, and measured recovery point/duration. No such completed exercise is recorded by this documentation update.
+The echo example does not exercise PostgreSQL. Use a database-backed application with known pre-backup records: verify those records survived, then write and read a new record through the application. Verify database ownership, login permissions, and denied foreign-project access. Preserve private import logs and record source/target environments, code/image versions, backup ID/checksum, start/end times, data checks, errors, and measured recovery point/duration. The reported SQL-marker drill above does not replace application-specific transaction checks.
 
 A production routing switch is a separate operational step after acceptance. Restore intended domains and reapply specs before changing DNS; validate TLS, application data, monitoring, and watchdog down/recovery receipt. Do not point production traffic at an unverified exercise host.
 
 ## Target recovery capabilities
 
-Encrypted external backup automation and independent backup-age alerts now have an implementation in the scheduled backup playbook. The selected RPO is 24 hours and RTO four hours for node-01; live deployment, failure delivery, measured recovery and a full application acceptance harness remain open. Once identity, durable jobs/revisions, and controlled deletion exist, extend backups and restore checks to those records and pause/resume workers explicitly. The current implementation has no worker or operation history to recover.
+Encrypted external backup automation and independent backup-age alerts now have an implementation in the scheduled backup playbook. The selected RPO is 24 hours and RTO four hours for node-01; successful deployment and marker recovery have operator-reported evidence; failure delivery, precise recovery measurement and application-level acceptance remain open. Once identity, durable jobs/revisions, and controlled deletion exist, extend backups and restore checks to those records and pause/resume workers explicitly. The current implementation has no worker or operation history to recover.
 
 See [Deployment](deployment.md), [Runbook](runbook.md), and [ADR-003](../03-decisions/ADR-003-postgresql-provisioning.md).
 
 
 ## Retrieve a scheduled recovery bundle
+
+The [recovery playbook](../../operations/backup/ansible/restore-recovery.yml) retrieves and verifies the explicitly selected snapshot. Use the commands below for manual inspection or recovery outside the playbook.
 
 Use an isolated recovery host with restic, S3 credentials and the independently
 saved repository password configured. Identify an explicit verified snapshot:

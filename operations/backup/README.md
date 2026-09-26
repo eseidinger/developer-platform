@@ -2,6 +2,64 @@
 
 Run deployment commands from the repository root.
 
+## Start with the playbooks
+
+Run these commands from the repository root on the **WSL/Ansible controller**.
+Use the source backup inventory for backup tasks and the separate recovery
+inventory for the disposable VM.
+
+| Task | Playbook | Details |
+| --- | --- | --- |
+| Configure existing S3 repository access | [setup-backup.yml](ansible/setup-backup.yml) | [Credentials and initialization](#encrypted-s3-backup-repository-setup) |
+| Install scheduled backups and alerts | [deploy-backup.yml](ansible/deploy-backup.yml) | [Schedule and watchdog prerequisites](#scheduled-backups-and-independent-backup-alerts) |
+| Create a pre-backup marker and verified backup | [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml) | [Source test preparation](#automate-marker-creation-and-the-source-backup) |
+| Restore and test a fresh isolated VM | [restore-recovery.yml](ansible/restore-recovery.yml) | [Recovery inventory and safeguards](#restore-a-fresh-recovery-vm-with-ansible) |
+
+### Backup setup and scheduling
+
+Prepare `operations/backup/ansible/inventory.backup.yml` from its example and set
+the source host. Configure the external watchdog's backup endpoint/schema/token
+before deploying the schedule. Credentials are prompted privately.
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/setup-backup.yml
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/deploy-backup.yml
+```
+
+For a **new repository only**, follow the explicit initialization instructions
+below. Existing repository access does not require initialization.
+
+### Recovery drill
+
+First create a marker and backup on the source:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/prepare-recovery-test.yml \
+  -e recovery_test_project=smoke
+```
+
+Use the printed snapshot ID and independent controller marker path in the
+recovery inventory: `recovery_snapshot`, `recovery_marker_file`, and
+`recovery_projects: [smoke]`. [Create/start a fresh VM](#local-recovery-vm-in-wsl-2)
+and accept its verified SSH host key, then run:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.recovery.yml \
+  operations/backup/ansible/restore-recovery.yml
+```
+
+The restore playbook refuses existing installations. Its fetched report must show
+`result: passed` and `historical_data_verified: true` for a marker drill.
+For an already-restored VM, [rerun only the check script](#run-tests-against-the-prepared-recovery-vm).
+Do not rerun restoration to troubleshoot an acceptance failure.
+
+The sections below explain configuration, recovery behavior, script usage, and
+limitations. Manual restore commands are in the
+[operations guide](../../docs/05-operations/backup-recovery.md#restore-into-an-isolated-installation).
+
 ## Encrypted S3 backup repository setup
 
 [setup-backup.yml](ansible/setup-backup.yml) installs the distribution's `restic` package
@@ -217,8 +275,10 @@ outbox retries every five minutes. If initial start delivery fails, a later succ
 or failure carries the complete run identity; the external monitor can still
 accept it without a start event. Meanwhile, its previous success continues aging.
 
-This implements automation; **SQL/application recovery, measured RPO/RTO, live S3
-failure tests and actual backup-alert receipt still need operational evidence**.
+The operator-reported September 26, 2026 drill passed automated restore checks
+including a pre-backup SQL marker. Precisely measured RPO/RTO, live S3 failure
+tests, actual backup-alert receipt, and database-backed application acceptance
+remain separate evidence requirements.
 Exact-file readback is not an application restore exercise. Continue with
 [backup and recovery](../../docs/05-operations/backup-recovery.md).
 
