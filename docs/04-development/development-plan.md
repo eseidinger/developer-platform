@@ -40,10 +40,12 @@ flowchart LR
 
 | Phase | Entry condition | Outcome / dependency |
 |---|---|---|
-| [1](phase-1-foundation.md) | Access to actual code and target host | Hybrid foundation, minimal API/CLI flow, backup, and alert channel |
-| [2](phase-2-platform-api.md) | Reproducible vertical slice | Stable spec/provider contract and direct Docker path |
+| [1](phase-1-foundation.md) | Access to actual code and target host | 1A operational protection, 1B accountable access/security alerts, 1C durable lifecycle and minimal API/CLI |
+| [2](phase-2-platform-api.md) | Reproducible vertical slice | Retained diagnostics/policy/recovery/retirement packages, stable contract and direct Docker parity |
 | [3](phase-3-developer-experience.md) | Reliable lifecycle and authorization | Portal, templates, human database access, application OIDC |
 | [4](phase-4-ai-operations.md) | Access-controlled data and deployment history | Evidence-based assistance and controlled actions |
+
+**Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their acceptance minimum by that phase’s exit; later extensions do not defer it.
 
 Basic access enforcement, audit, secrets, and observability start in Phase 1. Phase 3 extends these capabilities rather than removing them from the MVP.
 

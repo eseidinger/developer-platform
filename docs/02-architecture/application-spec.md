@@ -105,6 +105,10 @@ The example produces `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB
 6. Check binding prefixes and configuration/secret target names for collisions.
 7. Generate a plan and new revision; identical specs are semantically idempotent.
 
+## Contract work required for Phase 2
+
+The draft currently exposes one CPU/memory budget. It does not yet define separate requests and limits required by DEV-008 and OPS-005. Resolve those portable semantics, their validation, and the schema migration in PLAN-002 before accepting scaling/policy tasks; do not silently interpret one budget as two independently configurable values. The first profile remains one image and one HTTP endpoint, with a fixed replica count; multiple replicas do not imply multiple components.
+
 ## Status and evolution
 
 Status includes at least `desiredRevision`, `observedRevision`, `phase`, `conditions`, `operationId`, and authorized endpoint information. Conditions carry timestamps, reasons, and redacted messages. Secret values and administrative provider credentials are excluded.

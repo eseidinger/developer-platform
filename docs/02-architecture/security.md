@@ -26,7 +26,7 @@ OIDC identities use stable issuer and subject identifiers, not only mutable disp
 
 Workloads, CI, and interactive database users receive separate identities. Database roles separate runtime DML from schema migration/ownership. Network access, authentication, and object authorization are distinct checks.
 
-Secrets are excluded from Git, ApplicationSpec, audit events, and AI context. Rotation proceeds from a new credential version through updated bindings and successful reconnection to revocation of the old version.
+Secret values are excluded from Git, ApplicationSpec, audit events, and AI context. Authorized secret references are permitted in ApplicationSpec; they do not disclose stored values. Rotation proceeds from a new credential version through updated bindings and successful reconnection to revocation of the old version.
 
 Docker daemon access belongs exclusively to the privileged provisioning path. A restricted API proxy alone does not guarantee tenant isolation: even permitted container creation must prevent arbitrary host mounts, privileged containers, and socket mounts. The lab assumes trusted workloads.
 

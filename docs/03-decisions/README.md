@@ -14,7 +14,6 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 | [006](ADR-006-python-quarkus-evolution.md) | Python prototype and possible Quarkus evolution | Open |
 | [007](ADR-007-ui-api-deployment.md) | Combined or separate UI/API deployment | Proposed |
 | [008](ADR-008-ai-assisted-operations.md) | AI for development and operations | Accepted product focus; execution design proposed |
-
 | [009](ADR-009-edge-and-cluster-ingress.md) | Caddy edge and Traefik cluster ingress | Accepted for hybrid starting profile; operational acceptance open |
 
 ## Decision process

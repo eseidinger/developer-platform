@@ -13,7 +13,7 @@ Offer the API-based lifecycle as understandable self-service. Angular is a porta
 - Provide a portal for projects, applications, deployments, redacted configuration, logs, and operations.
 - Provide a CLI using the same contract, with understandable errors and progress.
 - Create a web-application/PostgreSQL template, preferably as one deployable artifact.
-- Automate OIDC clients and redirect URIs for hosted applications if ADR-004 is accepted.
+- Resolve the ADR-004 implementation decision, then automate OIDC clients and redirect URIs for hosted applications. F-10 remains a Phase 3 requirement while the implementation choice is open; deferring that requirement requires an explicit scope amendment.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
 - Make ownership, roles, and the distinction between application and platform permissions visible.
 - At phase entry, review the deferred multi-component backlog against a concrete use case and measured capacity. Design independent updates, per-component results/configuration/secrets and a versioned migration path before scheduling implementation. Record the scheduling decision or continued deferral and next review trigger in the development plan; avoid hidden schema changes.

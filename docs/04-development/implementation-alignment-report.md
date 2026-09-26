@@ -2,6 +2,8 @@
 
 Assessment date: September 26, 2026. Source revision: `bbd509dd4bf3e3dbcb2094cfdaf92a35ab3100f8`.
 
+This is a dated source assessment, not the current delivery schedule. The backlog and phase gates were subsequently refined; use the [active plan](development-plan.md#backlog-delivery-commitments) for sequencing and the [delivery backlog](delivery-backlog.md) for acceptance tasks. The source findings and recorded test results below have not been rerun by documentation-only amendments. The former archive is available in Git history.
+
 ## Assessment
 
 The repository implements an **administrator-operated hybrid lab foundation**. It substantially matches the selected infrastructure topology, but does **not yet satisfy the Phase 1 acceptance gate** or the documented self-service MVP. The largest gaps are scoped authorization, the application/environment domain model, persistent asynchronous operations, observed deployment health, controlled removal, and demonstrated recovery and alert delivery.
@@ -154,7 +156,9 @@ The [smoke script](../../scripts/smoke.py) checks unauthenticated rejection, rep
 
 The [watchdog integration script](../../watchdog/scripts/test-watchdog.py) exercises temporary PHP/MariaDB services, but substitutes successful mail handoff and disables the optional HTTPS probe. It also checks schema import, repeated import preservation, and credential-safe authentication failures. It cannot establish real notification receipt. It was inspected, not executed; the separate PHP freshness and SMTP fixture tests above were executed.
 
-## Recommended sequence
+## Recommended sequence at assessment time
+
+The subsequent plan supersedes this ordering with Phase 1A protection, 1B accountable access and 1C lifecycle gates, followed by Phase 2 retained-backlog completion and portability. The historical recommendations below explain the assessment; they are not a competing execution plan.
 
 1. **Validate the current operational guidance.** Workspace-absence statements and broken links are corrected; current commands and the archived restore sequence are now discoverable with validation labels. Execute the documented flow on an isolated installation and record outcomes. The proxy choice is resolved by ADR-009; prioritize defining and testing the remaining network boundaries independently. Preserve other proposed ADR statuses until explicitly decided.
 2. **Complete the Phase 1 domain and security foundation.** Introduce project/environment/application identity, scoped authorization and audit, strict input validation, and explicit supported profile constraints. Preserve the existing hardened workload and PostgreSQL path.

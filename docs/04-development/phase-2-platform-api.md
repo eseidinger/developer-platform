@@ -1,6 +1,6 @@
 # Phase 2 – Stable Contract and Provider Portability
 
-Status: planned. Covers [F-04, F-07, F-08, N-01, and N-02](../01-product/requirements.md).
+Status: planned. Covers [F-07 and Phase 2 extensions of F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
 
 Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 
@@ -10,7 +10,7 @@ Evolve the working hybrid path into a reliable control plane and execute the sam
 
 ## Work packages
 
-1. Compare the actual API with [ApplicationSpec](../02-architecture/application-spec.md); implement the schema, OpenAPI contract, and versioning rules.
+1. Compare the actual API with [ApplicationSpec](../02-architecture/application-spec.md); implement the schema, OpenAPI contract, and versioning rules, including explicit request/limit resource semantics needed by scaling and policy tasks.
 2. Model capabilities and service profiles per environment. Remove backend-specific fields from the public contract.
 3. Harden persistent jobs, revisions, concurrent updates, retries, drift handling, and deletion plans.
 4. Add a Docker adapter alongside Kubernetes; reuse database and observability providers.

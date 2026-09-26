@@ -1,6 +1,6 @@
 # Phase 1 – Foundation and Usable Vertical Slice
 
-Status: partially implemented; acceptance gate remains open. The inspected Python API, PostgreSQL/Kubernetes provisioning, hybrid infrastructure, monitoring, and watchdog tooling provide the foundation. The [implementation alignment report](implementation-alignment-report.md) records passing local checks and remaining source gaps; live application/database acceptance, failure recovery, isolated restore, and alert receipt remain unverified. Covers [F-01 through F-06, F-08, and N-02 through N-08](../01-product/requirements.md).
+Status: partially implemented; acceptance gate remains open. The inspected Python API, PostgreSQL/Kubernetes provisioning, hybrid infrastructure, monitoring, and watchdog tooling provide the foundation. The [implementation alignment report](implementation-alignment-report.md) records passing local checks and remaining source gaps; live application/database acceptance, failure recovery, isolated restore, and alert receipt remain unverified. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
 
 Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 
@@ -37,9 +37,11 @@ OPS-001, OPS-002 and OPS-004 require all backlog criteria to pass. Reapply these
 
 ### 1C — Durable single-application lifecycle
 
-Implement the project/environment/application identity and supported single-image profile with stable IDs and minimally separated provider ports. Persist desired revisions and operation outcomes before side effects; resume after process interruption. Phase 2 hardens this baseline and adds revision selection, concurrency guarantees and portability.
+Implement the project/environment/application identity and supported single-image profile with stable IDs and minimally separated provider ports. Persist desired revisions and asynchronous jobs atomically before side effects; return an operation ID, expose authorized progress, and resume after worker interruption. Phase 2 hardens this baseline and adds revision selection, concurrency guarantees and portability.
 
+- Validate the supported single-image profile and reject unknown fields or unsupported capabilities before side effects; preserve technology-independent public identities and provider boundaries.
 - Deploy a sample application in a fresh environment and write/read PostgreSQL through it. Bind managed configuration/secrets, deny foreign-project database access, preserve data across updates and repeat identical requests without duplicate resources.
+- Exercise an authorized application restart without changing its desired spec or deleting data; record the operation and observe recovery readiness.
 - Interrupt provisioning after database creation and fail a deployment; retry resumes safely with durable, visible outcomes. Distinguish accepted configuration from observed readiness. Show desired/ready counts, active image and reasons for bad-image, unready, stalled and unschedulable states.
 - Provide validated ordinary configuration CRUD and separate authorized secret CRUD with redacted views/events. Report rollout requirements and activation/adoption; rotate credentials through successful reconnection and include new secret state in backup/restore acceptance.
 - Provide basic authorized logs, metrics and resource inspection for diagnosis. Mark missing/stale telemetry explicitly. Measure host/shared-service/workload/storage consumption and reserve before setting capacity targets.

@@ -15,7 +15,7 @@ The available Ubuntu host has **16 vCPUs and 32 GB RAM**. The hybrid design runs
 | Workload compute | k3d with project namespaces; implemented | Applications, services, secrets, and Traefik ingress; environment model remains proposed |
 | Observability | Docker outside k3d | Prometheus, Grafana, Loki, Alertmanager |
 | Collectors/exporters | Alongside monitored systems | Host, database, container, and Kubernetes signals |
-| Host watchdog | systemd outside Docker | Detect Docker/monitoring failures |
+| Host heartbeat sender | systemd outside Docker; implemented | Check API dependency and Prometheus readiness; stop heartbeats on failure so the external watchdog can notify |
 | External watchdog | Independent PHP/MySQL web hosting | Detect host/network failures using heartbeats and probes |
 
 [Topology diagram](diagrams/topology.md).
@@ -51,7 +51,7 @@ A possible **planning baseline**, not a measurement or capacity guarantee:
 
 Measure actual usable memory on the host: “32 GB” and “32 GiB” are not equivalent. Reduce budgets accordingly. Also constrain and measure CPU, I/O, connections, and log growth.
 
-All local components share one host failure domain. The host watchdog helps during Docker failures but cannot detect a complete host failure independently. The external watchdog remains necessary.
+All local components share one host failure domain. The host sender does not directly inspect the Docker daemon or deliver a local notification; failed API/Prometheus checks stop its heartbeat. The external watchdog detects expiry, including during host loss. Broader host checks remain target work; actual notification receipt remains unverified.
 
 ## Expansion option
 

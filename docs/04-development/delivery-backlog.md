@@ -26,7 +26,7 @@ Every checkbox is open because implementation/acceptance evidence has not been a
 
 Phase gates remain **1A → 1B → 1C → 2 → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Deferred tasks have no scheduled phase and cannot block the single-image gates. Component attribution in initial diagnostics uses the single supported component; rerun those checks when the model expands.
 
-For every task introducing an endpoint, data surface or persisted state, include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Repeat isolated restore when recovery scope changes. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
+Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Repeat isolated restore when recovery scope changes. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
 ## Phase task index
 
@@ -186,7 +186,7 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **DEV-008-T01 · 2** — Change fixed replicas and CPU/memory requests/limits for one component; test explained quota rejection and host-capacity scheduling diagnostics. Prerequisites: OPS-005-T02; DEV-006-T01.
+- [ ] **DEV-008-T01 · 2** — Change fixed replicas and CPU/memory requests/limits for one component; test explained quota rejection and host-capacity scheduling diagnostics. Prerequisites: PLAN-002; OPS-005-T02; DEV-006-T01.
 - [ ] **DEV-008-T02 · Deferred** — Scale and allocate resources independently per component, retaining quota and scheduling failure attribution. Prerequisites: DEV-001-T02; DEV-008-T01.
 
 
@@ -329,7 +329,7 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-005-T01 · 2** — Configure per-project quotas, resource defaults and allowed network/security policy; show impact on existing workloads and subsequent deployments. Prerequisites: OPS-004-T01; OPS-003-T01.
+- [ ] **OPS-005-T01 · 2** — Configure per-project quotas, resource defaults and allowed network/security policy; show impact on existing workloads and subsequent deployments. Prerequisites: PLAN-002; OPS-004-T01; OPS-003-T01.
 - [ ] **OPS-005-T02 · 2** — Reject security/quota violations with specific reasons; admit against aggregate host allocations after system/shared-service reserve and test policy enforcement. Prerequisites: OPS-005-T01; OPS-003-T02.
 
 
@@ -389,17 +389,17 @@ Phase tasks:
 
 ## Additional phase tasks
 
-These tasks make the existing phase work executable without inventing new DEV/OPS stories or treating portability, interfaces or AI as acceptance criteria for unrelated stories. They are mandatory within their assigned phase except where an existing ADR decision makes scope conditional. Deferred component implementation remains separate.
+These tasks make the existing phase work executable without inventing new DEV/OPS stories or treating portability, interfaces or AI as acceptance criteria for unrelated stories. They are mandatory within their assigned phase. An unresolved ADR may block implementation choices; it does not waive a requirement or permit phase closure without its acceptance evidence. An explicit scope change must update the requirements and phase plan together. Deferred component implementation remains separate.
 
-- [ ] **PLAN-001 · 1C** — Implement stable project/environment/application identity and persisted desired revisions/operations before side effects, with a supported single-image profile and minimal provider ports; demonstrate minimal API/CLI deployment and record installation versions/parameters. Prerequisites: Phase 1B gate.
-- [ ] **PLAN-002 · 2** — Complete ApplicationSpec/API fit-gap and schema reuse assessment, versioned OpenAPI contract, environment capabilities/profiles and migration rules; reject unsupported requests before side effects and keep backend fields out of the public contract. Prerequisites: Phase 1 gate.
+- [ ] **PLAN-001 · 1C** — Implement stable project/environment/application identity and atomically persisted desired revisions/asynchronous jobs before side effects, returning an operation ID with authorized progress and worker-interruption recovery. Validate the supported single-image profile, reject unknown fields/unsupported capabilities before side effects, and use technology-independent public identities and minimal provider ports. Demonstrate an authorized application restart with unchanged desired spec, retained data and observed readiness; demonstrate minimal API/CLI deployment and record installation versions/parameters. Prerequisites: Phase 1B gate.
+- [ ] **PLAN-002 · 2** — Complete ApplicationSpec/API fit-gap and schema reuse assessment, versioned OpenAPI contract, environment capabilities/profiles, explicit CPU/memory request/limit semantics and migration rules; reject unsupported requests before side effects and keep backend fields out of the public contract. Prerequisites: Phase 1 gate.
 - [ ] **PLAN-003 · 2** — Harden worker interruption, concurrent writes, revision retention and drift recovery; prove no duplicated resources/lost revisions and redacted traceable provider failures. Prerequisites: PLAN-002; DEV-007-T02.
 - [ ] **PLAN-004 · 2** — Add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: PLAN-002; PLAN-003; Phase 2 retained-backlog packages.
 - [ ] **PLAN-005 · 2** — Record ADR-006 language decision; if migration is selected, create separately gated parity/state-migration tasks before execution. A decision alone does not prove migration complete. Prerequisites: Code/effort analysis before contract stabilization.
 - [ ] **PLAN-006 · 3** — Deliver portal and CLI using the same API for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail server-side. Prerequisites: Phase 2 gate.
 - [ ] **PLAN-007 · 3** — Deliver the web/PostgreSQL template and reproducible create/deploy/diagnose journey; verify UI/API compatibility and document the role matrix. Prerequisites: PLAN-006.
 - [ ] **PLAN-008 · 3** — Deliver separate authorized/audited human database identity and controlled tunnel; test foreign-project denial, credentials distinct from application credentials, and revocation of new/existing sessions per policy. Prerequisites: Phase 2 gate; accepted IAM design.
-- [ ] **PLAN-009 · 3** — Automate hosted-application OIDC clients/redirect URIs; demonstrate platform/application role separation and no implicit platform-admin access. Record the decision if this conditional scope remains blocked. Prerequisites: Phase 2 gate; ADR-004 acceptance.
+- [ ] **PLAN-009 · 3** — Automate hosted-application OIDC clients/redirect URIs; demonstrate platform/application role separation and no implicit platform-admin access. Record the blocking decision while the implementation choice remains open; F-10 acceptance is still required for Phase 3 completion. Prerequisites: Phase 2 gate; ADR-004 acceptance.
 - [ ] **PLAN-010 · 4.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 3 gate; scoped data/audit evidence.
 - [ ] **PLAN-011 · 4.2** — Correlate incident logs, metrics and history with timestamps/comparison windows; distinguish observations/hypotheses and explicitly report missing evidence. Prerequisites: PLAN-010; DEV-004-T02; DEV-005-T02; DEV-007-T02.
 - [ ] **PLAN-012 · 4.3** — Implement read-only investigation with tool budgets/errors; evaluate bad database host, pool exhaustion, resource pressure and insufficient evidence for diagnosis, abstention, unnecessary calls and time/cost; test injection and secret/project boundaries. Prerequisites: PLAN-011.
