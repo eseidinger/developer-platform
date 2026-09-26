@@ -4,8 +4,8 @@ __pycache__/
 *.pyc
 .venv/
 ansible/inventory.yml
-watchdog/src/config.local.php
-watchdog/ansible/inventory.watchdog.yml
-watchdog/ansible/inventory.heartbeat.yml
-ansible/inventory.backup.yml
-ansible/backup-secrets.yml
+operations/watchdog/src/config.local.php
+operations/watchdog/ansible/inventory.watchdog.yml
+operations/heartbeat/ansible/inventory.heartbeat.yml
+operations/backup/ansible/inventory.backup.yml
+operations/backup/ansible/backup-secrets.yml

@@ -1,6 +1,6 @@
 # Deployment and Installation
 
-Status: **operational draft** for the target hybrid installation. Executable [bootstrap](../../scripts/up.sh), [platform Ansible](../../ansible/deploy.yml), and [watchdog/heartbeat playbooks](../../watchdog/ansible/README.md) exist. Follow the [root setup guide](../../README.md) and [Ansible guide](../../ansible/README.md) for current commands.
+Status: **operational draft** for the target hybrid installation. Executable [bootstrap](../../scripts/up.sh), [platform Ansible](../../ansible/deploy.yml), and [watchdog/heartbeat playbooks](../../operations/watchdog/ansible/README.md) exist. Follow the [root setup guide](../../README.md) and [Ansible guide](../../ansible/README.md) for current commands.
 
 The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records the inspected source baseline and passing local checks, including Compose configuration, shell syntax, and watchdog/heartbeat playbook syntax. No target-host deployment or live acceptance was performed in that assessment. The sequence below describes the target procedure; identity-provider setup, persistent workers, revision-aware reconciliation, and the complete acceptance flow remain implementation gaps.
 
@@ -51,7 +51,7 @@ Without `--volumes`, teardown retains Compose service volumes, including Postgre
 
 `bash scripts/down.sh --volumes` deletes persistent Compose service data as well as the cluster. It is a deliberate disposable-lab reset, not a recovery or routine upgrade step. Both teardown modes preserve `.env`, local backups, and installed tools.
 
-Configure the [watchdog and heartbeat](../../watchdog/ansible/README.md) and [off-host backup process](backup-recovery.md) separately. Installation alone does not verify notification receipt or recoverability.
+Configure the [watchdog and heartbeat](../../operations/watchdog/ansible/README.md) and [off-host backup process](backup-recovery.md) separately. Installation alone does not verify notification receipt or recoverability.
 
 ## Target installation and release procedures
 

@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 EnvironmentFile=/etc/developer-platform/watchdog.env
-ExecStart=/usr/bin/python3 /opt/developer-platform/watchdog/scripts/heartbeat.py
+ExecStart=/usr/bin/python3 /usr/local/lib/developer-platform/heartbeat.py
 DynamicUser=true
 ProtectSystem=strict
 ProtectHome=true

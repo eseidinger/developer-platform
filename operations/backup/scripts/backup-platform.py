@@ -160,6 +160,11 @@ class Job:
                     raise BackupError('required source missing')
                 archive.add(source, arcname=name,
                             filter=lambda item: None if '__pycache__' in Path(item.name).parts else item)
+            # Older deployed checkouts retain the manual helper in scripts/.
+            backup_scripts = self.root / 'operations/backup/scripts'
+            if backup_scripts.exists():
+                archive.add(backup_scripts, arcname='operations/backup/scripts',
+                            filter=lambda item: None if '__pycache__' in Path(item.name).parts else item)
         config_dir = Path(self.config.get('config_dir', '/etc/developer-platform'))
         with tarfile.open(bundle / 'host-config.tar.gz', 'w:gz') as archive:
             archive.add(config_dir, arcname='etc/developer-platform')

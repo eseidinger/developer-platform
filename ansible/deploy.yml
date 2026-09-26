@@ -136,6 +136,7 @@
               - persistence
               - platform
               - scripts
+              - operations/backup/scripts
           delegate_to: localhost
           become: false
           changed_when: true

@@ -140,7 +140,8 @@ Current procedures: [deployment and lifecycle](docs/05-operations/deployment.md)
   same PUT request. Databases are never deleted automatically.
 
 [Backup and recovery](docs/05-operations/backup-recovery.md) ·
-[Watchdog installation](watchdog/README.md) ·
+[Operational tooling](operations/README.md) ·
+[Watchdog installation](operations/watchdog/README.md) ·
 [Architecture decisions](docs/03-decisions/README.md)
 
 ## Validation
@@ -148,15 +149,16 @@ Current procedures: [deployment and lifecycle](docs/05-operations/deployment.md)
 ```bash
 docker compose config --quiet
 python3 -m unittest discover -s tests -v
-python3 -m compileall -q platform scripts
-bash -n scripts/up.sh scripts/down.sh scripts/backup.sh
+python3 -m unittest discover -s operations/backup/tests -v
+python3 -m compileall -q platform scripts operations
+bash -n scripts/up.sh scripts/down.sh
 python3 scripts/smoke.py
 ```
 
 Additional live checks:
 `python3 scripts/isolation.py` tests PostgreSQL and network isolation after
 policies have converged; it retains the `isolation` test project.
-`python3 watchdog/scripts/test-watchdog.py` starts temporary PHP/MariaDB containers and
+`python3 operations/watchdog/scripts/test-watchdog.py` starts temporary PHP/MariaDB containers and
 removes only that test project afterward. Email handoff is simulated;
 no emails are sent.
 
@@ -165,7 +167,7 @@ kube-router rules take effect. This installation is intended for trusted lab
 workloads, not untrusted multi-tenancy.
 
 With PHP >=8.2, PDO-MySQL, and optionally cURL, run:
-`php watchdog/tests/watchdog.php` and `php -l` for all PHP files.
+`php operations/watchdog/tests/watchdog.php` and `php -l` for all PHP files.
 CI runs syntax/configuration checks and unit tests; the full integration test
 requires a Docker host with k3d.
 

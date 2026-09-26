@@ -4,7 +4,7 @@ Status: operational draft based on [ADR-005](../03-decisions/ADR-005-observabili
 
 ## Current inspection and evidence
 
-The [runbook](runbook.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbook.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../watchdog/README.md) and [deployment playbooks guide](../../watchdog/ansible/README.md).
+The [runbook](runbook.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbook.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../operations/watchdog/README.md) and [deployment playbooks guide](../../operations/watchdog/ansible/README.md).
 
 Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager has a `local-only` receiver with no notification integration. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. Independent backup-age/failure checks now exist in the optional backup watchdog channel; deployment and actual backup-alert receipt still require verification.
 
@@ -51,7 +51,7 @@ The [Runbook](runbook.md) describes responses; [Observability architecture](../0
 
 ## Scheduled backup monitoring
 
-Deploy the separate `backup.php` channel and [scheduled backup job](../../ansible/README.md#scheduled-backups-and-independent-backup-alerts)
+Deploy the separate `backup.php` channel and [scheduled backup job](../../operations/backup/README.md#scheduled-backups-and-independent-backup-alerts)
 for capture-time freshness independent of host heartbeat. The backup channel alerts
 on explicit failure, no success, age over 24 hours or an attempt running over two
 hours. Local `status.json` distinguishes verified storage from pending notification;

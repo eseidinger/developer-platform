@@ -1,6 +1,6 @@
 # Backup and Recovery
 
-Status: current commands reviewed against [backup.sh](../../scripts/backup.sh), Compose, and the API at the source baseline in the [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions). The SQL restore/reapply sequence is carried forward from the archived operations guide and adapted to current paths. **No backup, SQL import, cluster recreation, or application recovery was executed for this documentation update.** Syntax checks do not establish recoverability.
+Status: current commands reviewed against the [backup runner](../../operations/backup/scripts/backup-platform.py), Compose, and the API at the source baseline in the [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions). The SQL restore/reapply sequence is carried forward from the archived operations guide and adapted to current paths. **No backup, SQL import, cluster recreation, or application recovery was executed for this documentation update.** Syntax checks do not establish recoverability.
 
 ## Current backup scope
 
@@ -17,10 +17,10 @@ The workload contract has no PVCs; durable application data belongs in PostgreSQ
 
 ## Set up encrypted off-host storage
 
-Use the [backup repository playbook](../../ansible/README.md#encrypted-s3-backup-repository-setup)
+Use the [backup repository playbook](../../operations/backup/README.md#encrypted-s3-backup-repository-setup)
 to install restic, configure private S3 credentials and a separately recoverable
 repository password, and explicitly initialize a new repository when needed.
-This prepares storage only. The separate [scheduled backup playbook](../../ansible/README.md#scheduled-backups-and-independent-backup-alerts)
+This prepares storage only. The separate [scheduled backup playbook](../../operations/backup/README.md#scheduled-backups-and-independent-backup-alerts)
 adds capture, exact-snapshot readback, retention and independent backup alerts;
 target-host execution and isolated application restore acceptance remain open. The confirmed policy and
 implementation evidence are tracked under OPS-006 in the
@@ -28,23 +28,20 @@ implementation evidence are tracked under OPS-006 in the
 
 ## Make a current backup
 
-Run from the repository root on the source host, with PostgreSQL running and access to its Compose project. An Ansible installation requires a privileged shell in `/opt/developer-platform`.
+After completing [backup deployment](../../operations/backup/README.md#scheduled-backups-and-independent-backup-alerts), start the managed backup service on the source host:
 
 ```bash
-bash scripts/backup.sh
+sudo systemctl start platform-backup.service
+sudo cat /var/lib/developer-platform-backup/status.json
+sudo journalctl -u platform-backup.service -n 40 --no-pager
+sudo /usr/local/sbin/platform-restic snapshots --host node-01 --tag developer-platform,verified
 ```
 
-The script creates `.runtime/backups/postgres-<UTC timestamp>.sql.gz` with private permissions. It writes to a temporary file and publishes the final name only after `pg_dumpall` and gzip succeed. It includes role password hashes and all databases. Select the exact path printed by the script; do not select an unfinished `.tmp` file.
+The service captures PostgreSQL roles/databases, deployment configuration, and service data; encrypts and uploads the bundle; verifies an exact-snapshot readback; and applies retention. Caddy and Grafana briefly stop during capture. Starting an already-running service does not create another backup.
 
-```bash
-backup_file=.runtime/backups/postgres-REPLACE_WITH_TIMESTAMP.sql.gz
-gzip -t "$backup_file"
-sha256sum "$backup_file"
-```
+Confirm `result: success`, a recent capture timestamp, and the matching verified snapshot. Record its full identifier and source revision. Notification delivery can remain pending even after a verified backup; inspect the journal and status before retrying.
 
-Replace the placeholder before execution. Record the checksum, source revision, PostgreSQL version, UTC time, and backup identifier alongside the encrypted recovery bundle. Gzip integrity is not SQL or data validation. Coordinate application writes if the recovery scenario needs consistency across multiple databases; this dump does not provide a single cross-database application transaction snapshot.
-
-Encrypt the dump and `.env` using the operator's selected backup system, copy them off-host, and verify retrieval and decryption. The scheduled backup playbook supplies encryption/upload/scheduler/retention automation; this manual SQL command alone does not invoke it. Confirm the installation-specific recovery targets, storage, recipients and retention before operational acceptance. Preserve the original `DATABASE_KEY`: generating a replacement will produce credentials that do not match restored roles.
+Follow [bundle retrieval](#retrieve-a-scheduled-recovery-bundle) to obtain the verified `postgres.sql.gz` and original `.env` for an isolated restore. Preserve the original `DATABASE_KEY`: generating a replacement produces credentials that do not match restored roles. Coordinate application writes if consistency across databases is required; the dump does not provide a single cross-database application transaction snapshot.
 
 ## Restore into an isolated installation
 
@@ -71,7 +68,7 @@ docker compose exec -T postgres psql -X -U postgres -d postgres -c '\l'
 set -o pipefail
 umask 077
 mkdir -p .runtime/recovery
-backup_file=/absolute/private/path/postgres-REPLACE_WITH_TIMESTAMP.sql.gz
+backup_file=/absolute/private/path/bundle/postgres.sql.gz
 gzip -t "$backup_file" && gzip -dc "$backup_file" | \
   docker compose exec -T postgres psql -X -U postgres -d postgres \
   > .runtime/recovery/restore.stdout 2> .runtime/recovery/restore.stderr

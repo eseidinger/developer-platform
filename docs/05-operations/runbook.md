@@ -73,7 +73,7 @@ sudo journalctl -u platform-heartbeat.service -n 50 --no-pager
 
 The oneshot service can be inactive between successful runs; inspect its last result and timer schedule. It sends only when API dependency readiness and Prometheus readiness pass. Check those endpoints first, then sender connectivity, endpoint/token configuration, and TLS without printing secrets.
 
-On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../watchdog/README.md). A stale cron makes the status page unavailable, but has no independent notifier. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
+On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../operations/watchdog/README.md). A stale cron makes the status page unavailable, but has no independent notifier. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
 
 ## Docker or k3d unavailable
 
@@ -143,5 +143,5 @@ sudo systemctl start platform-backup-recover.service
 Do not run recovery concurrently with capture or remove the process lock. Avoid
 `restic unlock` until all restic processes have stopped and a stale repository lock
 has been established. Unverified/pending snapshots require investigation; do not
-count them as recovery points. See the [backup deployment guide](../../ansible/README.md#scheduled-backups-and-independent-backup-alerts)
+count them as recovery points. See the [backup deployment guide](../../operations/backup/README.md#scheduled-backups-and-independent-backup-alerts)
 for service interruption, retention and restore limits.

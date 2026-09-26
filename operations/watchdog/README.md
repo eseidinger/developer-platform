@@ -8,7 +8,7 @@ SMTP; cURL is also required for optional HTTPS checks.
 For hosting with SSH and SCP, the [Ansible deployment playbook](ansible/README.md#external-watchdog-via-scp)
 automates the file upload, private configuration upload, and optional cron job.
 
-1. Upload the contents of `watchdog/src/` to the web host’s `watchdog/` directory.
+1. Upload the contents of `operations/watchdog/src/` to the web host’s `watchdog/` directory.
    Set DocumentRoot exclusively to
    `watchdog/public/`. `common.php`, `config.local.php`, and `cron.php`
    must remain outside publicly accessible directories.
@@ -29,12 +29,13 @@ automates the file upload, private configuration upload, and optional cron job.
 6. On the Docker host, create `/etc/developer-platform/watchdog.env` with mode 0600:
    `WATCHDOG_URL=https://status.example.com/heartbeat.php` and
    `WATCHDOG_TOKEN=...`.
-7. Copy both units from `watchdog/systemd/` to `/etc/systemd/system/`;
-   adjust the installation path in ExecStart if necessary.
+7. Install `operations/heartbeat/scripts/heartbeat.py` as
+   `/usr/local/lib/developer-platform/heartbeat.py` (mode 0644, parent directory 0755).
+   Copy both units from `operations/heartbeat/systemd/` to `/etc/systemd/system/`.
    Run `systemctl daemon-reload` and
    `systemctl enable --now platform-heartbeat.timer`.
 
-Steps 6–7 can be automated with the [heartbeat Ansible playbook](ansible/README.md#platform-heartbeat),
+Steps 6–7 can be automated with the [heartbeat Ansible playbook](../heartbeat/README.md),
 which also installs the sender script in a location readable by the systemd service.
 
 If schema import fails, the importer reports the failing stage, SQLSTATE, driver
@@ -75,16 +76,15 @@ actual email delivery and a public installation have not been tested.
 ## Repository layout and tests
 
 The PHP application, configuration, and SQL schema live in `src/`; `ansible/` contains deployment
-playbooks and inventory examples, `scripts/` contains the heartbeat sender and
-integration runner, `systemd/` contains the host units, and `tests/` contains
+playbooks and inventory examples, `scripts/` contains the integration runner, and `tests/` contains
 the PHP checks and disposable container stack.
 
 From the repository root:
 
 ```bash
-php watchdog/tests/watchdog.php
-php -d curl.cainfo=/tmp/watchdog-smtp-cert.pem -d sendmail_path=/bin/true watchdog/tests/watchdog-mail.php
-python3 watchdog/scripts/test-watchdog.py
+php operations/watchdog/tests/watchdog.php
+php -d curl.cainfo=/tmp/watchdog-smtp-cert.pem -d sendmail_path=/bin/true operations/watchdog/tests/watchdog-mail.php
+python3 operations/watchdog/scripts/test-watchdog.py
 ```
 
 ## Independent backup monitoring
@@ -94,7 +94,7 @@ python3 watchdog/scripts/test-watchdog.py
 disabled for existing installations. To enable, upload the current release,
 re-run the CLI schema importer, then set a random token distinct from the host
 heartbeat token. The additive `backup_monitor` table preserves existing host
-state. Use the same new token for the [scheduled backup playbook](../ansible/README.md#scheduled-backups-and-independent-backup-alerts).
+state. Use the same new token for the [scheduled backup playbook](../backup/README.md#scheduled-backups-and-independent-backup-alerts).
 
 The existing cron now checks both channels independently. Backup events never
 update `monitor.last_heartbeat`; host heartbeats never update `backup_monitor`.
@@ -116,7 +116,7 @@ The platform runner queues undelivered events locally; cron retries failed mail
 handoff without marking it delivered. This does not independently monitor failure
 of the external watchdog host or its cron.
 
-Run `php watchdog/tests/backup.php` for pure transition/freshness tests.
+Run `php operations/watchdog/tests/backup.php` for pure transition/freshness tests.
 The disposable integration test also covers separate-token denial, replay handling,
 host/backup independence, overdue/stalled conditions and repeat schema import.
 Mail remains simulated in that test; verify actual BACKUP DOWN and UP receipt.
