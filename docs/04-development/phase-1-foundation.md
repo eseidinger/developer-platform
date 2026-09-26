@@ -1,6 +1,6 @@
 # Phase 1 – Foundation and Usable Vertical Slice
 
-Status: partially implemented; acceptance gate remains open. The inspected Python API, PostgreSQL/Kubernetes provisioning, hybrid infrastructure, monitoring, and watchdog tooling provide the foundation. The [implementation alignment report](implementation-alignment-report.md) records passing local checks and remaining source gaps; live application/database acceptance, failure recovery, isolated restore, and alert receipt remain unverified. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
+Status: acceptance gate open; see [backlog task evidence](delivery-backlog.md#evidence-conventions) for the dated implementation baseline and verification limits. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
 
 Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 

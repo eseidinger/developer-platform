@@ -2,11 +2,11 @@
 
 Status: **operational draft** for the target hybrid installation. Executable [bootstrap](../../scripts/up.sh), [platform Ansible](../../ansible/deploy.yml), and [watchdog/heartbeat playbooks](../../watchdog/ansible/README.md) exist. Follow the [root setup guide](../../README.md) and [Ansible guide](../../ansible/README.md) for current commands.
 
-The [implementation alignment report](../04-development/implementation-alignment-report.md) records the inspected source baseline and passing local checks, including Compose configuration, shell syntax, and watchdog/heartbeat playbook syntax. No target-host deployment or live acceptance was performed in that assessment. The sequence below describes the target procedure; identity-provider setup, persistent workers, revision-aware reconciliation, and the complete acceptance flow remain implementation gaps.
+The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records the inspected source baseline and passing local checks, including Compose configuration, shell syntax, and watchdog/heartbeat playbook syntax. No target-host deployment or live acceptance was performed in that assessment. The sequence below describes the target procedure; identity-provider setup, persistent workers, revision-aware reconciliation, and the complete acceptance flow remain implementation gaps.
 
 ## Current installation and lifecycle
 
-**Validation:** the commands below were reviewed against the repository scripts. Shell syntax and Compose configuration checks passed in the [alignment assessment](../04-development/implementation-alignment-report.md); deployment, restart, and recreation were not executed for this documentation update.
+**Validation:** the commands below were reviewed against the repository scripts. Shell syntax and Compose configuration checks passed in the [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions); deployment, restart, and recreation were not executed for this documentation update.
 
 Run from the repository root on the intended host, with the prerequisites in the [setup guide](../../README.md). For an Ansible installation, use a privileged shell in `/opt/developer-platform`; its configuration/runtime directories are root-only. Use a fresh trusted shell so previously exported settings do not override `.env`.
 

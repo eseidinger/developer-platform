@@ -47,6 +47,6 @@ Source inspection establishes the routing and certificate-eligibility paths, not
 5. Recovery of Caddy certificate state and configuration from protected storage, followed by routing/TLS verification.
 6. Forwarded client/protocol headers across both proxies, and allowed/denied connectivity when network segmentation is implemented.
 
-These exercises remain unverified. Record environment, revision, certificate state, timing, and outcomes in the [alignment report](../04-development/implementation-alignment-report.md) before claiming acceptance.
+These exercises remain unverified. Record environment, revision, certificate state, timing, and outcomes beside DEV-009-T01 and OPS-007-T01 in the [delivery backlog](../04-development/delivery-backlog.md) before claiming acceptance.
 
 Details: [Infrastructure](../02-architecture/infrastructure.md), [Topology](../02-architecture/diagrams/topology.md), [Deployment](../05-operations/deployment.md).

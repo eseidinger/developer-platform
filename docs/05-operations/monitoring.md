@@ -8,7 +8,7 @@ The [runbook](runbook.md#inspect-the-current-installation) contains dependency a
 
 Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager has a `local-only` receiver with no notification integration. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, backup-age alerts, maintenance windows, and a separate local notification service are not implemented.
 
-The [alignment report](../04-development/implementation-alignment-report.md) records passing local watchdog freshness and SMTP fixture tests. Real delivery, public probes, and cluster/host outage exercises remain unverified. Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
+The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. Real delivery, public probes, and cluster/host outage exercises remain unverified. Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
 
 ## Target coverage and alert contract
 

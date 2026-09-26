@@ -18,11 +18,7 @@ As of September 26, 2026. Future phases are proposals without confirmed dates.
 
 ## Implementation status
 
-The inspected baseline is an administrator-operated hybrid foundation: a Python API persists project specs/status, provisions PostgreSQL databases/logins, and applies hardened Kubernetes workloads and generated credential Secrets. Compose, bootstrap/Ansible deployment, monitoring, local SQL backups, and external watchdog/heartbeat tooling exist in this repository.
-
-The [implementation alignment report](implementation-alignment-report.md) records the September 26, 2026 assessment at revision `bbd509dd4bf3e3dbcb2094cfdaf92a35ab3100f8`. Python unit/syntax checks, shell syntax, Compose configuration, PHP freshness/SMTP fixture tests and lint, and watchdog/heartbeat Ansible syntax checks passed locally. These results establish source and local-check evidence; they do not establish a working target-host installation or live acceptance.
-
-Phase 1 remains incomplete. Scoped authorization, the project/environment/application model, durable operations, observed health, controlled removal, application/database write-read acceptance, isolated restore, and demonstrated alert receipt remain open. No phase is marked complete by this assessment.
+The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation; no phase has acceptance evidence establishing completion. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment.
 
 ## Work sequence and gates
 
@@ -87,7 +83,7 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 
 | Topic | Next step | Gate |
 |---|---|---|
-| Operational state and acceptance | Use the inspected source baseline in the [alignment report](implementation-alignment-report.md); inventory live resources and record acceptance exercises | Phase 1 |
+| Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](delivery-backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
 | Python / Quarkus | Decide ADR-006 using code and effort analysis | Phase 2 |
 | Identity provider, roles, and realm model | Explicitly accept the detailed ADR-004 approach | Minimal IAM in Phase 1; expansion in Phase 3 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
@@ -98,4 +94,4 @@ The project owner decides scope and ADRs; implementation and operations provide 
 
 ## Recording progress
 
-For each completed work package and story criterion, record the date, repository revision, environment, test/demo results, and remaining limitations. Link evidence from the delivery table before closing a story; all its acceptance criteria must pass, including any deferred component-specific criteria. Record partial slices separately. Recheck authorization/audit and backup coverage whenever new endpoints, secrets, identities, revisions, or inventories are introduced. Update the roadmap and ADR when scope changes. A requested or generated artifact alone does not prove an operational system.
+For each completed work package and story criterion, record the date, repository revision, environment, test/demo results, and remaining limitations. Record and link evidence beside the relevant backlog task before closing a story; all its acceptance criteria must pass, including any deferred component-specific criteria. Record partial slices separately. Recheck authorization/audit and backup coverage whenever new endpoints, secrets, identities, revisions, or inventories are introduced. Update the roadmap and ADR when scope changes. A requested or generated artifact alone does not prove an operational system.

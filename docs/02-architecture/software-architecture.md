@@ -1,6 +1,6 @@
 # Software Architecture
 
-Status: target design draft. The inspected [Python API](../../platform/app/main.py) synchronously provisions PostgreSQL and Kubernetes resources and persists the latest project spec/status. The [implementation alignment report](../04-development/implementation-alignment-report.md) records source evidence and local checks; live acceptance remains unverified. The domain modules, asynchronous operations, and provider contract below remain proposed. Quarkus and a multi-service implementation have not been selected.
+Status: target design draft. The inspected [Python API](../../platform/app/main.py) synchronously provisions PostgreSQL and Kubernetes resources and persists the latest project spec/status. The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records source evidence and local checks; live acceptance remains unverified. The domain modules, asynchronous operations, and provider contract below remain proposed. Quarkus and a multi-service implementation have not been selected.
 
 ## Ports and adapters
 

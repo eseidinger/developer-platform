@@ -15,14 +15,13 @@ As of September 26, 2026. This documentation covers the product, target architec
 
 ## Status and evidence
 
-The [implementation alignment report](04-development/implementation-alignment-report.md) records the September 26, 2026 source assessment at revision `bbd509dd4bf3e3dbcb2094cfdaf92a35ab3100f8`, requirements coverage, local verification results, and remaining acceptance gaps.
+The [delivery backlog](04-development/delivery-backlog.md#evidence-conventions) is the authoritative task and evidence register. It distinguishes source implementation, executed local checks and operational acceptance, with dated revisions and environment limits. Update those task records as work ships; the development plan defines sequencing and ADRs define decisions.
 
-- **Confirmed requirement:** an established project constraint. These include a technology-independent API, the hybrid starting topology, and AI support for development and operations.
-- **Implemented in source:** an administrator-operated Python API provisions PostgreSQL databases/logins and Kubernetes workloads with generated credentials in Secrets. Compose, bootstrap/Ansible automation, monitoring, backups, and watchdog tooling are present.
-- **Verified locally:** Python unit/syntax checks, shell syntax, Compose configuration, PHP freshness/SMTP fixture tests and lint, and watchdog/heartbeat Ansible syntax checks passed as recorded in the report.
-- **Unverified operationally:** live installation, application/database acceptance, scoped user isolation, failure recovery, isolated restore, and real notification receipt are not established by these checks. Phase 1 remains incomplete.
-- **Proposed:** an architectural approach that has not yet been accepted as a product decision.
-- **Specification draft:** details that make the contract consistent and the implementation verifiable. They do not imply an implemented interface or an accepted decision.
+- **Confirmed requirement:** an established project constraint, not implementation evidence.
+- **Implemented in source:** a concrete code/configuration path, not proof of deployment.
+- **Verified locally:** a recorded check passed within its stated scope.
+- **Accepted operationally:** the task's acceptance criteria passed in a recorded environment.
+- **Proposed / specification draft:** target behavior or a decision still requiring implementation or acceptance.
 
 Examples use illustrative versions, URLs, and names. Actual software versions, domains, capacity, and operational targets must be selected before installation. This documentation is not a current product or version assessment.
 
@@ -30,4 +29,4 @@ Examples use illustrative versions, URLs, and names. Actual software versions, d
 
 The target architecture in `02-architecture/` describes the intended system. ADRs record rationale and alternatives; `04-development/` records architectural evolution and planned work. Operational documents describe intended procedures until execution evidence is added.
 
-For an architectural change, update the relevant ADR first, followed by affected specifications, requirements, and phases. Supersede accepted ADRs with new records rather than rewriting past decisions. Record verifiable implementation and acceptance evidence for completed features in the development plan.
+For an architectural change, update the relevant ADR first, followed by affected specifications, requirements, and phases. Supersede accepted ADRs with new records rather than rewriting past decisions. Record verifiable implementation and acceptance evidence beside delivery-backlog tasks; update the development plan only when sequencing or scope changes.

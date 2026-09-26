@@ -1,6 +1,6 @@
 # Operations Runbook
 
-Status: current administrator procedures reviewed against source; commands were not run against a live installation for this update. See the [implementation alignment report](../04-development/implementation-alignment-report.md) for checks actually performed. Run commands from the repository root on the affected host; an Ansible installation requires a privileged shell in `/opt/developer-platform`.
+Status: current administrator procedures reviewed against source; commands were not run against a live installation for this update. See the [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) for checks actually performed. Run commands from the repository root on the affected host; an Ansible installation requires a privileged shell in `/opt/developer-platform`.
 
 ## Inspect the current installation
 

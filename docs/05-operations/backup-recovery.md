@@ -1,6 +1,6 @@
 # Backup and Recovery
 
-Status: current commands reviewed against [backup.sh](../../scripts/backup.sh), Compose, and the API at the source baseline in the [implementation alignment report](../04-development/implementation-alignment-report.md). The SQL restore/reapply sequence is carried forward from the archived operations guide and adapted to current paths. **No backup, SQL import, cluster recreation, or application recovery was executed for this documentation update.** Syntax checks do not establish recoverability.
+Status: current commands reviewed against [backup.sh](../../scripts/backup.sh), Compose, and the API at the source baseline in the [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions). The SQL restore/reapply sequence is carried forward from the archived operations guide and adapted to current paths. **No backup, SQL import, cluster recreation, or application recovery was executed for this documentation update.** Syntax checks do not establish recoverability.
 
 ## Current backup scope
 
