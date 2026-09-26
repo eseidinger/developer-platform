@@ -9,7 +9,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 os.chdir(Path(__file__).resolve().parents[1])
-env = dict(os.environ, TEST_PASSWORD=secrets.token_hex(24), TEST_TOKEN=secrets.token_hex(32))
+env = dict(os.environ, TEST_PASSWORD=secrets.token_hex(24), TEST_TOKEN=secrets.token_hex(32), TEST_BACKUP_TOKEN=secrets.token_hex(32))
 compose = ["docker", "compose", "-p", "platform-watchdog-test", "-f", "tests/compose.watchdog.yaml"]
 def run(*args, **kwargs):
     return subprocess.run(compose + list(args), env=env, check=True, **kwargs)
@@ -17,8 +17,8 @@ existing = run("ps", "-aq", capture_output=True, text=True).stdout.strip()
 if existing:
     raise SystemExit("Existing watchdog-test containers found; refusing to alter them")
 
-def http(path, token=None, method="GET"):
-    request = urllib.request.Request("http://127.0.0.1:18088/" + path, method=method,
+def http(path, token=None, method="GET", data=None):
+    request = urllib.request.Request("http://127.0.0.1:18088/" + path, method=method, data=json.dumps(data).encode() if data is not None else None,
         headers={"Authorization": "Bearer " + token} if token else {})
     try:
         with urllib.request.urlopen(request, timeout=5) as response:
@@ -77,6 +77,48 @@ try:
     query("UPDATE monitor SET checked_at = UTC_TIMESTAMP() - INTERVAL 10 MINUTE")
     assert http("") == 503
     print("PASS: watchdog authentication, throttling, heartbeat expiry, recovery and stale cron")
+    backup_token = env["TEST_BACKUP_TOKEN"]
+    assert http("backup.php", env["TEST_TOKEN"]) == 401
+    assert http("heartbeat.php", backup_token, "POST") == 401
+    assert http("backup.php", backup_token) == 200
+    def scalar(sql):
+        php = "$c=require '/app/config.local.php'; require '/app/common.php'; echo database($c)->query(" + json.dumps(sql) + ")->fetchColumn();"
+        return run("exec", "-T", "php", "php", "-r", php, capture_output=True, text=True).stdout
+    original_heartbeat = scalar('SELECT last_heartbeat FROM monitor WHERE id=1')
+    start = int(time.time()) - 2
+    event = {"run_id": "a" * 32, "started": start, "event": "success", "snapshot": "b" * 64}
+    assert http("backup.php", backup_token, "POST", {**event, "started": int(time.time()) + 1000}) == 400
+    assert http("backup.php", backup_token, "POST", event) == 204
+    assert http("backup.php", backup_token, "POST", event) == 204
+    assert scalar('SELECT last_heartbeat FROM monitor WHERE id=1') == original_heartbeat
+    cron()
+    assert scalar('SELECT state FROM backup_monitor WHERE id=1') == 'up'
+    newer = {"run_id": "c" * 32, "started": start + 1, "event": "failure"}
+    assert http("backup.php", backup_token, "POST", newer) == 204
+    assert http("backup.php", backup_token, "POST", event) == 409
+    run("exec", "-T", "php", "php", "-d", "sendmail_path=/bin/false", "cron.php", capture_output=True)
+    assert scalar('SELECT notified_state FROM backup_monitor WHERE id=1') == 'up'
+    cron()
+    assert scalar('SELECT state FROM backup_monitor WHERE id=1') == 'down'
+    assert int(scalar('SELECT last_capture FROM backup_monitor WHERE id=1')) == start
+    query("UPDATE monitor SET last_heartbeat = UTC_TIMESTAMP() - INTERVAL 1 MINUTE")
+    assert http("heartbeat.php", env["TEST_TOKEN"], "POST") == 204
+    cron()
+    assert scalar('SELECT state FROM backup_monitor WHERE id=1') == 'down'
+    assert scalar('SELECT notified_state FROM backup_monitor WHERE id=1') == 'down'
+    query("UPDATE backup_monitor SET outcome='success',last_capture=UNIX_TIMESTAMP()-86401")
+    cron()
+    assert scalar('SELECT state FROM backup_monitor WHERE id=1') == 'down'
+    query("UPDATE backup_monitor SET last_capture=UNIX_TIMESTAMP(),running=1,started=UNIX_TIMESTAMP()-7201")
+    cron()
+    assert scalar('SELECT state FROM backup_monitor WHERE id=1') == 'down'
+    recovery = {"run_id": "d" * 32, "started": int(time.time()), "event": "success", "snapshot": "e" * 64}
+    assert http("backup.php", backup_token, "POST", recovery) == 204
+    cron()
+    assert scalar('SELECT notified_state FROM backup_monitor WHERE id=1') == 'up'
+    run("exec", "-T", "php", "php", "import-schema.php")
+    assert scalar('SELECT run_id FROM backup_monitor WHERE id=1') == 'd' * 32
+    print('PASS: independent backup auth/state, replay protection, overdue/stalled detection, recovery and repeat migration')
 finally:
     # Only the disposable test project and its anonymous database volume are removed.
     run("down", "--volumes")

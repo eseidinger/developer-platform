@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-function sendWatchdogMail(array $config, string $state): bool {
+function sendWatchdogMail(array $config, string $state, string $topic = 'platform', string $reason = ''): bool {
     try {
         if (!in_array($state, ['up', 'down'], true)) {
             throw new RuntimeException('Invalid watchdog state');
@@ -12,8 +12,13 @@ function sendWatchdogMail(array $config, string $state): bool {
                 throw new RuntimeException('Invalid mail address');
             }
         }
-        $subject = 'Developer Platform: ' . strtoupper($state);
+        if (!in_array($topic, ['platform', 'backup'], true)
+            || ($topic === 'backup' && !in_array($reason, ['up', 'failed', 'stalled', 'overdue', 'no-backup'], true))) {
+            throw new RuntimeException('Invalid notification topic');
+        }
+        $subject = 'Developer Platform: ' . ($topic === 'backup' ? 'BACKUP ' : '') . strtoupper($state);
         $body = 'The external watchdog reports: ' . $state;
+        if ($topic === 'backup') $body .= "\nBackup condition: " . $reason;
         if (($config['mail_transport'] ?? 'mail') === 'mail') {
             return mail($config['mail_to'], $subject, $body, 'From: ' . $config['mail_from']);
         }

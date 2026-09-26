@@ -1,0 +1,23 @@
+---
+all:
+  children:
+    developer_platform:
+      hosts:
+        platform:
+          ansible_host: 192.0.2.10 # Replace with node-01's SSH address.
+          ansible_user: root
+      vars:
+        backup_restic_repository: s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform
+        backup_s3_region: hel1
+        # Set true explicitly on the first run for a new repository only.
+        backup_restic_initialize: false
+        # Credentials/password are prompted privately. For unattended use, pass
+        # backup_s3_access_key, backup_s3_secret_key and backup_restic_password
+        # in an Ansible Vault encrypted variables file; never add them here.
+
+        # deploy-backup.yml settings (upgrade external watchdog first):
+        backup_platform_dir: /opt/developer-platform
+        backup_instance: node-01 # Stable identity used to scope retention.
+        backup_watchdog_url: https://status.example.com/backup.php
+        # Prompted privately: backup_watchdog_token (distinct from heartbeat).
+        backup_run_now: false

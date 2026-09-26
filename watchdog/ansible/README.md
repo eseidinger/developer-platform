@@ -102,3 +102,19 @@ validation does not connect to the host:
 ```bash
 ansible-playbook -i watchdog/ansible/inventory.heartbeat.example.yml watchdog/ansible/deploy-heartbeat.yml --syntax-check
 ```
+
+## Upgrade for backup signals
+
+The release list includes `backup.php` and `public/backup.php`. After uploading,
+re-run `php /absolute/path/watchdog/import-schema.php` on the hosting account to
+add the independent backup table. Existing monitor/history rows are preserved.
+Then add a new `backup_token` to the private configuration, distinct from `token`;
+keep existing mail/heartbeat settings. You can edit the remote configuration or
+explicitly supply a complete local configuration using `watchdog_config_file`.
+The latter replaces the remote file, so preserve all existing settings.
+
+Enabling backup monitoring can send a BACKUP DOWN/no-backup alert on the next cron
+run until the first verified backup arrives. It does not change host heartbeat
+status. Configure and deploy [scheduled platform backups](../../ansible/README.md#scheduled-backups-and-independent-backup-alerts)
+after the authenticated backup endpoint is available. Upload/syntax success does
+not establish database migration, cron execution or real email delivery.

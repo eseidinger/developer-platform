@@ -6,6 +6,9 @@ return [
     'password' => 'replace-me',
     'token' => 'replace-with-at-least-32-random-characters',
     'max_age' => 300,
+    // Optional independent backup signal. Use a DISTINCT random token (32+ chars).
+    // Empty disables backup checks; enabling starts no-backup/overdue alerts.
+    'backup_token' => '',
     // Optional fixed HTTPS URL, never accepted from an HTTP request.
     'health_url' => null,
     'mail_to' => 'admin@example.com',

@@ -32,4 +32,4 @@ flowchart TB
 
 Arrows show logical flows rather than firewall rules. Caddy and shared services remain outside k3d, but all local components share one host failure domain. Public application TLS terminates at Caddy; the ingress hop is HTTP.
 
-Separate Docker networks, the identity provider, durable worker, PostgreSQL/application telemetry, and automated encrypted external backups remain target work and are not shown as implemented components. Local SQL dumps exist but are not off-host recovery. The watchdog is independently hosted; actual installation and notification receipt still require evidence.
+Separate Docker networks, the identity provider, durable worker and PostgreSQL/application telemetry remain target work. Optional encrypted backup automation now has an Ansible deployment path, but its target-host installation and acceptance are unverified and it is not shown as a deployed component. Local SQL dumps exist but are not off-host recovery. The watchdog is independently hosted; actual installation and notification receipt still require evidence.

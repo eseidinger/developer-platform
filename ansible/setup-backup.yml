@@ -1,0 +1,181 @@
+---
+- name: Set up encrypted S3 backup access on the platform host
+  hosts: developer_platform
+  become: true
+  gather_facts: true
+  vars_prompt:
+    - name: backup_s3_access_key
+      prompt: S3 access key ID
+      private: true
+    - name: backup_s3_secret_key
+      prompt: S3 secret access key
+      private: true
+    - name: backup_restic_password
+      prompt: Restic repository password (save independently of the host; reuse on reruns)
+      private: true
+      confirm: true
+
+  pre_tasks:
+    - name: Apply defaults without overriding inventory
+      ansible.builtin.set_fact:
+        backup_restic_repository: "{{ backup_restic_repository | default('s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform') }}"
+        backup_s3_region: "{{ backup_s3_region | default('hel1') }}"
+
+    - name: Validate host and repository settings
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] is version('22.04', '>=')
+          - backup_restic_repository is match('^s3:https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._-]+/[A-Za-z0-9/_-]+$')
+          - backup_s3_region is match('^[A-Za-z0-9-]+$')
+        fail_msg: Use Ubuntu 22.04+ and an HTTPS S3 repository with a dedicated bucket prefix.
+
+    - name: Validate nonempty single-line credentials
+      ansible.builtin.assert:
+        that:
+          - backup_s3_access_key | length > 0
+          - backup_s3_secret_key | length > 0
+          - backup_restic_password | length >= 20
+          - "'\n' not in backup_s3_access_key and '\r' not in backup_s3_access_key"
+          - "'\n' not in backup_s3_secret_key and '\r' not in backup_s3_secret_key"
+          - "'\n' not in backup_restic_password and '\r' not in backup_restic_password"
+        fail_msg: Supply single-line S3 credentials and a repository password of at least 20 characters.
+      no_log: true
+
+    - name: Inspect existing repository password file
+      ansible.builtin.stat:
+        path: /etc/developer-platform/backup/restic-password
+        follow: false
+      register: backup_password_stat
+
+    - name: Refuse an unexpected password file type
+      ansible.builtin.assert:
+        that:
+          - not backup_password_stat.stat.exists or backup_password_stat.stat.isreg | default(false)
+        fail_msg: The existing restic-password path must be a regular file.
+
+    - name: Read existing password for rerun protection
+      ansible.builtin.slurp:
+        src: /etc/developer-platform/backup/restic-password
+      register: backup_existing_password
+      when: backup_password_stat.stat.exists
+      no_log: true
+
+    - name: Refuse implicit repository password replacement
+      ansible.builtin.assert:
+        that:
+          - backup_existing_password.content | b64decode == backup_restic_password ~ '\n'
+        fail_msg: Reuse the existing repository password. Password rotation requires a separate restic key workflow.
+      when: backup_password_stat.stat.exists
+      no_log: true
+
+  tasks:
+    - name: Install restic and TLS trust certificates
+      ansible.builtin.apt:
+        name: [restic, ca-certificates]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create private backup configuration directory
+      ansible.builtin.file:
+        path: /etc/developer-platform/backup
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Store repository password privately
+      ansible.builtin.copy:
+        content: "{{ backup_restic_password }}\n"
+        dest: /etc/developer-platform/backup/restic-password
+        owner: root
+        group: root
+        mode: '0600'
+        force: false
+      no_log: true
+      diff: false
+
+    - name: Enforce password file permissions on reruns
+      ansible.builtin.file:
+        path: /etc/developer-platform/backup/restic-password
+        state: file
+        owner: root
+        group: root
+        mode: '0600'
+      when: not ansible_check_mode or backup_password_stat.stat.exists
+
+    - name: Configure S3 access without exposing credentials in logs or diffs
+      ansible.builtin.template:
+        src: backup-restic.env.j2
+        dest: /etc/developer-platform/backup/restic.env
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+      diff: false
+
+    - name: Create local command directory
+      ansible.builtin.file:
+        path: /usr/local/sbin
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install configured restic command
+      ansible.builtin.copy:
+        src: files/platform-restic
+        dest: /usr/local/sbin/platform-restic
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Verify repository access and optionally initialize
+      when: not ansible_check_mode
+      block:
+        - name: Read existing encrypted repository configuration
+          ansible.builtin.command:
+            argv: [/usr/local/sbin/platform-restic, cat, config]
+          register: backup_repository_probe
+          changed_when: false
+          failed_when: false
+          no_log: true
+
+        - name: Require explicit initialization for a new repository
+          ansible.builtin.assert:
+            that:
+              - backup_repository_probe.rc == 0 or (backup_restic_initialize | default(false) | bool)
+            fail_msg: >-
+              Cannot open the repository. Check the endpoint, credentials and password.
+              For a new dedicated prefix only, rerun with -e backup_restic_initialize=true.
+              No repository was initialized.
+
+        - name: Initialize explicitly requested new repository
+          ansible.builtin.command:
+            argv: [/usr/local/sbin/platform-restic, init]
+          when:
+            - backup_restic_initialize | default(false) | bool
+            - backup_repository_probe.rc != 0
+          changed_when: true
+          no_log: true
+          # Never remove an existing repository or treat a failed init as success.
+          # Restic refuses initialization if a repository config already exists.
+
+        - name: Verify repository decryption and snapshot listing
+          ansible.builtin.command:
+            argv: [/usr/local/sbin/platform-restic, snapshots, --json]
+          changed_when: false
+          no_log: true
+
+        - name: Read installed restic version
+          ansible.builtin.command:
+            argv: [/usr/bin/restic, version]
+          register: backup_restic_version
+          changed_when: false
+
+        - name: Report setup result without credentials
+          ansible.builtin.debug:
+            msg: >-
+              {{ backup_restic_version.stdout }}. Repository access verified.
+              No backup, schedule, retention deletion or restore was run.

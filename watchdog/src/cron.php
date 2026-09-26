@@ -3,6 +3,8 @@ declare(strict_types=1);
 if (PHP_SAPI !== 'cli') { http_response_code(404); exit; }
 require __DIR__ . '/common.php';
 require __DIR__ . '/mail.php';
+require __DIR__ . '/backup.php';
+$exitCode = 0;
 
 $stage = 'loading configuration';
 try {
@@ -35,7 +37,7 @@ try {
             $curl = curl_init($config['health_url']);
             try {
                 curl_setopt_array($curl, [
-                    CURLOPT_NOBODY => true, CURLOPT_RETURNTRANSFER => true,
+                    CURLOPT_HTTPGET => true, CURLOPT_RETURNTRANSFER => true,
                     CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_TIMEOUT => 10,
                     CURLOPT_FOLLOWLOCATION => false,
                     CURLOPT_PROTOCOLS => CURLPROTO_HTTPS,
@@ -70,5 +72,15 @@ try {
     // Raw exception messages may contain connection details or sensitive URLs.
     $detail = $error instanceof PDOException ? '; database_driver_code=' . (int)($error->errorInfo[1] ?? 0) : '';
     error_log('Watchdog cron failed while ' . $stage . '; error_type=' . get_class($error) . $detail);
-    exit(1);
+    $exitCode = 1;
 }
+
+// Backup checks have their own state and still run after host-monitor errors.
+try {
+    $backupConfig = settings();
+    if (backupEnabled($backupConfig)) checkBackup(database($backupConfig), $backupConfig);
+} catch (Throwable $error) {
+    error_log('Backup watchdog check failed');
+    $exitCode = 1;
+}
+exit($exitCode);

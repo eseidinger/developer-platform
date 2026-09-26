@@ -15,4 +15,5 @@ jobs:
       - run: bash -n scripts/up.sh scripts/down.sh scripts/backup.sh
       - run: find watchdog tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - run: php watchdog/tests/watchdog.php
+      - run: php watchdog/tests/backup.php
       - run: php -d curl.cainfo="$RUNNER_TEMP/watchdog-smtp-cert.pem" -d sendmail_path=/bin/true watchdog/tests/watchdog-mail.php

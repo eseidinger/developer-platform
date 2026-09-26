@@ -99,7 +99,7 @@ docker system df
 docker compose logs --tail=100 postgres
 ```
 
-Attribute growth before removing anything. Never remove unidentified volumes. Follow [backup creation and verification](backup-recovery.md#make-a-current-backup); the current system has no backup-age alert or automated off-host upload. A completed dump does not prove recoverability.
+Attribute growth before removing anything. Never remove unidentified volumes. Follow [backup creation and verification](backup-recovery.md#make-a-current-backup); the manual SQL script alone has no off-host upload or freshness alert. If the scheduled backup playbook is deployed, inspect its independent status and notification channel below. A completed dump does not prove recoverability.
 
 ## Compromised credential or access revocation
 
@@ -112,3 +112,36 @@ Preserve `DATABASE_KEY` during recovery. Changing it changes derived Secrets but
 Record affected resources, commands, results, actual recovery duration, and remaining uncertainty. Verify an application request, database write/read, and relevant recovery notifications.
 
 Revision-bound rollback, resumable operation IDs, retained-resource deletion inventories, and per-user audit investigation remain target procedures in the [software architecture](../02-architecture/software-architecture.md). They cannot be used as current incident prerequisites.
+
+
+## Scheduled backup failed or interrupted
+
+If the optional backup automation is deployed, inspect:
+
+```bash
+sudo systemctl status platform-backup.service platform-backup.timer --no-pager
+sudo journalctl -u platform-backup.service -n 40 --no-pager
+sudo cat /var/lib/developer-platform-backup/status.json
+sudo systemctl status platform-backup-notify.timer --no-pager
+sudo journalctl -u platform-backup-notify.service -n 20 --no-pager
+```
+
+A failure after readback can retain a valid `last_verified_snapshot`; notification
+failure is recorded separately in `notification.json`. Restore S3/watchdog access,
+then use `sudo systemctl start platform-backup-notify.service` to retry delivery.
+For a failed capture/upload, resolve the reported stage and restart the backup
+service. The host heartbeat cannot clear backup failures.
+
+If `/var/lib/developer-platform-backup/resume.json` remains, exact container IDs
+still require restart. Inspect them before replacing/removing containers. The
+recovery service retries all recorded services even if one fails:
+
+```bash
+sudo systemctl start platform-backup-recover.service
+```
+
+Do not run recovery concurrently with capture or remove the process lock. Avoid
+`restic unlock` until all restic processes have stopped and a stale repository lock
+has been established. Unverified/pending snapshots require investigation; do not
+count them as recovery points. See the [backup deployment guide](../../ansible/README.md#scheduled-backups-and-independent-backup-alerts)
+for service interruption, retention and restore limits.

@@ -1,0 +1,17 @@
+[Unit]
+Description=Capture and verify encrypted platform backup
+Requires=docker.service
+After=docker.service network-online.target platform-backup-recover.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/local/sbin/platform-backup run
+ExecStopPost=/usr/local/sbin/platform-backup recover
+TimeoutStartSec=2h
+TimeoutStopSec=5min
+KillMode=control-group
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

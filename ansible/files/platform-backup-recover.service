@@ -1,0 +1,15 @@
+[Unit]
+Description=Recover services after interrupted platform backup
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+Before=platform-backup.service
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/local/sbin/platform-backup recover
+TimeoutStartSec=5min
+
+[Install]
+WantedBy=multi-user.target

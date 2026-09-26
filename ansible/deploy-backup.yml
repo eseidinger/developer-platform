@@ -1,0 +1,164 @@
+---
+- name: Deploy scheduled platform backups and independent backup reporting
+  hosts: developer_platform
+  become: true
+  gather_facts: true
+  vars_prompt:
+    - name: backup_watchdog_token
+      prompt: Independent backup token (same backup_token as external watchdog; NOT host heartbeat token)
+      private: true
+  pre_tasks:
+    - name: Resolve non-secret backup settings
+      ansible.builtin.set_fact:
+        backup_platform_dir: "{{ backup_platform_dir | default('/opt/developer-platform') }}"
+        backup_instance: "{{ backup_instance | default('node-01') }}"
+        backup_source_revision: "{{ backup_source_revision | default('unknown; source files included') }}"
+
+    - name: Validate platform and watchdog settings
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] is version('22.04', '>=')
+          - backup_platform_dir is match('^/[A-Za-z0-9_./-]+$')
+          - backup_platform_dir != '/'
+          - "'..' not in backup_platform_dir.split('/')"
+          - backup_instance is match('^[A-Za-z0-9][A-Za-z0-9_-]*$')
+          - backup_watchdog_url | default('') is match('^https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9_./-]*backup.php$')
+        fail_msg: Set the platform directory, stable installation identity, and dedicated HTTPS backup.php endpoint.
+
+    - name: Validate independent backup token
+      ansible.builtin.assert:
+        that:
+          - backup_watchdog_token is match('^[A-Za-z0-9_-]{32,}$')
+          - not backup_watchdog_token.startswith('replace-')
+      no_log: true
+
+    - name: Require completed restic setup and platform installation
+      ansible.builtin.stat:
+        path: "{{ item }}"
+      loop:
+        - /usr/local/sbin/platform-restic
+        - /etc/developer-platform/backup/restic.env
+        - /etc/developer-platform/backup/restic-password
+        - "{{ backup_platform_dir }}/compose.yaml"
+        - "{{ backup_platform_dir }}/.env"
+      register: backup_required_files
+
+    - name: Check required files
+      ansible.builtin.assert:
+        that: item.stat.isreg | default(false)
+        fail_msg: Complete setup-backup.yml and platform installation before deploying the scheduled job.
+      loop: "{{ backup_required_files.results }}"
+      loop_control:
+        label: "{{ item.item }}"
+
+    - name: Verify separate watchdog protocol and schema without changing freshness
+      ansible.builtin.uri:
+        url: "{{ backup_watchdog_url }}"
+        headers:
+          Authorization: "Bearer {{ backup_watchdog_token }}"
+        follow_redirects: none
+        status_code: 200
+        return_content: true
+        timeout: 20
+      register: backup_watchdog_preflight
+      when: not ansible_check_mode
+      no_log: true
+
+    - name: Require supported backup watchdog contract
+      ansible.builtin.assert:
+        that:
+          - backup_watchdog_preflight.json.protocol == 1
+          - backup_watchdog_preflight.json.max_age == 86400
+          - backup_watchdog_preflight.json.timeout == 7200
+      when: not ansible_check_mode
+      no_log: true
+
+    - name: Verify encrypted repository access
+      ansible.builtin.command:
+        argv: [/usr/local/sbin/platform-restic, snapshots, --json]
+      changed_when: false
+      when: not ansible_check_mode
+      no_log: true
+
+  tasks:
+    - name: Install backup runtime
+      ansible.builtin.apt:
+        name: [python3, ca-certificates]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+
+    - name: Create private state directory
+      ansible.builtin.file:
+        path: /var/lib/developer-platform-backup
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Install backup runner
+      ansible.builtin.copy:
+        src: ../scripts/backup-platform.py
+        dest: /usr/local/sbin/platform-backup
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Configure private backup job
+      ansible.builtin.copy:
+        content: "{{ {'platform_dir': backup_platform_dir, 'instance': backup_instance, 'source_revision': backup_source_revision, 'watchdog_url': backup_watchdog_url, 'watchdog_token': backup_watchdog_token} | to_nice_json }}\n"
+        dest: /etc/developer-platform/backup/job.json
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+      diff: false
+
+    - name: Install backup systemd units
+      ansible.builtin.copy:
+        src: "files/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+        owner: root
+        group: root
+        mode: '0644'
+      loop:
+        - platform-backup.service
+        - platform-backup.timer
+        - platform-backup-recover.service
+        - platform-backup-notify.service
+        - platform-backup-notify.timer
+      notify: Reload backup units
+
+    - name: Apply unit definitions
+      ansible.builtin.meta: flush_handlers
+
+    - name: Enable recovery at boot and repair any interrupted capture
+      ansible.builtin.systemd_service:
+        name: platform-backup-recover.service
+        enabled: true
+        state: started
+      when: not ansible_check_mode
+
+    - name: Enable scheduled backups and notification retry
+      ansible.builtin.systemd_service:
+        name: "{{ item }}"
+        enabled: true
+        state: started
+      loop: [platform-backup.timer, platform-backup-notify.timer]
+      when: not ansible_check_mode
+
+    - name: Run a first backup when explicitly requested
+      ansible.builtin.systemd_service:
+        name: platform-backup.service
+        state: started
+        no_block: true
+      when:
+        - not ansible_check_mode
+        - backup_run_now | default(false) | bool
+
+  handlers:
+    - name: Reload backup units
+      ansible.builtin.systemd_service:
+        daemon_reload: true
+      when: not ansible_check_mode

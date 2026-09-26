@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry independent backup status delivery
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/usr/local/sbin/platform-backup notify
+TimeoutStartSec=30s

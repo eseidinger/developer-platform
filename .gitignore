@@ -7,3 +7,5 @@ ansible/inventory.yml
 watchdog/src/config.local.php
 watchdog/ansible/inventory.watchdog.yml
 watchdog/ansible/inventory.heartbeat.yml
+ansible/inventory.backup.yml
+ansible/backup-secrets.yml

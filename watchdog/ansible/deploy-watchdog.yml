@@ -54,7 +54,7 @@
     - name: Check local release files and optional configuration
       ansible.builtin.stat:
         path: "{{ item }}"
-      loop: "{{ [watchdog_source_dir ~ '/common.php', watchdog_source_dir ~ '/cron.php', watchdog_source_dir ~ '/mail.php', watchdog_source_dir ~ '/schema.sql', watchdog_source_dir ~ '/import-schema.php', watchdog_source_dir ~ '/config.example.php', watchdog_source_dir ~ '/public/index.php', watchdog_source_dir ~ '/public/heartbeat.php'] + ([watchdog_config_file] if watchdog_config_file | length > 0 else []) }}"
+      loop: "{{ [watchdog_source_dir ~ '/common.php', watchdog_source_dir ~ '/backup.php', watchdog_source_dir ~ '/public/backup.php', watchdog_source_dir ~ '/cron.php', watchdog_source_dir ~ '/mail.php', watchdog_source_dir ~ '/schema.sql', watchdog_source_dir ~ '/import-schema.php', watchdog_source_dir ~ '/config.example.php', watchdog_source_dir ~ '/public/index.php', watchdog_source_dir ~ '/public/heartbeat.php'] + ([watchdog_config_file] if watchdog_config_file | length > 0 else []) }}"
       register: watchdog_local_files
 
     - name: Require readable local files
@@ -90,6 +90,8 @@
             argv: "{{ watchdog_scp_command + [watchdog_source_dir ~ '/' ~ item, watchdog_remote ~ ':' ~ watchdog_install_dir ~ '/' ~ item] }}"
           loop:
             - common.php
+            - backup.php
+            - public/backup.php
             - cron.php
             - mail.php
             - schema.sql

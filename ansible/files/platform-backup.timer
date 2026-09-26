@@ -1,0 +1,11 @@
+[Unit]
+Description=Platform backup every twelve hours UTC
+
+[Timer]
+OnCalendar=*-*-* 00,12:00:00 UTC
+Persistent=true
+RandomizedDelaySec=0
+Unit=platform-backup.service
+
+[Install]
+WantedBy=timers.target

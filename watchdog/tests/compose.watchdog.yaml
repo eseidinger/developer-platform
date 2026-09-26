@@ -18,8 +18,10 @@ services:
     environment:
       TEST_PASSWORD: ${TEST_PASSWORD:?}
       TEST_TOKEN: ${TEST_TOKEN:?}
+      TEST_BACKUP_TOKEN: ${TEST_BACKUP_TOKEN:?}
     command: ["php", "-S", "0.0.0.0:8080", "-t", "public"]
     volumes:
+      - ../src/backup.php:/app/backup.php:ro
       - ../src/common.php:/app/common.php:ro
       - ../src/cron.php:/app/cron.php:ro
       - ../src/mail.php:/app/mail.php:ro

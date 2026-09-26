@@ -15,6 +15,17 @@ Status: current commands reviewed against [backup.sh](../../scripts/backup.sh), 
 
 The workload contract has no PVCs; durable application data belongs in PostgreSQL. Identity-provider state, job/revision metadata, and retained-resource inventories belong to the target architecture and are not current backup artifacts.
 
+## Set up encrypted off-host storage
+
+Use the [backup repository playbook](../../ansible/README.md#encrypted-s3-backup-repository-setup)
+to install restic, configure private S3 credentials and a separately recoverable
+repository password, and explicitly initialize a new repository when needed.
+This prepares storage only. The separate [scheduled backup playbook](../../ansible/README.md#scheduled-backups-and-independent-backup-alerts)
+adds capture, exact-snapshot readback, retention and independent backup alerts;
+target-host execution and isolated application restore acceptance remain open. The confirmed policy and
+implementation evidence are tracked under OPS-006 in the
+[delivery backlog](../04-development/delivery-backlog.md).
+
 ## Make a current backup
 
 Run from the repository root on the source host, with PostgreSQL running and access to its Compose project. An Ansible installation requires a privileged shell in `/opt/developer-platform`.
@@ -33,7 +44,7 @@ sha256sum "$backup_file"
 
 Replace the placeholder before execution. Record the checksum, source revision, PostgreSQL version, UTC time, and backup identifier alongside the encrypted recovery bundle. Gzip integrity is not SQL or data validation. Coordinate application writes if the recovery scenario needs consistency across multiple databases; this dump does not provide a single cross-database application transaction snapshot.
 
-Encrypt the dump and `.env` using the operator's selected backup system, copy them off-host, and verify retrieval and decryption. No encryption/upload/scheduler/retention automation exists in this repository. Define RPO/RTO, storage, recipients, and retention before operational acceptance. Preserve the original `DATABASE_KEY`: generating a replacement will produce credentials that do not match restored roles.
+Encrypt the dump and `.env` using the operator's selected backup system, copy them off-host, and verify retrieval and decryption. The scheduled backup playbook supplies encryption/upload/scheduler/retention automation; this manual SQL command alone does not invoke it. Confirm the installation-specific recovery targets, storage, recipients and retention before operational acceptance. Preserve the original `DATABASE_KEY`: generating a replacement will produce credentials that do not match restored roles.
 
 ## Restore into an isolated installation
 
@@ -151,6 +162,33 @@ A production routing switch is a separate operational step after acceptance. Res
 
 ## Target recovery capabilities
 
-Encrypted external backup automation, backup-age alerts, defined RPO/RTO, and an executable acceptance harness remain open. Once identity, durable jobs/revisions, and controlled deletion exist, extend backups and restore checks to those records and pause/resume workers explicitly. The current implementation has no worker or operation history to recover.
+Encrypted external backup automation and independent backup-age alerts now have an implementation in the scheduled backup playbook. The selected RPO is 24 hours and RTO four hours for node-01; live deployment, failure delivery, measured recovery and a full application acceptance harness remain open. Once identity, durable jobs/revisions, and controlled deletion exist, extend backups and restore checks to those records and pause/resume workers explicitly. The current implementation has no worker or operation history to recover.
 
 See [Deployment](deployment.md), [Runbook](runbook.md), and [ADR-003](../03-decisions/ADR-003-postgresql-provisioning.md).
+
+
+## Retrieve a scheduled recovery bundle
+
+Use an isolated recovery host with restic, S3 credentials and the independently
+saved repository password configured. Identify an explicit verified snapshot:
+
+```bash
+sudo /usr/local/sbin/platform-restic snapshots --host node-01 --tag developer-platform,verified
+sudo /usr/local/sbin/platform-restic restore REPLACE_WITH_FULL_SNAPSHOT_ID --target /root/platform-recovery
+```
+
+Use a new empty destination. The restored tree contains `bundle/manifest.json`
+(with its original directory hierarchy as recorded by restic). Verify every listed
+SHA-256 checksum before using `postgres.sql.gz` or the archives. Keep the entire
+extracted tree private: it contains credentials. Inspect archive members and
+extract only into the isolated recovery environment, never over the source host.
+
+`platform-files.tar.gz` contains the deployment source and `.env`;
+`host-config.tar.gz` contains private host configuration and units. Service-state
+archives are `proxy-data.tar.gz`, `proxy-config.tar.gz`, and `grafana-grafana.tar.gz`.
+Restore them into their corresponding freshly created named volumes while those
+services are stopped, preserving ownership. Adapt test domains/notification
+identities before starting services; never send recovery-test signals to the
+production watchdog channel. Then follow the isolated SQL import/reapply procedure
+above, verify data markers, permissions, ingress and alerts, and measure RPO/RTO.
+The backup job's automatic readback validates bytes, not these application outcomes.

@@ -1,0 +1,10 @@
+[Unit]
+Description=Retry pending backup notifications
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+Unit=platform-backup-notify.service
+
+[Install]
+WantedBy=timers.target

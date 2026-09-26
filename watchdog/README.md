@@ -51,7 +51,7 @@ if available.
 
 Cron combines heartbeat freshness with an optional fixed HTTPS health check.
 No HTTP target address is taken from requests. Redirects are disabled.
-The optional health check uses HEAD; the target must support it with a 2xx response.
+The optional health check uses GET; the target must return a 2xx response.
 Email is sent when status changes; failed mail or SMTP handoffs are retried on
 the next run. Successful handoff means acceptance by the mail server, not
 guaranteed delivery. SMTP failures do not fall back to PHP mail().
@@ -86,3 +86,37 @@ php watchdog/tests/watchdog.php
 php -d curl.cainfo=/tmp/watchdog-smtp-cert.pem -d sendmail_path=/bin/true watchdog/tests/watchdog-mail.php
 python3 watchdog/scripts/test-watchdog.py
 ```
+
+## Independent backup monitoring
+
+`public/backup.php` accepts authenticated backup events using a separate
+`backup_token` in private `config.local.php`. Empty/unset leaves backup checks
+disabled for existing installations. To enable, upload the current release,
+re-run the CLI schema importer, then set a random token distinct from the host
+heartbeat token. The additive `backup_monitor` table preserves existing host
+state. Use the same new token for the [scheduled backup playbook](../ansible/README.md#scheduled-backups-and-independent-backup-alerts).
+
+The existing cron now checks both channels independently. Backup events never
+update `monitor.last_heartbeat`; host heartbeats never update `backup_monitor`.
+Backup emails are labeled **BACKUP DOWN/UP** and use the existing mail recipients.
+A first DOWN/no-backup message is expected before a verified snapshot is reported.
+
+Authenticated GET returns the protocol/age/timeout configuration without changing
+freshness. POST accepts at most 4096 bytes of JSON: `run_id` (32 lowercase hex
+characters), `started` (UTC Unix seconds), and `event` (`start`, `success`, or
+`failure`). Success additionally requires a full 64-hex `snapshot` ID. Future
+start times beyond five minutes are rejected. Duplicate completions are safe;
+older runs and contradictory completions return 409. A completion can arrive
+without its start after a transport outage. Only success updates capture freshness.
+
+Backup health becomes down for explicit failure, missing success, a run older
+than two hours, or last successful capture older than 24 hours. Starting a new
+run does not clear the previous failure. Recovery requires a fresh verified success.
+The platform runner queues undelivered events locally; cron retries failed mail
+handoff without marking it delivered. This does not independently monitor failure
+of the external watchdog host or its cron.
+
+Run `php watchdog/tests/backup.php` for pure transition/freshness tests.
+The disposable integration test also covers separate-token denial, replay handling,
+host/backup independence, overdue/stalled conditions and repeat schema import.
+Mail remains simulated in that test; verify actual BACKUP DOWN and UP receipt.

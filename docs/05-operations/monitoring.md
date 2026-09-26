@@ -6,7 +6,7 @@ Status: operational draft based on [ADR-005](../03-decisions/ADR-005-observabili
 
 The [runbook](runbook.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbook.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../watchdog/README.md) and [deployment playbooks guide](../../watchdog/ansible/README.md).
 
-Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager has a `local-only` receiver with no notification integration. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, backup-age alerts, maintenance windows, and a separate local notification service are not implemented.
+Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager has a `local-only` receiver with no notification integration. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. Independent backup-age/failure checks now exist in the optional backup watchdog channel; deployment and actual backup-alert receipt still require verification.
 
 The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. Real delivery, public probes, and cluster/host outage exercises remain unverified. Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
 
@@ -47,3 +47,18 @@ On introduction and after alert-channel changes, trigger a test failure, confirm
 Daily or automated review covers critical alerts, overdue jobs, backup success, and resource growth. Restore exercises follow the agreed backup policy.
 
 The [Runbook](runbook.md) describes responses; [Observability architecture](../02-architecture/observability.md) covers data flows and permissions.
+
+
+## Scheduled backup monitoring
+
+Deploy the separate `backup.php` channel and [scheduled backup job](../../ansible/README.md#scheduled-backups-and-independent-backup-alerts)
+for capture-time freshness independent of host heartbeat. The backup channel alerts
+on explicit failure, no success, age over 24 hours or an attempt running over two
+hours. Local `status.json` distinguishes verified storage from pending notification;
+`platform-backup-notify.timer` retries undelivered events every five minutes.
+Neither host heartbeats nor authenticated GET preflight refresh backup age.
+
+Verify a real BACKUP DOWN/UP cycle after deployment. Use disposable test resources
+or a separate watchdog configuration for failure injection; do not forge a success
+signal for a backup that has not passed readback. No timer or external channel
+establishes isolated SQL/application restoration by itself.
