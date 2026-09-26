@@ -1,44 +1,156 @@
 # Backup and Recovery
 
-Status: operational draft. No backup or restore has been executed as part of preparing this documentation. Recoverability is a central operational acceptance criterion for the single-host architecture.
+Status: current commands reviewed against [backup.sh](../../scripts/backup.sh), Compose, and the API at the source baseline in the [implementation alignment report](../04-development/implementation-alignment-report.md). The SQL restore/reapply sequence is carried forward from the archived operations guide and adapted to current paths. **No backup, SQL import, cluster recreation, or application recovery was executed for this documentation update.** Syntax checks do not establish recoverability.
 
-## Backup scope
+## Current backup scope
 
-| Data | Backup approach | Restore considerations |
-|---|---|---|
-| Project databases | Consistent PostgreSQL backups | Engine compatibility, extensions, roles/grants |
-| Platform metadata | Database backup including revisions and provider mappings | Restart must not duplicate resources |
-| Database roles and permissions | Separately saved administrative state | Restore owners and default privileges |
-| Identity-provider state | Appropriate database/configuration backup | Include clients, identities, and key material |
-| Secrets/keys | Separate encrypted backup | Access must remain possible during platform failure |
-| Infrastructure/routing configuration | Versioned repository plus external configuration | No secrets in Git |
-| Application volumes | Consistent application-specific backups | Cannot be reconstructed from image or spec |
-| Dashboards/alert rules | Versioned configuration | Telemetry history has separate retention |
+| Data | Current mechanism | Remaining responsibility |
+| --- | --- | --- |
+| Project databases, roles and password hashes | Local compressed `pg_dumpall` | Encrypt, copy off-host, define retention, and prove restore |
+| Platform metadata | Same dump includes `platform.projects` with latest specs/status | No revision history, jobs, or audit records exist |
+| `.env`, especially `DATABASE_KEY` and `POSTGRES_PASSWORD` | Separate operator-managed copy | Encrypt and retain access independently of the platform host |
+| Caddy data/config and customized Grafana state | Compose volumes; not included in SQL dump | Separate backup/recreation procedure and validation |
+| Infrastructure, alert rules, workload image identities | Repository revision and external artifact storage | Retain compatible images and record versions/digests |
+| External watchdog MySQL/configuration | Separate hosting service | Back up through the hosting provider; PostgreSQL dump excludes it |
 
-A volume on the same host is not an external backup. Backups require separate credentials and protection against accidental overwrite or deletion.
+The workload contract has no PVCs; durable application data belongs in PostgreSQL. Identity-provider state, job/revision metadata, and retained-resource inventories belong to the target architecture and are not current backup artifacts.
 
-## Policy before operational acceptance
+## Make a current backup
 
-RPO, RTO, frequency, retention, encryption, storage location, and ownership remain to be defined. Daily logical database backups are a possible lab starting point; they do not automatically satisfy shorter RPO targets. For stronger requirements, evaluate base backups, WAL archiving, and point-in-time recovery.
+Run from the repository root on the source host, with PostgreSQL running and access to its Compose project. An Ansible installation requires a privileged shell in `/opt/developer-platform`.
 
-Monitoring checks backup age and outcome. Recoverability is demonstrated only through restore verification.
+```bash
+bash scripts/backup.sh
+```
 
-## Restore procedure
+The script creates `.runtime/backups/postgres-<UTC timestamp>.sql.gz` with private permissions. It writes to a temporary file and publishes the final name only after `pg_dumpall` and gzip succeed. It includes role password hashes and all databases. Select the exact path printed by the script; do not select an unfinished `.tmp` file.
 
-1. Establish incident scope, the latest consistent backup, and acceptable data loss.
-2. Build a new isolated target environment; do not overwrite production volumes.
-3. Make keys/secrets available through the designated emergency access path.
-4. Restore PostgreSQL foundations, roles/extensions, and required databases in the appropriate order.
-5. Restore the identity provider and platform metadata. Keep workers paused initially.
-6. Inventory provider resources and reconcile them with restored IDs/revisions; resolve orphaned or newer resources manually.
-7. Start compatible application revisions; verify data, permissions, and health.
-8. Switch routing only after acceptance, then resume workers deliberately.
-9. Record the actual data recovery point, RPO/RTO, deviations, and follow-up work.
+```bash
+backup_file=.runtime/backups/postgres-REPLACE_WITH_TIMESTAMP.sql.gz
+gzip -t "$backup_file"
+sha256sum "$backup_file"
+```
 
-Restoring one project must not overwrite others. Database state, application version, and schema must be compatible. Retained resources from deletion operations remain inventoried.
+Replace the placeholder before execution. Record the checksum, source revision, PostgreSQL version, UTC time, and backup identifier alongside the encrypted recovery bundle. Gzip integrity is not SQL or data validation. Coordinate application writes if the recovery scenario needs consistency across multiple databases; this dump does not provide a single cross-database application transaction snapshot.
 
-## Exercise and evidence
+Encrypt the dump and `.env` using the operator's selected backup system, copy them off-host, and verify retrieval and decryption. No encryption/upload/scheduler/retention automation exists in this repository. Define RPO/RTO, storage, recipients, and retention before operational acceptance. Preserve the original `DATABASE_KEY`: generating a replacement will produce credentials that do not match restored roles.
 
-Perform a complete recovery using test data into an empty target environment. Verify roles, grant separation, secret bindings, and a write/read operation. Record backup ID, versions, start/end times, data checks, and result.
+## Restore into an isolated installation
 
-[Deployment](deployment.md), [Runbook](runbook.md), [ADR-003](../03-decisions/ADR-003-postgresql-provisioning.md).
+Use a separate host or Docker daemon with no existing platform data. A different checkout or Compose project name on the source host is insufficient isolation: the Docker network, k3d cluster name, and host ports are fixed. This is a whole-instance restore, not a procedure for overwriting one project in an active installation.
+
+1. Install the prerequisites from [deployment](deployment.md). Check out the recorded source revision and use the same PostgreSQL major version for the first exercise; validate any version migration separately. Restore the original `.env` securely with mode 0600 and make the verified, decrypted dump available privately.
+2. Keep the recovery host isolated from production routing and external application side effects. Set `EDGE_BIND_IP=127.0.0.1`, `PLATFORM_DOMAIN=platform.localhost`, and `APPS_DOMAIN=apps.localhost` in its `.env`. Preserve `DATABASE_KEY` and `POSTGRES_PASSWORD`. Use a fresh shell with no old exported platform settings. Do not enable a sender that would impersonate the production heartbeat.
+3. From the recovery checkout, validate configuration and start only PostgreSQL:
+
+```bash
+docker compose config --quiet
+docker compose up -d --wait --wait-timeout 120 postgres
+```
+
+Confirm this is the empty recovery instance before proceeding. Only the initialized `postgres`/`platform` and template databases should exist; no project data should already be present:
+
+```bash
+docker compose exec -T postgres psql -X -U postgres -d postgres -c '\l'
+```
+
+4. Import the selected dump, keeping private logs for review:
+
+```bash
+set -o pipefail
+umask 077
+mkdir -p .runtime/recovery
+backup_file=/absolute/private/path/postgres-REPLACE_WITH_TIMESTAMP.sql.gz
+gzip -t "$backup_file" && gzip -dc "$backup_file" | \
+  docker compose exec -T postgres psql -X -U postgres -d postgres \
+  > .runtime/recovery/restore.stdout 2> .runtime/recovery/restore.stderr
+```
+
+Replace the path before execution. The stock PostgreSQL container has already created the `postgres` role and `platform` database, so this archived full-dump approach can report duplicate-object errors for those initialization objects. It intentionally does not use `ON_ERROR_STOP`, which would stop at the expected duplicates. **A zero exit code is not import acceptance:** inspect both logs, account for every error, and verify all databases/roles/data. Do not blanket-ignore duplicate errors for project objects; they indicate a non-empty target or another problem. Logs can contain SQL and sensitive values; keep them private. If unexpected errors occur, stop and correct the recovery procedure in a fresh isolated target rather than importing repeatedly over partial state.
+
+5. Check that the recovery catalog is readable:
+
+```bash
+docker compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d platform \
+  -c 'SELECT name, spec, status FROM projects ORDER BY name;'
+```
+
+A missing catalog table is a recovery problem unless the backed-up installation had never initialized the API. Review expected database names, ownership, and roles against the source inventory. The dump may restore the administrator password, so `.env` must match the original credentials before the API starts.
+
+6. Bootstrap the cluster and services, then reapply the catalog as below:
+
+```bash
+python3 scripts/install-k3d.py
+bash scripts/up.sh
+curl --fail-with-body http://127.0.0.1:8000/readyz
+```
+
+The API has no background reconciler. Bootstrap recreates cluster/controller credentials, but does not restore application workloads until PUT is repeated.
+
+## Reapply restored projects
+
+Use this after SQL restore, or after cluster recreation with intact PostgreSQL volumes. The following commands target only the local API. They apply every stored project's latest spec, so review the catalog before running the Python block and ensure this is the intended recovery installation.
+
+```bash
+umask 077
+mkdir -p .runtime/recovery
+eval "$(python3 scripts/env.py)"
+curl --fail-with-body http://127.0.0.1:8000/projects \
+  -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  --output .runtime/recovery/projects.json
+```
+
+Review `.runtime/recovery/projects.json` for expected names, images, and ports. It is an external copy of the latest catalog, not a revision history. Then reapply:
+
+```bash
+python3 - <<'PYTHON'
+import json
+import os
+import re
+import urllib.request
+from pathlib import Path
+
+projects = json.loads(Path('.runtime/recovery/projects.json').read_text())
+for project in projects:
+    name = project['name']
+    if (not isinstance(name, str)
+            or not re.fullmatch(r'[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?', name)
+            or project['spec']['name'] != name):
+        raise ValueError('Invalid project identity in recovery catalog')
+for project in projects:
+    name = project['name']
+    request = urllib.request.Request(
+        'http://127.0.0.1:8000/projects/' + name,
+        data=json.dumps(project['spec']).encode(),
+        headers={'Authorization': 'Bearer ' + os.environ['PLATFORM_TOKEN'],
+                 'Content-Type': 'application/json'},
+        method='PUT',
+    )
+    with urllib.request.urlopen(request, timeout=180) as response:
+        result = json.load(response)
+    if result.get('status') != 'applied':
+        raise RuntimeError('Unexpected provisioning result for ' + name)
+    print(name + ': applied; rollout and data verification still required')
+PYTHON
+```
+
+An error stops the loop. Earlier projects may already have been applied; inspect status/resources, fix the cause, and repeat safely with the same specs. A timeout does not prove the server stopped processing. Project passwords are derived from the restored `DATABASE_KEY`; provisioning does not reset existing role passwords.
+
+## Recovery verification and evidence
+
+For each project, use the [runbook](runbook.md#application-unhealthy-after-deployment) to inspect rollout and routing, then execute the application's own data checks. For `hello`, for example:
+
+```bash
+kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello rollout status deployment/hello --timeout=180s
+curl --fail-with-body -H 'Host: hello.apps.localhost' http://127.0.0.1/
+```
+
+The echo example does not exercise PostgreSQL. Use a database-backed application with known pre-backup records: verify those records survived, then write and read a new record through the application. Verify database ownership, login permissions, and denied foreign-project access. Preserve private import logs and record source/target environments, code/image versions, backup ID/checksum, start/end times, data checks, errors, and measured recovery point/duration. No such completed exercise is recorded by this documentation update.
+
+A production routing switch is a separate operational step after acceptance. Restore intended domains and reapply specs before changing DNS; validate TLS, application data, monitoring, and watchdog down/recovery receipt. Do not point production traffic at an unverified exercise host.
+
+## Target recovery capabilities
+
+Encrypted external backup automation, backup-age alerts, defined RPO/RTO, and an executable acceptance harness remain open. Once identity, durable jobs/revisions, and controlled deletion exist, extend backups and restore checks to those records and pause/resume workers explicitly. The current implementation has no worker or operation history to recover.
+
+See [Deployment](deployment.md), [Runbook](runbook.md), and [ADR-003](../03-decisions/ADR-003-postgresql-provisioning.md).

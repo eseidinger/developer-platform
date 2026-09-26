@@ -6,8 +6,8 @@ administrators. The current interface is a REST API with interactive documentati
 there is no self-service portal or tenant-specific authorization.
 
 For installation and prerequisites, start with the [main README](../README.md).
-See [architecture](../docs/architecture.md) for isolation and availability limits,
-and [backup and recovery](../docs/operations.md) for operational procedures.
+See [architecture](../docs/02-architecture/infrastructure.md) for isolation and availability limits,
+and [backup and recovery](../docs/05-operations/backup-recovery.md) for operational procedures.
 
 ## Access the platform
 
@@ -140,7 +140,7 @@ There is no project deletion endpoint. For a complete lab reset, use
 `bash scripts/down.sh --volumes`, then bootstrap again. Running `down.sh` without
 `--volumes` retains the stored project catalog and databases, but removes Kubernetes
 workloads. Reapply the saved specifications after bootstrap as described in
-[recovery](../docs/operations.md).
+[recovery](../docs/05-operations/backup-recovery.md).
 
 ## Application runtime contract
 
@@ -212,7 +212,7 @@ updates and apply relevant settings to `.env` explicitly.
 Choose network settings before startup. Updating a domain or IP does not rewrite
 previously provisioned project resources until they are reapplied. Updating
 `K3S_IMAGE` does not replace an existing cluster. See the
-[recreation instructions](../docs/operations.md) when changing lab versions.
+[recreation instructions](../docs/05-operations/backup-recovery.md) when changing lab versions.
 
 The API's internal `POSTGRES_HOST` and `KUBECONFIG` settings are supplied by
 [its Compose module](compose.yaml). Bootstrap generates the controller kubeconfig

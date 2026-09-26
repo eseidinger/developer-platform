@@ -2,6 +2,18 @@
 
 Status: operational draft based on [ADR-005](../03-decisions/ADR-005-observability-watchdog.md).
 
+## Current inspection and evidence
+
+The [runbook](runbook.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbook.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../watchdog/README.md) and [deployment playbooks guide](../../watchdog/ansible/README.md).
+
+Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager has a `local-only` receiver with no notification integration. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, backup-age alerts, maintenance windows, and a separate local notification service are not implemented.
+
+The [alignment report](../04-development/implementation-alignment-report.md) records passing local watchdog freshness and SMTP fixture tests. Real delivery, public probes, and cluster/host outage exercises remain unverified. Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
+
+## Target coverage and alert contract
+
+The remaining sections describe intended operational coverage, including capabilities that still need implementation.
+
 ## Minimum coverage
 
 | Area | Checks | Response |

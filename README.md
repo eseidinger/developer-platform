@@ -113,6 +113,10 @@ Production TLS has not been tested locally with real DNS names and ACME.
 
 ## Operations
 
+Current procedures: [deployment and lifecycle](docs/05-operations/deployment.md),
+[incident runbook](docs/05-operations/runbook.md), and
+[monitoring checks](docs/05-operations/monitoring.md).
+
 - Status: `docker compose ps`; cluster:
   `kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A`.
 - Stop without losing data: `docker compose stop` and
@@ -120,7 +124,7 @@ Production TLS has not been tested locally with real DNS names and ACME.
 - Restart: `bash scripts/up.sh`.
 - Tear down containers and the Kubernetes cluster: `bash scripts/down.sh`.
   Persistent service data is retained; after bootstrap, reapply saved project specs
-  as described in [recovery](docs/operations.md).
+  as described in [recovery](docs/05-operations/backup-recovery.md).
 - Tear down and delete all lab service data: `bash scripts/down.sh --volumes`.
   Both modes preserve `.env`, local backups, and installed tools.
 - Never delete Compose volumes or k3d resources if their data is still needed.
@@ -135,9 +139,9 @@ Production TLS has not been tested locally with real DNS names and ACME.
 - After partial SQL/Kubernetes failures, the status remains `failed`; repeat the
   same PUT request. Databases are never deleted automatically.
 
-[Backup and recovery](docs/operations.md) ·
+[Backup and recovery](docs/05-operations/backup-recovery.md) ·
 [Watchdog installation](watchdog/README.md) ·
-[Architecture decisions](docs/architecture.md)
+[Architecture decisions](docs/03-decisions/README.md)
 
 ## Validation
 

@@ -1,57 +1,114 @@
 # Operations Runbook
 
-Status: initial target procedures, to be validated against a real installation. Add actual hostnames, access details, and commands from the implementation repository. These procedures do not imply completed execution.
+Status: current administrator procedures reviewed against source; commands were not run against a live installation for this update. See the [implementation alignment report](../04-development/implementation-alignment-report.md) for checks actually performed. Run commands from the repository root on the affected host; an Ansible installation requires a privileged shell in `/opt/developer-platform`.
 
-## General incident procedure
+## Inspect the current installation
 
-Record impact, time, project/environment, revision, and operation ID. Distinguish host, network, runtime, database, and application failure domains first. Preserve telemetry and recent changes; redact secrets.
+```bash
+docker compose ps
+curl --fail-with-body http://127.0.0.1:8000/healthz
+curl --fail-with-body http://127.0.0.1:8000/readyz
+curl --fail-with-body http://127.0.0.1:9090/-/ready
+docker compose exec -T postgres pg_isready -U postgres -d platform
+kubectl --kubeconfig .runtime/admin.kubeconfig get nodes -o wide
+kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
+```
 
-Limit interventions to the affected scope. Establish backup/recovery status before modifying data. After an intervention, verify health and an application-level write/read operation, then close the incident with a traceable record.
-
-## External heartbeat missing
-
-1. Check the last receipt, external scheduler, and notification channel.
-2. Check host reachability through an independent administrative path.
-3. If the host is reachable, inspect the sender, token, TLS, time, and outbound network path.
-4. If the host is lost, evaluate provider/network status and recovery using [Backup and recovery](backup-recovery.md).
-5. Confirm heartbeat recovery and service health separately.
-
-A working heartbeat does not rule out database or application failure.
-
-## Docker or k3d unavailable
-
-Check host disk, memory, and daemon/system logs. During a k3d-only failure, external PostgreSQL and monitoring services should remain available. Do not start by deleting volumes or the entire cluster.
-
-After recovery, verify nodes, ingress, database connectivity, and applications. The reconciler observes existing resources before resuming jobs.
+`/healthz` is process health; `/readyz` checks PostgreSQL and Kubernetes connectivity. PostgreSQL readiness is not a data-integrity or application-permission check. Record time, host, code revision (`git rev-parse HEAD`), affected project, latest spec, and observed symptoms. The current API has no operation IDs, revision history, durable job steps, or per-user audit trail. Preserve available logs and redact credentials before sharing them.
 
 ## Provisioning stuck or failed
 
-Inspect the operation, current revision, last successful step, and provider result. After an ambiguous timeout, identify provider resources first. Check permissions, quotas, registry access, and networking.
+In a trusted shell with tracing disabled, load the admin credentials and list stored projects:
 
-Resume the same operation after fixing the cause. Do not delete an existing database as a cleanup shortcut. Remove orphaned resources only after establishing ownership and inventory.
+```bash
+eval "$(python3 scripts/env.py)"
+curl --fail-with-body http://127.0.0.1:8000/projects \
+  -H "Authorization: Bearer $PLATFORM_TOKEN"
+docker compose logs --tail=100 platform-api postgres
+```
+
+`provisioning` can remain after process termination. `failed` records a provisioning error; `applied` means resource application completed, not that the workload is healthy. Early dependency failures can prevent any status update. Check the dependency commands above and inspect existing Kubernetes resources before retrying after an ambiguous timeout.
+
+For the example project `hello` (substitute the actual project and namespace):
+
+```bash
+kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello get pods,svc,ingress
+kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello describe pods
+kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello get events --sort-by=.metadata.creationTimestamp
+kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello logs deployment/hello --tail=100
+```
+
+After fixing permissions, image, quota, or dependency failures, repeat PUT with the project's complete intended spec. For the unchanged sample:
+
+```bash
+curl --fail-with-body -X PUT http://127.0.0.1:8000/projects/hello \
+  -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  -H 'Content-Type: application/json' --data-binary @examples/project.json
+kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello rollout status deployment/hello --timeout=180s
+```
+
+Use the actual saved spec for an existing application; the sample would replace its image and port. [Recovery](backup-recovery.md#reapply-restored-projects) shows how to retrieve and reapply the stored catalog. There is no background worker to resume. PUT preserves existing databases, provided the configuration and database credentials remain compatible. Do not delete a database to repair a failed workload.
 
 ## Application unhealthy after deployment
 
-Compare old and new image/configuration revisions and database migrations. Check readiness, logs, resources, and dependencies. Roll back to a known revision if the schema is compatible; otherwise use a forward fix or verified recovery plan.
+Inspect rollout, logs, pod events, image pulls, resource limits, probes, and database connectivity. Compare the desired image/port with your externally retained prior spec and migration records; the platform stores only the latest spec. A manual rollback is another PUT of a known compatible spec, followed by rollout and application verification. It does not roll back database schema changes.
 
-After the intervention, execute an application request and database operation, rather than checking process state alone.
+For the default local sample route:
+
+```bash
+curl --fail-with-body -H 'Host: hello.apps.localhost' http://127.0.0.1/
+```
+
+Use the configured HTTPS hostname for public applications. The sample only echoes HTTP; acceptance additionally requires an application-specific PostgreSQL write/read with known test data.
+
+## External heartbeat missing
+
+Check the sender on the platform host:
+
+```bash
+sudo systemctl status platform-heartbeat.timer
+sudo systemctl status platform-heartbeat.service
+sudo journalctl -u platform-heartbeat.service -n 50 --no-pager
+```
+
+The oneshot service can be inactive between successful runs; inspect its last result and timer schedule. It sends only when API dependency readiness and Prometheus readiness pass. Check those endpoints first, then sender connectivity, endpoint/token configuration, and TLS without printing secrets.
+
+On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../watchdog/README.md). A stale cron makes the status page unavailable, but has no independent notifier. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
+
+## Docker or k3d unavailable
+
+Inspect host disk/memory, Docker logs, and node status before changing resources. PostgreSQL and monitoring are outside k3d and should survive a cluster-only outage. Use the [start/stop procedure](deployment.md#current-installation-and-lifecycle) after resolving the cause; do not begin by deleting volumes or the cluster. If the cluster must be recreated, retain database volumes and [reapply stored specs](backup-recovery.md#reapply-restored-projects). No reconciler automatically restores workloads.
 
 ## PostgreSQL unreachable or slow
 
-Check host/container status, disk, database connections, locks, DNS, and connectivity from the workload. Distinguish authentication, permission, and transport failures.
+Use the readiness and service-log commands above. Inspect host disk, connection limits, locks, database permissions, and connectivity from the affected workload. A read-only connection/activity summary is:
 
-Do not grant blanket superuser access. Identify schema changes and long-running queries before intervention. Afterwards, verify the connection pool and error/latency baseline.
+```bash
+docker compose exec -T postgres psql -X -U postgres -d platform -c \
+  'SELECT datname, usename, state, wait_event_type, count(*) FROM pg_stat_activity GROUP BY datname, usename, state, wait_event_type;'
+```
 
-## Low disk space / failed backup
+Resolve the cause without granting blanket superuser access. Verify application connectivity and write/read behavior afterwards.
 
-Attribute growth to database data, logs, metrics, images, or volumes. Apply retention and remove known expendable data deliberately; never remove unidentified volumes. Reduce write pressure if database storage is at risk.
+## Low disk space or failed backup
 
-Check backup target, access, and capacity; repeat the backup and plan restore verification. A green job without data verification does not resolve a failed backup.
+```bash
+df -h
+df -i
+docker system df
+docker compose logs --tail=100 postgres
+```
 
-## Compromised credential / access revocation
+Attribute growth before removing anything. Never remove unidentified volumes. Follow [backup creation and verification](backup-recovery.md#make-a-current-backup); the current system has no backup-age alert or automated off-host upload. A completed dump does not prove recoverability.
 
-Identify the affected principal and scope, block access, issue new credentials, and update workloads deliberately. Revoke old credentials and terminate existing sessions according to policy. Review audit records for unauthorized activity; never include secret values in incident reports.
+## Compromised credential or access revocation
 
-## Closure
+The API uses one shared administrator token; individual user revocation and scoped audit are not implemented. Coordinate replacement of `PLATFORM_TOKEN` in `.env` and recreate the API container so it receives the new environment. Revoke access to the old credential at its distribution points.
 
-Verify recovery alerts, document data loss or unknown impact, and distinguish causes from hypotheses. Address recurrence through tests, monitoring, or an ADR change. Record timestamps and actual recovery duration in operational evidence.
+Preserve `DATABASE_KEY` during recovery. Changing it changes derived Secrets but does not update existing PostgreSQL role passwords; rotation requires coordinated role-password and workload-Secret changes. Follow the [platform configuration notes](../../platform/README.md#configuration). The root [operations notes](../../README.md#operations) describe controller-token rotation. Never include secret values in incident records.
+
+## Closure and target capabilities
+
+Record affected resources, commands, results, actual recovery duration, and remaining uncertainty. Verify an application request, database write/read, and relevant recovery notifications.
+
+Revision-bound rollback, resumable operation IDs, retained-resource deletion inventories, and per-user audit investigation remain target procedures in the [software architecture](../02-architecture/software-architecture.md). They cannot be used as current incident prerequisites.

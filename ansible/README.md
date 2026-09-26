@@ -34,7 +34,7 @@ manage only `PLATFORM_DOMAIN`, `APPS_DOMAIN`, `TLS_EMAIL`, and `EDGE_BIND_IP`.
 Other settings retain their generated or existing values. For a custom subnet or
 K3S image, prepare the target `.env` using `scripts/init.py` and edit it before the
 first deployment. Existing clusters are not automatically upgraded by bootstrap.
-Back up `.env`, especially `DATABASE_KEY`, as described in [operations](../docs/operations.md).
+Back up `.env`, especially `DATABASE_KEY`, as described in [operations](../docs/05-operations/backup-recovery.md).
 
 Useful inventory overrides:
 
@@ -57,7 +57,7 @@ Rerunning the playbook reapplies sources and endpoints and reconciles the runnin
 platform. k3d installation and bootstrap run on every deployment and report
 changes, even if configuration is unchanged. Source extraction does not delete
 obsolete remote files. Backups and the external watchdog require the separate
-[operations](../docs/operations.md) and [watchdog](../watchdog/README.md) setup.
+[operations](../docs/05-operations/backup-recovery.md) and [watchdog](../watchdog/README.md) setup.
 
 ```bash
 ansible-playbook -i ansible/inventory.example.yml ansible/deploy.yml --syntax-check

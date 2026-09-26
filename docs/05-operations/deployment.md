@@ -4,6 +4,59 @@ Status: **operational draft** for the target hybrid installation. Executable [bo
 
 The [implementation alignment report](../04-development/implementation-alignment-report.md) records the inspected source baseline and passing local checks, including Compose configuration, shell syntax, and watchdog/heartbeat playbook syntax. No target-host deployment or live acceptance was performed in that assessment. The sequence below describes the target procedure; identity-provider setup, persistent workers, revision-aware reconciliation, and the complete acceptance flow remain implementation gaps.
 
+## Current installation and lifecycle
+
+**Validation:** the commands below were reviewed against the repository scripts. Shell syntax and Compose configuration checks passed in the [alignment assessment](../04-development/implementation-alignment-report.md); deployment, restart, and recreation were not executed for this documentation update.
+
+Run from the repository root on the intended host, with the prerequisites in the [setup guide](../../README.md). For an Ansible installation, use a privileged shell in `/opt/developer-platform`; its configuration/runtime directories are root-only. Use a fresh trusted shell so previously exported settings do not override `.env`.
+
+For a new local lab:
+
+```bash
+python3 scripts/init.py
+python3 scripts/install-k3d.py
+bash scripts/up.sh
+```
+
+`init.py` preserves an existing `.env`. Before public installation, configure domains, DNS, firewall, bind address, and non-overlapping network settings as described in the [host setup](../../README.md#deploy-to-the-existing-hetzner-host), or use the [Ansible deployment guide](../../ansible/README.md). Current topology is Caddy at the edge, Traefik inside k3d, and one shared Docker network; the segmented topology remains a target design.
+
+Check startup using the [runbook commands](runbook.md#inspect-the-current-installation). `/healthz` checks only the API process; `/readyz` checks PostgreSQL and Kubernetes. Neither proves an application's database write/read flow.
+
+To stop services while retaining containers, cluster, and data:
+
+```bash
+docker compose stop
+.runtime/bin/k3d cluster stop workloads
+```
+
+To start them again, or rebuild the API from updated sources:
+
+```bash
+bash scripts/up.sh
+```
+
+Bootstrap starts an existing cluster; it does not upgrade its Kubernetes image. It also does not reapply stored project specs automatically. Watchdog heartbeat delivery will stop during dependency downtime and can produce an external alert; no expiring maintenance-window feature exists.
+
+### Recreate the workload cluster
+
+This procedure removes Kubernetes workloads and custom cluster resources. First create and secure a [backup](backup-recovery.md#make-a-current-backup), preserve `.env`, record image versions, and save any manually managed manifests. The project catalog contains only the latest `name/image/port` specs. Test version changes on an isolated installation before using this procedure on a populated host.
+
+```bash
+bash scripts/down.sh
+# If changing the Kubernetes version, edit K3S_IMAGE in .env now.
+bash scripts/up.sh
+```
+
+Without `--volumes`, teardown retains Compose service volumes, including PostgreSQL and the project catalog. Follow [reapply restored projects](backup-recovery.md#reapply-restored-projects), then verify workloads and application data. No SQL import is needed when the retained database volume is intact. Changing PostgreSQL major versions requires a separate migration or compatible logical restore; retaining its volume alone is not an upgrade procedure.
+
+`bash scripts/down.sh --volumes` deletes persistent Compose service data as well as the cluster. It is a deliberate disposable-lab reset, not a recovery or routine upgrade step. Both teardown modes preserve `.env`, local backups, and installed tools.
+
+Configure the [watchdog and heartbeat](../../watchdog/ansible/README.md) and [off-host backup process](backup-recovery.md) separately. Installation alone does not verify notification receipt or recoverability.
+
+## Target installation and release procedures
+
+The remaining sections describe the intended architecture. Identity-provider setup, durable workers, revision history, scoped authorization, and operation IDs are not supplied by the current API.
+
 ## Define the installation profile first
 
 Required inputs include host access, DNS/domains, registry, approved software versions, persistent volume paths, private network ranges, secret storage, external backup storage, OIDC configuration, and watchdog/alert recipients. Agree on RPO/RTO and retention before production-like acceptance.
