@@ -21,3 +21,7 @@ all:
         backup_watchdog_url: https://status.example.com/backup.php
         # Prompted privately: backup_watchdog_token (distinct from heartbeat).
         backup_run_now: false
+
+
+        # Optional in-place drill notification window (does not change watchdog thresholds):
+        # backup_drill_wait_seconds: 300

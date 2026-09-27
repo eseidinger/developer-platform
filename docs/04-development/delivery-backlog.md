@@ -430,6 +430,34 @@ one optional real-restic check skipped, including six new drill control-flow
 checks. These are local fixture results, not execution on node-01. Subsequent
 operator-reported live execution is recorded as F-2026-09-27 below.
 
+**Freshness drill tooling (September 27, 2026; OPS-006-T02/OPS-007-T01):**
+Added [stalled](../../operations/backup/ansible/drill-backup-stalled.yml) and
+[overdue](../../operations/backup/ansible/drill-backup-overdue.yml) launch
+playbooks plus [status/evidence collection](../../operations/backup/ansible/check-backup-drill.yml).
+They use the existing lab and installed runner, real two-hour/24-hour thresholds,
+an independent transient systemd service and the backup lock. The stalled attempt
+delays capture; the overdue exercise lets the previous verified capture age without
+sending fabricated events. Scheduled attempts cannot acquire the lock during
+these exercises. A normal verified capture follows the wait; interruption also
+attempts recovery. Reports keep prior/current evidence; actual email receipt
+remains an operator check. Local syntax validation and nine simulated-clock/control-flow
+tests passed; full backup suite: 34 passed, one optional real-restic test skipped.
+No live freshness exercise was run during implementation. Subsequent operator
+output confirms launch and waiting state below; overdue/stalled acceptance
+remains open.
+
+**Stalled drill launch (September 27, 2026; operator-supplied output):**
+The launch playbook completed with 13 successful tasks and zero failures on
+inventory host platform. The status playbook showed the transient service active
+and the report in running/waiting-for-stalled state. Run
+bfe5d4443417454ba8b73cd00b9fc3df started at 08:46:40 UTC; the real stalled threshold
+is crossed after 10:46:40 UTC, with recovery scheduled no earlier than 10:51:41 UTC.
+Remote report: /var/lib/developer-platform-backup-drill/freshness-_5w2hvpe/report.json.
+The report retained the previous verified capture/snapshot while waiting.
+This is launch/progress evidence only; completion, recovery and DOWN/UP email
+receipt for this drill have not yet been confirmed. Exact deployed revision was
+not supplied.
+
 **Failed-backup drill evidence F-2026-09-27 (operator supplied; OPS-006-T02/OPS-007-T01):** The operator reports that [drill-backup-failure.yml](../../operations/backup/ansible/drill-backup-failure.yml) executed correctly on the existing lab and both notification emails arrived. The referenced drill injects database-capture failure, verifies preservation of the prior successful capture/snapshot, waits for the DOWN notification window, then runs and verifies a normal recovery backup. This is operator-reported acceptance of the failed-capture/recovery path and its email pair. The fetched report, exact deployed revision, snapshot IDs and receipt times were not supplied for independent inspection. It does not establish upload-failure, overdue/stalled, local-monitoring-outage or mail-delivery-failure acceptance. No separate test environment was used, in accordance with ADR-010.
 
 **Scheduled backup evidence S-2026-09-27 (operator supplied; OPS-006-T02):** `platform-backup.timer` reported its last trigger at 00:00:04 UTC and next at 12:00 UTC. The service journal records successful start/completion at 00:00:04/00:01:38 UTC. Durable status records run `60c70027e90644258716b3c3bfeb8c4b`, `running: false`, `result: success`, `stage: complete`, and verified snapshot `38f989c67a080a82970d796d1a3da1c79d6264005e131d116431a12333a0e1ed`. The journal explicitly reports verified backup and completed retention. This establishes one scheduled successful capture/readback/retention run, not full retention-policy/access-control acceptance, notification email receipt, or restoration of this snapshot. Exact deployed revision was not supplied.

@@ -17,6 +17,8 @@ inventory for the disposable VM.
 | Configure existing S3 repository access | [setup-backup.yml](ansible/setup-backup.yml) | [Credentials and initialization](#encrypted-s3-backup-repository-setup) |
 | Install scheduled backups and alerts | [deploy-backup.yml](ansible/deploy-backup.yml) | [Schedule and watchdog prerequisites](#scheduled-backups-and-independent-backup-alerts) |
 | Exercise failed-backup email and verified recovery in the existing lab | [drill-backup-failure.yml](ansible/drill-backup-failure.yml) | [In-place failure drill](#failed-backup-notification-drill-on-the-existing-lab) |
+| Exercise stalled/overdue backup detection | [stalled](ansible/drill-backup-stalled.yml), [overdue](ansible/drill-backup-overdue.yml) | [Real-time freshness drills](#stalled-and-overdue-backup-drills) |
+| Inspect a running/completed freshness drill | [check-backup-drill.yml](ansible/check-backup-drill.yml) | Fetches the latest report without changing the drill |
 | Create a pre-backup marker and verified backup | [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml) | [Source test preparation](#automate-marker-creation-and-the-source-backup) |
 | Restore and test a fresh isolated VM | [restore-recovery.yml](ansible/restore-recovery.yml) | [Recovery inventory and safeguards](#restore-a-fresh-recovery-vm-with-ansible) |
 
@@ -74,6 +76,93 @@ A passing report proves the runner outcomes and watchdog HTTP acceptance,
 not mailbox receipt. Confirm both emails separately before recording acceptance.
 This exercises database-capture failure, not upload failure, overdue/stalled
 detection or notification-delivery failure.
+
+### Stalled and overdue backup drills
+
+Run these **one at a time** on the existing lab, from the controller. They use
+the real watchdog thresholds: no shortened limits, fabricated events or edited
+capture timestamps. No watchdog redeployment or extra environment is needed.
+
+Start with stalled detection:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/drill-backup-stalled.yml
+```
+
+This starts a real backup attempt but delays capture until **two hours plus five
+minutes** have elapsed. The external watchdog should report BACKUP DOWN with
+condition `stalled`. The same attempt then captures/uploads/verifies the backup,
+triggering BACKUP UP. If it fails or is interrupted, the helper attempts a fresh
+normal recovery backup.
+
+Check progress at any time:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/check-backup-drill.yml
+```
+
+Wait for a `passed` report **and both emails** before starting the next exercise:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/drill-backup-overdue.yml
+```
+
+Overdue detection lets the previous verified capture age past **24 hours**, then
+allows five minutes for the watchdog notification. It sends no artificial start
+or success event while waiting. A real recovery backup follows. Depending on
+the previous capture time, this takes up to roughly 24 hours plus the
+notification window and recovery duration. Expect BACKUP DOWN condition
+`overdue`, then BACKUP UP. This deliberately exceeds the normal RPO target for
+the exercise; existing stored recovery points are preserved.
+
+Both launch playbooks return after preflight, not after completion. A transient
+`platform-backup-freshness-drill.service` continues without the controller.
+The installed runner's lock prevents concurrent backup/drill work throughout.
+**Scheduled captures are skipped with lock-contention failures during the drill**;
+the timers are not disabled or edited. The drill's final verified backup restores
+freshness; normal future timer runs resume after the lock is released.
+Applications run normally during the wait; recovery capture briefly pauses
+Caddy/Grafana, as in ordinary backups.
+
+The notification window can be increased with
+`-e backup_drill_wait_seconds=600` (60–1800 seconds supported).
+The helper checks the authenticated watchdog protocol without refreshing its
+state. It requires a recent successful local backup and no pending notification
+or service recovery. The existing watchdog must be healthy/UP before the exercise;
+local preflight alone cannot certify its current notification state.
+
+Reports are retained privately in
+`/var/lib/developer-platform-backup-drill/freshness-*/report.json`; `latest`
+points to the last launched run. The check playbook fetches
+`.runtime/backup-drill/<host>/freshness-latest.json` and flags failures. Archive
+this controller copy before collecting another run if needed; original remote
+reports remain separate. A report marked `passed` verifies elapsed thresholds
+and runner recovery, **not** cron execution or mailbox receipt. Record the actual
+DOWN reason and both email receipts in the backlog.
+
+To inspect or gracefully abort on node-01:
+
+```bash
+journalctl -u platform-backup-freshness-drill --no-pager
+systemctl stop --no-block platform-backup-freshness-drill.service
+```
+
+A graceful stop requests recovery; allow time for the normal backup and inspect
+the report. An aborted exercise is not marked passed. Do not force-kill it.
+Power loss or genuine recovery failures can still prevent recovery. After an
+abnormal termination, inspect the report and
+`/var/lib/developer-platform-backup/status.json`; once the drill has stopped,
+run `systemctl start platform-backup.service` if recovery is needed.
+A killed drill can leave a `running` report; the check playbook flags it if the
+service is no longer active. A host reboot releases the lock; the existing
+backup recovery service/timer remains responsible for recovery.
+
+These exercises cover natural backup age and a stalled attempt while local
+monitoring remains available. They do not claim local-monitoring-outage,
+SMTP-delivery-failure or restoration acceptance.
 
 ### Recovery drill
 

@@ -1,0 +1,94 @@
+---
+- name: Start a supervised real-time backup freshness drill
+  hosts: developer_platform
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Validate live drill settings
+      ansible.builtin.assert:
+        that:
+          - not ansible_check_mode
+          - backup_drill_mode | default('') in ['stalled', 'overdue']
+          - backup_drill_wait_seconds | default(300) | int >= 60
+          - backup_drill_wait_seconds | default(300) | int <= 1800
+        fail_msg: Select stalled or overdue. This is a live exercise; check mode is unsupported.
+    - name: Check for an existing freshness drill
+      ansible.builtin.command:
+        argv: [systemctl, show, platform-backup-freshness-drill.service, --property=ActiveState, --value]
+      changed_when: false
+      register: freshness_active
+    - name: Refuse overlapping drills
+      ansible.builtin.assert:
+        that: freshness_active.stdout not in ['active', 'activating', 'deactivating', 'reloading']
+    - name: Explain duration and backup gap
+      ansible.builtin.debug:
+        msg: >-
+          Mode {{ backup_drill_mode }}: stalled waits more than two hours; overdue
+          waits until the last verified capture is more than 24 hours old.
+          Scheduled backups cannot acquire the lock during the drill. Existing backups
+          remain intact. A verified recovery backup follows, briefly pausing Caddy/Grafana.
+          The playbook returns after starting the service; it does not certify completion.
+  tasks:
+    - name: Create evidence parent
+      ansible.builtin.file:
+        path: /var/lib/developer-platform-backup-drill
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Create private unique drill directory
+      ansible.builtin.tempfile:
+        state: directory
+        path: /var/lib/developer-platform-backup-drill
+        prefix: freshness-
+      register: freshness_directory
+    - name: Install freshness helper
+      ansible.builtin.copy:
+        src: ../scripts/drill-backup-freshness.py
+        dest: "{{ freshness_directory.path }}/drill.py"
+        mode: '0700'
+    - name: Start independently supervised background drill
+      ansible.builtin.command:
+        argv:
+          - systemd-run
+          - --unit=platform-backup-freshness-drill
+          - --collect
+          - --property=Type=exec
+          - --property=UMask=0077
+          - "--property=RuntimeMaxSec={{ (86400 if backup_drill_mode == 'overdue' else 7200) + (backup_drill_wait_seconds | default(300) | int) + 7500 }}"
+          - --property=TimeoutStopSec=7500
+          - --property=Nice=10
+          - /usr/bin/python3
+          - "{{ freshness_directory.path }}/drill.py"
+          - --mode
+          - "{{ backup_drill_mode }}"
+          - --window
+          - "{{ backup_drill_wait_seconds | default(300) | int }}"
+          - --report
+          - "{{ freshness_directory.path }}/report.json"
+      changed_when: true
+    - name: Point to the latest launched drill evidence
+      ansible.builtin.file:
+        src: "{{ freshness_directory.path }}"
+        dest: /var/lib/developer-platform-backup-drill/latest
+        state: link
+        force: true
+    - name: Wait for preflight report
+      ansible.builtin.wait_for:
+        path: "{{ freshness_directory.path }}/report.json"
+        timeout: 45
+    - name: Read launch result
+      ansible.builtin.slurp:
+        src: "{{ freshness_directory.path }}/report.json"
+      register: freshness_launch
+    - name: Require successful preflight
+      ansible.builtin.assert:
+        that: (freshness_launch.content | b64decode | from_json).result in ['running', 'passed']
+        fail_msg: Drill preflight failed; inspect the transient service journal before retrying.
+    - name: Report how to follow the drill
+      ansible.builtin.debug:
+        msg:
+          - "Drill launched, not yet accepted. Run check-backup-drill.yml to collect status."
+          - "Remote report: {{ freshness_directory.path }}/report.json"
+          - "Journal: journalctl -u platform-backup-freshness-drill --no-pager"
+          - "Confirm BACKUP DOWN reason {{ backup_drill_mode }} and subsequent BACKUP UP."

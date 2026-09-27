@@ -1,0 +1,35 @@
+---
+- name: Read and collect latest freshness drill evidence
+  hosts: developer_platform
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read transient service state
+      ansible.builtin.command:
+        argv: [systemctl, show, platform-backup-freshness-drill.service, --property=ActiveState, --property=Result, --property=ExecMainStatus]
+      register: freshness_service
+      changed_when: false
+    - name: Read latest report
+      ansible.builtin.slurp:
+        src: /var/lib/developer-platform-backup-drill/latest/report.json
+      register: freshness_report
+    - name: Decode report
+      ansible.builtin.set_fact:
+        freshness_evidence: "{{ freshness_report.content | b64decode | from_json }}"
+    - name: Fetch latest report
+      ansible.builtin.fetch:
+        src: /var/lib/developer-platform-backup-drill/latest/report.json
+        dest: "{{ playbook_dir }}/../../../.runtime/backup-drill/{{ inventory_hostname }}/freshness-latest.json"
+        flat: true
+    - name: Display evidence and remaining mailbox check
+      ansible.builtin.debug:
+        msg:
+          - "{{ freshness_service.stdout_lines }}"
+          - "{{ freshness_evidence }}"
+          - "A passed report is runner evidence; confirm DOWN/UP mailbox receipt separately."
+    - name: Flag failed or interrupted drills
+      ansible.builtin.assert:
+        that:
+          - freshness_evidence.result in ['running', 'passed']
+          - freshness_evidence.result != 'running' or 'ActiveState=active' in freshness_service.stdout or 'ActiveState=activating' in freshness_service.stdout
+        fail_msg: Inspect the journal and backup status; recovery may need attention.
