@@ -12,6 +12,10 @@ Collectors remain close to monitored components; Prometheus, Grafana, Loki, and 
 
 Keep the external watchdog small: last receipt time, probe result, state changes, and alert/recovery delivery. It is not a second telemetry backend.
 
+## Implementation note — September 27, 2026
+
+The implemented systemd component is a heartbeat sender: it checks API `/readyz` and Prometheus readiness and sends only on success. It does not directly inspect the Docker daemon or send a local alert. Maintenance windows remain unimplemented. Catalog-driven blackbox probes and backup freshness signals now exist; [ADR-014](ADR-014-catalog-availability-monitoring.md) and [ADR-015](ADR-015-verified-backup-bundles.md) record their actual boundaries. This source note does not accept the remaining proposed coverage.
+
 ## Alternatives
 
 Keeping everything in the cluster is simple but shares its failure domain. A host-only watchdog detects Docker failures, not host loss. An external monitoring service could replace PHP/MySQL; selection and cost remain undecided.

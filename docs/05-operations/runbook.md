@@ -14,7 +14,7 @@ kubectl --kubeconfig .runtime/admin.kubeconfig get nodes -o wide
 kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 ```
 
-`/healthz` is process health; `/readyz` checks PostgreSQL and Kubernetes connectivity. PostgreSQL readiness is not a data-integrity or application-permission check. Record time, host, code revision (`git rev-parse HEAD`), affected project, latest spec, and observed symptoms. The current API has no operation IDs, revision history, durable job steps, or per-user audit trail. Preserve available logs and redact credentials before sharing them.
+`/healthz` is process health; `/readyz` executes a SQL query and reads the `platform-system` namespace using the controller credential. It does not check every node or workload. PostgreSQL readiness is not a data-integrity or application-permission check. Record time, host, code revision (`git rev-parse HEAD`), affected project, latest spec, and observed symptoms. The current API has no operation IDs, revision history, durable job steps, or per-user audit trail. Preserve available logs and redact credentials before sharing them.
 
 ## Provisioning stuck or failed
 
@@ -99,7 +99,7 @@ docker system df
 docker compose logs --tail=100 postgres
 ```
 
-Attribute growth before removing anything. Never remove unidentified volumes. Follow [backup creation and verification](backup-recovery.md#make-a-current-backup); the manual SQL script alone has no off-host upload or freshness alert. If the scheduled backup playbook is deployed, inspect its independent status and notification channel below. A completed dump does not prove recoverability.
+Attribute growth before removing anything. Never remove unidentified volumes. Follow [backup creation and verification](backup-recovery.md#make-a-current-backup); the former standalone SQL helper has been removed; use the managed backup service, which includes encrypted upload, readback and freshness reporting. If the scheduled backup playbook is deployed, inspect its independent status and notification channel below. A completed dump does not prove recoverability.
 
 ## Compromised credential or access revocation
 

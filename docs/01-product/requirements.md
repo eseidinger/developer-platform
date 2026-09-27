@@ -49,6 +49,6 @@ The [delivery backlog](../04-development/delivery-backlog.md) retains detailed D
 
 The hybrid installation is a single-host lab with a shared failure domain. Multiple Kubernetes nodes in Docker do not provide host-level high availability. Namespaces and Docker networks alone do not guarantee strong tenant isolation.
 
-Availability, p95 provisioning time, API latency, log retention, RPO, RTO, and concurrent application count remain to be defined. First measure baselines under representative load; do not promise unsupported SLAs.
+Availability, p95 provisioning time, API latency and concurrent application count remain to be defined. The owner selected a 24-hour RPO and four-hour RTO, twelve-hour backups and 14 daily / 8 weekly / 6 monthly retention points; these are targets, not measured guarantees. Prometheus and Loki currently use seven-day retention; a project log-access/retention contract remains open. The lab initial response target is 24 hours with one responder. See [backup policy evidence](../04-development/delivery-backlog.md#current-backup-and-recovery-progress) and [alert ownership](../05-operations/monitoring.md#alert-process). Measure representative baselines before promising SLAs.
 
 Multi-cluster operation, automatic multi-node HA, a broad data-service catalog, complex autoscaling, and unattended AI remediation are outside Phase 1 (MVP). See the [development plan](../04-development/development-plan.md) for phases and dependencies.

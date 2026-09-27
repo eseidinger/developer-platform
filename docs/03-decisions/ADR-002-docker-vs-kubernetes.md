@@ -12,6 +12,10 @@ Starting profile: platform services, PostgreSQL, and central observability run i
 
 k3d is an installation profile of the Kubernetes adapter. A direct Docker compute adapter is added as a second path to validate ADR-001.
 
+## Implementation note — September 27, 2026
+
+[Cluster configuration](../../scripts/cluster_config.py) now implements k3d/k3s with one server and two agents. The earlier “k3d proposed” wording records the original decision scope, not current implementation status. No direct Docker workload adapter exists.
+
 ## Alternatives and evolution
 
 | Option | Benefit | Limitation |

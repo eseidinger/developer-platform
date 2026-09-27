@@ -2,6 +2,16 @@
 
 Status: target design draft. The inspected [Python API](../../platform/app/main.py) synchronously provisions PostgreSQL and Kubernetes resources and persists the latest project spec/status. The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records source evidence and local checks; live acceptance remains unverified. The domain modules, asynchronous operations, and provider contract below remain proposed. Quarkus and a multi-service implementation have not been selected.
 
+## Current control plane
+
+[ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md) records the implemented synchronous administrator boundary. FastAPI calls PostgreSQL and the Kubernetes dynamic client directly; `manifests.py` generates fixed resources and `monitoring.py` publishes derived probe targets. There are no provider interfaces or persisted provisioning jobs.
+
+Each PUT replaces the latest catalog spec, publishes monitoring, ensures the database/login, applies manifests with Kubernetes server-side apply, then writes `applied`. Failures can leave SQL or Kubernetes resources and a `failed`/`provisioning` catalog entry. All projects share one session advisory lock, and no expected revision prevents a later request from overwriting an earlier spec. Catalog, SQL and Kubernetes changes are not atomic together.
+
+Retirement acknowledges prior manual namespace removal and retains the catalog/database/login; it does not perform the target deletion plan. The monitoring loop retries discovery every 30 seconds, preserving prior targets on failure; it never repairs workloads. [ADR-014](../03-decisions/ADR-014-catalog-availability-monitoring.md) records this boundary.
+
+## Target design
+
 ## Ports and adapters
 
 The core models Applications, Environments, Resources, Deployments, and Grants. REST, CLI, and later MCP are inbound adapters; Docker, Kubernetes, PostgreSQL, and monitoring are outbound adapters. A modular service with persistent worker state is sufficient initially; separate processes are not a domain requirement.

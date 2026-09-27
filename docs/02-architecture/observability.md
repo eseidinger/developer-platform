@@ -1,42 +1,41 @@
 # Observability Architecture
 
-Status: design draft; installed dashboards and alert rules have not been verified.
+Status: implemented lab signals plus target coverage. Source configuration is not deployment evidence; [current monitoring progress](../04-development/delivery-backlog.md#current-monitoring-progress) records local preparation and operator-reported outcomes separately.
 
-## Signals and placement
+## Current signals and placement
 
-| Signal | Source | Proposed destination |
+| Signal | Implemented source/path | Limit |
 |---|---|---|
-| Host and containers | node-exporter, container metrics | Prometheus |
-| Application availability | Catalog-discovered blackbox HTTP(S) probes outside k3d | Prometheus and Alertmanager |
-| Kubernetes | kube-state-metrics, node/workload metrics | Prometheus outside k3d |
-| PostgreSQL | Database exporter and host metrics | Prometheus |
-| Logs | Collector with project/environment attribution | Loki |
-| Traces, later | OpenTelemetry instrumentation/collector | Optional Tempo |
-| Alerts | Prometheus rules | Alertmanager and designated recipients |
-| Platform domain status | Reconciler, jobs, health checks | Platform API and dashboards |
+| Host | node-exporter → Prometheus | No measured project/shared-service capacity breakdown |
+| Kubernetes object state | kube-state-metrics via private NodePort 30090 → Prometheus | No pod/container CPU or memory usage scrape |
+| Application availability | Catalog → file discovery → blackbox exporter → Prometheus | Root-path status/content from the platform host, not an independent external network |
+| Monitoring components | Prometheus and blackbox-exporter self-scrapes | Does not prove email delivery |
+| Logs | Alloy reads host Docker JSON log files → Loki | No explicit k3d application log collection or project/environment attribution |
+| Views | Grafana Prometheus/Loki data sources | No provisioned dashboards or scoped developer views |
+| Alerts | Scrape failure, low disk, unavailable replicas, application failure/missing result/stale discovery → Alertmanager | Default receiver sends nothing; SMTP requires separate configuration |
+| Host health | systemd sender checks API SQL/Kubernetes access and Prometheus readiness → external watchdog | Does not directly inspect Docker, all nodes/workloads, Grafana, Loki or Alertmanager |
+| Backup freshness | Optional scheduled runner → separately authenticated external backup channel | Independent of heartbeat; shares watchdog hosting/mail |
 
-Collectors run near their sources; central storage and alerting are outside the workload cluster. On a single host, they still depend on that host. A host watchdog outside Docker and an independent PHP/MySQL watchdog complement one another.
+Prometheus retains seven days or 4 GB, whichever limit is reached first; Loki has seven-day retention configured. Alloy's host file collector depends on Docker JSON log files and does not collect pod logs inside k3d explicitly. Loki has authentication disabled. Access to shared backends is administrative, with no platform-enforced tenant filters.
 
-Operational validation uses the existing single-environment lab and external watchdog under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md); a duplicate test installation is not required.
+Central storage and alerting are outside k3d but share its host failure domain. The external PHP/MySQL watchdog is independently hosted. Its optional fixed HTTPS GET checks status codes, not the application content contract. The systemd component sends heartbeats only on successful readiness checks; it is not a local notification service.
 
-The [application probe implementation](../../infrastructure/monitoring/README.md) derives targets from the project catalog, retains failed applications, and removes explicitly retired ones. It checks public URLs from the platform host, not from an independent external network. The API periodically publishes discovery only; workload reconciliation remains future work.
+[ADR-014](../03-decisions/ADR-014-catalog-availability-monitoring.md) records catalog membership, bounded profiles, monitoring-only reconciliation and retirement semantics. [Application monitoring](../../infrastructure/monitoring/README.md) supplies configuration and verification procedures. Discovery retains failed applications and excludes only explicitly retired catalog entries. The thread does not repair workloads.
 
-## Platform and project views
+[ADR-015](../03-decisions/ADR-015-verified-backup-bundles.md) records capture-time freshness and separate backup notifications. Under [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md), the monitoring chain ends at the external watchdog; silent hosting/scheduler/mail failure is accepted for the lab. Maintenance windows are not implemented.
 
-Operators see the host, Docker, cluster, database, certificates, storage, jobs, and monitoring itself. Developers see only authorized applications and their logs, health, versions, and metrics. Links to shared dashboards do not replace data-access enforcement.
+## Target coverage and project views
 
-Telemetry uses stable project, environment, and application IDs, deployment revisions, and operation IDs. Metric labels exclude unbounded user/request IDs. Structured logs and trace context identify individual requests.
+PostgreSQL exporter metrics, application request/error/latency signals, workload resource usage, attributed Kubernetes logs and traces remain future work. Proposed OpenTelemetry/Tempo integration is not installed. Durable jobs/revisions must exist before exposing their telemetry.
 
-## Domain status
+Operators should see host, Docker, cluster, database, certificates, storage, jobs and monitoring. Developers should see only authorized applications and logs/health/metrics. Shared dashboard links cannot enforce this boundary. Introduce server-side authorization before exposing those views.
 
-`RUNNING` requires observed readiness of the desired revision. A started container alone is insufficient. Missing telemetry is marked unknown or stale, not healthy. Provider state, application health, and monitoring availability remain distinguishable.
+Target telemetry uses stable project, environment and application IDs, deployment revisions and operation IDs. Current probe labels use project/application name, namespace and URL; there are no environment/revision/operation IDs. Avoid unbounded request IDs in metric labels; use structured logs/trace context for requests.
 
-MVP signals include request errors and latency, resource consumption, database connections, free disk space, backup age, and job failures. Automatic performance diagnosis is not an MVP feature.
+## Status and operational evidence
 
-## Monitoring itself and AI context
+The current catalog stores `provisioning`, `applied`, `failed` or `retired`; it does not transition with ongoing workload health. Probe success is a separate observation. Future `RUNNING` requires observed readiness of the desired revision, with missing/stale telemetry distinguished from health.
 
-An authenticated heartbeat from the platform host reaches independent web hosting. Its independent scheduler detects overdue heartbeats and sends a deduplicated alert and recovery notification. A heartbeat proves only that the sender functions; additional service probes are needed.
+Selected heartbeat, SMTP, scrape-rule and backup DOWN/UP notifications have operator-reported receipt in the backlog. Application probe fixtures do not establish live application-rule delivery or complete host/cluster failure acceptance. Continue controlled checks on the existing lab under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md); no duplicate installation is required.
 
-Later, AI reads telemetry alongside deployment history and redacted configuration changes. Results distinguish observations, data gaps, and hypotheses.
-
-[ADR-005](../03-decisions/ADR-005-observability-watchdog.md) explains the failure boundaries. [Monitoring](../05-operations/monitoring.md) covers operational checks and alert procedures.
+Later AI reads authorized telemetry alongside deployment history and redacted changes, separating observations, gaps and hypotheses. [ADR-005](../03-decisions/ADR-005-observability-watchdog.md) explains target failure boundaries; [Monitoring](../05-operations/monitoring.md) covers current checks and remaining acceptance.

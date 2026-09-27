@@ -2,6 +2,12 @@
 
 Status: **v1alpha1 contract draft**, including environment, health, deletion protection, and validation rules. This is neither an implemented schema nor a ready-to-deploy manifest.
 
+## Difference from the current API
+
+The implemented [project contract](../../platform/README.md#project-specification) is JSON with `name`, `image`, optional `port` and `probe_profile`, submitted to `PUT /projects/{name}`. It has no schema version, environments, optional resource selection, configurable bindings or grants. PostgreSQL is always provisioned; bindings use `PG*` variables. PUT returns 200 after resource application and stores only the latest spec/status, rather than a revision and asynchronous operation ID.
+
+Unknown request fields are currently ignored by Pydantic's default behavior. Images are not resolved to digests. The stricter validation, capability rejection and secret references below are target requirements; sending this YAML or adding its fields to a current project request does not implement them. A versioned migration remains PLAN-002 work. See [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
+
 ## Purpose and scope
 
 A spec describes the desired state of an application in a project/environment: workload, required resources, configuration, and access. The server produces observed status separately. Docker networks, Kubernetes namespaces, and PostgreSQL server addresses are outside this contract.

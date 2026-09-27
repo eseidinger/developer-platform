@@ -1,6 +1,6 @@
 # Infrastructure Architecture
 
-Status: the hybrid solution is the selected starting topology. [ADR-009](../03-decisions/ADR-009-edge-and-cluster-ingress.md) accepts the implemented Caddy edge / Traefik cluster ingress split. Source configuration has been inspected; public TLS, recovery, and target-host acceptance remain unverified. A larger topology remains an expansion option.
+Status: the hybrid solution is the selected starting topology. [ADR-009](../03-decisions/ADR-009-edge-and-cluster-ingress.md) accepts the implemented Caddy edge / Traefik cluster ingress split. Source configuration has been inspected; public TLS and full target-host acceptance remain open. Operator-reported marker-based recovery and selected email delivery checks are recorded in the backlog; they do not establish complete acceptance. A larger topology remains an expansion option.
 
 ## Starting topology: existing Hetzner host
 
@@ -13,8 +13,8 @@ The available Ubuntu host has **16 vCPUs and 32 GB RAM**. The hybrid design runs
 | Identity provider | Dedicated service; Keycloak proposed | Authentication and client identities |
 | PostgreSQL | Docker outside k3d, persistent volume | Platform metadata and separate project databases |
 | Workload compute | k3d with project namespaces; implemented | Applications, services, secrets, and Traefik ingress; environment model remains proposed |
-| Observability | Docker outside k3d | Prometheus, Grafana, Loki, Alertmanager |
-| Collectors/exporters | Alongside monitored systems | Host, database, container, and Kubernetes signals |
+| Observability | Docker outside k3d; implemented | Prometheus, Grafana, Loki, Alertmanager; data sources are provisioned, dashboards are not |
+| Collectors/exporters | node-exporter, kube-state-metrics, blackbox exporter and Alloy; implemented | Host metrics, Kubernetes object state, application availability and host Docker logs; PostgreSQL and workload usage/log telemetry remain target work |
 | Host heartbeat sender | systemd outside Docker; implemented | Check API dependency and Prometheus readiness; stop heartbeats on failure so the external watchdog can notify |
 | External watchdog | Independent PHP/MySQL web hosting | Detect host/network failures using heartbeats and probes |
 
@@ -51,7 +51,7 @@ A possible **planning baseline**, not a measurement or capacity guarantee:
 
 Measure actual usable memory on the host: “32 GB” and “32 GiB” are not equivalent. Reduce budgets accordingly. Also constrain and measure CPU, I/O, connections, and log growth.
 
-All local components share one host failure domain. The host sender does not directly inspect the Docker daemon or deliver a local notification; failed API/Prometheus checks stop its heartbeat. The external watchdog detects expiry, including during host loss. Broader host checks remain target work; actual notification receipt remains unverified.
+All local components share one host failure domain. The host sender does not directly inspect the Docker daemon or deliver a local notification; failed API/Prometheus checks stop its heartbeat. The external watchdog detects expiry, including during host loss. Broader host checks remain target work. The operator has reported receipt for heartbeat, selected Alertmanager and backup scenarios; see [current monitoring evidence](../04-development/delivery-backlog.md#current-monitoring-progress).
 
 ## Expansion option
 

@@ -1,5 +1,9 @@
 # Backup and Recovery
 
+## Lab validation scope
+
+[ADR-010](../03-decisions/ADR-010-single-environment-lab.md) selects the existing lab and watchdog for reversible operational exercises. New isolated recovery environments are deferred. Fresh-VM commands below document historical drills and a future explicitly selected restore; they are not the routine next step. Existing restore evidence remains valid, and unmet fresh-restore criteria remain open. Use the [in-place failure/freshness drills](../../operations/backup/README.md#start-with-the-playbooks) for current notification checks.
+
 ## Use the playbooks first
 
 The supported path is the [backup and recovery playbook workflow](../../operations/backup/README.md#start-with-the-playbooks).
@@ -55,7 +59,7 @@ The [delivery backlog progress checklist](../04-development/delivery-backlog.md#
 this guide explains execution and the scope of reported evidence.
 
 The following sections explain scope and manual fallback procedures. Use the
-playbooks above for routine drills.
+current in-place playbooks for routine notification drills; isolated restore procedures remain deferred under ADR-010.
 
 ## Current backup scope
 
@@ -65,10 +69,12 @@ playbooks above for routine drills.
 | Platform metadata | Same dump includes `platform.projects` with latest specs/status | No revision history, jobs, or audit records exist |
 | `.env`, especially `DATABASE_KEY` and `POSTGRES_PASSWORD` | Deployment archive in encrypted bundle | Retain repository credentials/password independently of the host |
 | Caddy data/config and customized Grafana state | Stopped-service volume archives in encrypted bundle | Validate restored settings; disable production notifications in recovery |
-| Infrastructure, alert rules, workload image identities | Repository revision and external artifact storage | Retain compatible images and record versions/digests |
+| Infrastructure, alert rules, workload image identities | Deployed sources/config in the encrypted bundle plus image metadata; images are not exported | Retain compatible images and record versions/digests |
 | External watchdog MySQL/configuration | Separate hosting service | Back up through the hosting provider; PostgreSQL dump excludes it |
 
 The workload contract has no PVCs; durable application data belongs in PostgreSQL. Identity-provider state, job/revision metadata, and retained-resource inventories belong to the target architecture and are not current backup artifacts.
+
+The implemented bundle, verification, retention and notification boundaries are recorded in [ADR-015](../03-decisions/ADR-015-verified-backup-bundles.md). Readback validates captured bytes; it does not establish SQL/application restoration.
 
 ## Set up encrypted off-host storage
 

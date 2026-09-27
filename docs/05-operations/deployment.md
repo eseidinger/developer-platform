@@ -1,6 +1,6 @@
 # Deployment and Installation
 
-Status: **operational draft** for the target hybrid installation. Executable [bootstrap](../../scripts/up.sh), [platform Ansible](../../ansible/deploy.yml), and [watchdog/heartbeat playbooks](../../operations/watchdog/ansible/README.md) exist. Follow the [root setup guide](../../README.md) and [Ansible guide](../../ansible/README.md) for current commands.
+Status: current lab lifecycle procedures plus target installation/release drafts. Executable [bootstrap](../../scripts/up.sh), [platform Ansible](../../ansible/deploy.yml), and [watchdog/heartbeat playbooks](../../operations/watchdog/ansible/README.md) exist. Follow the [root setup guide](../../README.md) and [Ansible guide](../../ansible/README.md) for current commands.
 
 The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records the inspected source baseline and passing local checks, including Compose configuration, shell syntax, and watchdog/heartbeat playbook syntax. No target-host deployment or live acceptance was performed in that assessment. The sequence below describes the target procedure; identity-provider setup, persistent workers, revision-aware reconciliation, and the complete acceptance flow remain implementation gaps.
 
@@ -20,7 +20,7 @@ bash scripts/up.sh
 
 `init.py` preserves an existing `.env`. Before public installation, configure domains, DNS, firewall, bind address, and non-overlapping network settings as described in the [host setup](../../README.md#deploy-to-the-existing-hetzner-host), or use the [Ansible deployment guide](../../ansible/README.md). The selected topology in [ADR-009](../03-decisions/ADR-009-edge-and-cluster-ingress.md) retains Caddy at the edge and Traefik inside k3d. The implementation uses one shared Docker network; segmentation remains separate target work.
 
-Check startup using the [runbook commands](runbook.md#inspect-the-current-installation). `/healthz` checks only the API process; `/readyz` checks PostgreSQL and Kubernetes. Neither proves an application's database write/read flow.
+Check startup using the [runbook commands](runbook.md#inspect-the-current-installation). `/healthz` checks only the API process; `/readyz` executes a SQL query and reads the `platform-system` namespace using the controller credential; it does not check all nodes or workloads. Neither proves an application's database write/read flow.
 
 To stop services while retaining containers, cluster, and data:
 
@@ -39,7 +39,7 @@ Bootstrap starts an existing cluster; it does not upgrade its Kubernetes image. 
 
 ### Recreate the workload cluster
 
-This procedure removes Kubernetes workloads and custom cluster resources. First create and secure a [backup](backup-recovery.md#make-a-current-backup), preserve `.env`, record image versions, and save any manually managed manifests. The project catalog contains the latest `name/image/port/probe_profile` specs and lifecycle status, not revision history. Test version changes on an isolated installation before using this procedure on a populated host.
+This procedure removes Kubernetes workloads and custom cluster resources. First create and secure a [backup](backup-recovery.md#make-a-current-backup), preserve `.env`, record image versions, and save any manually managed manifests. The project catalog contains the latest `name/image/port/probe_profile` specs and lifecycle status, not revision history. Under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md), new isolated installations are deferred. Use bounded checks on the existing lab and record version-migration validation that remains unverified; this procedure does not authorize creating another environment.
 
 ```bash
 bash scripts/down.sh
@@ -86,6 +86,6 @@ Rollback restores a known workload and configuration revision. It does not autom
 
 ## Platform upgrade
 
-Pause or safely drain jobs before incompatible schema changes, back up metadata, and test migration in a non-production environment first. After upgrading, test the API, authorization, providers, and a representative workflow. The rollback path must account for both software and metadata schema.
+Pause or safely drain jobs before incompatible schema changes, back up metadata, and define migration/rollback checks. ADR-010 currently defers any check requiring a new isolated environment; keep that acceptance open until the owner revises the constraint. After upgrading, test the API, authorization, providers, and a representative workflow. The rollback path must account for both software and metadata schema.
 
 Release evidence includes artifact, spec/code revision, migrations, timestamp, executor, operation ID, and result. See [Runbook](runbook.md) and [Backup and recovery](backup-recovery.md).

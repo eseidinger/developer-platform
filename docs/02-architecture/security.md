@@ -1,6 +1,16 @@
 # Security and Identity
 
-Status: security design draft. Keycloak is proposed, not confirmed as installed.
+Status: implemented administrator boundary followed by a target security design. Keycloak, individual platform identities and scoped grants are not implemented.
+
+## Current security boundary
+
+One shared `PLATFORM_TOKEN` authorizes all project operations; it provides neither user attribution nor project-scoped access. Health/readiness, OpenAPI/docs and the certificate gate are unauthenticated. No durable security audit exists. The following role model is a target, not a current permission matrix.
+
+The provisioner connects as PostgreSQL `postgres`. Its Kubernetes ServiceAccount has cluster-wide get/list/create/patch/update permissions for the allowed resource kinds, including namespaces, Secrets and Deployments. RBAC does not restrict it to `project-*` names. It has no delete verb or mounted Docker socket, but it remains privileged infrastructure. The external controller uses a long-lived token Secret; bootstrap also enables Kubernetes Secret encryption. See [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
+
+Each project gets one database-owning login and a password derived by HMAC-SHA256 from `DATABASE_KEY` and the project name. Runtime, migration and human identities are not separated. Existing SQL passwords are not updated on PUT, so changing the key alone produces incompatible workload credentials. [ADR-013](../03-decisions/ADR-013-database-credential-lifecycle.md) documents this recovery/rotation coupling.
+
+Workload manifests enforce non-root/read-only execution, quotas and NetworkPolicies. All services and k3d nodes still share one Docker network; PostgreSQL transport TLS is absent, and new-pod egress can precede policy convergence. Loki has authentication disabled, and shared monitoring does not enforce project permissions. These are trusted-lab controls, not hostile-tenant isolation.
 
 ## Trust boundaries
 

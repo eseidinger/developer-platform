@@ -42,6 +42,31 @@ The task notes below inherit **baseline B-2026-09-26**, inspected source revisio
 
 “Open” is delivery status, distinct from implementation and verification. Where a task note names multiple IDs, the findings apply to each as specified; deferred extensions have no source implementation or local acceptance evidence. Local evidence IDs refer to the [verification register](#verification-register). As evidence changes, update the relevant task note, checkbox and record together; never silently turn an old test result into a current one.
 
+
+## Documentation review September 27, 2026
+
+Read-only implementation assessment of source revision `39ae809259ed4d9d7611af31dc2372cb2357639b`, followed by documentation changes. This supplements B-2026-09-26; it does not rewrite historical evidence or close task checkboxes. No live deployment, fault injection, mail delivery or recovery was performed in this review.
+
+| Finding and source evidence | Documentation disposition | Remaining task/decision |
+|---|---|---|
+| [API](../../platform/app/main.py) accepts `name/image/port/probe_profile`, ignores extras and returns synchronous 200; ApplicationSpec described a richer asynchronous contract | Added explicit current/target comparison, current provisioning diagram and ADR-012 | PLAN-001/002/003: versioned contract, reject unknown/unsupported input, durable revisions/jobs and concurrency |
+| Same API uses one all-project token, PostgreSQL administrator and cluster-wide [controller RBAC](../../infrastructure/kubernetes/controller.yaml); scoped role descriptions were target-only | Security page now states actual credential/authorization boundaries | OPS-001/004 and ADR-004: individual access/audit; no tenant permission claim |
+| [Database provisioning](../../platform/app/main.py) derives HMAC passwords but never changes existing SQL passwords; runtime login owns its database | ADR-013 records key recovery and coordinated rotation; future role separation remains proposed | DEV-003/010, PLAN-008 and ADR-003: rotation/adoption and separate identities |
+| [Monitoring loop](../../platform/app/monitoring.py) rebuilds files only; PUT/retirement share its global lock | Software/observability pages distinguish monitoring reconciliation from workload recovery | DEV-006/007 and PLAN-003: observed health and resumable provisioning |
+| [Probe/retirement paths](../../platform/app/main.py) now exist beyond the imported baseline; retirement acknowledges manual removal and retains SQL/spec | ADR-014 records durable catalog membership and disposable discovery; historical “deletion absent” evidence remains dated | DEV-011/OPS-008 remain open for actual deletion planning, audit and cleanup; OPS-007-T01 for live probes |
+| [Prometheus](../../infrastructure/monitoring/prometheus.yaml) now has five jobs; [Alloy](../../infrastructure/monitoring/config.alloy) collects host logs, not attributed pod logs; Grafana has data sources only | Replaced mixed proposed/current observability table; corrected scrape inventory | DEV-004/005, OPS-003/007: logs, resource usage, PostgreSQL/app telemetry and scoped views |
+| Backlog records selected backup RPO/RTO/retention and partial SMTP/backup receipt while summary pages still called all undefined/unverified | Requirements, infrastructure, topology and monitoring summaries now reference selected policy and current evidence | Full scenario acceptance and precise measurements remain open; historical checks are not promoted |
+| [Backup runner](../../operations/backup/scripts/backup-platform.py) implements exact readback, verified-only retention, service-stop recovery and independent backup state without an ADR | ADR-015 records bundle scope, exclusions and integrity/restore distinction; removed reference to deleted manual SQL helper | OPS-006/007: remaining failure, restoration and delivery criteria |
+| Generic deployment/recovery text required new isolated environments and additional watchdog monitoring after owner decisions excluded them | Added ADR-010 scope to recovery/upgrade guidance and replaced stale watchdog-observer requirement with ADR-011 limitation | Deferred fresh-restore criteria stay open; independent watchdog observer is excluded, not an unfinished task |
+| ADR-002 still called k3d proposed, ADR-005 suggested direct Docker checks, and ADR index rows 010/011 fell outside its table | Added dated implementation notes without rewriting accepted decisions; repaired index and added records 012–015 | New source-derived records require owner acceptance; language/provider/IAM choices retain existing status |
+
+These ADR additions document implemented tradeoffs rather than infer owner approval. Existing accepted ADRs are preserved. Validation for this review (local checkout, Python 3.14.7):
+
+- All 410 relative Markdown links, including heading fragments, passed across 50 documentation files.
+- Shell syntax passed for 67 fenced examples in modified documents; the embedded catalog-reapply Python parsed successfully.
+- Eleven existing manifest/discovery unit tests passed (`test_manifests.py` and `test_monitoring.py`), establishing the selected resource/discovery behavior only.
+- `git diff --check` passed. Application source and deployment configuration were unchanged. API lifecycle tests were not rerun because FastAPI/Kubernetes/psycopg dependencies are absent from this interpreter; no live/integration tests were run.
+
 ## Phase task index
 
 This index lists execution tasks, not story completion promises. Task details and checkboxes below are authoritative.

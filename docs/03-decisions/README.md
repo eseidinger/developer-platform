@@ -15,16 +15,20 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 | [007](ADR-007-ui-api-deployment.md) | Combined or separate UI/API deployment | Proposed |
 | [008](ADR-008-ai-assisted-operations.md) | AI for development and operations | Accepted product focus; execution design proposed |
 | [009](ADR-009-edge-and-cluster-ingress.md) | Caddy edge and Traefik cluster ingress | Accepted for hybrid starting profile; operational acceptance open |
-
 | [010](ADR-010-single-environment-lab.md) | Single-environment lab and in-place operational checks | Accepted September 27, 2026 |
-
 | [011](ADR-011-watchdog-monitoring-boundary.md) | Lab watchdog monitoring boundary; accepted silent-failure risk | Accepted September 27, 2026 |
+| [012](ADR-012-admin-provisioning-baseline.md) | Synchronous administrator provisioning and privileged control plane | Implemented baseline; record acceptance not recorded |
+| [013](ADR-013-database-credential-lifecycle.md) | Deterministic project credentials and retained SQL data | Implemented baseline; record acceptance not recorded |
+| [014](ADR-014-catalog-availability-monitoring.md) | Catalog-derived probes and explicit retirement | Implemented design; record/live acceptance open |
+| [015](ADR-015-verified-backup-bundles.md) | Encrypted recovery bundles and verified-only retention | Implemented design; record acceptance open; policy/evidence in backlog |
+
+ADRs 012–015 record choices observable in source as of September 27, 2026. **Implemented** describes what the code does; it does not imply owner approval of these new records, acceptance of the future design, or completed operational validation. Alternatives describe tradeoffs, not a reconstructed history of owner decisions.
 
 ## Decision process
 
 1. Define the problem, constraints, and affected requirements.
 2. Describe realistic alternatives and their operational consequences.
-3. Plan a small proof: provider contract test, restore, access test, or lab.
+3. Plan a bounded proof consistent with ADR-010: local fixtures or a controlled check on the existing lab. Fresh isolated restoration remains deferred.
 4. The project owner accepts, rejects, or defers the decision; add the date and evidence.
 5. Update architecture, development planning, and operational documentation.
 

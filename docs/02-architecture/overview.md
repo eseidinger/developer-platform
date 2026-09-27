@@ -1,6 +1,16 @@
 # Architecture Overview
 
-Status: consolidated target architecture. The technology-independent API and hybrid starting topology are confirmed; specific interfaces and component boundaries are drafts.
+Status: current lab summary plus target architecture. The technology-independent API is an accepted requirement; the richer domain, provider ports and worker below remain drafts.
+
+## Implemented lab
+
+The [FastAPI service](../../platform/app/main.py) accepts synchronous administrator PUT requests for one image, HTTP endpoint and mandatory PostgreSQL database per project. A project name also identifies its application; there are no separately addressable environments or components. It stores only the latest spec and provisioning status in PostgreSQL and directly applies Kubernetes manifests. Docker runs shared services; it is not an application compute provider.
+
+A global PostgreSQL advisory lock serializes provisioning and retirement. Recovery requires repeating PUT; there is no durable provisioning worker, revision history or audit model. A background thread rebuilds monitoring discovery only. `applied` means resource application completed, not that the workload is ready. See [the current API guide](../../platform/README.md) and [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
+
+## Target architecture
+
+The diagram and domain description below describe the intended evolution, not deployed components.
 
 ## Three responsibility layers
 

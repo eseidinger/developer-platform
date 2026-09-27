@@ -401,7 +401,7 @@ backup, a running attempt older than two hours, or capture age over 24 hours.
 Stale events cannot override newer results; failure does not refresh the last
 successful capture. Notifications are deduplicated and failed mail handoff is
 retried by cron. Host and backup channels share the external hosting/mail provider;
-independent watchdog-hosting failure detection remains separate work.
+silent watchdog-hosting/scheduler failure is an accepted lab limitation under [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md), with no additional observer required.
 
 Notification transport failure does not invalidate a verified snapshot. A durable
 outbox retries every five minutes. If initial start delivery fails, a later success
@@ -410,8 +410,8 @@ accept it without a start event. Meanwhile, its previous success continues aging
 
 The operator-reported September 26, 2026 drill passed automated restore checks
 including a pre-backup SQL marker. Precisely measured RPO/RTO, live S3 failure
-tests, actual backup-alert receipt, and database-backed application acceptance
-remain separate evidence requirements.
+tests, scenario-specific backup-alert receipt, and database-backed application acceptance
+remain separate evidence requirements. Selected DOWN/UP paths have since been reported; see the [current backlog](../../docs/04-development/delivery-backlog.md#current-backup-and-recovery-progress).
 Exact-file readback is not an application restore exercise. Continue with
 [backup and recovery](../../docs/05-operations/backup-recovery.md).
 

@@ -1,6 +1,6 @@
 # SaaS / Developer Platform Documentation
 
-As of September 26, 2026. This documentation covers the product, target architecture, architectural decisions, development sequence, and operations.
+Reviewed against source on September 27, 2026. This documentation covers the product, target architecture, architectural decisions, development sequence, and operations.
 
 ## Getting started
 
@@ -23,10 +23,10 @@ The [delivery backlog](04-development/delivery-backlog.md#evidence-conventions) 
 - **Accepted operationally:** the task's acceptance criteria passed in a recorded environment.
 - **Proposed / specification draft:** target behavior or a decision still requiring implementation or acceptance.
 
-Examples use illustrative versions, URLs, and names. Actual software versions, domains, capacity, and operational targets must be selected before installation. This documentation is not a current product or version assessment.
+Target-contract examples use illustrative domains and names. Current lab defaults and pinned versions come from `.env.example`, Compose modules and deployment scripts; review them before installation. Backup targets and the lab response policy have already been selected in the delivery backlog. Source review does not assess whether dependencies are current or verify a deployed installation.
 
 ## Maintenance
 
-The target architecture in `02-architecture/` describes the intended system. ADRs record rationale and alternatives; `04-development/` records architectural evolution and planned work. Operational documents describe intended procedures until execution evidence is added.
+Architecture pages distinguish the implemented lab from the intended system. The [September 27 source review](04-development/delivery-backlog.md#documentation-review-september-27-2026) records corrected mismatches and remaining implementation gaps. ADRs record rationale and alternatives; `04-development/` records architectural evolution, evidence and planned work. Operations guides identify executable current procedures and label future or deferred exercises separately.
 
 For an architectural change, update the relevant ADR first, followed by affected specifications, requirements, and phases. Supersede accepted ADRs with new records rather than rewriting past decisions. Record verifiable implementation and acceptance evidence beside delivery-backlog tasks; update the development plan only when sequencing or scope changes.

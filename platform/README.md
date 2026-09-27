@@ -86,9 +86,11 @@ resolver supports wildcard localhost names. Public applications use
 | Field | Required | Contract |
 | --- | --- | --- |
 | `name` | Yes | 1–32 lowercase letters, digits, or hyphens; start with a letter and end with a letter or digit. Must match the URL path. |
-| `image` | Yes | Container image reference, 1–512 characters. Use an explicit tag or digest. |
+| `image` | Yes | Container image reference, 2–512 characters under the current regex. An explicit tag or digest is recommended but not enforced. |
 | `port` | No | Container TCP port, 1024–65535; defaults to 8080. |
 | `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
+
+Unknown fields are silently ignored by the current Pydantic model; they are not applied or rejected. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/02-architecture/application-spec.md) is a future contract, not an input format for this endpoint.
 
 The API currently accepts no configuration fields for replicas, resource limits,
 custom environment variables, volumes, image pull secrets, or application commands.
@@ -248,8 +250,8 @@ kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello logs deployment/
 ## Develop and validate
 
 [app/main.py](app/main.py) implements request validation, authentication, database
-provisioning, and Kubernetes reconciliation. [app/manifests.py](app/manifests.py)
-defines the workload resources and can be tested without a live cluster.
+provisioning, and request-driven Kubernetes apply. [app/manifests.py](app/manifests.py)
+defines the workload resources and can be tested without a live cluster. [app/monitoring.py](app/monitoring.py) rebuilds catalog-derived probe discovery. The implemented boundaries are recorded in [ADRs 012–015](../docs/03-decisions/README.md).
 [requirements.txt](requirements.txt) pins direct Python dependencies, while
 [Dockerfile](Dockerfile) defines the Python 3.14.7 API runtime.
 

@@ -1,6 +1,6 @@
 # Development Plan and Architectural Evolution
 
-As of September 26, 2026. Future phases are proposals without confirmed dates.
+As of September 27, 2026. Future phases are proposals without confirmed dates.
 
 ## Architectural evolution
 
@@ -51,7 +51,7 @@ The [delivery backlog](delivery-backlog.md) preserves all 19 permanent DEV/OPS I
 
 Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Design and local implementation may overlap, but do not release expanded self-service before 1A and 1B pass. Phase 2 completes the retained single-image backlog and safe project retirement before the second-provider acceptance gate. Phase 3 and Phase 4 depend on those demonstrated outcomes.
 
-The table assigns delivery responsibility by role; named owners, dates, and capacity remain unassigned. Assign a named owner before starting each package. Every row is open. A single-image slice does not close criteria that require multiple components.
+The table assigns delivery responsibility by role; named delivery owners, dates, and capacity remain unassigned. Alert response is assigned to the project owner under the lab response policy. Assign a named owner before starting each package. Every row is open. A single-image slice does not close criteria that require multiple components.
 
 | Story | Requirement mapping | Delivery gate and disposition | Accountable role |
 |---|---|---|---|
@@ -93,10 +93,10 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 | Python / Quarkus | Decide ADR-006 using code and effort analysis | Phase 2 |
 | Identity provider, roles, and realm model | Explicitly accept the detailed ADR-004 approach | Minimal IAM in Phase 1; expansion in Phase 3 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
-| Domains, versions, storage, alert recipients | Complete the installation profile | Before first deployment |
-| RPO/RTO, retention, capacity | Measure baselines and establish targets | Before production-like acceptance |
+| Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |
+| RPO/RTO, retention, capacity | Backup policy is selected (24-hour RPO, four-hour RTO, 14/8/6 retention); measure recovery and capacity against targets | Before production-like acceptance |
 
-The project owner decides scope and ADRs; implementation and operations provide evidence. Specific people, dates, and capacity commitments remain unassigned.
+The project owner decides scope and ADRs; implementation and operations provide evidence. Specific delivery owners, dates, and capacity commitments remain unassigned; the project owner is the sole alert responder.
 
 ## Recording progress
 

@@ -6,9 +6,13 @@ Status: operational draft based on [ADR-005](../03-decisions/ADR-005-observabili
 
 The [runbook](runbook.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbook.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../operations/watchdog/README.md) and [deployment playbooks guide](../../operations/watchdog/ansible/README.md).
 
-Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; actual delivery still requires acceptance. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. Independent backup-age/failure checks now exist in the optional backup watchdog channel; source backup deployment has operator-reported evidence; actual backup-specific alert receipt still requires verification.
+Prometheus has five configured jobs: itself, node-exporter, kube-state-metrics, blackbox-exporter and catalog-discovered applications. Alloy collects host Docker JSON logs; explicit k3d application log collection and workload usage metrics remain absent.
 
-The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. The operator confirmed heartbeat outage/recovery mail and recovery after correcting the HTTPS probe from HEAD to GET. Recovered Prometheus/Grafana health and all three scrape targets also passed. Broader cluster/host failure exercises, Alertmanager delivery, and backup-specific mail remain subject to the current backlog; see [current monitoring progress](../04-development/delivery-backlog.md#current-monitoring-progress). Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
+Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; selected synthetic and scrape-failure FIRING/RESOLVED receipt has operator-reported evidence; application-rule and delivery-failure acceptance remain open.
+
+The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. The optional backup watchdog channel checks backup age/failure independently of heartbeat. Backup deployment and selected DOWN/UP receipt have operator-reported evidence; remaining scenarios are tracked in the backlog.
+
+The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. The operator confirmed heartbeat outage/recovery mail and recovery after correcting the HTTPS probe from HEAD to GET. The recorded recovery checks passed Prometheus/Grafana health and the three scrape targets configured at that time. Broader cluster/host failure exercises, application-rule delivery, notification failures and remaining backup scenarios stay open; see [current monitoring progress](../04-development/delivery-backlog.md#current-monitoring-progress). Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
 
 ## Target coverage and alert contract
 
@@ -34,11 +38,11 @@ Thresholds depend on measured baselines and operational goals. For example, disk
 
 ## Watchdog contract
 
-Proposed starting values: heartbeat every minute, overdue after five minutes, external check every minute. Nominal detection is therefore about five to six minutes after the last heartbeat; verify the web host's actual scheduler frequency. A cron job running only every five minutes increases detection time accordingly.
+Current sender timer: every 60 seconds, with up to five seconds randomized delay and an initial two-minute boot delay. The example watchdog configuration sets a 300-second heartbeat age and the hosting guide recommends cron every minute; the deployed schedule must be verified. Nominal detection is therefore about five to six minutes after the last heartbeat; verify the web host's actual scheduler frequency. A cron job running only every five minutes increases detection time accordingly.
 
-The receiver authenticates the sender, uses server-side receipt time, and stores the target ID and last state. Repeated requests must be safe. Implement token rotation and rate limits; tokens must not appear in URLs or logs.
+The receiver authenticates the sender, uses server-side receipt time, and stores the target ID and last state. Repeated requests must be safe. The heartbeat receiver enforces a 30-second minimum interval; coordinated token rotation remains an operator procedure. Tokens must not appear in URLs or logs.
 
-Deduplication sends an alert on state change and a recovery notification when service returns. Maintenance windows have an expiry. The heartbeat complements external health probes; it does not alone prove healthy PostgreSQL or application services.
+The implemented watchdog notifies on state change and retries failed mail handoff on later cron runs. Maintenance windows with expiry remain proposed. The heartbeat complements external health probes; it does not alone prove healthy PostgreSQL or application services.
 
 ## Alert process
 
