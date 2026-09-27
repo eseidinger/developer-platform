@@ -7,6 +7,7 @@ Status: design draft; installed dashboards and alert rules have not been verifie
 | Signal | Source | Proposed destination |
 |---|---|---|
 | Host and containers | node-exporter, container metrics | Prometheus |
+| Application availability | Catalog-discovered blackbox HTTP(S) probes outside k3d | Prometheus and Alertmanager |
 | Kubernetes | kube-state-metrics, node/workload metrics | Prometheus outside k3d |
 | PostgreSQL | Database exporter and host metrics | Prometheus |
 | Logs | Collector with project/environment attribution | Loki |
@@ -17,6 +18,8 @@ Status: design draft; installed dashboards and alert rules have not been verifie
 Collectors run near their sources; central storage and alerting are outside the workload cluster. On a single host, they still depend on that host. A host watchdog outside Docker and an independent PHP/MySQL watchdog complement one another.
 
 Operational validation uses the existing single-environment lab and external watchdog under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md); a duplicate test installation is not required.
+
+The [application probe implementation](../../infrastructure/monitoring/README.md) derives targets from the project catalog, retains failed applications, and removes explicitly retired ones. It checks public URLs from the platform host, not from an independent external network. The API periodically publishes discovery only; workload reconciliation remains future work.
 
 ## Platform and project views
 

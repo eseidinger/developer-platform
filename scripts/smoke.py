@@ -33,7 +33,7 @@ try:
 except urllib.error.HTTPError as error:
     assert error.code in (401, 403)
 
-project = {"name": "smoke", "image": "hashicorp/http-echo:1.0.0", "port": 5678}
+project = {"name": "smoke", "image": "hashicorp/http-echo:1.0.0", "port": 5678, "probe_profile": "hello-world"}
 assert request("/projects/smoke", project)["status"] == "applied"
 assert request("/projects/smoke", project)["status"] == "applied"
 assert sum(p["name"] == "smoke" for p in request("/projects")) == 1

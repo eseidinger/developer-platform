@@ -14,6 +14,10 @@ The [backlog evidence](../04-development/delivery-backlog.md#evidence-convention
 
 The remaining sections describe intended operational coverage, including capabilities that still need implementation.
 
+## Application availability probes
+
+[Application monitoring](../../infrastructure/monitoring/README.md) defines catalog-driven blackbox exporter targets, shared Prometheus rules, Alertmanager delivery, explicit retirement and local verification. The probe runs alongside Prometheus outside k3d. Public domains use HTTPS/status/content checks from the platform host; local `apps.localhost` uses HTTP routing through Caddy. Neither provides an independent outside-network vantage point. Existing external heartbeat/backup channels remain separate. Live deployment and outage/recovery receipt for these application rules remain acceptance work.
+
 ## Minimum coverage
 
 | Area | Checks | Response |

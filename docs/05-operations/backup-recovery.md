@@ -152,13 +152,13 @@ bash scripts/up.sh
 curl --fail-with-body http://127.0.0.1:8000/readyz
 ```
 
-The API has no background reconciler. Bootstrap recreates cluster/controller credentials, but does not restore application workloads until PUT is repeated.
+The API has no background workload reconciler. Bootstrap recreates cluster/controller credentials, but does not restore application workloads until PUT is repeated.
 
 ## Reapply restored projects
 
 The [recovery playbook](../../operations/backup/ansible/restore-recovery.yml) reapplies explicitly selected projects automatically. The following is a manual fallback.
 
-Use this after SQL restore, or after cluster recreation with intact PostgreSQL volumes. The following commands target only the local API. They apply every stored project's latest spec, so review the catalog before running the Python block and ensure this is the intended recovery installation.
+Use this after SQL restore, or after cluster recreation with intact PostgreSQL volumes. The following commands target only the local API. They apply every non-retired stored project's latest spec, so review the catalog before running the Python block and ensure this is the intended recovery installation.
 
 ```bash
 umask 077
@@ -180,6 +180,7 @@ import urllib.request
 from pathlib import Path
 
 projects = json.loads(Path('.runtime/recovery/projects.json').read_text())
+projects = [project for project in projects if project.get('status') != 'retired']
 for project in projects:
     name = project['name']
     if (not isinstance(name, str)

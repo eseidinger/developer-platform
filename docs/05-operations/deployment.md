@@ -39,7 +39,7 @@ Bootstrap starts an existing cluster; it does not upgrade its Kubernetes image. 
 
 ### Recreate the workload cluster
 
-This procedure removes Kubernetes workloads and custom cluster resources. First create and secure a [backup](backup-recovery.md#make-a-current-backup), preserve `.env`, record image versions, and save any manually managed manifests. The project catalog contains only the latest `name/image/port` specs. Test version changes on an isolated installation before using this procedure on a populated host.
+This procedure removes Kubernetes workloads and custom cluster resources. First create and secure a [backup](backup-recovery.md#make-a-current-backup), preserve `.env`, record image versions, and save any manually managed manifests. The project catalog contains the latest `name/image/port/probe_profile` specs and lifecycle status, not revision history. Test version changes on an isolated installation before using this procedure on a populated host.
 
 ```bash
 bash scripts/down.sh

@@ -25,6 +25,8 @@ External web hosting: PHP/MySQL watchdog ← systemd heartbeat from the host
   filesystems and restricted network access.
 - Persistent project state; repeating a PUT repairs partial failures without deleting data.
 - Monitoring, Docker log collection, SQL backups, and an independent watchdog.
+- Catalog-driven application probes with shared alerts and explicit retirement; see
+  [application availability monitoring](infrastructure/monitoring/README.md).
 
 This is a working foundation for administration and lab use on a single host.
 A self-service portal, OIDC/Keycloak, tenant-specific user permissions, automated
@@ -148,7 +150,9 @@ Current procedures: [deployment and lifecycle](docs/05-operations/deployment.md)
 
 ```bash
 docker compose config --quiet
+python3 -m pip install -r tests/requirements.txt
 python3 -m unittest discover -s tests -v
+python3 scripts/check-monitoring.py
 python3 -m unittest discover -s operations/backup/tests -v
 python3 -m compileall -q platform scripts operations
 bash -n scripts/up.sh scripts/down.sh

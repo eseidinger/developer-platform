@@ -1,0 +1,30 @@
+# Profiles are deliberately bounded; application specs cannot supply arbitrary URLs.
+modules:
+  http_status:
+    prober: http
+    timeout: 5s
+    http: &status
+      method: GET
+      valid_status_codes: [200]
+      follow_redirects: false
+      preferred_ip_protocol: ip4
+      body_size_limit: 1MB
+  http_hello_world:
+    prober: http
+    timeout: 5s
+    http:
+      <<: *status
+      fail_if_body_not_matches_regexp: ['^hello-world\s*$']
+  https_status:
+    prober: http
+    timeout: 5s
+    http:
+      <<: *status
+      fail_if_not_ssl: true
+  https_hello_world:
+    prober: http
+    timeout: 5s
+    http:
+      <<: *status
+      fail_if_not_ssl: true
+      fail_if_body_not_matches_regexp: ['^hello-world\s*$']

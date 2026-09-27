@@ -3,6 +3,8 @@ import hashlib
 import hmac
 import logging
 import os
+import threading
+from typing import Literal
 from contextlib import asynccontextmanager
 
 import psycopg
@@ -12,9 +14,11 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
+from kubernetes.client.exceptions import ApiException
 from pydantic import BaseModel, Field, field_validator
 
 from .manifests import resources, validate_name
+from .monitoring import discovery_loop, publish_catalog
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer()
@@ -38,7 +42,14 @@ async def lifespan(app):
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
     config.load_kube_config()
     runtime = dynamic.DynamicClient(ApiClient())
-    yield
+    stop = threading.Event()
+    worker = threading.Thread(target=discovery_loop, args=(stop, connect, log), daemon=True)
+    worker.start()
+    try:
+        yield
+    finally:
+        stop.set()
+        worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 
@@ -50,6 +61,7 @@ class Project(BaseModel):
     name: str
     image: str = Field(min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$")
     port: int = Field(default=8080, ge=1024, le=65535)
+    probe_profile: Literal["status", "hello-world"] = "status"
 
     @field_validator("name")
     @classmethod
@@ -109,6 +121,8 @@ def provision(name: str, project: Project):
                 conn.execute("""INSERT INTO projects(name,spec,status) VALUES (%s,%s,'provisioning')
                     ON CONFLICT(name) DO UPDATE SET spec=excluded.spec,
                     status='provisioning',updated_at=now()""", (name, Jsonb(project.model_dump())))
+                # Register before side effects; failed applications must remain monitored.
+                publish_catalog(conn)
                 password = password_for(name)
                 provision_database(conn, name, password)
                 for manifest in resources(name, project.image, project.port,
@@ -125,6 +139,44 @@ def provision(name: str, project: Project):
         raise HTTPException(503, "Provisioning failed; retry the same PUT. Existing data is retained.")
     return {"name": name, "status": "applied", "namespace": "project-" + name,
             "host": name + "." + os.environ["APPS_DOMAIN"]}
+
+class Retirement(BaseModel):
+    confirm_name: str
+
+
+@app.post("/projects/{name}/retire", dependencies=[Depends(admin)])
+def retire(name: str, confirmation: Retirement):
+    """Acknowledge manual workload removal; retain catalog, database, and role."""
+    if name != confirmation.confirm_name:
+        raise HTTPException(400, "Confirmation must match the project name")
+    try:
+        validate_name(name)
+    except ValueError:
+        raise HTTPException(400, "Invalid project name")
+    try:
+        with connect() as conn:
+            conn.execute("SELECT pg_advisory_lock(731904)")
+            try:
+                if not conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone():
+                    raise HTTPException(404, "Unknown project")
+                try:
+                    runtime.resources.get(api_version="v1", kind="Namespace").get(name="project-" + name)
+                except ApiException as exc:
+                    if exc.status != 404:
+                        raise
+                else:
+                    raise HTTPException(409, "Remove the project namespace and wait for deletion before retirement")
+                conn.execute("UPDATE projects SET status='retired',updated_at=now() WHERE name=%s", (name,))
+                publish_catalog(conn)
+            finally:
+                conn.execute("SELECT pg_advisory_unlock(731904)")
+    except HTTPException:
+        raise
+    except Exception:
+        log.error("Project retirement failed: %s", name)
+        raise HTTPException(503, "Retirement incomplete; retry the same request. Existing data is retained.")
+    return {"name": name, "status": "retired", "data_retained": True}
+
 
 @app.get("/internal/tls", include_in_schema=False)
 def allow_certificate(domain: str = Query(max_length=253)):

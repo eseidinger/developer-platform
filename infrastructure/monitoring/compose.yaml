@@ -1,5 +1,17 @@
 services:
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.27.0
+    restart: unless-stopped
+    command: ["--config.file=/etc/blackbox/blackbox.yaml"]
+    volumes:
+      - ./blackbox.yaml:/etc/blackbox/blackbox.yaml:ro
+    networks: [platform]
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
   prometheus:
+    depends_on: [platform-api]
     image: prom/prometheus:v3.14.0
     restart: unless-stopped
     command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=4GB"]
@@ -7,6 +19,7 @@ services:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
       - ./alerts.yaml:/etc/prometheus/alerts.yml:ro
       - prometheus:/prometheus
+      - monitoring_discovery:/etc/prometheus/discovery:ro
     ports: ["127.0.0.1:9090:9090"]
     networks: [platform]
     mem_limit: 1g
@@ -51,10 +64,11 @@ services:
     networks: [platform]
     mem_limit: 128m
   node-exporter:
+    depends_on: [platform-api]
     image: prom/node-exporter:v1.12.1
     restart: unless-stopped
     pid: host
-    command: ["--path.rootfs=/host", "--path.procfs=/host/proc", "--path.sysfs=/host/sys"]
-    volumes: ["/:/host:ro"]
+    command: ["--path.rootfs=/host", "--path.procfs=/host/proc", "--path.sysfs=/host/sys", "--collector.textfile.directory=/discovery"]
+    volumes: ["/:/host:ro", "monitoring_discovery:/discovery:ro"]
     networks: [platform]
     mem_limit: 128m

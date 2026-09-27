@@ -525,6 +525,8 @@ Phase tasks:
 
 #### Current monitoring progress
 
+**Application probe preparation (September 27, 2026):** [Catalog-driven blackbox probes](../../infrastructure/monitoring/README.md) add root-path HTTP 200 and optional `hello-world` content profiles, shared availability/missing-result/discovery-freshness rules, and authenticated retirement acknowledgement after manual namespace removal. Failed/provisioning entries stay monitored; retired entries retain SQL data/specs and leave discovery. Public HTTPS probes run on the platform host; local probes use HTTP routing through Caddy. Outside-network reachability remains manual evidence. Source/local preparation does not establish deployment, real retirement, or notification receipt; OPS-007-T01 remains open. This is not the full planned deletion/audit workflow. Local verification: 16 platform tests passed; Prometheus configuration and six alert-rule scenarios passed; disposable exporter/Prometheus fixtures verified content/status/timeout/TLS rejection, recovery, target labels and removal without reload. API image build and UID 10001/shared-volume reader checks passed. Backup regression suite: 34 passed, one optional real-restic test skipped. No live platform deployment or real notification test was run.
+
 
 **SMTP configuration tooling (September 27, 2026; OPS-007-T01):**
 Added [inventory-based Alertmanager deployment](../../operations/alertmanager/README.md)

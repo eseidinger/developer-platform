@@ -88,6 +88,7 @@ resolver supports wildcard localhost names. Public applications use
 | `name` | Yes | 1–32 lowercase letters, digits, or hyphens; start with a letter and end with a letter or digit. Must match the URL path. |
 | `image` | Yes | Container image reference, 1–512 characters. Use an explicit tag or digest. |
 | `port` | No | Container TCP port, 1024–65535; defaults to 8080. |
+| `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
 
 The API currently accepts no configuration fields for replicas, resource limits,
 custom environment variables, volumes, image pull secrets, or application commands.
@@ -130,17 +131,22 @@ The stored status describes provisioning rather than ongoing application health:
 | `provisioning` | A request is applying resources, or the process stopped during provisioning. | If it remains stuck, inspect the API and repeat the PUT. |
 | `applied` | The request completed resource application. | Check rollout and application behavior. |
 | `failed` | Provisioning encountered an error and recorded the failure. | Resolve the cause and repeat the same PUT. |
+| `retired` | Administrator acknowledged namespace removal; monitoring ended and SQL data/spec remain. | PUT explicitly reactivates the application. |
 
 Provisioning runs synchronously and is serialized with a PostgreSQL advisory lock.
 Database and Kubernetes operations do not form a single transaction. Partial failures
 can leave resources in place, and early failures may prevent a status from being
-recorded. There is no background reconciler; repeat PUT to repair the desired state.
+recorded. There is no workload reconciler; repeat PUT to repair the desired state. A separate monitoring-only loop republishes application probe targets from the catalog.
 
-There is no project deletion endpoint. For a complete lab reset, use
+There is no automated project deletion endpoint. After deliberate manual namespace removal, authenticated `POST /projects/{name}/retire` with `{"confirm_name":"<name>"}` records retirement and removes monitoring while retaining SQL data and the catalog. See [application monitoring and retirement](../infrastructure/monitoring/README.md). For a complete lab reset, use
 `bash scripts/down.sh --volumes`, then bootstrap again. Running `down.sh` without
 `--volumes` retains the stored project catalog and databases, but removes Kubernetes
 workloads. Reapply the saved specifications after bootstrap as described in
 [recovery](../docs/05-operations/backup-recovery.md).
+
+## Automatic availability monitoring
+
+Every project is registered for a root-path HTTP 200 check (`probe_profile: "status"`). Use `probe_profile: "hello-world"` to additionally check the smoke response body. Existing specs default to `status`; include the profile in every full-spec PUT to preserve it. Failed deployments stay monitored; only explicit retirement removes a target. Local `.localhost` installations use HTTP through Caddy; public domains use verified HTTPS from the platform host. See [configuration, limits and validation](../infrastructure/monitoring/README.md).
 
 ## Application runtime contract
 
@@ -183,6 +189,7 @@ access before network rules converge; this lab is intended for trusted workloads
 | `GET /readyz` | None | 200 with `{"status":"ready"}` when database and Kubernetes checks pass; otherwise 503 |
 | `GET /projects` | Admin bearer token | 200 with the stored project list |
 | `PUT /projects/{name}` | Admin bearer token | 200 with the applied project name, namespace, and host |
+| `POST /projects/{name}/retire` | Admin bearer token and matching `confirm_name` | 200 with retained-data retirement; 409 while namespace exists |
 | `GET /internal/tls?domain=...` | None; used by Caddy | 200 for a project host whose stored status is `applied`; 403 for an unauthorized host |
 
 The TLS authorization route is excluded from OpenAPI and does not provision projects.

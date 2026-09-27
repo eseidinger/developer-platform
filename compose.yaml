@@ -14,6 +14,7 @@ volumes:
   postgres:
   caddy_data:
   caddy_config:
+  monitoring_discovery:
   prometheus:
   grafana:
   loki:

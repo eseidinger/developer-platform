@@ -11,6 +11,7 @@ services:
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
       KUBECONFIG: /run/platform/kubeconfig
     volumes:
+      - monitoring_discovery:/var/lib/platform-monitoring
       - ../.runtime/controller.kubeconfig:/run/platform/kubeconfig:ro
     networks: [platform]
     depends_on:

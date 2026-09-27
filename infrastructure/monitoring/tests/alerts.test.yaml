@@ -1,0 +1,114 @@
+rule_files:
+  - ../alerts.yaml
+evaluation_interval: 1m
+tests:
+  - name: sustained application failure and recovery
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="applications",instance="https://smoke.apps.example/",project="smoke",application="smoke",namespace="project-smoke"}'
+        values: '0 0 0 0 1'
+    alert_rule_test:
+      - eval_time: 2m
+        alertname: ApplicationUnavailable
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ApplicationUnavailable
+        exp_alerts:
+          - exp_labels:
+              job: applications
+              instance: https://smoke.apps.example/
+              project: smoke
+              application: smoke
+              namespace: project-smoke
+              severity: warning
+            exp_annotations:
+              summary: Application smoke probe failed
+              description: 'Probe https://smoke.apps.example/ failed. Check DNS, TLS, ingress, status and expected content.'
+      - eval_time: 4m
+        alertname: ApplicationUnavailable
+        exp_alerts: []
+  - name: scrape succeeds without probe result
+    interval: 1m
+    input_series:
+      - series: 'up{job="applications",instance="http://smoke.apps.localhost/",project="smoke",application="smoke",namespace="project-smoke"}'
+        values: '1+0x4'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ApplicationProbeMissing
+        exp_alerts:
+          - exp_labels:
+              job: applications
+              instance: http://smoke.apps.localhost/
+              project: smoke
+              application: smoke
+              namespace: project-smoke
+              severity: warning
+            exp_annotations:
+              summary: Application smoke probe result missing
+  - name: exporter failure is a scrape failure
+    interval: 1m
+    input_series:
+      - series: 'up{job="applications",instance="http://smoke.apps.localhost/",application="smoke"}'
+        values: '0+0x4'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ApplicationProbeMissing
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ScrapeTargetDown
+        exp_alerts:
+          - exp_labels:
+              job: applications
+              instance: http://smoke.apps.localhost/
+              application: smoke
+              severity: critical
+            exp_annotations:
+              summary: Monitoring target applications unavailable
+  - name: discovery stopped publishing
+    interval: 1m
+    input_series:
+      - series: 'platform_discovery_last_success_timestamp_seconds{job="host",instance="node-exporter:9100"}'
+        values: '0+0x6'
+    alert_rule_test:
+      - eval_time: 5m
+        alertname: ApplicationDiscoveryStale
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: ApplicationDiscoveryStale
+        exp_alerts:
+          - exp_labels:
+              job: host
+              instance: node-exporter:9100
+              severity: warning
+            exp_annotations:
+              summary: Application monitoring discovery is stale or unavailable
+  - name: missing discovery is not healthy
+    interval: 1m
+    input_series: []
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ApplicationDiscoveryStale
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+            exp_annotations:
+              summary: Application monitoring discovery is stale or unavailable
+  - name: healthy probes and fresh discovery
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="applications",instance="smoke",project="smoke",application="smoke",namespace="project-smoke"}'
+        values: '1+0x6'
+      - series: 'up{job="applications",instance="smoke",project="smoke",application="smoke",namespace="project-smoke"}'
+        values: '1+0x6'
+      - series: 'platform_discovery_last_success_timestamp_seconds{job="host"}'
+        values: '0+60x6'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: ApplicationUnavailable
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: ApplicationProbeMissing
+        exp_alerts: []
+      - eval_time: 6m
+        alertname: ApplicationDiscoveryStale
+        exp_alerts: []

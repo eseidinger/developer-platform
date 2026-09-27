@@ -22,3 +22,27 @@ groups:
           severity: warning
         annotations:
           summary: "Project deployment has unavailable replicas"
+  - name: applications
+    rules:
+      - alert: ApplicationUnavailable
+        expr: probe_success{job="applications"} == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Application {{ $labels.application }} probe failed'
+          description: 'Probe {{ $labels.instance }} failed. Check DNS, TLS, ingress, status and expected content.'
+      - alert: ApplicationProbeMissing
+        expr: up{job="applications"} == 1 unless on(job, instance, project, application, namespace) probe_success{job="applications"}
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Application {{ $labels.application }} probe result missing'
+      - alert: ApplicationDiscoveryStale
+        expr: (time() - platform_discovery_last_success_timestamp_seconds > 120) or absent(platform_discovery_last_success_timestamp_seconds) or (node_textfile_scrape_error{job="host"} == 1)
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Application monitoring discovery is stale or unavailable'
