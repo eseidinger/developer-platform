@@ -2,6 +2,10 @@
 
 Run deployment commands from the repository root.
 
+## Current lab policy
+
+[ADR-010](../../docs/03-decisions/ADR-010-single-environment-lab.md) selects the existing platform and watchdog for controlled, reversible checks. Do not create an additional test or recovery environment as a routine next step. The isolated recovery procedures below remain references for past drills or a future explicitly chosen exercise; new isolated drills are deferred, and their unverified acceptance criteria stay open.
+
 ## Start with the playbooks
 
 Run these commands from the repository root on the **WSL/Ansible controller**.
@@ -12,6 +16,7 @@ inventory for the disposable VM.
 | --- | --- | --- |
 | Configure existing S3 repository access | [setup-backup.yml](ansible/setup-backup.yml) | [Credentials and initialization](#encrypted-s3-backup-repository-setup) |
 | Install scheduled backups and alerts | [deploy-backup.yml](ansible/deploy-backup.yml) | [Schedule and watchdog prerequisites](#scheduled-backups-and-independent-backup-alerts) |
+| Exercise failed-backup email and verified recovery in the existing lab | [drill-backup-failure.yml](ansible/drill-backup-failure.yml) | [In-place failure drill](#failed-backup-notification-drill-on-the-existing-lab) |
 | Create a pre-backup marker and verified backup | [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml) | [Source test preparation](#automate-marker-creation-and-the-source-backup) |
 | Restore and test a fresh isolated VM | [restore-recovery.yml](ansible/restore-recovery.yml) | [Recovery inventory and safeguards](#restore-a-fresh-recovery-vm-with-ansible) |
 
@@ -30,6 +35,45 @@ ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
 
 For a **new repository only**, follow the explicit initialization instructions
 below. Existing repository access does not require initialization.
+
+### Failed-backup notification drill on the existing lab
+
+This uses the installed platform and watchdog under ADR-010. It requires a prior
+successful backup with no pending recovery or notification. Run:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/drill-backup-failure.yml
+```
+
+The helper uses the installed runner and its existing lock. It overrides the
+Docker command in memory for one attempt, failing database capture before any
+service is stopped or data uploaded. The previous verified snapshot/time must
+remain unchanged. It waits five minutes for the external watchdog to send
+BACKUP DOWN with reason `failed`, then attempts a normal verified backup in
+a finally block. Recovery capture briefly interrupts Caddy/Grafana and runs
+normal retention. No credentials or permanent configuration are changed.
+
+Override the notification window with `-e backup_drill_wait_seconds=600` if
+the watchdog scheduler needs longer; supported range is 60–1800 seconds.
+The lock is held throughout: overlapping backup attempts are refused and
+notification retries defer to the drill. Avoid the regular 00:00/12:00 UTC
+backup windows. The normal schedule remains enabled.
+
+A transient systemd service owns the drill, so losing the controller connection
+does not cancel recovery. Power loss, forced termination or a genuine backup
+failure can still prevent recovery; inspect the drill journal and normal backup
+status before retrying. Do not kill the service to shorten the wait.
+Check mode is rejected because this is an operational exercise.
+
+The playbook fetches before/failure/recovery evidence under
+`.runtime/backup-drill/<host>/<run>/`; the private source report and helper remain
+in the printed `/root/backup-drill-*` directory. Inspect
+`journalctl -u <backup-drill-unit> --no-pager` if the playbook fails.
+A passing report proves the runner outcomes and watchdog HTTP acceptance,
+not mailbox receipt. Confirm both emails separately before recording acceptance.
+This exercises database-capture failure, not upload failure, overdue/stalled
+detection or notification-delivery failure.
 
 ### Recovery drill
 

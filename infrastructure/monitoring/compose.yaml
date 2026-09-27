@@ -43,9 +43,10 @@ services:
     mem_limit: 256m
   alertmanager:
     image: prom/alertmanager:v0.34.1
+    command: ["--config.file=/etc/alertmanager/alertmanager.yaml", "--storage.path=/alertmanager"]
     restart: unless-stopped
     volumes:
-      - ./alertmanager.yaml:/etc/alertmanager/alertmanager.yml:ro
+      - ${ALERTMANAGER_CONFIG_DIR:-.}:/etc/alertmanager:ro
       - alertmanager:/alertmanager
     networks: [platform]
     mem_limit: 128m

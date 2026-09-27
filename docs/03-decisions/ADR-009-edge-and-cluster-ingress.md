@@ -38,7 +38,7 @@ The implementation currently shares the `developer-platform` Docker network. Net
 
 ## Validation and review triggers
 
-Source inspection establishes the routing and certificate-eligibility paths, not public TLS or recovery acceptance. On an isolated installation, record:
+Source inspection establishes the routing and certificate-eligibility paths, not public TLS or recovery acceptance. Under [ADR-010](ADR-010-single-environment-lab.md), use controlled checks on the existing lab; defer exercises that require a fresh isolated installation. Record:
 
 1. Platform and application routing with real DNS and ACME issuance, including renewal behavior.
 2. Rejection of unknown, wrong-domain, and non-applied project names by the certificate authorization path.

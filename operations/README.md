@@ -3,6 +3,7 @@
 | Directory | Responsibility |
 | --- | --- |
 | [watchdog](watchdog/README.md) | External PHP/MySQL monitoring, backup signals, and outage/recovery notifications |
+| [alertmanager](alertmanager/README.md) | Inventory-based authenticated SMTP configuration and email delivery checks |
 | [heartbeat](heartbeat/README.md) | Platform health checks and authenticated heartbeat sender |
 | [backup](backup/README.md) | PostgreSQL dumps, encrypted S3 backups, retention, and recovery helpers |
 

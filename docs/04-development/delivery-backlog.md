@@ -28,6 +28,10 @@ Phase gates remain **1A → 1B → 1C → 2 → 3 → 4.1–4.5**. Dependencies 
 
 Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Repeat isolated restore when recovery scope changes. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
+## Accepted lab validation approach
+
+**Owner decision, September 27, 2026:** [ADR-010](../03-decisions/ADR-010-single-environment-lab.md) accepts a single-environment lab. Use the existing platform and external watchdog for controlled, reversible failure checks; do not require or provision a separate test platform/watchdog. Previous isolated recovery results remain evidence. New fresh-installation restore drills are deferred under this constraint; affected OPS-006-T03 criteria remain open. The next failed-backup notification exercise should use the existing installation with a bounded fault and recovery steps, preserving real backup data and verified-success history.
+
 ## Evidence conventions
 
 The task notes below inherit **baseline B-2026-09-26**, inspected source revision `bbd509dd4bf3e3dbcb2094cfdaf92a35ab3100f8`. Findings were imported from the former alignment assessment, including its review of changes since `25c80743dc23991baeb5444444bbd79571bd93c3`. They are dated evidence, not a fresh assessment of HEAD. Documentation consolidation did not rerun implementation checks or live acceptance. The historical report and resolved documentation findings remain in Git history.
@@ -395,7 +399,7 @@ Phase tasks:
 
 #### Current backup and recovery progress
 
-As of September 26, 2026, the following criterion-level progress supersedes older
+As of September 27, 2026, the following criterion-level progress supersedes older
 baseline/implementation-only notes below. Parent task IDs and prerequisites are
 unchanged; OPS-006-T01/T02/T03 remain open for the outstanding criteria.
 
@@ -404,11 +408,31 @@ unchanged; OPS-006-T01/T02/T03 remain open for the outstanding criteria.
 - [ ] **T01 — Remaining planning:** confirm production replacement-host procedure and storage-access policy; the local VM is the exercised recovery target.
 - [x] **T02 — Source backup exercised:** managed capture, encrypted S3 upload and verified readback completed on `node-01`; marker preparation playbook reported service exit code 0 and capture after marker commit.
 - [x] **T02 — Automation safeguards locally tested:** failed-upload behavior, checksum rejection, scoped retention, interrupted-service recovery and independent watchdog state transitions have local tests (not live failure-delivery acceptance).
-- [ ] **T02 — Remaining operational acceptance:** record timer-triggered execution, live failed/missing/overdue/stalled backup notifications, retention/access-control evidence, and complete OPS-007-T01 prerequisite.
+- [x] **T02 — Scheduled execution:** operator-supplied timer, status and journal output confirms the September 27, 2026 midnight run on `node-01`, from 00:00:04 to 00:01:38 UTC (94 seconds), with verified snapshot and retention completion.
+- [x] **T02 — No-backup notification and recovery:** operator confirmed both BACKUP DOWN and BACKUP UP emails on September 27, 2026 and supplied DOWN reason `no-backup`. Source defines this as no recorded successful capture (`last_capture` is null). This establishes initial no-backup detection and recovery email receipt; actual receipt times were not supplied. This initial check does not establish failed, overdue or stalled scenarios; later drill evidence is recorded separately below.
+- [x] **T02 — Failed capture notification and recovery:** operator confirmed successful execution of the failure-drill playbook on the existing lab and receipt of both drill emails (September 27, 2026). This covers injected database-capture failure and subsequent verified backup recovery; see F-2026-09-27 below.
+- [ ] **T02 — Remaining operational acceptance:** live overdue/stalled backup notifications and missing updates after a prior successful capture (including local-monitoring outage), full retention/access-control evidence, and complete OPS-007-T01 prerequisite.
 - [x] **T03 — Fresh isolated restore:** playbook restored SQL, source/configuration and service volumes from S3 into a fresh Ubuntu VM without reading the source host during restoration.
 - [x] **T03 — Historical SQL marker:** an independent pre-backup receipt matched the restored record through a Kubernetes test pod using the project Secret.
 - [x] **T03 — Recovered service checks:** API/catalog, selected project rollout, HTTP ingress, project database authentication/write/read, denied catalog CONNECT privilege, Prometheus targets and Grafana database health passed.
 - [ ] **T03 — Remaining acceptance:** exercise unavailable/corrupt backup and wrong/missing keys, recovery notification receipt, precise RPO/RTO measurements, production DNS/TLS and application-level database transactions; record a recurring drill schedule.
+
+**In-place failure drill tooling (September 27, 2026; OPS-006-T02/OPS-007-T01):**
+Added [drill-backup-failure.yml](../../operations/backup/ansible/drill-backup-failure.yml)
+and a supervised helper using the installed backup runner and its lock. It injects
+a database-capture failure with an in-memory Docker override, checks preservation
+of the last verified capture, waits for the notification window, and attempts a
+normal verified recovery backup in a finally block. A transient systemd service
+continues independently of the controller. Reports retain before/failure/recovery
+status without credentials; mailbox receipt requires operator confirmation.
+Local playbook syntax passed; 26 backup/recovery tests ran with 25 passing and
+one optional real-restic check skipped, including six new drill control-flow
+checks. These are local fixture results, not execution on node-01. Subsequent
+operator-reported live execution is recorded as F-2026-09-27 below.
+
+**Failed-backup drill evidence F-2026-09-27 (operator supplied; OPS-006-T02/OPS-007-T01):** The operator reports that [drill-backup-failure.yml](../../operations/backup/ansible/drill-backup-failure.yml) executed correctly on the existing lab and both notification emails arrived. The referenced drill injects database-capture failure, verifies preservation of the prior successful capture/snapshot, waits for the DOWN notification window, then runs and verifies a normal recovery backup. This is operator-reported acceptance of the failed-capture/recovery path and its email pair. The fetched report, exact deployed revision, snapshot IDs and receipt times were not supplied for independent inspection. It does not establish upload-failure, overdue/stalled, local-monitoring-outage or mail-delivery-failure acceptance. No separate test environment was used, in accordance with ADR-010.
+
+**Scheduled backup evidence S-2026-09-27 (operator supplied; OPS-006-T02):** `platform-backup.timer` reported its last trigger at 00:00:04 UTC and next at 12:00 UTC. The service journal records successful start/completion at 00:00:04/00:01:38 UTC. Durable status records run `60c70027e90644258716b3c3bfeb8c4b`, `running: false`, `result: success`, `stage: complete`, and verified snapshot `38f989c67a080a82970d796d1a3da1c79d6264005e131d116431a12333a0e1ed`. The journal explicitly reports verified backup and completed retention. This establishes one scheduled successful capture/readback/retention run, not full retention-policy/access-control acceptance, notification email receipt, or restoration of this snapshot. Exact deployed revision was not supplied.
 
 **Operational evidence R-2026-09-26 (operator supplied):** Source `node-01`;
 recovery target `platform-recovery`, Ubuntu 24.04 amd64 under QEMU/KVM in WSL 2.
@@ -473,10 +497,33 @@ Phase tasks:
 
 #### Current monitoring progress
 
+
+**SMTP configuration tooling (September 27, 2026; OPS-007-T01):**
+Added [inventory-based Alertmanager deployment](../../operations/alertmanager/README.md)
+with STARTTLS/implicit TLS, a private password prompt or Vault input, a separate
+0600 password file, pre-installation amtool validation, and Alertmanager-only
+recreation/readiness checks. Private configuration is included in existing
+infrastructure backup capture and preserved across bootstrap; isolated recovery
+explicitly selects the notification-free default. Local validation on the working
+tree based on `0756ef8`: Ansible syntax/check-mode checks passed (check mode made
+zero changes); default/private Compose resolution passed; both TLS modes passed
+amtool validation using `prom/alertmanager:v0.34.1`; backup/recovery suite passed
+19 tests with one optional real-restic test skipped. No target deployment, real
+SMTP connection, notification receipt or new restore drill was performed.
+OPS-007-T01 remains open.
+
+
 - [x] **T01 — External heartbeat delivery:** operator confirmed both outage and recovery emails during the pause/resume exercise.
 - [x] **T01 — HTTPS probe correction:** diagnosed HTTP 405 from HEAD on the GET-only health endpoint, changed the watchdog to GET, and operator confirmed status UP plus recovery email.
 - [x] **Recovery monitoring health:** recovered Prometheus ready, Grafana database `ok`, and `host`, `kubernetes-state`, and `prometheus` scrape targets UP; automated restore suite also passed monitoring.
-- [ ] **T01 — Remaining monitoring acceptance:** real Alertmanager delivery/response ownership, backup-specific notification exercises, delivery failures, broader host/cluster failure detection, public application canary, and independent watchdog cron/hosting failure detection.
+- [x] **T01 — Alertmanager SMTP delivery:** operator confirmed successful playbook execution on `node-01` and receipt of both FIRING and RESOLVED emails for the synthetic `PlatformEmailTest` alert on September 27, 2026.
+- [x] **T01 — Prometheus-to-email delivery:** operator confirmed both FIRING and RESOLVED emails during the `node-exporter` stop/start exercise for `ScrapeTargetDown` on `node-01` (September 27, 2026).
+- [x] **T01 — Backup channel email receipt:** operator confirmed BACKUP DOWN/UP for initial no-backup and the subsequent failed-capture drill (September 27, 2026); see OPS-006-T02 and F-2026-09-27 for scope limits.
+- [ ] **T01 — Remaining monitoring acceptance:** response ownership, scenario-specific backup notification exercises, delivery failures, broader host/cluster failure detection, public application canary, and independent watchdog cron/hosting failure detection.
+
+**Operator-reported SMTP evidence (September 27, 2026; OPS-007-T01):** The operator reported that the SMTP deployment playbook completed without errors and confirmed both alert and recovery email receipt after submitting `PlatformEmailTest` directly to Alertmanager using amtool on `node-01`. This establishes Alertmanager-to-email delivery only; it bypasses Prometheus rule evaluation. Exact deployed revision, receipt times, delivery latency and named response owner were not captured. Delivery-failure handling and the other T01 acceptance checks remain open. This live evidence follows the local-only tooling validation above.
+
+**Operator-reported rule-path evidence (September 27, 2026; OPS-007-T01):** Following the guided `node-exporter` stop/start exercise, the operator confirmed receipt of both alert and recovery emails. This verifies the selected scrape-failure rule through Prometheus, Alertmanager and SMTP, including recovery. Exact deployed revision and receipt/detection timings were not captured. This does not establish complete host/cluster failure detection, other rule coverage, or delivery-failure handling; OPS-007-T01 remains open.
 
 These are operator-reported live outcomes, distinct from the imported local tests.
 Healthy recovery monitoring does not establish alert delivery; the recovery VM

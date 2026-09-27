@@ -10,7 +10,7 @@ Create, update, observe, and deliberately remove a web application with PostgreS
 
 ## Ordered work packages and acceptance gates
 
-The [delivery backlog](delivery-backlog.md) supplies binding acceptance criteria and the [development plan](development-plan.md#backlog-delivery-commitments) maps every story. These gates are open. Deliver in order; use disposable resources for failure and recovery checks.
+The [delivery backlog](delivery-backlog.md) supplies binding acceptance criteria and the [development plan](development-plan.md#backlog-delivery-commitments) maps every story. These gates are open. Deliver in order. Under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md), use controlled, reversible checks on the existing lab; do not require a separate test platform or watchdog. Fresh isolated restore exercises are deferred, not implicitly accepted.
 
 ### 1A — Operational protection
 

@@ -126,6 +126,7 @@
               - tar
               - --exclude=__pycache__
               - --exclude=*.pyc
+              - --exclude=infrastructure/monitoring/private
               - -czf
               - "{{ platform_archive.path }}"
               - -C

@@ -76,3 +76,7 @@ See [watchdog deployment](../operations/watchdog/ansible/README.md) and [heartbe
 ## Backups
 
 See [backup setup and scheduling](../operations/backup/README.md).
+
+## Alertmanager email
+
+See [inventory-based SMTP setup and delivery checks](../operations/alertmanager/README.md).

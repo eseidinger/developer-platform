@@ -64,7 +64,8 @@ def recover(bundle, projects):
     values = dict(line.split('=', 1) for line in env.read_text().splitlines()
                   if line.strip() and not line.lstrip().startswith('#'))
     values.update(EDGE_BIND_IP='127.0.0.1', PLATFORM_DOMAIN='platform.localhost',
-                  APPS_DOMAIN='apps.localhost', TLS_EMAIL='admin@example.com')
+                  APPS_DOMAIN='apps.localhost', TLS_EMAIL='admin@example.com',
+                  ALERTMANAGER_CONFIG_DIR='.')
     env.write_text(''.join(f'{key}={value}\n' for key, value in values.items()))
     env.chmod(0o600)
     (ROOT / 'infrastructure/proxy/Caddyfile').write_text('''http://platform.localhost {

@@ -16,6 +16,8 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 | [008](ADR-008-ai-assisted-operations.md) | AI for development and operations | Accepted product focus; execution design proposed |
 | [009](ADR-009-edge-and-cluster-ingress.md) | Caddy edge and Traefik cluster ingress | Accepted for hybrid starting profile; operational acceptance open |
 
+| [010](ADR-010-single-environment-lab.md) | Single-environment lab and in-place operational checks | Accepted September 27, 2026 |
+
 ## Decision process
 
 1. Define the problem, constraints, and affected requirements.

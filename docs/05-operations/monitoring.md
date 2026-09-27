@@ -6,7 +6,7 @@ Status: operational draft based on [ADR-005](../03-decisions/ADR-005-observabili
 
 The [runbook](runbook.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbook.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../operations/watchdog/README.md) and [deployment playbooks guide](../../operations/watchdog/ansible/README.md).
 
-Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager has a `local-only` receiver with no notification integration. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. Independent backup-age/failure checks now exist in the optional backup watchdog channel; source backup deployment has operator-reported evidence; actual backup-specific alert receipt still requires verification.
+Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; actual delivery still requires acceptance. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. Independent backup-age/failure checks now exist in the optional backup watchdog channel; source backup deployment has operator-reported evidence; actual backup-specific alert receipt still requires verification.
 
 The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. The operator confirmed heartbeat outage/recovery mail and recovery after correcting the HTTPS probe from HEAD to GET. Recovered Prometheus/Grafana health and all three scrape targets also passed. Broader cluster/host failure exercises, Alertmanager delivery, backup-specific mail, and watchdog-hosting failure detection remain open; see [current monitoring progress](../04-development/delivery-backlog.md#current-monitoring-progress). Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
 
@@ -58,7 +58,9 @@ hours. Local `status.json` distinguishes verified storage from pending notificat
 `platform-backup-notify.timer` retries undelivered events every five minutes.
 Neither host heartbeats nor authenticated GET preflight refresh backup age.
 
-Verify a real BACKUP DOWN/UP cycle after deployment. Use disposable test resources
-or a separate watchdog configuration for failure injection; do not forge a success
-signal for a backup that has not passed readback. No timer or external channel
+Verify a real BACKUP DOWN/UP cycle after deployment. Use controlled, reversible exercises on the existing lab platform and watchdog,
+following [ADR-010](../03-decisions/ADR-010-single-environment-lab.md). A separate
+test installation is not required. Describe impact, retain original settings,
+restore normal operation and verify recovery; do not forge a success signal for
+a backup that has not passed readback. No timer or external channel
 establishes isolated SQL/application restoration by itself.

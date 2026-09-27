@@ -16,6 +16,8 @@ Status: design draft; installed dashboards and alert rules have not been verifie
 
 Collectors run near their sources; central storage and alerting are outside the workload cluster. On a single host, they still depend on that host. A host watchdog outside Docker and an independent PHP/MySQL watchdog complement one another.
 
+Operational validation uses the existing single-environment lab and external watchdog under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md); a duplicate test installation is not required.
+
 ## Platform and project views
 
 Operators see the host, Docker, cluster, database, certificates, storage, jobs, and monitoring itself. Developers see only authorized applications and their logs, health, versions, and metrics. Links to shared dashboards do not replace data-access enforcement.

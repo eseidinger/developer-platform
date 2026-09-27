@@ -1,0 +1,22 @@
+---
+all:
+  children:
+    developer_platform:
+      hosts:
+        platform:
+          ansible_host: node-01 # Replace with the SSH hostname or address.
+          ansible_user: root
+      vars:
+        alertmanager_platform_dir: /opt/developer-platform
+        alertmanager_smtp_host: smtp.example.com
+        alertmanager_smtp_port: 587
+        alertmanager_smtp_encryption: starttls # Or implicit_tls (usually port 465).
+        alertmanager_smtp_username: alerts@example.com
+        alertmanager_smtp_from: alerts@example.com
+        alertmanager_email_to: operator@example.com # Comma-separated recipients.
+        alertmanager_response_owner: platform operator
+        # Password is prompted privately. For automation, supply
+        # alertmanager_smtp_password in an Ansible Vault encrypted vars file.
+        # alertmanager_group_wait: 30s
+        # alertmanager_group_interval: 5m
+        # alertmanager_repeat_interval: 4h

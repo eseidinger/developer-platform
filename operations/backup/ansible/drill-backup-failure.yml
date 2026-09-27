@@ -1,0 +1,73 @@
+---
+- name: Exercise backup failure and recovery on the existing lab
+  hosts: developer_platform
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Validate drill settings
+      ansible.builtin.assert:
+        that:
+          - not ansible_check_mode
+          - backup_drill_wait_seconds | default(300) | int >= 60
+          - backup_drill_wait_seconds | default(300) | int <= 1800
+        fail_msg: This live lab drill requires execution mode and a 60–1800 second notification window.
+    - name: Explain the live exercise
+      ansible.builtin.debug:
+        msg: >-
+          A capture failure will trigger real BACKUP DOWN email. After the notification
+          window a normal backup will run, briefly interrupting Caddy/Grafana during
+          capture, and should trigger BACKUP UP. Mail receipt requires your confirmation.
+  tasks:
+    - name: Allocate private drill evidence directory
+      ansible.builtin.tempfile:
+        state: directory
+        path: /root
+        prefix: backup-drill-
+      register: backup_drill_directory
+    - name: Install drill helper
+      ansible.builtin.copy:
+        src: ../scripts/drill-backup-failure.py
+        dest: "{{ backup_drill_directory.path }}/drill.py"
+        mode: '0700'
+    - name: Start independently supervised drill and await its result
+      ansible.builtin.command:
+        argv:
+          - systemd-run
+          - "--unit={{ backup_drill_directory.path | basename }}"
+          - --wait
+          - --collect
+          - --property=Type=exec
+          - --property=UMask=0077
+          - "--property=RuntimeMaxSec={{ (backup_drill_wait_seconds | default(300) | int) + 7500 }}"
+          - --property=TimeoutStopSec=7500
+          - --property=Nice=10
+          - /usr/bin/python3
+          - "{{ backup_drill_directory.path }}/drill.py"
+          - --wait-seconds
+          - "{{ backup_drill_wait_seconds | default(300) | int }}"
+          - --report
+          - "{{ backup_drill_directory.path }}/report.json"
+      async: 18000
+      poll: 10
+      register: backup_drill_run
+      failed_when: false
+    - name: Fetch drill evidence
+      ansible.builtin.fetch:
+        src: "{{ backup_drill_directory.path }}/report.json"
+        dest: "{{ playbook_dir }}/../../../.runtime/backup-drill/{{ inventory_hostname }}/{{ backup_drill_directory.path | basename }}/"
+        flat: true
+      register: backup_drill_fetch
+      failed_when: false
+    - name: Require successful drill and recovered backup
+      ansible.builtin.assert:
+        that:
+          - backup_drill_run.rc | default(1) == 0
+          - backup_drill_fetch.dest is defined
+        fail_msg: >-
+          Drill or recovery did not complete successfully. Inspect journalctl -u
+          {{ backup_drill_directory.path | basename }} and the backup status before retrying.
+    - name: Report remaining acceptance check
+      ansible.builtin.debug:
+        msg:
+          - "Failure and verified recovery passed. Evidence: {{ backup_drill_fetch.dest }}"
+          - "Confirm BACKUP DOWN condition failed and subsequent BACKUP UP receipt."

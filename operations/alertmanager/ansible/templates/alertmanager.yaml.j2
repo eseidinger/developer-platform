@@ -1,0 +1,18 @@
+global:
+  smtp_smarthost: {{ (alertmanager_smtp_host ~ ':' ~ alertmanager_smtp_port) | to_json }}
+  smtp_from: {{ alertmanager_smtp_from | to_json }}
+  smtp_auth_username: {{ alertmanager_smtp_username | to_json }}
+  smtp_auth_password_file: /etc/alertmanager/smtp-password
+  smtp_require_tls: true
+  smtp_force_implicit_tls: {{ (alertmanager_smtp_encryption == 'implicit_tls') | to_json }}
+route:
+  receiver: operator-email
+  group_by: [alertname, job]
+  group_wait: {{ alertmanager_group_wait | default('30s') | to_json }}
+  group_interval: {{ alertmanager_group_interval | default('5m') | to_json }}
+  repeat_interval: {{ alertmanager_repeat_interval | default('4h') | to_json }}
+receivers:
+  - name: operator-email
+    email_configs:
+      - to: {{ alertmanager_email_to | to_json }}
+        send_resolved: true

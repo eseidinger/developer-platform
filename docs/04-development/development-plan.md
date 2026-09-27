@@ -79,6 +79,10 @@ Multi-component support remains deferred from the single-image MVP and Phase 2 p
 
 Docker portability, human database access, hosted-application OIDC, and AI are additions to this backlog. Retain their phases, but review priority against open story criteria at each gate. No calendar or effort commitments are implied.
 
+## Lab validation constraint
+
+[ADR-010](../03-decisions/ADR-010-single-environment-lab.md) records the owner’s accepted single-environment lab policy. Continue operational checks on the existing platform and external watchdog with explicit impact and recovery steps. Do not provision additional test environments. Existing isolated restore evidence is retained; new empty-host restore exercises are deferred and their outstanding acceptance criteria remain open.
+
 ## Open decisions and ownership
 
 | Topic | Next step | Gate |

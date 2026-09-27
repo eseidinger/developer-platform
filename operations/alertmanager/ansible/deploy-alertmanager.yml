@@ -1,0 +1,164 @@
+---
+- name: Configure authenticated SMTP for platform Alertmanager
+  hosts: developer_platform
+  become: true
+  gather_facts: false
+  vars_prompt:
+    - name: alertmanager_smtp_password
+      prompt: SMTP password (or provider app password)
+      private: true
+  pre_tasks:
+    - name: Apply installation default
+      ansible.builtin.set_fact:
+        alertmanager_platform_dir: "{{ alertmanager_platform_dir | default('/opt/developer-platform') }}"
+
+    - name: Validate SMTP settings and response ownership
+      ansible.builtin.assert:
+        that:
+          - alertmanager_platform_dir is match('^/[A-Za-z0-9_./-]+$')
+          - alertmanager_platform_dir != '/'
+          - alertmanager_smtp_host is match('^[A-Za-z0-9.-]+$')
+          - alertmanager_smtp_port | int > 0
+          - alertmanager_smtp_port | int < 65536
+          - alertmanager_smtp_encryption in ['starttls', 'implicit_tls']
+          - alertmanager_smtp_username | length > 0
+          - alertmanager_smtp_from | length > 0
+          - alertmanager_email_to | length > 0
+          - alertmanager_response_owner | length > 0
+
+    - name: Require a private password
+      ansible.builtin.assert:
+        that:
+          - alertmanager_smtp_password | default('') | length > 0
+      no_log: true
+
+    - name: Check that the platform is already installed
+      ansible.builtin.stat:
+        path: "{{ alertmanager_platform_dir }}/{{ item }}"
+      loop: [.env, compose.yaml]
+      register: alertmanager_installation
+      when: not ansible_check_mode
+
+    - name: Require existing platform files before deployment
+      ansible.builtin.assert:
+        that: item.stat.isreg | default(false)
+        fail_msg: Deploy the platform first or correct alertmanager_platform_dir.
+      loop: "{{ alertmanager_installation.results }}"
+      when: not ansible_check_mode
+      no_log: true
+
+  tasks:
+    - name: Validate and deploy on an existing Docker Compose installation
+      when: not ansible_check_mode
+      block:
+        - name: Allocate private candidate directory
+          ansible.builtin.tempfile:
+            state: directory
+            prefix: alertmanager-
+          register: alertmanager_candidate
+
+        - name: Render candidate configuration
+          ansible.builtin.template:
+            src: templates/alertmanager.yaml.j2
+            dest: "{{ alertmanager_candidate.path }}/alertmanager.yaml"
+            mode: '0600'
+          diff: false
+
+        - name: Stage SMTP password
+          ansible.builtin.copy:
+            content: "{{ alertmanager_smtp_password }}"
+            dest: "{{ alertmanager_candidate.path }}/smtp-password"
+            mode: '0600'
+          no_log: true
+          diff: false
+
+        - name: Validate candidate with the image shipped in this checkout
+          ansible.builtin.command:
+            argv:
+              - docker
+              - run
+              - --rm
+              - --network=none
+              - --user=0
+              - --entrypoint=/bin/amtool
+              - --volume
+              - "{{ alertmanager_candidate.path }}:/etc/alertmanager:ro"
+              - "{{ (lookup('ansible.builtin.file', playbook_dir ~ '/../../../infrastructure/monitoring/compose.yaml') | from_yaml).services.alertmanager.image }}"
+              - check-config
+              - /etc/alertmanager/alertmanager.yaml
+          changed_when: false
+          no_log: true
+
+        - name: Create private configuration directory for the container user
+          ansible.builtin.file:
+            path: "{{ alertmanager_platform_dir }}/infrastructure/monitoring/private"
+            state: directory
+            owner: '65534'
+            group: '65534'
+            mode: '0700'
+
+        - name: Install validated configuration and password
+          ansible.builtin.copy:
+            src: "{{ alertmanager_candidate.path }}/{{ item }}"
+            dest: "{{ alertmanager_platform_dir }}/infrastructure/monitoring/private/{{ item }}"
+            remote_src: true
+            owner: '65534'
+            group: '65534'
+            mode: '0600'
+          loop: [smtp-password, alertmanager.yaml]
+          no_log: true
+          diff: false
+          notify: Recreate Alertmanager
+
+        - name: Install monitoring Compose definition with private config support
+          ansible.builtin.copy:
+            src: "{{ playbook_dir }}/../../../infrastructure/monitoring/compose.yaml"
+            dest: "{{ alertmanager_platform_dir }}/infrastructure/monitoring/compose.yaml"
+            owner: root
+            group: root
+            mode: '0644'
+          notify: Recreate Alertmanager
+
+        - name: Select private configuration across platform redeployments
+          ansible.builtin.lineinfile:
+            path: "{{ alertmanager_platform_dir }}/.env"
+            regexp: '^ALERTMANAGER_CONFIG_DIR='
+            line: 'ALERTMANAGER_CONFIG_DIR=./private'
+            owner: root
+            group: root
+            mode: '0600'
+          no_log: true
+          diff: false
+          notify: Recreate Alertmanager
+
+        - name: Apply configuration changes
+          ansible.builtin.meta: flush_handlers
+
+        - name: Ensure Alertmanager is running
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --no-deps, alertmanager]
+            chdir: "{{ alertmanager_platform_dir }}"
+          changed_when: false
+
+        - name: Verify Alertmanager readiness inside its container
+          ansible.builtin.command:
+            argv: [docker, compose, exec, -T, alertmanager, wget, -q, -O, /dev/null, 'http://127.0.0.1:9093/-/ready']
+            chdir: "{{ alertmanager_platform_dir }}"
+          changed_when: false
+          register: alertmanager_ready
+          until: alertmanager_ready.rc == 0
+          retries: 12
+          delay: 5
+      always:
+        - name: Remove private candidate files
+          ansible.builtin.file:
+            path: "{{ alertmanager_candidate.path }}"
+            state: absent
+          when: alertmanager_candidate.path is defined
+
+  handlers:
+    - name: Recreate Alertmanager
+      ansible.builtin.command:
+        argv: [docker, compose, up, -d, --no-deps, --force-recreate, alertmanager]
+        chdir: "{{ alertmanager_platform_dir }}"
+      changed_when: true
