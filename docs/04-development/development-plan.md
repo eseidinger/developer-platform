@@ -83,6 +83,8 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 
 [ADR-010](../03-decisions/ADR-010-single-environment-lab.md) records the owner’s accepted single-environment lab policy. Continue operational checks on the existing platform and external watchdog with explicit impact and recovery steps. Do not provision additional test environments. Existing isolated restore evidence is retained; new empty-host restore exercises are deferred and their outstanding acceptance criteria remain open.
 
+[ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md) bounds monitoring at the existing external watchdog. Independent detection of its scheduler/hosting failure is excluded from Phase 1A acceptance, with silent failure explicitly accepted by the owner. This is a scope decision, not a passed test or deferred implementation; other monitoring criteria remain required.
+
 ## Open decisions and ownership
 
 | Topic | Next step | Gate |

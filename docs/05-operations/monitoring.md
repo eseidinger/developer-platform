@@ -8,7 +8,7 @@ The [runbook](runbook.md#inspect-the-current-installation) contains dependency a
 
 Prometheus currently scrapes itself, node-exporter, and kube-state-metrics; Alloy collects host Docker logs. Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; actual delivery still requires acceptance. The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. Independent backup-age/failure checks now exist in the optional backup watchdog channel; source backup deployment has operator-reported evidence; actual backup-specific alert receipt still requires verification.
 
-The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. The operator confirmed heartbeat outage/recovery mail and recovery after correcting the HTTPS probe from HEAD to GET. Recovered Prometheus/Grafana health and all three scrape targets also passed. Broader cluster/host failure exercises, Alertmanager delivery, backup-specific mail, and watchdog-hosting failure detection remain open; see [current monitoring progress](../04-development/delivery-backlog.md#current-monitoring-progress). Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
+The [backlog evidence](../04-development/delivery-backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. The operator confirmed heartbeat outage/recovery mail and recovery after correcting the HTTPS probe from HEAD to GET. Recovered Prometheus/Grafana health and all three scrape targets also passed. Broader cluster/host failure exercises, Alertmanager delivery, and backup-specific mail remain subject to the current backlog; see [current monitoring progress](../04-development/delivery-backlog.md#current-monitoring-progress). Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
 
 ## Target coverage and alert contract
 
@@ -38,7 +38,11 @@ Deduplication sends an alert on state change and a recovery notification when se
 
 ## Alert process
 
-Each alert has severity, affected resource, start time, last observation, runbook reference, and an assigned recipient. Actual contacts remain open. Record impact and changes during incidents; group recurring related alerts.
+Each alert has severity, affected resource, start time, last observation, runbook reference, and an assigned recipient. Record impact and changes during incidents; group recurring related alerts.
+
+**Accepted lab response policy (September 27, 2026):** The project owner is the sole responder for alerts delivered to the existing alert email inbox. The target is to acknowledge and begin investigation within 24 hours of notification, reflecting operation as a side project alongside regular work. This is a response target, not a resolution deadline. There is no secondary responder or escalation coverage. Automated detection and notifications continue independently of operator availability.
+
+Under [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md), the existing external watchdog is the end of the lab monitoring chain. No additional external service is required to monitor its hosting or scheduler. Silent watchdog failure, including missed platform or backup notifications during that failure, is an accepted limitation rather than outstanding acceptance work. Manual status/scheduler inspection remains available; it does not provide independent notification.
 
 ## Operational checks
 

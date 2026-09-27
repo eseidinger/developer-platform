@@ -20,6 +20,8 @@ Keeping everything in the cluster is simple but shares its failure domain. A hos
 
 The three layers have distinct responsibilities. Test the heartbeat, check scheduler, and notification channel separately. Tokens, TLS, deduplication, maintenance windows, and alert resolution are operational responsibilities.
 
+For the current lab, [ADR-011](ADR-011-watchdog-monitoring-boundary.md) accepts silent watchdog failure and excludes an additional external observer from acceptance. The remaining proposed capabilities retain their existing status.
+
 ## Validation
 
 Stop the workload cluster, simulate a Docker service failure, and stop heartbeats: the appropriate independent layer must respond. Then verify recovery notifications and alert resolution.

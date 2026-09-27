@@ -18,6 +18,8 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 
 | [010](ADR-010-single-environment-lab.md) | Single-environment lab and in-place operational checks | Accepted September 27, 2026 |
 
+| [011](ADR-011-watchdog-monitoring-boundary.md) | Lab watchdog monitoring boundary; accepted silent-failure risk | Accepted September 27, 2026 |
+
 ## Decision process
 
 1. Define the problem, constraints, and affected requirements.

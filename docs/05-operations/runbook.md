@@ -73,7 +73,7 @@ sudo journalctl -u platform-heartbeat.service -n 50 --no-pager
 
 The oneshot service can be inactive between successful runs; inspect its last result and timer schedule. It sends only when API dependency readiness and Prometheus readiness pass. Check those endpoints first, then sender connectivity, endpoint/token configuration, and TLS without printing secrets.
 
-On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../operations/watchdog/README.md). A stale cron makes the status page unavailable, but has no independent notifier. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
+On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../operations/watchdog/README.md). A stale cron makes the status page unavailable, but has no independent notifier. Under [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md), silent watchdog failure is an accepted lab limitation; no additional external observer is required. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
 
 ## Docker or k3d unavailable
 
