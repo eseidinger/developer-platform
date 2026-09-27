@@ -411,7 +411,8 @@ unchanged; OPS-006-T01/T02/T03 remain open for the outstanding criteria.
 - [x] **T02 — Scheduled execution:** operator-supplied timer, status and journal output confirms the September 27, 2026 midnight run on `node-01`, from 00:00:04 to 00:01:38 UTC (94 seconds), with verified snapshot and retention completion.
 - [x] **T02 — No-backup notification and recovery:** operator confirmed both BACKUP DOWN and BACKUP UP emails on September 27, 2026 and supplied DOWN reason `no-backup`. Source defines this as no recorded successful capture (`last_capture` is null). This establishes initial no-backup detection and recovery email receipt; actual receipt times were not supplied. This initial check does not establish failed, overdue or stalled scenarios; later drill evidence is recorded separately below.
 - [x] **T02 — Failed capture notification and recovery:** operator confirmed successful execution of the failure-drill playbook on the existing lab and receipt of both drill emails (September 27, 2026). This covers injected database-capture failure and subsequent verified backup recovery; see F-2026-09-27 below.
-- [ ] **T02 — Remaining operational acceptance:** live overdue/stalled backup notifications and missing updates after a prior successful capture (including local-monitoring outage), full retention/access-control evidence, and complete OPS-007-T01 prerequisite.
+- [x] **T02 — Stalled backup notification and recovery:** the operator supplied a passed drill/recovery report and confirmed both BACKUP DOWN (stalled) and subsequent BACKUP UP emails on September 27, 2026. See stalled drill completion evidence below.
+- [ ] **T02 — Remaining operational acceptance:** live overdue backup notifications and missing updates after a prior successful capture (including local-monitoring outage), full retention/access-control evidence, and complete OPS-007-T01 prerequisite.
 - [x] **T03 — Fresh isolated restore:** playbook restored SQL, source/configuration and service volumes from S3 into a fresh Ubuntu VM without reading the source host during restoration.
 - [x] **T03 — Historical SQL marker:** an independent pre-backup receipt matched the restored record through a Kubernetes test pod using the project Secret.
 - [x] **T03 — Recovered service checks:** API/catalog, selected project rollout, HTTP ingress, project database authentication/write/read, denied catalog CONNECT privilege, Prometheus targets and Grafana database health passed.
@@ -454,9 +455,35 @@ bfe5d4443417454ba8b73cd00b9fc3df started at 08:46:40 UTC; the real stalled thres
 is crossed after 10:46:40 UTC, with recovery scheduled no earlier than 10:51:41 UTC.
 Remote report: /var/lib/developer-platform-backup-drill/freshness-_5w2hvpe/report.json.
 The report retained the previous verified capture/snapshot while waiting.
-This is launch/progress evidence only; completion, recovery and DOWN/UP email
-receipt for this drill have not yet been confirmed. Exact deployed revision was
-not supplied.
+This records initial launch/progress; completion evidence follows below. Exact
+deployed revision was not supplied.
+
+**Stalled drill completion (September 27, 2026; operator-supplied report):**
+The status playbook completed with six successful tasks and zero failures. The
+transient service was inactive with exit code 0; the report recorded result
+passed, stage complete and recovery exit code 0. The threshold/notification
+window ended at 10:51:41 UTC; recovery finished at 10:52:38 UTC. Recovery run
+bfe5d4443417454ba8b73cd00b9fc3df produced verified snapshot
+b056b5582daad0c73b974a60caba37ed960fac5e5838a1287a7493c8c4c0c23d.
+The runner retains the attempt start, 08:46:40 UTC, as last_verified_capture;
+this is not the completion time. The report establishes elapsed-threshold and
+verified-recovery behavior. The operator subsequently confirmed receipt of both BACKUP DOWN with stalled
+reason and subsequent BACKUP UP emails on September 27, 2026. This completes
+the stalled notification/recovery check. Exact receipt times were not supplied;
+overdue and other remaining operational criteria stay open.
+
+**Overdue drill progress (September 27, 2026; operator-supplied report):**
+The status playbook completed with six successful tasks and zero failures. The
+transient service was active and the report recorded mode overdue, result running,
+and stage waiting-for-overdue. The exercise started at 11:25:57 UTC on September 27.
+Its baseline is the stalled-drill verified snapshot
+b056b5582daad0c73b974a60caba37ed960fac5e5838a1287a7493c8c4c0c23d,
+with last_verified_capture at September 27 08:46:40 UTC (the attempt start, not
+its 10:52:38 UTC completion). The 24-hour threshold is exceeded at September 28
+08:46:41 UTC; recovery is scheduled no earlier than 08:51:41 UTC after the
+five-minute notification window (10:46:41/10:51:41 Berlin time, CEST).
+This is waiting-state evidence only. Completion, verified recovery and overdue
+DOWN/UP email receipt remain unconfirmed. Exact deployed revision was not supplied.
 
 **Failed-backup drill evidence F-2026-09-27 (operator supplied; OPS-006-T02/OPS-007-T01):** The operator reports that [drill-backup-failure.yml](../../operations/backup/ansible/drill-backup-failure.yml) executed correctly on the existing lab and both notification emails arrived. The referenced drill injects database-capture failure, verifies preservation of the prior successful capture/snapshot, waits for the DOWN notification window, then runs and verifies a normal recovery backup. This is operator-reported acceptance of the failed-capture/recovery path and its email pair. The fetched report, exact deployed revision, snapshot IDs and receipt times were not supplied for independent inspection. It does not establish upload-failure, overdue/stalled, local-monitoring-outage or mail-delivery-failure acceptance. No separate test environment was used, in accordance with ADR-010.
 
