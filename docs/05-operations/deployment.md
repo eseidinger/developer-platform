@@ -37,6 +37,13 @@ bash scripts/up.sh
 
 Bootstrap starts an existing cluster; it does not upgrade its Kubernetes image. It also does not reapply stored project specs automatically. Watchdog heartbeat delivery will stop during dependency downtime and can produce an external alert; no expiring maintenance-window feature exists.
 
+The Ansible deployment validates the transferred Compose configuration, refuses
+to overlap a running backup or availability drill, then stops and removes all
+Compose service containers without deleting volumes. PostgreSQL is started first;
+the existing k3d cluster and shared network remain in place. A literal
+`docker compose down` is not used because active k3d nodes hold that network.
+This is a full control-plane/shared-service outage, not a rolling deployment.
+
 ### Recreate the workload cluster
 
 This procedure removes Kubernetes workloads and custom cluster resources. First create and secure a [backup](backup-recovery.md#make-a-current-backup), preserve `.env`, record image versions, and save any manually managed manifests. The project catalog contains the latest `name/image/port/probe_profile` specs and lifecycle status, not revision history. Under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md), new isolated installations are deferred. Use bounded checks on the existing lab and record version-migration validation that remains unverified; this procedure does not authorize creating another environment.

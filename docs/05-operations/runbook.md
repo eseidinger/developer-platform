@@ -75,6 +75,10 @@ The oneshot service can be inactive between successful runs; inspect its last re
 
 On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../operations/watchdog/README.md). A stale cron makes the status page unavailable, but has no independent notifier. Under [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md), silent watchdog failure is an accepted lab limitation; no additional external observer is required. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
 
+## Availability drill
+
+For controlled acceptance checks on the existing lab, use the [cluster and Docker-boundary playbooks](../../operations/heartbeat/README.md#availability-drills). They restore the selected service automatically and do not delete cluster or application data. Confirm emails separately before recording acceptance.
+
 ## Docker or k3d unavailable
 
 Inspect host disk/memory, Docker logs, and node status before changing resources. PostgreSQL and monitoring are outside k3d and should survive a cluster-only outage. Use the [start/stop procedure](deployment.md#current-installation-and-lifecycle) after resolving the cause; do not begin by deleting volumes or the cluster. If the cluster must be recreated, retain database volumes and [reapply stored specs](backup-recovery.md#reapply-restored-projects). No reconciler automatically restores workloads.

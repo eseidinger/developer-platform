@@ -1,0 +1,4 @@
+---
+- import_playbook: drill-platform-availability.yml
+  vars:
+    platform_availability_mode: cluster

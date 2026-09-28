@@ -1,0 +1,92 @@
+---
+- name: Exercise platform cluster or Docker availability and recovery
+  hosts: developer_platform
+  become: true
+  gather_facts: false
+  vars:
+    platform_availability_mode: cluster
+    platform_availability_dir: /var/lib/developer-platform-availability-drill
+    platform_availability_wait_seconds: 90
+    platform_availability_docker_outage_seconds: 360
+  pre_tasks:
+    - name: Validate live drill settings
+      ansible.builtin.assert:
+        that:
+          - not ansible_check_mode
+          - platform_availability_mode in ['cluster', 'docker']
+          - platform_availability_wait_seconds | int >= 30
+          - platform_availability_docker_outage_seconds | int >= 300
+        fail_msg: This is a live drill. Select cluster or docker mode; do not use check mode.
+    - name: Explain the selected failure boundary
+      ansible.builtin.debug:
+        msg: >-
+          Cluster mode stops only k3d-workloads-server-0. Docker mode stops the
+          local Docker service for {{ platform_availability_docker_outage_seconds }} seconds;
+          it does not simulate a power-off or independently recover a real host outage.
+          Both modes restore the affected service automatically; confirm notification emails separately.
+  tasks:
+    - name: Create private evidence directory
+      ansible.builtin.file:
+        path: "{{ platform_availability_dir }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Create a unique drill directory
+      ansible.builtin.tempfile:
+        state: directory
+        path: "{{ platform_availability_dir }}"
+        prefix: "platform-availability-{{ platform_availability_mode }}-"
+      register: availability_drill
+    - name: Install drill helper
+      ansible.builtin.copy:
+        src: ../scripts/drill-platform-availability.py
+        dest: "{{ availability_drill.path }}/drill.py"
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Run the drill under systemd supervision
+      ansible.builtin.command:
+        argv:
+          - systemd-run
+          - "--unit={{ availability_drill.path | basename }}"
+          - --wait
+          - --collect
+          - --property=Type=exec
+          - --property=UMask=0077
+          - --property=RuntimeMaxSec=1800
+          - --property=TimeoutStopSec=600
+          - /usr/bin/python3
+          - "{{ availability_drill.path }}/drill.py"
+          - --mode
+          - "{{ platform_availability_mode }}"
+          - --report
+          - "{{ availability_drill.path }}/report.json"
+          - --notification-wait
+          - "{{ platform_availability_wait_seconds }}"
+          - --docker-outage-wait
+          - "{{ platform_availability_docker_outage_seconds }}"
+      async: 2100
+      poll: 10
+      register: availability_run
+      failed_when: false
+    - name: Fetch drill report
+      ansible.builtin.fetch:
+        src: "{{ availability_drill.path }}/report.json"
+        dest: "{{ playbook_dir }}/../../../.runtime/availability-drill/{{ inventory_hostname }}/{{ availability_drill.path | basename }}/"
+        flat: true
+      register: availability_report
+      failed_when: false
+    - name: Require recovered platform state
+      ansible.builtin.assert:
+        that:
+          - availability_run.rc | default(1) == 0
+          - availability_report.dest is defined
+        fail_msg: >-
+          The drill did not complete cleanly. Inspect the fetched report and
+          journalctl -u {{ availability_drill.path | basename }} --no-pager before retrying.
+    - name: Report evidence and mailbox check
+      ansible.builtin.debug:
+        msg:
+          - "Evidence: {{ availability_report.dest }}"
+          - "Confirm the relevant FIRING and RESOLVED emails before recording acceptance."

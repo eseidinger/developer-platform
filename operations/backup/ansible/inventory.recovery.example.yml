@@ -14,3 +14,6 @@ all:
         # Optional controller path to an independent pre-backup marker receipt.
         # With a marker, select only its matching project.
         # recovery_marker_file: /absolute/private/path/smoke-marker.json
+        # Optional selected recovery preflight checks. They make read-only
+        # restic calls with --no-lock and expect each condition to fail.
+        # recovery_preflight_cases: [unavailable-endpoint, wrong-password, missing-password]

@@ -50,3 +50,50 @@ validation does not connect to the host:
 ```bash
 ansible-playbook -i operations/heartbeat/ansible/inventory.heartbeat.example.yml operations/heartbeat/ansible/deploy-heartbeat.yml --syntax-check
 ```
+
+## Availability drills
+
+The following playbooks exercise the existing lab and automatically restore the
+chosen failure boundary. Run them from the controller, one at a time. They write
+private reports under `/var/lib/developer-platform-availability-drill/` on the
+platform host and fetch a copy into `.runtime/availability-drill/` on the
+controller.
+
+Cluster mode stops only the k3d server container. It waits for Prometheus to see
+the `kubernetes-state` target down and for `ScrapeTargetDown` to fire, then
+starts the same container and verifies all three nodes, the scrape target, and
+alert resolution:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/heartbeat/ansible/drill-cluster-availability.yml
+```
+
+Confirm the `ScrapeTargetDown` FIRING and RESOLVED emails. The normal default
+wait adds 90 seconds after the alert begins firing so Alertmanager can notify.
+No project data, volumes, namespaces, or container definitions are removed.
+
+Docker mode is a local host-boundary simulation: it stops Docker for six minutes
+so the existing heartbeat becomes overdue at the external watchdog, then starts
+Docker. Recovery then performs the same controlled Compose reconciliation as a
+deployment: Compose containers are stopped and removed without deleting volumes,
+PostgreSQL starts first, and the remaining services and existing k3d cluster are
+reconciled. The drill requires PostgreSQL, the Platform API, Prometheus,
+Kubernetes nodes, and the heartbeat timer to recover before it can pass:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/heartbeat/ansible/drill-docker-availability.yml
+```
+
+Confirm the external watchdog DOWN and UP emails. This is not a physical host
+or power-loss test: it cannot independently recover a machine that is actually
+offline. Recovery invokes the normal bootstrap reconciliation, but does not
+delete or recreate the existing cluster, named volumes, or project data.
+
+Both drills are live changes. Do not run them during provisioning, a backup
+capture, or another availability exercise. If a run fails, use the fetched report
+and `journalctl -u <printed-unit> --no-pager`, then verify `docker compose ps`,
+`kubectl --kubeconfig /opt/developer-platform/.runtime/admin.kubeconfig get nodes`,
+and the heartbeat timer before retrying. A report proves observed monitoring and
+recovery state; email receipt remains an operator confirmation.

@@ -1,10 +1,18 @@
 # ADR-015 – Encrypted Recovery Bundles with Verified-Only Retention
 
-Recorded: September 27, 2026. Status: **Implemented design; owner acceptance of this record not recorded**. The owner-selected storage/schedule/RPO/RTO policy and partial operational evidence are recorded under [OPS-006](../04-development/delivery-backlog.md#current-backup-and-recovery-progress).
+Recorded: September 27, 2026. Status: **Implemented design; lab replacement-host and credential policy accepted September 28, 2026**. The owner-selected storage/schedule/RPO/RTO policy and partial operational evidence are recorded under [OPS-006](../04-development/delivery-backlog.md#current-backup-and-recovery-progress).
 
 ## Context
 
 Recovering a recreated cluster requires SQL roles/data, platform configuration and credential continuity, plus selected service state. A successful upload alone does not prove that the captured bundle is retrievable; host heartbeats do not prove backup freshness.
+
+## Accepted lab recovery access policy
+
+When recovery is required, the operator provisions a fresh Ubuntu recovery VM in WSL with the existing recovery-VM workflow. The lab does not maintain a permanently running recovery host.
+
+The Hetzner S3 access key and secret, plus the restic repository password, are retained in the operator's password manager outside `node-01` and outside this repository. The operator selects an explicit verified snapshot and runs the recovery playbook against that freshly provisioned VM.
+
+This is the accepted replacement-host and storage-access policy for the single-environment lab. It provides recovery planning; it does not replace evidence from a restore exercise.
 
 ## Implemented choice
 

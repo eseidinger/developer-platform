@@ -222,6 +222,40 @@
             chdir: "{{ platform_install_dir }}"
           changed_when: false
 
+        - name: Check for maintenance jobs that must not overlap deployment
+          ansible.builtin.command:
+            argv:
+              - systemctl
+              - list-units
+              - --type=service
+              - --state=activating,active,running
+              - --no-legend
+              - platform-backup.service
+              - platform-backup-freshness-drill.service
+              - backup-drill-*
+              - platform-availability-*
+          register: platform_maintenance_units
+          changed_when: false
+
+        - name: Refuse deployment during backup or availability maintenance
+          ansible.builtin.assert:
+            that: platform_maintenance_units.stdout | trim == ''
+            fail_msg: >-
+              Deployment cannot overlap an active backup or availability drill:
+              {{ platform_maintenance_units.stdout | trim }}
+
+        - name: Stop existing Compose services cleanly
+          ansible.builtin.command:
+            argv: [docker, compose, stop, --timeout, '60']
+            chdir: "{{ platform_install_dir }}"
+          changed_when: true
+
+        - name: Remove stopped Compose containers while preserving data and the shared network
+          ansible.builtin.command:
+            argv: [docker, compose, rm, --force]
+            chdir: "{{ platform_install_dir }}"
+          changed_when: true
+
         - name: Reconcile Compose services and Kubernetes cluster
           ansible.builtin.command:
             argv: [bash, scripts/up.sh]
@@ -232,7 +266,7 @@
 
         - name: Wait for the platform API
           ansible.builtin.uri:
-            url: http://127.0.0.1:8000/healthz
+            url: http://127.0.0.1:8000/readyz
             status_code: 200
           register: platform_health
           until: platform_health.status | default(0) == 200

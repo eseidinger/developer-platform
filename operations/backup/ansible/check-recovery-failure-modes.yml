@@ -1,0 +1,139 @@
+---
+- name: Verify recovery credential and storage failure modes without repository writes
+  hosts: recovery
+  become: true
+  gather_facts: true
+  vars_prompt:
+    - name: backup_s3_access_key
+      prompt: S3 access key ID
+      private: true
+    - name: backup_s3_secret_key
+      prompt: S3 secret access key
+      private: true
+    - name: backup_restic_password
+      prompt: Existing restic repository password
+      private: true
+  vars:
+    backup_restic_repository: s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform
+    backup_s3_region: hel1
+    recovery_preflight_cases: [unavailable-endpoint, wrong-password, missing-password]
+    recovery_preflight_wrong_password: deliberately-invalid-recovery-preflight-password
+  pre_tasks:
+    - name: Require the explicitly selected local recovery VM
+      ansible.builtin.assert:
+        that:
+          - not ansible_check_mode
+          - ansible_host == '127.0.0.1'
+          - ansible_port | int == 2222
+          - ansible_facts['hostname'] == 'platform-recovery'
+          - ansible_facts['distribution'] == 'Ubuntu'
+          - ansible_facts['distribution_version'] is version('24.04', '>=')
+          - ansible_facts['architecture'] == 'x86_64'
+          - recovery_preflight_cases | length > 0
+          - recovery_preflight_cases | difference(['unavailable-endpoint', 'wrong-password', 'missing-password']) | length == 0
+        fail_msg: Use the disposable platform-recovery VM at 127.0.0.1:2222. Check mode is unsupported; use syntax-check.
+    - name: Validate repository settings and credentials privately
+      ansible.builtin.assert:
+        that:
+          - backup_restic_repository is match('^s3:https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._-]+/[A-Za-z0-9/_-]+$')
+          - backup_s3_region is match('^[A-Za-z0-9-]+$')
+          - backup_s3_access_key | length > 0
+          - backup_s3_secret_key | length > 0
+          - backup_restic_password | length >= 20
+          - recovery_preflight_wrong_password != backup_restic_password
+      no_log: true
+  tasks:
+    - block:
+        - name: Install read-only recovery-preflight prerequisites
+          ansible.builtin.apt:
+            name: [ca-certificates, restic]
+            update_cache: true
+            state: present
+        - name: Allocate private temporary credential directory
+          ansible.builtin.tempfile:
+            state: directory
+            path: /root
+            prefix: recovery-preflight-
+          register: recovery_preflight_private
+          no_log: true
+        - name: Store the valid repository password temporarily
+          ansible.builtin.copy:
+            content: "{{ backup_restic_password }}\n"
+            dest: "{{ recovery_preflight_private.path }}/password"
+            mode: '0600'
+          no_log: true
+        - name: Check unavailable storage endpoint fails without a repository lock
+          ansible.builtin.command:
+            argv: [restic, snapshots, --no-lock]
+          environment:
+            RESTIC_REPOSITORY: s3:https://127.0.0.1:1/recovery-preflight
+            RESTIC_PASSWORD_FILE: "{{ recovery_preflight_private.path }}/password"
+            AWS_ACCESS_KEY_ID: "{{ backup_s3_access_key }}"
+            AWS_SECRET_ACCESS_KEY: "{{ backup_s3_secret_key }}"
+            AWS_DEFAULT_REGION: "{{ backup_s3_region }}"
+          register: recovery_preflight_unavailable
+          changed_when: false
+          failed_when: false
+          no_log: true
+          when: "'unavailable-endpoint' in recovery_preflight_cases"
+        - name: Check wrong repository password fails without a repository lock
+          ansible.builtin.command:
+            argv: [restic, snapshots, --no-lock]
+          environment:
+            RESTIC_REPOSITORY: "{{ backup_restic_repository }}"
+            RESTIC_PASSWORD: "{{ recovery_preflight_wrong_password }}"
+            AWS_ACCESS_KEY_ID: "{{ backup_s3_access_key }}"
+            AWS_SECRET_ACCESS_KEY: "{{ backup_s3_secret_key }}"
+            AWS_DEFAULT_REGION: "{{ backup_s3_region }}"
+          register: recovery_preflight_wrong_password_result
+          changed_when: false
+          failed_when: false
+          no_log: true
+          when: "'wrong-password' in recovery_preflight_cases"
+        - name: Check missing repository password fails without a repository lock
+          ansible.builtin.command:
+            argv: [restic, snapshots, --no-lock]
+          environment:
+            RESTIC_REPOSITORY: "{{ backup_restic_repository }}"
+            RESTIC_PASSWORD_FILE: "{{ recovery_preflight_private.path }}/missing-password"
+            AWS_ACCESS_KEY_ID: "{{ backup_s3_access_key }}"
+            AWS_SECRET_ACCESS_KEY: "{{ backup_s3_secret_key }}"
+            AWS_DEFAULT_REGION: "{{ backup_s3_region }}"
+          register: recovery_preflight_missing_password
+          changed_when: false
+          failed_when: false
+          no_log: true
+          when: "'missing-password' in recovery_preflight_cases"
+        - name: Require each selected failure mode
+          ansible.builtin.assert:
+            that:
+              - recovery_preflight_unavailable.rc != 0 if 'unavailable-endpoint' in recovery_preflight_cases else true
+              - recovery_preflight_wrong_password_result.rc != 0 if 'wrong-password' in recovery_preflight_cases else true
+              - recovery_preflight_missing_password.rc != 0 if 'missing-password' in recovery_preflight_cases else true
+            fail_msg: A selected negative recovery preflight unexpectedly succeeded; stop and inspect the private task output before any restore.
+        - name: Record non-secret preflight evidence
+          ansible.builtin.copy:
+            content: |
+              {
+                "performed_at": "{{ ansible_facts['date_time']['iso8601'] }}",
+                "repository_write_mode": "disabled (--no-lock)",
+                "results": {
+                  "unavailable_endpoint": "{{ 'expected failure observed' if 'unavailable-endpoint' in recovery_preflight_cases else 'not selected' }}",
+                  "wrong_password": "{{ 'expected failure observed' if 'wrong-password' in recovery_preflight_cases else 'not selected' }}",
+                  "missing_password": "{{ 'expected failure observed' if 'missing-password' in recovery_preflight_cases else 'not selected' }}"
+                }
+              }
+            dest: "{{ recovery_preflight_private.path }}/report.json"
+            mode: '0600'
+        - name: Fetch non-secret preflight evidence
+          ansible.builtin.fetch:
+            src: "{{ recovery_preflight_private.path }}/report.json"
+            dest: "{{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/preflight-{{ ansible_facts['date_time']['iso8601_basic_short'] }}.json"
+            flat: true
+      always:
+        - name: Remove temporary recovery credentials
+          ansible.builtin.file:
+            path: "{{ recovery_preflight_private.path }}"
+            state: absent
+          when: recovery_preflight_private is defined
+          no_log: true

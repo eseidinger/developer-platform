@@ -23,7 +23,7 @@ network requirements. The playbook does not change the firewall.
 The playbook installs Docker from its official APT repository, verifies downloaded
 kubectl and k3d checksums, copies deployment sources to `/opt/developer-platform`,
 generates secrets on the target, and runs `scripts/up.sh`. It then waits for the
-API health endpoint. The controller's `.env` and `.runtime` are not transferred.
+API dependency-readiness endpoint. The controller's `.env` and `.runtime` are not transferred.
 The installation and runtime directories are root-only; `.env` has mode 0600.
 Run manual maintenance commands with sudo from the installation directory.
 kubectl is also installed at `/usr/local/bin/kubectl` for host administration.
@@ -54,10 +54,21 @@ avoid changing its package source. Conflicting distribution Docker packages are
 not automatically removed. The existing engine must provide Compose >= 2.20.3.
 
 Rerunning the playbook reapplies sources and endpoints and reconciles the running
-platform. k3d installation and bootstrap run on every deployment and report
-changes, even if configuration is unchanged. Source extraction does not delete
-obsolete remote files. Backups and the external watchdog require the separate
-[operations](../docs/05-operations/backup-recovery.md) and [watchdog](../operations/watchdog/README.md) setup.
+platform. After validating the transferred Compose configuration and confirming
+that no backup or availability drill is active, deployment performs a controlled
+full outage of the Compose services. It stops and removes their containers, but
+preserves named volumes, `.env`, the k3d cluster, and the shared Docker network.
+PostgreSQL starts and becomes healthy before the dynamically addressed services
+are recreated. This is intentionally not `docker compose down`: k3d remains
+attached to the shared network, so that network must not be removed. The external
+watchdog can alert if the deployment exceeds its heartbeat window.
+
+k3d installation and bootstrap run on every deployment and report changes, even
+if configuration is unchanged. Bootstrap refreshes the k3d load balancer when
+the Kubernetes API is stale after a Docker restart. Source extraction does not
+delete obsolete remote files. Backups and the external watchdog require the
+separate [operations](../docs/05-operations/backup-recovery.md) and
+[watchdog](../operations/watchdog/README.md) setup.
 
 ```bash
 ansible-playbook -i ansible/inventory.example.yml ansible/deploy.yml --syntax-check

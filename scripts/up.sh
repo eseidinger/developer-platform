@@ -20,6 +20,25 @@ else
 fi
 k3d kubeconfig get workloads > .runtime/admin.kubeconfig
 export KUBECONFIG="$PWD/.runtime/admin.kubeconfig"
+if ! kubectl --request-timeout=5s get --raw=/readyz >/dev/null 2>&1; then
+  # The k3d load balancer resolves its named upstream when nginx starts. After
+  # a Docker daemon restart the node can receive a different address while the
+  # load balancer retains the old resolution. Restarting only the load balancer
+  # refreshes that resolution without recreating the cluster or its data.
+  echo "Refreshing the k3d API load balancer..."
+  docker restart k3d-workloads-serverlb >/dev/null
+fi
+echo "Waiting for the Kubernetes API to become ready (up to 120 seconds)..."
+for attempt in $(seq 1 24); do
+  if kubectl --request-timeout=5s get --raw=/readyz >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "$attempt" == 24 ]]; then
+    echo "Kubernetes API did not become ready." >&2
+    exit 1
+  fi
+  sleep 5
+done
 echo "Waiting for Kubernetes nodes to become Ready (up to 180 seconds)..."
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
 kubectl apply -f infrastructure/kubernetes/controller.yaml
@@ -33,5 +52,5 @@ test -s .runtime/controller.kubeconfig
 # Container UID 10001 needs read access; .runtime remains private to the host user.
 chmod 644 .runtime/controller.kubeconfig
 rm -f .runtime/token.json
-docker compose up -d --build
+docker compose up -d --build --remove-orphans
 echo "Platform API: http://127.0.0.1:8000/docs"

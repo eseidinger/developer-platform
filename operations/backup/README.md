@@ -21,6 +21,7 @@ inventory for the disposable VM.
 | Inspect a running/completed freshness drill | [check-backup-drill.yml](ansible/check-backup-drill.yml) | Fetches the latest report without changing the drill |
 | Create a pre-backup marker and verified backup | [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml) | [Source test preparation](#automate-marker-creation-and-the-source-backup) |
 | Restore and test a fresh isolated VM | [restore-recovery.yml](ansible/restore-recovery.yml) | [Recovery inventory and safeguards](#restore-a-fresh-recovery-vm-with-ansible) |
+| Verify recovery storage and credential failure paths | [check-recovery-failure-modes.yml](ansible/check-recovery-failure-modes.yml) | [Read-only recovery preflight](#read-only-recovery-failure-preflight) |
 
 ### Backup setup and scheduling
 
@@ -161,8 +162,7 @@ service is no longer active. A host reboot releases the lock; the existing
 backup recovery service/timer remains responsible for recovery.
 
 These exercises cover natural backup age and a stalled attempt while local
-monitoring remains available. They do not claim local-monitoring-outage,
-SMTP-delivery-failure or restoration acceptance.
+monitoring remains available. [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md) accepts skipping the missing-update/local-monitoring-outage exercise for this lab. Notification-delivery-failure injection is an accepted limitation under ADR-011; these exercises do not claim restoration acceptance.
 
 ### Recovery drill
 
@@ -192,6 +192,25 @@ Do not rerun restoration to troubleshoot an acceptance failure.
 The sections below explain configuration, recovery behavior, script usage, and
 limitations. Manual restore commands are in the
 [operations guide](../../docs/05-operations/backup-recovery.md#restore-into-an-isolated-installation).
+
+## Read-only recovery failure preflight
+
+When an operator explicitly provisions the disposable recovery VM, run this before a selected restore to verify that recovery fails safely with unavailable storage and invalid credentials:
+
+```bash
+ansible-playbook -i operations/backup/ansible/inventory.recovery.yml \
+  operations/backup/ansible/check-recovery-failure-modes.yml
+```
+
+It prompts privately for the real S3 credentials and repository password, then deliberately tests an unreachable loopback S3 endpoint, a wrong password, and a missing password. Each selected command must fail. Restic is invoked with `--no-lock`; the playbook does not initialize, lock, restore, prune, retag, or otherwise write the repository. It saves a non-secret pass/fail report under `.runtime/recovery-evidence/` and removes its temporary credentials even after a failure.
+
+Select a subset with, for example, `-e 'recovery_preflight_cases=["wrong-password","missing-password"]'`. A successful preflight proves only that the negative cases failed; it does not prove an unavailable bundle can be restored. Deliberately corrupting the sole live repository is an accepted limitation under [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md); repository `check`, verified readback, and checksum-rejection tests remain the available evidence. Do not run it against `node-01`.
+
+## Quarterly recovery review
+
+On the first Saturday of January, April, July, and October, the operator reviews the latest verified snapshot inventory, runs `sudo /usr/local/sbin/platform-restic check` on `node-01`, and records the result in the delivery backlog or operations log. If recovery access or the stored scope has changed, explicitly provision the WSL recovery VM and run the read-only preflight before any selected restore.
+
+A routine full fresh-VM restore is not scheduled for this lab under ADR-010. Perform one after material changes to backed-up state, backup format, credentials, database version, or bootstrap behavior, or during an actual recovery event.
 
 ## Encrypted S3 backup repository setup
 

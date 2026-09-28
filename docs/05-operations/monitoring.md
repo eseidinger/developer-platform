@@ -8,7 +8,7 @@ The [runbook](runbook.md#inspect-the-current-installation) contains dependency a
 
 Prometheus has five configured jobs: itself, node-exporter, kube-state-metrics, blackbox-exporter and catalog-discovered applications. Alloy collects host Docker JSON logs; explicit k3d application log collection and workload usage metrics remain absent.
 
-Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; selected synthetic and scrape-failure FIRING/RESOLVED receipt has operator-reported evidence; application-rule and delivery-failure acceptance remain open.
+Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; selected synthetic and scrape-failure FIRING/RESOLVED receipt has operator-reported evidence; application-rule acceptance remains open; notification-delivery-failure injection is an accepted limitation under ADR-011.
 
 The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. The optional backup watchdog channel checks backup age/failure independently of heartbeat. Backup deployment and selected DOWN/UP receipt have operator-reported evidence; remaining scenarios are tracked in the backlog.
 
