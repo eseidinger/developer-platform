@@ -19,7 +19,7 @@ As of October 1, 2026. Future phases are proposals without confirmed dates.
 
 ## Implementation status
 
-The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation; no phase has acceptance evidence establishing completion. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment. Current Phase 1A criterion-level progress is recorded under [backup and recovery](delivery-backlog.md#current-backup-and-recovery-progress) and [monitoring](delivery-backlog.md#current-monitoring-progress); successful drills do not close their remaining acceptance gates.
+The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B, Phase 1C, and all later gates remain open. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment. Phase 1A criterion-level evidence is recorded under [backup and recovery](delivery-backlog.md#current-backup-and-recovery-progress) and [monitoring](delivery-backlog.md#current-monitoring-progress).
 
 ## Work sequence and gates
 
@@ -96,7 +96,7 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 
 ## Lab validation constraint
 
-[ADR-010](../03-decisions/ADR-010-single-environment-lab.md) records the owner’s accepted single-environment lab policy. Continue operational checks on the existing platform and external watchdog with explicit impact and recovery steps. Do not provision additional test environments. Existing isolated restore evidence is retained; new empty-host restore exercises are deferred and their outstanding acceptance criteria remain open.
+[ADR-010](../03-decisions/ADR-010-single-environment-lab.md) records the owner’s accepted single-environment lab policy. Continue operational checks on the existing platform and external watchdog with explicit impact and recovery steps. Do not provision additional test environments. [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) omits new isolated restore exercises and recurring full-restoration scheduling from Phase 1A; existing evidence remains historical reference material.
 
 [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md) bounds monitoring at the existing external watchdog. Independent detection of its scheduler/hosting failure is excluded from Phase 1A acceptance, with silent failure explicitly accepted by the owner. This is a scope decision, not a passed test or deferred implementation; other monitoring criteria remain required.
 
@@ -109,7 +109,7 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 | Identity provider, roles, and realm model | Explicitly accept the detailed ADR-004 approach | Minimal IAM in Phase 1; expansion in Phase 3 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
 | Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |
-| RPO/RTO, retention, capacity | Backup policy is selected (24-hour RPO, four-hour RTO, 14/8/6 retention); measure recovery and capacity against targets | Before production-like acceptance |
+| RPO/RTO, retention, capacity | Backup policy is selected (24-hour RPO, four-hour RTO, 14/8/6 retention); [ADR-017](../03-decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits full-horizon retention evidence from Phase 1A, so measure recovery, retention, and capacity against targets | Before production-like acceptance |
 
 The project owner decides scope and ADRs; implementation and operations provide evidence. Specific delivery owners, dates, and capacity commitments remain unassigned; the project owner is the sole alert responder.
 

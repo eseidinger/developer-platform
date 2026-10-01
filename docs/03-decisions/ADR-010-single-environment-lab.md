@@ -58,3 +58,5 @@ lab evidence from production-grade availability guarantees.
 Revisit before hosting important user data, onboarding users who require
 availability, or performing an exercise that cannot be safely reversed in place.
 A separate environment would require a new explicit owner decision.
+
+Phase 1A recovery-exercise scope is further amended by [ADR-016](ADR-016-phase-1a-recovery-scope.md).

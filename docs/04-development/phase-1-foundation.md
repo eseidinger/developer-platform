@@ -1,6 +1,6 @@
 # Phase 1 – Foundation and Usable Vertical Slice
 
-Status: acceptance gate open; see [backlog task evidence](delivery-backlog.md#evidence-conventions) for the dated implementation baseline and verification limits. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
+Status: Phase 1A complete under ADR-011, ADR-016, and ADR-017; Phase 1B and 1C remain open. See [backlog task evidence](delivery-backlog.md#evidence-conventions) for the dated implementation baseline and verification limits. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
 
 Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 
@@ -10,7 +10,7 @@ Create, update, observe, and deliberately remove a web application with PostgreS
 
 ## Ordered work packages and acceptance gates
 
-The [delivery backlog](delivery-backlog.md) supplies binding acceptance criteria and the [development plan](development-plan.md#backlog-delivery-commitments) maps every story. These gates are open. Deliver in order. Under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md), use controlled, reversible checks on the existing lab; do not require a separate test platform or watchdog. Fresh isolated restore exercises are deferred, not implicitly accepted.
+The [delivery backlog](delivery-backlog.md) supplies binding acceptance criteria and the [development plan](development-plan.md#backlog-delivery-commitments) maps every story. Gate 1A is complete; deliver 1B then 1C in order. Under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md), use controlled, reversible checks on the existing lab; do not require a separate test platform or watchdog. [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) omits isolated recovery exercises and recurring full-restoration scheduling from Phase 1A.
 
 ### 1A — Operational protection
 
@@ -20,9 +20,7 @@ Inventory the current installation and reproduce the hybrid profile. Complete an
 - Independently exercise host heartbeat expiry/recovery, k3d failure, a public application canary with compatible method and expected content through [Prometheus/blackbox exporter](../../infrastructure/monitoring/README.md) and Alertmanager (host network perspective; outside-network reachability is separately checked manually). Under [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md), independent monitoring of watchdog cron/hosting is excluded from lab acceptance; silent watchdog failure is an accepted limitation. Keep platform, alert-pipeline and backup signals separately authenticated and timestamped so one cannot refresh another.
 - Schedule encrypted off-host backups of databases/roles, platform state, configuration and recovery secrets, plus required service state. Record the selected storage, schedule, retention/access policy, independently recoverable keys, RPO/RTO, and replacement-host path before acceptance.
 - Verify exact backup retrieval/integrity and recovery credentials; failed uploads must not advance successful capture time. Test failed, overdue, and stalled backups. Under [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md), the lab does not exercise missing backup updates while local monitoring is unavailable; this is an accepted coverage limit. Bound job duration and prevent overlapping capture/retention operations.
-- Restore into an empty isolated installation without relying on the original host. Verify application data write/read, permissions, recreated workloads, ingress, monitoring and alerts. Record measured data loss and recovery time against selected targets. Test corrupt/unavailable backups and unavailable keys; do not treat extraction or SQL process exit as proof of recovery.
-
-Repeat recovery acceptance after changes to stored secrets/state, backup format, database major version or bootstrap behavior; schedule recurring exercises. Local fixtures do not establish off-host recovery or actual alert receipt. OPS-006 closes only with all its evidence; OPS-007 remains open for Phase 2 coverage.
+Maintain the documented replacement-host procedure and independently recoverable credentials, but do not treat an in-place restart as isolated-restoration proof. Full recovery exercises, corrupt/unavailable backup and key scenarios, and recurring full-restoration scheduling are deferred outside Phase 1A by [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md). [ADR-017](../03-decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits elapsed-time proof of the full 14/8/6 retention horizon; it does not change the configured retention policy. OPS-006-T01/T02 are complete within this scope; OPS-007 remains open for Phase 2 coverage.
 
 ### 1B — Accountable access and security events
 

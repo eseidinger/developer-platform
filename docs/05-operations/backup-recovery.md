@@ -2,11 +2,11 @@
 
 ## Lab validation scope
 
-[ADR-010](../03-decisions/ADR-010-single-environment-lab.md) selects the existing lab and watchdog for reversible operational exercises. New isolated recovery environments are deferred. Fresh-VM commands below document historical drills and a future explicitly selected restore; they are not the routine next step. Existing restore evidence remains valid, and unmet fresh-restore criteria remain open. Use the [in-place failure/freshness drills](../../operations/backup/README.md#start-with-the-playbooks) for current notification checks.
+[ADR-010](../03-decisions/ADR-010-single-environment-lab.md) selects the existing lab and watchdog for reversible operational exercises. [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) omits isolated recovery exercises from Phase 1A. Fresh-VM commands below document historical drills and the procedure for a future explicitly selected recovery; they are not a current Phase 1A acceptance step. Use the [in-place failure/freshness drills](../../operations/backup/README.md#start-with-the-playbooks) for current notification checks.
 
 The accepted recovery-access procedure is to provision a fresh Ubuntu VM in WSL with the recovery-VM workflow when recovery is required. The Hetzner S3 access key and secret, and the restic repository password, are retained in the operator password manager outside `node-01` and outside this repository. Select an explicit verified snapshot, then run the recovery playbook against the new VM. This records the lab replacement-host plan; a restore drill remains separate evidence.
 
-Before a deliberately selected restore, use the [read-only recovery failure preflight](../../operations/backup/README.md#read-only-recovery-failure-preflight) on that VM to confirm unavailable storage and invalid credential paths fail. It uses restic `--no-lock` and does not modify the repository. On September 28, 2026, the operator completed the unavailable-endpoint, wrong-password, and missing-password cases; all produced the expected failures and the non-secret report records no-lock mode. The operator performs a lightweight snapshot/integrity review on the first Saturday of January, April, July, and October. A routine full restore remains deferred under ADR-010; run one after material recovery-scope changes or an actual recovery event.
+Before a deliberately selected restore, use the [read-only recovery failure preflight](../../operations/backup/README.md#read-only-recovery-failure-preflight) on that VM to confirm unavailable storage and invalid credential paths fail. It uses restic `--no-lock` and does not modify the repository. On September 28, 2026, the operator completed the unavailable-endpoint, wrong-password, and missing-password cases; all produced the expected failures and the non-secret report records no-lock mode. The operator may perform a lightweight snapshot/integrity review on the first Saturday of January, April, July, and October. A full restore requires a later explicit decision or an actual recovery event under ADR-016.
 
 ## Use the playbooks first
 
@@ -66,7 +66,7 @@ The [delivery backlog progress checklist](../04-development/delivery-backlog.md#
 this guide explains execution and the scope of reported evidence.
 
 The following sections explain scope and manual fallback procedures. Use the
-current in-place playbooks for routine notification drills; isolated restore procedures remain deferred under ADR-010.
+current in-place playbooks for routine notification drills; isolated restore procedures require a later explicit decision or an actual recovery event under ADR-016.
 
 ## Current backup scope
 

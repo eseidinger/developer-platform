@@ -32,6 +32,6 @@ Checksum readback proves bytes, not SQL import, application transactions or RPO/
 
 ## Evidence and evolution
 
-Source: [runner](../../operations/backup/scripts/backup-platform.py), [systemd/deployment configuration](../../operations/backup/ansible/deploy-backup.yml), [watchdog transitions](../../operations/watchdog/src/backup.php). [Backup procedures](../../operations/backup/README.md) document deployment, retention and controlled in-place drills. Operator-reported scheduled capture, marker restore and selected email receipt do not close all OPS-006/007 criteria.
+Source: [runner](../../operations/backup/scripts/backup-platform.py), [systemd/deployment configuration](../../operations/backup/ansible/deploy-backup.yml), [watchdog transitions](../../operations/watchdog/src/backup.php). [Backup procedures](../../operations/backup/README.md) document deployment, retention and controlled in-place drills. Operator-reported scheduled capture, marker restore and selected email receipt do not demonstrate the complete 14/8/6 retention horizon or production-grade recovery guarantees; ADR-017 omits that elapsed-time retention evidence from Phase 1A.
 
-New isolated restore environments remain deferred under ADR-010. Revisit backup format/scope when identities, secrets, revisions, jobs or persistent workload volumes are added, or when important data requires finer RPO, PITR or fewer service interruptions.
+New isolated restore environments remain deferred under ADR-010; [ADR-016](ADR-016-phase-1a-recovery-scope.md) excludes their exercises from Phase 1A. Revisit backup format/scope when identities, secrets, revisions, jobs or persistent workload volumes are added, or when important data requires finer RPO, PITR or fewer service interruptions.

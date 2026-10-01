@@ -26,11 +26,13 @@ Top-level task checkboxes remain open where full acceptance is outstanding. Chec
 
 Phase gates remain **1A → 1B → 1C → 2 → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Deferred tasks have no scheduled phase and cannot block the single-image gates. Component attribution in initial diagnostics uses the single supported component; rerun those checks when the model expands.
 
-Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Repeat isolated restore when recovery scope changes. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
+**Gate status, October 1, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is the next open gate.
+
+Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Reassess the documented recovery procedure when recovery scope changes; [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) excludes isolated recovery exercises from the current Phase 1A gate. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
 ## Accepted lab validation approach
 
-**Owner decision, September 27, 2026:** [ADR-010](../03-decisions/ADR-010-single-environment-lab.md) accepts a single-environment lab. Use the existing platform and external watchdog for controlled, reversible failure checks; do not require or provision a separate test platform/watchdog. Previous isolated recovery results remain evidence. New fresh-installation restore drills are deferred under this constraint; affected OPS-006-T03 criteria remain open. The next failed-backup notification exercise should use the existing installation with a bounded fault and recovery steps, preserving real backup data and verified-success history.
+**Owner decisions, October 1, 2026:** [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) omits new fresh-installation restore drills, backup/key failure exercises, and recurring full-restoration scheduling from Phase 1A. Previous isolated recovery results remain historical evidence. OPS-006-T03 is deferred and does not block the 1A gate. [ADR-017](../03-decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits elapsed-time proof of the full 14/8/6 retention horizon; it does not change the configured policy or claim that its complete retention history has been demonstrated. The next failed-backup notification exercise should use the existing installation with a bounded fault and recovery steps, preserving real backup data and verified-success history.
 
 ## Evidence conventions
 
@@ -57,7 +59,7 @@ Read-only implementation assessment of source revision `39ae809259ed4d9d7611af31
 | [Prometheus](../../infrastructure/monitoring/prometheus.yaml) now has five jobs; [Alloy](../../infrastructure/monitoring/config.alloy) collects host logs, not attributed pod logs; Grafana has data sources only | Replaced mixed proposed/current observability table; corrected scrape inventory | DEV-004/005, OPS-003/007: logs, resource usage, PostgreSQL/app telemetry and scoped views |
 | Backlog records selected backup RPO/RTO/retention and partial SMTP/backup receipt while summary pages still called all undefined/unverified | Requirements, infrastructure, topology and monitoring summaries now reference selected policy and current evidence | Full scenario acceptance and precise measurements remain open; historical checks are not promoted |
 | [Backup runner](../../operations/backup/scripts/backup-platform.py) implements exact readback, verified-only retention, service-stop recovery and independent backup state without an ADR | ADR-015 records bundle scope, exclusions and integrity/restore distinction; removed reference to deleted manual SQL helper | OPS-006/007: remaining failure, restoration and delivery criteria |
-| Generic deployment/recovery text required new isolated environments and additional watchdog monitoring after owner decisions excluded them | Added ADR-010 scope to recovery/upgrade guidance and replaced stale watchdog-observer requirement with ADR-011 limitation | Deferred fresh-restore criteria stay open; independent watchdog observer is excluded, not an unfinished task |
+| Generic deployment/recovery text required new isolated environments and additional watchdog monitoring after owner decisions excluded them | Added ADR-010 scope to recovery/upgrade guidance and replaced stale watchdog-observer requirement with ADR-011 limitation | ADR-016 omits fresh-restore exercises from Phase 1A; independent watchdog observer is excluded, not an unfinished task |
 | ADR-002 still called k3d proposed, ADR-005 suggested direct Docker checks, and ADR index rows 010/011 fell outside its table | Added dated implementation notes without rewriting accepted decisions; repaired index and added records 012–015 | New source-derived records require owner acceptance; language/provider/IAM choices retain existing status |
 
 These ADR additions document implemented tradeoffs rather than infer owner approval. Existing accepted ADRs are preserved. Validation for this review (local checkout, Python 3.14.7):
@@ -73,7 +75,7 @@ This index lists execution tasks, not story completion promises. Task details an
 
 | Gate | Tasks |
 |---|---|
-| 1A | OPS-006-T01, OPS-006-T02, OPS-006-T03, OPS-007-T01 |
+| 1A | OPS-006-T01, OPS-006-T02, OPS-007-T01 |
 | 1B | OPS-001-T01, OPS-001-T02, OPS-002-T01, OPS-004-T01 |
 | 1C | DEV-002-T01, DEV-003-T01, DEV-003-T02, DEV-004-T01, DEV-005-T01, DEV-006-T01, DEV-007-T01, DEV-010-T01, DEV-011-T01, OPS-003-T01, PLAN-001 |
 | 2 | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003, PLAN-004, PLAN-005 |
@@ -142,7 +144,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [ ] **DEV-003-T01 · 1C** — Implement separate secret create/replace/remove and authorized binding; prove values stay out of configuration views, logs and audit, and deny foreign-project read/write. Prerequisites: OPS-004-T01; OPS-001-T01; PLAN-001.
-- [ ] **DEV-003-T02 · 1C** — Version and rotate a secret; observe adoption and successful reconnection before revoking the old version; restore new secret state in an isolated recovery exercise. Prerequisites: DEV-003-T01; DEV-006-T01; OPS-006-T03.
+- [ ] **DEV-003-T02 · 1C** — Version and rotate a secret; observe adoption and successful reconnection before revoking the old version; include the new secret state in backup coverage. Prerequisites: DEV-003-T01; DEV-006-T01; OPS-006-T02.
 - [ ] **DEV-003-T03 · Deferred** — Assign and rotate secrets per component and report adoption for every affected component without disclosing values. Prerequisites: DEV-001-T02; DEV-003-T02.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source partial; generated [Secret bindings](../../platform/app/manifests.py), redacted normal API responses/generic errors, and [cluster secret encryption](../../scripts/cluster_config.py) exist. User secret objects/references, authorized CRUD, rotation/adoption and comprehensive redaction tests are absent; local acceptance unverified (EV-01/02 are limited foundations). Changing `DATABASE_KEY` changes derived passwords, but [database provisioning](../../platform/app/main.py) only creates missing roles and does not update existing passwords: rotation must coordinate roles and Secrets. T03 — deferred, source absent, local unverified.
@@ -280,7 +282,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [ ] **DEV-010-T01 · 1C** — Bind managed database settings/secrets; demonstrate application write/read, denied cross-project database access and data preservation across redeployment. Prerequisites: PLAN-001; OPS-004-T01; OPS-001-T01.
-- [ ] **DEV-010-T02 · 2** — Expose data-service availability and a tracked recovery request; demonstrate operator review, isolated/controlled restoration and developer-visible outcome without exposing foreign-project data. Prerequisites: DEV-010-T01; OPS-006-T03; DEV-006-T01.
+- [ ] **DEV-010-T02 · 2** — Expose data-service availability and a tracked recovery request; demonstrate operator review, a documented controlled recovery procedure, and a developer-visible outcome without exposing foreign-project data. Prerequisites: DEV-010-T01; DEV-006-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source partial: [API provisioning](../../platform/app/main.py) creates dedicated non-superuser logins/databases and bindings use `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`, not the draft configurable `DB_*` prefix. Each runtime login owns its database; runtime/migration/human role separation is absent. The provisioner uses PostgreSQL `postgres` and cluster-wide Kubernetes permissions. Database preservation and CONNECT restrictions exist in source, but application write/read and live isolation remain unverified; smoke uses `http-echo`, and isolation was inspected, not run. T02 — source absent and local unverified for developer availability/recovery requests. Resolve ADR-003 role separation when implementing the binding/recovery design.
 
@@ -320,7 +322,7 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-001-T01 · 1B** — Implement durable redacted audit records for mutations, failures and grant changes; include actor/time/action/target/result and scope/revision/operation when available; define retention/tamper protection and enforce restricted access. Prerequisites: OPS-007-T01; OPS-006-T03.
+- [ ] **OPS-001-T01 · 1B** — Implement durable redacted audit records for mutations, failures and grant changes; include actor/time/action/target/result and scope/revision/operation when available; define retention/tamper protection and enforce restricted access. Prerequisites: OPS-007-T01; OPS-006-T02.
 - [ ] **OPS-001-T02 · 1B** — Inspect project permissions, workload security and network policies; filter/export audit by time; prove developers cannot alter records and exports contain no secrets. Prerequisites: OPS-001-T01; OPS-004-T01.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source absent for durable actor-attributed audit, restricted inspection/export and retention/tamper controls; latest project status and generic logs are insufficient. Local acceptance unverified. Record authentication/denial/grant changes with mutations, and release the access boundary together with OPS-004-T01.
@@ -419,14 +421,14 @@ Acceptance criteria:
 Phase tasks:
 
 - [x] **OPS-006-T01 · 1A** — Inventory databases, roles, state, config, secrets and service-state recovery needs; record storage, encryption/key recovery, schedule, retention/access, RPO/RTO and replacement-host decisions. Prerequisites: Installation inventory and operator-selected storage/targets.
-- [ ] **OPS-006-T02 · 1A** — Automate bounded non-overlapping scheduled capture, encryption, off-host transfer and verified readback; test failure/overdue/stalled/missing signals independently of heartbeat, retention and access controls; failed uploads never advance success time. Prerequisites: OPS-006-T01; OPS-007-T01.
-- [ ] **OPS-006-T03 · 1A** — Recover onto an empty isolated installation without the original host; verify data/permissions/workloads/ingress/monitoring and actual alert receipt against RPO/RTO; exercise unavailable/corrupt backup and key failures; record recurring exercise schedule. Prerequisites: OPS-006-T02.
+- [x] **OPS-006-T02 · 1A** — Automate bounded non-overlapping scheduled capture, encryption, off-host transfer and verified readback; test failure/overdue/stalled/missing signals independently of heartbeat, and verify scoped retention/access controls; failed uploads never advance success time. Full 14/8/6 elapsed-time retention evidence is omitted from Phase 1A by ADR-017. Prerequisites: OPS-006-T01; OPS-007-T01.
+- [ ] **OPS-006-T03 · Deferred** — Exercise recovery onto an empty isolated installation without the original host; verify data/permissions/workloads/ingress/monitoring and actual alert receipt against RPO/RTO; exercise unavailable/corrupt backup and key failures. Schedule only through a later explicit scope decision or an actual recovery event. Prerequisites: OPS-006-T02; ADR-016 revision or recovery event.
 
 #### Current backup and recovery progress
 
 As of September 27, 2026, the following criterion-level progress supersedes older
 baseline/implementation-only notes below. Parent task IDs and prerequisites are
-unchanged; OPS-006-T02/T03 remain open for the outstanding criteria. OPS-006-T01 is complete within the accepted single-environment lab scope.
+unchanged; OPS-006-T01/T02 are complete within the accepted single-environment lab scope. OPS-006-T03 is deferred by ADR-016.
 
 - [x] **T01 — Policy and scope:** documented SQL/roles/catalog, original configuration/secrets, Caddy/Grafana state, exclusions, S3 destination, encryption, twelve-hour schedule, 14/8/6 retention, 24-hour RPO and four-hour RTO targets.
 - [x] **T01 — Independent recovery access:** existing S3 credentials and repository password successfully opened the repository from the fresh recovery VM.
@@ -440,14 +442,14 @@ unchanged; OPS-006-T02/T03 remain open for the outstanding criteria. OPS-006-T01
 - [x] **T02 — Overdue backup notification and recovery:** the operator supplied a passed drill/recovery report and confirmed both BACKUP DOWN (`overdue`) and subsequent BACKUP UP emails on September 28, 2026. See overdue drill completion evidence below.
 - [x] **T02 — Repository integrity and snapshot inventory:** operator listed four `developer-platform,verified` snapshots for `node-01` and ran `platform-restic check` successfully on September 28, 2026.
 - [x] **T02 — Repository access controls:** operator confirmed root-only modes on September 28, 2026: backup directory and configured restic wrapper `0700`; S3 credential and repository-password files `0600`; all owned by `root:root`.
-- [ ] **T02 — Remaining operational acceptance:** long-horizon retention evidence for the 14 daily, 8 weekly, and 6 monthly policy.
+- **T02 — Accepted limitation:** [ADR-017](../03-decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits elapsed-time proof of the 14 daily, 8 weekly, and 6 monthly policy from Phase 1A. The configured policy and scoped retention implementation remain in operation; full-horizon behavior is not demonstrated.
 - **T02 — Accepted limitation (September 28, 2026):** [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md) removes the missing-update/local-monitoring-outage backup exercise from lab acceptance. The lab has no live evidence that external backup notifications continue while local monitoring is down.
 - [x] **T03 — Fresh isolated restore:** playbook restored SQL, source/configuration and service volumes from S3 into a fresh Ubuntu VM without reading the source host during restoration.
 - [x] **T03 — Historical SQL marker:** an independent pre-backup receipt matched the restored record through a Kubernetes test pod using the project Secret.
 - [x] **T03 — Recovered service checks:** API/catalog, selected project rollout, HTTP ingress, project database authentication/write/read, denied catalog CONNECT privilege, Prometheus targets and Grafana database health passed.
-- [ ] **T03 — Remaining acceptance:** recovery notification receipt, precise RPO/RTO measurements, production DNS/TLS and application-level database transactions. The lab recovery review is scheduled quarterly; routine fresh-VM restores remain deferred under ADR-010.
+- **T03 — Deferred scope:** recovery notification receipt, precise RPO/RTO measurements, production DNS/TLS, application-level database transactions, and recurring fresh-VM restoration are outside Phase 1A under ADR-016.
 
-**P-2026-09-28 — Recovery failure preflight and cadence prepared:** [check-recovery-failure-modes.yml](../../operations/backup/ansible/check-recovery-failure-modes.yml) runs selected unavailable-endpoint, wrong-password, and missing-password checks on the explicitly provisioned WSL recovery VM. It uses `restic snapshots --no-lock`, expects each negative case to fail, writes no repository state, removes temporary credentials, and fetches a non-secret report. The operator review cadence is the first Saturday of January, April, July, and October; full fresh-VM restores remain deliberately unscheduled under ADR-010. Live execution evidence is recorded below.
+**P-2026-09-28 — Historical recovery failure preflight and cadence:** [check-recovery-failure-modes.yml](../../operations/backup/ansible/check-recovery-failure-modes.yml) runs selected unavailable-endpoint, wrong-password, and missing-password checks on an explicitly provisioned WSL recovery VM. It uses `restic snapshots --no-lock`, expects each negative case to fail, writes no repository state, removes temporary credentials, and fetches a non-secret report. This tooling and its prior cadence are historical reference material; ADR-016 removes the exercises and recurring full restores from Phase 1A.
 
 **E-2026-09-28 — Recovery failure preflight passed:** The operator ran the playbook on `recovery_vm` after entering S3 credentials and the existing repository password. All three selected negative cases (`unavailable-endpoint`, `wrong-password`, `missing-password`) produced the expected failure, the assertion passed, and the temporary credential directory was removed. The fetched non-secret report is timestamped `2026-09-28T20:27:19Z` and records `repository_write_mode: disabled (--no-lock)`. This establishes the selected storage and credential failure behavior, not corruption, a full restore, or recovery-notification receipt.
 
@@ -670,7 +672,7 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-008-T01 · 2** — Preview project workloads/routes/credentials/databases/backups; record explicit project-specific retention/deletion decisions and confirmation invalidated by scope changes. Prerequisites: DEV-011-T01; OPS-004-T01; OPS-006-T03.
+- [ ] **OPS-008-T01 · 2** — Preview project workloads/routes/credentials/databases/backups; record explicit project-specific retention/deletion decisions and confirmation invalidated by scope changes. Prerequisites: DEV-011-T01; OPS-004-T01; OPS-006-T02.
 - [ ] **OPS-008-T02 · 2** — Revoke project access/credentials and remove selected resources; inject partial failures, retry without affecting other projects, and audit all retained/deleted resources and outcomes. Prerequisites: OPS-008-T01; OPS-001-T01.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source absent for scoped project retirement, inventory/confirmation, credential revocation and audited retryable cleanup. Whole-lab teardown cannot satisfy these workflows. Local acceptance unverified; prerequisites include retained data inventory, individual access and tested recovery.
@@ -755,10 +757,10 @@ These are **imported results**, executed during the September 26 assessment at t
 |---|---|---|---|
 | EV-01 · PLAN-001/002, DEV-008-T01, OPS-005-T01/02 | `python3 -m unittest discover -s tests -v` | Passed: 3 tests. | Name validation, generated namespace/network structure, and selected workload hardening/quota settings. |
 | EV-02 · PLAN-001, DEV-003-T01 | `python3 -m compileall -q platform scripts operations/watchdog/scripts` | Passed. | Python syntax compilation; not dependency import or service execution. |
-| EV-03 · PLAN-001, OPS-006-T02/03 | `bash -n scripts/up.sh scripts/down.sh` | Passed. | Shell syntax. |
+| EV-03 · PLAN-001, OPS-006-T02 | `bash -n scripts/up.sh scripts/down.sh` | Passed. | Shell syntax. |
 | EV-04 · PLAN-001, DEV-005-T01, OPS-003-T01 | `docker compose config --quiet` | Passed. | Compose configuration resolves using the assessed checkout's configuration; no services started. |
 | EV-05 · Documentation maintenance | Local Markdown link scan after guidance update | Passed: no broken relative file targets across 38 root/component/current-docs/watchdog Markdown files; the nine earlier broken occurrences are fixed. | Relative file-target existence, excluding fenced code, external URLs, and fragment validation. |
-| EV-06 · OPS-006-T03, PLAN-001 | Current operations code examples | Passed: `bash -n` for 22 shell blocks; embedded catalog-reapply Python parsed successfully. | Syntax only. No startup, shutdown, SQL backup/import, catalog replay, or alert exercise was executed. |
+| EV-06 · OPS-006-T02, PLAN-001 | Current operations code examples | Passed: `bash -n` for 22 shell blocks; embedded catalog-reapply Python parsed successfully. | Syntax only. No startup, shutdown, SQL backup/import, catalog replay, or alert exercise was executed. |
 | EV-07 · OPS-007-T01 | `php operations/watchdog/tests/watchdog.php` | Passed. | Heartbeat and scheduler freshness boundary checks. |
 | EV-08 · OPS-007-T01 | `php -d curl.cainfo=<unused temporary certificate path> -d sendmail_path=/bin/true operations/watchdog/tests/watchdog-mail.php` | Passed: seven SMTP scenarios plus validation/legacy transport checks. | Local fixture verifies STARTTLS/implicit TLS, authentication/recipient/data failures, missing TLS, certificate mismatch, invalid settings, and simulated PHP mail handoff. No real email is sent. Expected failure cases emit diagnostic logs. |
 | EV-09 · OPS-007-T01 | `php -l` on tracked watchdog PHP source and tests | Passed: 10 files. | PHP syntax; excludes private local configuration and does not establish database integration. |
@@ -793,7 +795,7 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | N-02 | DEV-007-T01/02, PLAN-003, DEV-011-T01, OPS-008-T02 |
 | N-03 | OPS-004-T01 and authorization checks on every later data surface |
 | N-04 | DEV-003-T01/02 and redaction checks on every later data surface |
-| N-05 | OPS-006-T01/02/03 and recovery checks whenever persisted state grows |
+| N-05 | OPS-006-T01/02; reassess the documented recovery procedure whenever persisted state grows |
 | N-06 | OPS-007-T01/02 |
 | N-07 | OPS-003-T01/02, OPS-005-T01/02 |
 | N-08 | OPS-001-T01/02 and audit checks on every later mutation/access change |

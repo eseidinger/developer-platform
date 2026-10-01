@@ -93,6 +93,6 @@ Rollback restores a known workload and configuration revision. It does not autom
 
 ## Platform upgrade
 
-Pause or safely drain jobs before incompatible schema changes, back up metadata, and define migration/rollback checks. ADR-010 currently defers any check requiring a new isolated environment; keep that acceptance open until the owner revises the constraint. After upgrading, test the API, authorization, providers, and a representative workflow. The rollback path must account for both software and metadata schema.
+Pause or safely drain jobs before incompatible schema changes, back up metadata, and define migration/rollback checks. ADR-010 defers routine checks requiring a new isolated environment, while ADR-016 excludes them from Phase 1A; a future exercise requires an explicit owner decision. After upgrading, test the API, authorization, providers, and a representative workflow. The rollback path must account for both software and metadata schema.
 
 Release evidence includes artifact, spec/code revision, migrations, timestamp, executor, operation ID, and result. See [Runbook](runbook.md) and [Backup and recovery](backup-recovery.md).

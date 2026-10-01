@@ -36,7 +36,7 @@ Phase 3 adds developer experience and access extensions; Phase 4 adds AI assista
 | N-02 | Make provisioning idempotent and resumable after partial failures | Phase 1 (MVP) | Database creation succeeds, deployment fails, retry creates no duplicates |
 | N-03 | Enforce project/environment boundaries server-side | Phase 1 (MVP) | Negative tests for resources, logs, secrets, jobs, and database access |
 | N-04 | Reference, protect, and redact secrets | Phase 1 (MVP) | Spec/audit/log inspection; rotation followed by reconnection |
-| N-05 | Make infrastructure and recovery reproducible | Phase 1 (MVP) | Rebuild and isolated restore from an external backup |
+| N-05 | Make infrastructure and recovery reproducible | Phase 1 (MVP) | Encrypted off-host capture, verified readback, independently recoverable credentials, and a documented replacement-host procedure; isolated recovery exercises are deferred by ADR-016 |
 | N-06 | Keep monitoring available during workload-cluster failure; detect host failure externally | Phase 1 (MVP) | k3d failure and separate host/heartbeat failure tests |
 | N-07 | Keep single-host operation within available resources | Phase 1 (MVP) | Load measurement including log growth, database, and reserve; no swap/disk exhaustion |
 | N-08 | Audit changes, role assignments, and provider operations | Phase 1 (MVP) | Correlate actor, target, revision, timestamp, result, and operation ID |
