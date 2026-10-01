@@ -6,17 +6,20 @@ Execution tracking: use the [phase task index and acceptance checkboxes](deliver
 
 ## Goal
 
-Evolve the working hybrid path into a reliable control plane and execute the same use case directly on Docker.
+Evolve the working hybrid path into a Kotlin/Spring application catalog, Quarkus control plane, and Python automation workers, then execute the same use case directly on Docker.
 
 ## Work packages
 
 1. Compare the actual API with [ApplicationSpec](../02-architecture/application-spec.md); implement the schema, OpenAPI contract, and versioning rules, including explicit request/limit resource semantics needed by scaling and policy tasks.
 2. Model capabilities and service profiles per environment. Remove backend-specific fields from the public contract.
-3. Harden persistent jobs, revisions, concurrent updates, retries, drift handling, and deletion plans.
-4. Add a Docker adapter alongside Kubernetes; reuse database and observability providers.
-5. Build provider contract tests and integration tests for partial failures.
-6. Decide [ADR-006](../03-decisions/ADR-006-python-quarkus-evolution.md) after code analysis. If migration is chosen, treat parity and state migration as separate work packages.
-7. Complete the fit-gap assessment in the [ADR index](../03-decisions/README.md) before stabilizing the schema.
+3. Define versioned Catalog ↔ Control Plane and Control Plane ↔ Python worker contracts, including stable IDs, permission/catalog versions, immutable job envelopes, structured results, events, idempotency, redaction, and correlation IDs.
+4. Extract the Kotlin/Spring Application Catalog. Migrate application metadata and grants with reconciliation, authorization parity, backup/restore, a single-writer cutover, and a tested rollback path.
+5. Implement the Quarkus control plane and migrate desired revisions, jobs, runtime state, policy, and events. Pass public-contract and behavior parity for success, denial, conflict, partial failure, resume, audit, and rollback before routing traffic to it.
+6. Separate Python workers behind durable dispatch. Use scoped provider credentials and prove safe interruption, duplicate delivery, stale authorization handling, timeout observation, and result redaction.
+7. Harden persistent jobs, revisions, concurrent updates, retries, drift handling, and deletion plans.
+8. Add a Docker adapter alongside Kubernetes; reuse database and observability provider contracts implemented by Python workers.
+9. Build catalog, control-plane, worker, provider, and end-to-end contract tests for partial failures and unavailable dependencies.
+10. Complete the fit-gap assessment in the [ADR index](../03-decisions/README.md) before stabilizing the schema.
 
 ## Retained backlog packages before provider acceptance
 
@@ -31,7 +34,9 @@ Include new revisions, jobs, audit, identities, secrets and retention inventorie
 
 ## Acceptance
 
-Deploy, update, observe, and remove the same portable application in two environments. Unsupported capabilities produce clear errors before side effects. Worker interruption and concurrent updates cause neither duplicate resources nor lost revisions.
+Create and authorize an application through the catalog; deploy, update, observe, and remove the same portable application through the control plane in two environments. Unsupported capabilities produce clear errors before side effects. Worker interruption and concurrent updates cause neither duplicate resources nor lost revisions.
+
+Cross-service acceptance traces a request from actor and catalog/grant version through desired revision, operation, Python job, provider resources, result, and event. Catalog or worker unavailability produces bounded, visible behavior. No service reads another service's tables, and cutover/rollback preserves stable IDs and authoritative state.
 
 Every retained backlog package above must have criterion-level evidence, including denied access, failure injection and retained-data checks. No deferred multi-component story closes through these single-image tests.
 

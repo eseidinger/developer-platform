@@ -696,11 +696,11 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. Docker hosts shared services but is not a direct application compute provider. No portable provider contract or reproducible provider comparison harness exists (F-07/UC-05).
 
-- [ ] **PLAN-005 · 2** — Record ADR-006 language decision; if migration is selected, create separately gated parity/state-migration tasks before execution. A decision alone does not prove migration complete. Prerequisites: Code/effort analysis before contract stabilization.
+- [ ] **PLAN-005 · 2** — Implement the ADR-006 transition as separately gated packages: versioned catalog/control-plane/worker contracts; Kotlin catalog metadata/grant migration; Quarkus control-plane contract and state parity; Python durable worker separation; single-writer cutovers; backup/restore and rollback. Prove cross-service authorization, audit correlation, interruption/idempotency, and stable-ID reconciliation before retiring the corresponding FastAPI path. Prerequisites: PLAN-001; PLAN-002; code/effort analysis before contract stabilization.
 
-  **Task evidence (B-2026-09-26):** Decision open (ADR-006); local implementation-language parity/migration acceptance unverified. The existing Python vertical slice is the baseline; Quarkus and a mixed-service control plane are not selected. Documentation-only changes do not accept an ADR.
+  **Task evidence (B-2026-09-26):** At this baseline the decision was open and local implementation-language parity/migration acceptance was unverified. The existing Python vertical slice remains the implementation baseline. ADR-006 accepted the target roles on October 1, 2026; that documentation decision supplies no implementation, migration, or acceptance evidence.
 
-- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the same API for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail server-side. Prerequisites: Phase 2 gate.
+- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned catalog and control-plane APIs for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail in the responsible service. Prerequisites: Phase 2 gate.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. REST/curl and interactive API docs are not a domain CLI or self-service portal; no UI/API compatibility journey exists.
 

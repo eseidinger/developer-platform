@@ -10,6 +10,9 @@ The available Ubuntu host has **16 vCPUs and 32 GB RAM**. The hybrid design runs
 |---|---|---|
 | Edge | Caddy in Docker outside k3d; implemented and selected | Public TLS, platform routing, application forwarding, and API-gated on-demand certificates |
 | Platform API | Docker; implemented | Synchronous admin provisioning and latest project spec/status; durable worker remains proposed |
+| Target application catalog | Docker placement proposed; not implemented | Kotlin/Spring Boot service for application metadata, ownership, environments, dependencies, and grants |
+| Target control plane | Docker placement proposed; not implemented | Quarkus service for deployment intent, policy, operations, runtime status, and events |
+| Target automation workers | Docker placement proposed; not implemented | Python execution of approved provider operations with scoped credentials |
 | Identity provider | Dedicated service; Keycloak proposed | Authentication and client identities |
 | PostgreSQL | Docker outside k3d, persistent volume | Platform metadata and separate project databases |
 | Workload compute | k3d with project namespaces; implemented | Applications, services, secrets, and Traefik ingress; environment model remains proposed |
@@ -43,13 +46,13 @@ A possible **planning baseline**, not a measurement or capacity guarantee:
 | Host, Docker, and base processes | 3 GiB |
 | PostgreSQL | 5 GiB |
 | Monitoring/logging | 4 GiB |
-| Platform API, worker, and identity provider | 3 GiB |
+| Catalog, control plane, workers, and identity provider | 3 GiB |
 | k3d system components | 3 GiB |
 | Application workloads | 9 GiB |
 | Reserve | 5 GiB |
 | Total | 32 GiB |
 
-Measure actual usable memory on the host: “32 GB” and “32 GiB” are not equivalent. Reduce budgets accordingly. Also constrain and measure CPU, I/O, connections, and log growth.
+The 3 GiB service allocation predates implementation of the three-service target and is only a placeholder. Measure idle, peak, and failure/retry behavior for each JVM service and Python worker before accepting it or reduce workload capacity/reserve explicitly. Measure actual usable memory on the host: “32 GB” and “32 GiB” are not equivalent. Also constrain and measure CPU, I/O, connections, and log growth.
 
 All local components share one host failure domain. The host sender does not directly inspect the Docker daemon or deliver a local notification; failed API/Prometheus checks stop its heartbeat. The external watchdog detects expiry, including during host loss. Broader host checks remain target work. The operator has reported receipt for heartbeat, selected Alertmanager and backup scenarios; see [current monitoring evidence](../04-development/delivery-backlog.md#current-monitoring-progress).
 

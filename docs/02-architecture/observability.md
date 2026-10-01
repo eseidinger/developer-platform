@@ -30,7 +30,7 @@ PostgreSQL exporter metrics, application request/error/latency signals, workload
 
 Operators should see host, Docker, cluster, database, certificates, storage, jobs and monitoring. Developers should see only authorized applications and logs/health/metrics. Shared dashboard links cannot enforce this boundary. Introduce server-side authorization before exposing those views.
 
-Target telemetry uses stable project, environment and application IDs, deployment revisions and operation IDs. Current probe labels use project/application name, namespace and URL; there are no environment/revision/operation IDs. Avoid unbounded request IDs in metric labels; use structured logs/trace context for requests.
+Target telemetry uses stable project, environment and application IDs plus catalog version, deployment revision, operation ID, job ID, and provider resource IDs. Propagate trace context across Catalog → Control Plane → Python worker calls and events. Each service exposes health, error, latency, dependency, saturation, and queue/job-age signals; dashboards distinguish catalog, policy/coordination, and provider-execution failures. Current probe labels use project/application name, namespace and URL; there are no environment/revision/operation IDs. Avoid unbounded request, operation, or job IDs in metric labels; use structured logs/trace context for them.
 
 ## Status and operational evidence
 

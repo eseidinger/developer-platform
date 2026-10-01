@@ -6,12 +6,12 @@ Execution tracking: use the [phase task index and acceptance checkboxes](deliver
 
 ## Goal
 
-Offer the API-based lifecycle as understandable self-service. Angular is a portal technology candidate; the final selection remains open.
+Offer the catalog and control-plane lifecycle as understandable self-service. Angular is a portal technology candidate; the final selection remains open.
 
 ## Work packages
 
-- Provide a portal for projects, applications, deployments, redacted configuration, logs, and operations.
-- Provide a CLI using the same contract, with understandable errors and progress.
+- Provide a portal that uses the catalog for application metadata/ownership and the control plane for deployments, redacted configuration, logs, and operations; do not reproduce either service's authorization rules in the UI.
+- Provide a CLI over the same versioned public contracts, with understandable errors and progress.
 - Create a web-application/PostgreSQL template, preferably as one deployable artifact.
 - Resolve the ADR-004 implementation decision, then automate OIDC clients and redirect URIs for hosted applications. F-10 remains a Phase 3 requirement while the implementation choice is open; deferring that requirement requires an explicit scope amendment.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.

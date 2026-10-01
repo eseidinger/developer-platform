@@ -4,13 +4,13 @@ Status: **v1alpha1 contract draft**, including environment, health, deletion pro
 
 ## Difference from the current API
 
-The implemented [project contract](../../platform/README.md#project-specification) is JSON with `name`, `image`, optional `port` and `probe_profile`, submitted to `PUT /projects/{name}`. It has no schema version, environments, optional resource selection, configurable bindings or grants. PostgreSQL is always provisioned; bindings use `PG*` variables. PUT returns 200 after resource application and stores only the latest spec/status, rather than a revision and asynchronous operation ID.
+The implemented [project contract](../../platform/README.md#project-specification) is JSON with `name`, `image`, optional `port` and `probe_profile`, submitted to `PUT /projects/{name}`. It has no schema version, environments, optional resource selection, configurable bindings, or catalog-backed identity and authorization. PostgreSQL is always provisioned; bindings use `PG*` variables. PUT returns 200 after resource application and stores only the latest spec/status, rather than a revision and asynchronous operation ID.
 
 Unknown request fields are currently ignored by Pydantic's default behavior. Images are not resolved to digests. The stricter validation, capability rejection and secret references below are target requirements; sending this YAML or adding its fields to a current project request does not implement them. A versioned migration remains PLAN-002 work. See [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
 
 ## Purpose and scope
 
-A spec describes the desired state of an application in a project/environment: workload, required resources, configuration, and access. The server produces observed status separately. Docker networks, Kubernetes namespaces, and PostgreSQL server addresses are outside this contract.
+A spec describes the desired runtime state of a catalog application in a catalog project/environment: workload, required resources, bindings, and configuration. The control plane produces observed status separately. Application ownership, membership, and grants are catalog operations, not fields that a deployment spec can mutate. Docker networks, Kubernetes namespaces, and PostgreSQL server addresses are outside this contract.
 
 The first profile supports one OCI image, one HTTP endpoint, and optional PostgreSQL. Object storage, messaging, cache, autoscaling, and multiple components are later capabilities. Unknown fields and unsupported capabilities must not be silently ignored.
 
@@ -25,7 +25,6 @@ metadata:
   name: price-service
   project: procurement
   environment: dev
-  owner: team-a
 spec:
   application:
     runtime:
@@ -63,30 +62,18 @@ spec:
     bindings:
       - resource: database
         as: DB
-  access:
-    humans:
-      - subject:
-          type: group
-          name: developers
-        role: developer
-    machines:
-      - subject:
-          type: application
-          name: reporting-service
-        permissions:
-          - resource: database
-            actions: [read]
 ```
 
-The final grant requires an existing application identity in the same project/environment. It is allowed only if the submitter can manage access and the provider can correctly enforce database read permissions, including future objects. Otherwise, the spec is rejected.
+Before accepting the spec, the control plane resolves the project, environment, and application to stable catalog IDs and verifies the caller's current deployment grant. A dependency or machine-to-resource grant, such as allowing `reporting-service` to read the database, is created through the catalog contract and enforced by the control-plane/provider path; it is not smuggled into a deployment update.
+
+Catalog relationships are descriptive and do not provision anything by themselves. The `resources` and `bindings` sections request their environment-specific runtime realization; the control plane rejects a request that conflicts with catalog relationships, authorization, or platform policy.
 
 ## Fields and semantics
 
 | Field | Meaning |
 |---|---|
 | `apiVersion`, `kind` | Explicit schema family and version |
-| `metadata.name/project/environment` | Stable resource identity; cannot move scopes through a rename after creation |
-| `metadata.owner` | Ownership metadata, not an automatic permission grant |
+| `metadata.name/project/environment` | Human-readable catalog references resolved to stable IDs; a deployment cannot create, rename, or move those catalog records |
 | `application.runtime` | Portable executable artifact |
 | `endpoints` | Named HTTP targets; `internal` describes network exposure, not authentication |
 | `scaling` | Equal limits specify a fixed instance count; different limits require autoscaling capability |
@@ -97,16 +84,15 @@ The final grant requires an existing application identity in the same project/en
 | `configuration.values` | Non-secret string values |
 | `configuration.secrets` | References to authorized secret objects, never plaintext values |
 | `bindings` | Inject a resource into the runtime under a defined prefix |
-| `access.humans/machines` | Permission assignments; internally normalizable to Principal–Resource–Action |
 
 The example produces `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB_PASSWORD`. Binding names are stable; values can change during rotation or migration. Credentials are delivered only to the authorized workload, never returned in status.
 
 ## Validation and authorization
 
 1. Check schema version, required fields, unique names, positive resource values, and valid ports.
-2. Check project/environment against request scope and permissions. The spec is not an authority source.
-3. Resolve secret, resource, and principal references; disallow implicit cross-project bindings.
-4. A `developer` can change deployments but cannot grant additional access. Changes to `access` require separate administrative permissions.
+2. Resolve application/project/environment through the catalog and check its versioned permission facts. The spec is not an identity or authority source.
+3. Resolve secret and resource references; disallow implicit cross-project bindings.
+4. A `developer` can change deployments but cannot grant additional access. Ownership, membership, dependency, and grant changes use separate authorized catalog operations.
 5. Check capabilities, quotas, service profiles, and resource limits. A shared-database profile does not promise a hard storage quota per database.
 6. Check binding prefixes and configuration/secret target names for collisions.
 7. Generate a plan and new revision; identical specs are semantically idempotent.
@@ -119,6 +105,6 @@ The draft currently exposes one CPU/memory budget. It does not yet define separa
 
 Status includes at least `desiredRevision`, `observedRevision`, `phase`, `conditions`, `operationId`, and authorized endpoint information. Conditions carry timestamps, reasons, and redacted messages. Secret values and administrative provider credentials are excluded.
 
-Breaking changes require a new schema version and migration path. Multi-component support needs a separate contract design; the existing `application` object must not silently become a list. The future `principals/grants` model is a possible next version, not a second simultaneously valid syntax.
+Breaking changes require a new schema version and migration path. Multi-component support needs a separate contract design; the existing `application` object must not silently become a list. The catalog's principals/grants model is a separate versioned contract, not a second syntax inside ApplicationSpec.
 
 Core decision: [ADR-001](../03-decisions/ADR-001-platform-api-abstraction.md). Permissions: [Security](security.md). UI/API options: [ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).

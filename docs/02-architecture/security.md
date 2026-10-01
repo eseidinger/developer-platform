@@ -14,7 +14,9 @@ Workload manifests enforce non-root/read-only execution, quotas and NetworkPolic
 
 ## Trust boundaries
 
-Identity, platform permissions, and application business permissions remain separate. A central OIDC provider authenticates people and clients. The Platform API decides permissions within Organization → Project → Environment → Resource scopes. Hosted applications decide their own business roles.
+Identity, platform permissions, and application business permissions remain separate. A central OIDC provider authenticates people and clients. The target Application Catalog owns organization/project/environment membership, ownership, and grant facts. The Catalog and Platform API each enforce those facts for their own endpoints; the Platform API also enforces deployment and infrastructure policy. Hosted applications decide their own business roles.
+
+Catalog-to-control-plane calls use a service identity and return stable IDs plus versioned permission facts, not reusable user credentials. Accepted operations record the actor and authorization/catalog versions used. Long-running or destructive work revalidates authorization before a material change. Python workers receive only the approved operation and scoped provider credentials; they cannot grant access or broaden the plan.
 
 Platform users do not automatically receive Kubernetes access. The provisioner uses separate infrastructure credentials with the smallest practical scope and operation set.
 

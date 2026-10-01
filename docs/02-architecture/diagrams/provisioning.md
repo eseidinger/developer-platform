@@ -37,28 +37,36 @@ Process termination can leave `provisioning`. Early dependency failures may prev
 ```mermaid
 sequenceDiagram
     actor Dev as Developer
-    participant API as Platform API
-    participant State as Platform State
-    participant Worker as Reconciler
+    participant Catalog as Application Catalog (Kotlin/Spring)
+    participant API as Control Plane (Quarkus)
+    participant State as Control-plane State
+    participant Worker as Automation Worker (Python)
     participant DB as DatabaseProvider
     participant Sec as SecretProvider
     participant Compute as ComputeProvider
-    Dev->>API: Spec and expected revision
-    API->>API: Authorize, validate, check capabilities
+    Dev->>Catalog: Create/update application metadata or grants
+    Catalog-->>Dev: Stable application/environment IDs + catalog version
+    Dev->>API: Spec, catalog IDs, and expected revision
+    API->>Catalog: Resolve identity and current permission facts
+    Catalog-->>API: Versioned metadata and authorization facts
+    API->>API: Enforce authorization, policy, and capabilities
     API->>State: Atomically store spec revision and job
     API-->>Dev: 202 with operation ID
-    Worker->>State: Lease job
+    API->>Worker: Dispatch immutable job envelope
     Worker->>DB: Ensure database and role
     DB-->>Worker: Stable resource ID / credential reference
-    Worker->>State: Persist step
+    Worker-->>API: Persist structured step result
     Worker->>Sec: Ensure binding
     Worker->>Compute: Ensure workload
     alt Workload ready
         Compute-->>Worker: Health and observed revision
-        Worker->>State: RUNNING and conditions
+        Worker-->>API: Completed result and observations
+        API->>State: RUNNING, conditions, and provider IDs
+        API-->>Catalog: Deployment summary event
     else Provider failure
         Compute-->>Worker: Error or unknown outcome
-        Worker->>State: Error, retry state, and existing resources
+        Worker-->>API: Redacted error, retry state, existing resources
+        API->>State: Persist failure and retry decision
         Note over Worker,DB: The provisioned database is retained
     end
     Dev->>API: Read operation
@@ -66,4 +74,4 @@ sequenceDiagram
     API-->>Dev: Progress or redacted failure reason
 ```
 
-Routing and observability are also resumable steps; they are condensed here for readability. After a timeout, the worker observes provider state before attempting creation again.
+Routing and observability are also resumable steps; they are condensed here for readability. After a timeout, the worker observes provider state before attempting creation again. The worker cannot change the desired revision or expand the plan. Destructive work triggers control-plane reauthorization against the catalog before dispatch or commit.

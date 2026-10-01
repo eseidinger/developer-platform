@@ -20,7 +20,7 @@ Development support follows using project knowledge from documentation, ADRs, AP
 
 ## Tool contract
 
-Read-only MCP tools: `get_application`, `get_deployments`, `get_logs`, `get_metrics`, `get_events`, `get_dependencies`, and `get_configuration`. They call the Platform API within the authorized scope and limit time windows and result size.
+The operations/AI implementation is a Python responsibility. Read-only MCP tools include `get_application`, `get_deployments`, `get_logs`, `get_metrics`, `get_events`, `get_dependencies`, and `get_configuration`. Catalog-owned metadata is read through the catalog API; runtime and operational data is read through the Platform API. Both services enforce the caller's scope and limit time windows and result size.
 
 Write tools such as `deploy`, `rollback`, `restart`, `scale`, and `update_configuration` are introduced only after 4.4. No tool receives unfiltered Docker/Kubernetes access. The MCP implementation and model selection remain open.
 

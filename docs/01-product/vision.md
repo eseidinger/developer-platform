@@ -15,7 +15,7 @@ The core promise is: **I describe what my application needs; the platform provis
 | Software architect | Evaluate implementation options through reproducible labs |
 | Tech lead | Understand project ownership, dependencies, and standards |
 
-The platform also serves as a cohesive reference and portfolio project. Python, Java/Quarkus, Angular, Docker, Kubernetes, and later AI demonstrate concrete responsibilities and justified decisions. Technology variety is not an acceptance criterion.
+The platform also serves as a cohesive reference and portfolio project. Kotlin/Spring Boot for the application catalog, Java/Quarkus for the control plane, Python for automation and operations, plus the portal, Docker, Kubernetes, and later AI demonstrate concrete responsibilities and justified decisions. Technology variety is not an acceptance criterion, and the target split is accepted only through functional and migration evidence.
 
 ## Product boundaries
 

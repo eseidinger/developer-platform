@@ -1,6 +1,6 @@
 # Development Plan and Architectural Evolution
 
-As of September 27, 2026. Future phases are proposals without confirmed dates.
+As of October 1, 2026. Future phases are proposals without confirmed dates.
 
 ## Architectural evolution
 
@@ -15,6 +15,7 @@ As of September 27, 2026. Future phases are proposals without confirmed dates.
 | September 24, 2026 | UI/API deployment options and technology-independent Platform API | Shared contract and provider abstraction |
 | September 24, 2026 | AI focus on operations/development; ApplicationSpec defined | Extensions above the same API |
 | September 25, 2026 | Structured documentation established | Separate architecture, decisions, and planning |
+| October 1, 2026 | Kotlin/Spring catalog, Quarkus control plane, and Python automation roles selected | Target ownership boundaries accepted; staged implementation and migration remain open |
 
 ## Implementation status
 
@@ -36,20 +37,34 @@ flowchart LR
 
 | Phase | Entry condition | Outcome / dependency |
 |---|---|---|
-| [1](phase-1-foundation.md) | Access to actual code and target host | 1A operational protection, 1B accountable access/security alerts, 1C durable lifecycle and minimal API/CLI |
-| [2](phase-2-platform-api.md) | Reproducible vertical slice | Retained diagnostics/policy/recovery/retirement packages, stable contract and direct Docker parity |
-| [3](phase-3-developer-experience.md) | Reliable lifecycle and authorization | Portal, templates, human database access, application OIDC |
-| [4](phase-4-ai-operations.md) | Access-controlled data and deployment history | Evidence-based assistance and controlled actions |
+| [1](phase-1-foundation.md) | Access to actual code and target host | 1A operational protection, 1B accountable access/security alerts, 1C durable lifecycle and minimal API/CLI, with target ownership seams in the Python baseline |
+| [2](phase-2-platform-api.md) | Reproducible vertical slice | Stable catalog/control-plane/worker contracts, gated service migration, retained packages, and direct Docker parity |
+| [3](phase-3-developer-experience.md) | Reliable lifecycle, authorization, and migrated public contracts | Portal, templates, human database access, application OIDC across catalog and control-plane APIs |
+| [4](phase-4-ai-operations.md) | Access-controlled data and deployment history | Python-based evidence assistance and controlled actions through the control plane |
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their acceptance minimum by that phase’s exit; later extensions do not defer it.
 
 Basic access enforcement, audit, secrets, and observability start in Phase 1. Phase 3 extends these capabilities rather than removing them from the MVP.
 
+## Technology transition
+
+[ADR-006](../03-decisions/ADR-006-python-quarkus-evolution.md) fixes the target responsibilities but does not prove an implementation. The current FastAPI service remains the operational baseline until each replacement is demonstrably safe. The transition follows these gates:
+
+| Gate | Phase | Required result |
+|---|---|---|
+| Logical seams | 1C | Stable catalog IDs and permission facts are separated from deployment revisions, operations, provider execution, and observed state, even if one Python deployment still implements them. Persisted jobs use a versioned envelope/result model. |
+| Catalog extraction | 2 | Kotlin/Spring Boot owns migrated application metadata and grants through a versioned API. Reconciliation proves record counts/IDs and authorization behavior; backup/restore and rollback are tested before it becomes the writer. |
+| Control-plane migration | 2 | Quarkus accepts the technology-independent contract and owns desired revisions, policy, operations, runtime state, and events. Contract tests and shadow/parity comparison cover success, denial, conflict, failure, and recovery before traffic moves. |
+| Worker separation | 2 | Python workers execute only bounded, idempotent jobs with scoped credentials. Interruption, duplicate delivery, stale authorization, timeouts, and result redaction pass acceptance. |
+| Provider portability | 2 | Kubernetes and Docker adapters pass the same provider contract and end-to-end lifecycle evidence after the service split. |
+
+Use one authoritative writer per data type at every migration step. Prefer backfill, compare, cut over, and retain a bounded rollback path over permanent dual writes. Correlate actor, catalog version, desired revision, operation ID, job ID, and provider resource IDs across services. Extend monitoring and recovery coverage before retiring the corresponding FastAPI path.
+
 ## Backlog delivery commitments
 
 The [delivery backlog](delivery-backlog.md) preserves all 19 permanent DEV/OPS IDs and their acceptance criteria. Its [phase task index](delivery-backlog.md#phase-task-index) assigns independently checkable tasks to one gate each, including provider, developer-experience and AI work. Stories may span gates; task completion and story completion are recorded separately. This plan supersedes the former six-milestone plan. No story is dropped or marked complete by this amendment.
 
-Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Design and local implementation may overlap, but do not release expanded self-service before 1A and 1B pass. Phase 2 completes the retained single-image backlog and safe project retirement before the second-provider acceptance gate. Phase 3 and Phase 4 depend on those demonstrated outcomes.
+Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Design and local implementation may overlap, but do not release expanded self-service before 1A and 1B pass. Phase 2 completes the retained single-image backlog and safe project retirement, then passes the service-migration gates before second-provider acceptance. Phase 3 and Phase 4 depend on those demonstrated outcomes.
 
 The table assigns delivery responsibility by role; named delivery owners, dates, and capacity remain unassigned. Alert response is assigned to the project owner under the lab response policy. Assign a named owner before starting each package. Every row is open. A single-image slice does not close criteria that require multiple components.
 
@@ -90,7 +105,7 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 | Topic | Next step | Gate |
 |---|---|---|
 | Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](delivery-backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
-| Python / Quarkus | Decide ADR-006 using code and effort analysis | Phase 2 |
+| Polyglot service rollout | Specify catalog/control-plane/job/event contracts and migration/rollback packages; satisfy ADR-006 transition gates | Logical seams in Phase 1C; extraction and cutover in Phase 2 |
 | Identity provider, roles, and realm model | Explicitly accept the detailed ADR-004 approach | Minimal IAM in Phase 1; expansion in Phase 3 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
 | Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |

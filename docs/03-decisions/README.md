@@ -11,7 +11,7 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 | [003](ADR-003-postgresql-provisioning.md) | PostgreSQL provisioning and human access | Proposed; database/Secret provisioning inspected in source |
 | [004](ADR-004-identity-and-access-management.md) | IAM and separate permission domains | Proposed |
 | [005](ADR-005-observability-watchdog.md) | Monitoring and independent watchdog | Proposed; implementation scope established |
-| [006](ADR-006-python-quarkus-evolution.md) | Python prototype and possible Quarkus evolution | Open |
+| [006](ADR-006-python-quarkus-evolution.md) | Kotlin catalog, Quarkus control plane, and Python automation roles | Accepted target direction October 1, 2026; implementation pending |
 | [007](ADR-007-ui-api-deployment.md) | Combined or separate UI/API deployment | Proposed |
 | [008](ADR-008-ai-assisted-operations.md) | AI for development and operations | Accepted product focus; execution design proposed |
 | [009](ADR-009-edge-and-cluster-ingress.md) | Caddy edge and Traefik cluster ingress | Accepted for hybrid starting profile; operational acceptance open |

@@ -1,15 +1,15 @@
 # Product Roadmap
 
-Status: planning draft as of September 26, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
+Status: planning draft as of October 1, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
 
 | Phase | User outcome | Acceptance gate |
 |---|---|---|
 | [1 – Foundation](../04-development/phase-1-foundation.md) | Deploy and observe an application with PostgreSQL on the hybrid installation | 1A verified recovery/alerts, 1B scoped access/audit/security alerts, and 1C durable lifecycle acceptance |
-| [2 – Platform API](../04-development/phase-2-platform-api.md) | Complete diagnostics, policy, recovery and retirement; use the same contract for Kubernetes and direct Docker | Retained single-image backlog packages, provider parity, capability rejection and concurrency/failure recovery |
+| [2 – Platform API](../04-development/phase-2-platform-api.md) | Extract the Kotlin catalog, Quarkus control plane, and Python workers; complete retained workflows and use the same deployment contract for Kubernetes and direct Docker | Contract/state migration and rollback, cross-service authorization/traceability, retained packages, provider parity, capability rejection and concurrency/failure recovery |
 | [3 – Developer Experience](../04-development/phase-3-developer-experience.md) | Guided self-service, controlled database access, and reusable templates | End-to-end journey with a role-aware interface and server-side access enforcement |
 | [4 – AI Operations and Development](../04-development/phase-4-ai-operations.md) | Explain platform context, investigate incidents, and propose reviewable changes | Evidence-based diagnosis, evaluation, and a controlled write path |
 
-The [amended delivery gates](../04-development/development-plan.md#backlog-delivery-commitments) order Phase 1 as operational protection, accountable access/security alerts, then durable lifecycle. Phase 2 completes diagnostics, policies, recovery and project retirement before provider acceptance. All 19 [backlog stories](../04-development/delivery-backlog.md) remain traceable; component-specific criteria stay deferred until separately scheduled.
+The [amended delivery gates](../04-development/development-plan.md#backlog-delivery-commitments) order Phase 1 as operational protection, accountable access/security alerts, then durable lifecycle with migration-safe ownership seams. Phase 2 completes diagnostics, policies, recovery and project retirement, passes the catalog/control-plane/worker migration gates, and then completes provider acceptance. All 19 [backlog stories](../04-development/delivery-backlog.md) remain traceable; component-specific criteria stay deferred until separately scheduled.
 
 Phase 1 is the MVP (minimum viable product), comprising all three gates 1A–1C. MVP is not a separate delivery stage.
 
