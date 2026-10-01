@@ -1,6 +1,6 @@
 # Developer Platform: Technology Roles and Service Boundaries
 
-Status: integrated into the target [architecture overview](docs/02-architecture/overview.md), [software architecture](docs/02-architecture/software-architecture.md), [ADR-006](docs/03-decisions/ADR-006-python-quarkus-evolution.md), and [development plan](docs/04-development/development-plan.md) on October 1, 2026. Those documents are authoritative for boundaries, sequencing, and acceptance; this file retains the originating summary.
+Status: integrated into the target [architecture overview](overview.md), [software architecture](software-architecture.md), [ADR-006](../03-decisions/ADR-006-python-quarkus-evolution.md), and [development plan](../04-development/development-plan.md) on October 1, 2026. Those documents are authoritative for boundaries, sequencing, and acceptance; this page retains the originating summary as an architecture reference.
 
 This document describes the intended division of responsibilities in the Developer Platform. The platform uses each language and framework where its strengths fit the workload: **Kotlin + Spring Boot** for application data and domain rules, **Java + Quarkus** for the platform runtime and control plane, and **Python** for infrastructure automation and operations. These are architectural roles; individual services can be introduced as the platform grows.
 

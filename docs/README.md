@@ -7,7 +7,7 @@ Reviewed against source on September 27, 2026. This documentation covers the pro
 | Area | Key question | Documents |
 |---|---|---|
 | Product | Who are we building for, and why? | [Vision](01-product/vision.md), [Use cases](01-product/use-cases.md), [Requirements](01-product/requirements.md), [Roadmap](01-product/roadmap.md) |
-| Architecture | How should the platform work? | [Overview](02-architecture/overview.md), [Infrastructure](02-architecture/infrastructure.md), [Software architecture](02-architecture/software-architecture.md) |
+| Architecture | How should the platform work? | [Overview](02-architecture/overview.md), [Technology roles](02-architecture/technology-roles.md), [Infrastructure](02-architecture/infrastructure.md), [Software architecture](02-architecture/software-architecture.md) |
 | Contract and cross-cutting concerns | What do applications declare, and how are they secured and observed? | [ApplicationSpec](02-architecture/application-spec.md), [Security](02-architecture/security.md), [Observability](02-architecture/observability.md), [Diagrams](02-architecture/diagrams/README.md) |
 | Decisions | Why this approach, and what are the alternatives? | [ADR index](03-decisions/README.md) |
 | Development | What has evolved, and what comes next? | [Development plan](04-development/development-plan.md), [Delivery backlog](04-development/delivery-backlog.md) |

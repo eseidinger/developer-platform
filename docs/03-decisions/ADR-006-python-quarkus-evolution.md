@@ -41,4 +41,4 @@ Implementation language does not change ApplicationSpec or provider domain bound
 
 The platform gains explicit responsibility boundaries and can use each ecosystem where it fits. It also accepts more deployments, versioned contracts, failure modes, service identities, tracing, and operational cost. Catalog availability affects new control-plane acceptance; already accepted operations retain the immutable authorization and catalog context required for safe resumption, subject to revalidation rules for destructive steps.
 
-Implementation is planned through [Phase 1 seams and Phase 2 migration gates](../04-development/development-plan.md#technology-transition). Acceptance of this direction does not mark any service, migration, or parity task complete.
+The [technology roles reference](../02-architecture/technology-roles.md) retains the originating summary. Implementation is planned through [Phase 1 seams and Phase 2 migration gates](../04-development/development-plan.md#technology-transition). Acceptance of this direction does not mark any service, migration, or parity task complete.
