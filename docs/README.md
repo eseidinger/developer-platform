@@ -11,7 +11,7 @@ Reviewed against source on September 27, 2026. This documentation covers the pro
 | Contract and cross-cutting concerns | What do applications declare, and how are they secured and observed? | [ApplicationSpec](02-architecture/application-spec.md), [Security](02-architecture/security.md), [Observability](02-architecture/observability.md), [Diagrams](02-architecture/diagrams/README.md) |
 | Decisions | Why this approach, and what are the alternatives? | [ADR index](03-decisions/README.md) |
 | Development | What has evolved, and what comes next? | [Development plan](04-development/development-plan.md), [Delivery backlog](04-development/delivery-backlog.md) |
-| Operations | How do we deploy, monitor, and recover? | [Deployment](05-operations/deployment.md), [Monitoring](05-operations/monitoring.md), [Backup and recovery](05-operations/backup-recovery.md), [Runbook](05-operations/runbook.md) |
+| Operations | How do we deploy, monitor, recover, and collect Phase 1B access evidence? | [Deployment](05-operations/deployment.md), [Phase 1B access validation](05-operations/phase-1b-access-validation.md), [Monitoring](05-operations/monitoring.md), [Backup and recovery](05-operations/backup-recovery.md), [Runbook](05-operations/runbook.md) |
 
 ## Status and evidence
 

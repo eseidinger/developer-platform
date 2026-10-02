@@ -329,6 +329,8 @@ Phase tasks:
 
 **Source update (October 2, 2026):** The Python baseline now defines an append-only `platform_audit.events` table, redaction, restricted writer/reader roles, a security-definer append function, and mutation/provisioning-failure/authentication-denial/grant-change hooks attributed to immutable OIDC principals. Restricted inspection/export, deployed backup coverage, and controlled live permission checks remain open. This update does not close OPS-001-T01 or T02.
 
+**Local verification (October 2, 2026):** The fresh local lab successfully appended a controlled event through the restricted writer after the audit policy migration; a direct `INSERT` by that writer was denied. This verifies the live append/access boundary only. Actor-attributed endpoint outcomes, time-filtered operator inspection/export, backup coverage, and the other T01/T02 criteria remain open.
+
 
 ### OPS-002 — Receive security event notifications
 
@@ -392,6 +394,8 @@ Phase tasks:
 **Decision update (October 2, 2026):** [ADR-004](../03-decisions/ADR-004-identity-and-access-management.md) accepts a provider-neutral OIDC boundary with Keycloak as the supported lab reference, platform-owned grants, immutable issuer/subject principal keys, and `viewer`, `developer`, `project-admin` and `platform-admin` roles. This resolves the prerequisite design choice but supplies no OPS-004 implementation or acceptance evidence.
 
 **Source update (October 2, 2026):** The Python baseline now validates configured OIDC JWT issuer/signature/audience/lifetime through a generic JWKS verifier, stores principals and project/platform grants in PostgreSQL, and checks those grants on every request. It provides audited grant/revocation endpoints, filters project lists by grants, and records authorization denials; revocation is effective on the next request because no permission cache exists. A Keycloak 26.4.1 Compose reference profile supplies the lab issuer without becoming the authorization source. Deployment, real Keycloak login/JWKS rotation, operator bootstrap, restricted user acceptance, and backup verification remain open. This update does not close OPS-004-T01.
+
+**Local verification (October 2, 2026):** A fresh Keycloak reference realm issued a PKCE Device Authorization token to an individual bootstrap platform administrator; `GET /projects` succeeded. Disposable project A received distinct viewer, developer, and project-admin grants. The individual-role denial/cross-project matrix, platform-grant revocation with an unchanged token, audit correlation, JWKS rotation, and backup verification remain open; OPS-004-T01 stays unchecked.
 
 
 ### OPS-005 — Enforce project policies and quotas

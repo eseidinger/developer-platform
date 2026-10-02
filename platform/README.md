@@ -40,6 +40,9 @@ ID (`sub`) for the first platform administrator. The API writes this one-time gr
 to PostgreSQL and will not recreate it on later starts. Remove the bootstrap setting
 after recording the controlled setup evidence.
 
+For the full local bootstrap, Device Authorization with PKCE, scoped-role, and
+revocation evidence procedure, see the [Phase 1B access-validation runbook](../docs/05-operations/phase-1b-access-validation.md).
+
 ## Create an application
 
 Run commands from the repository root. Export a short-lived access token from the

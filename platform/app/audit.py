@@ -94,10 +94,18 @@ def initialize(conn) -> None:
     )""")
     conn.execute(sql.SQL("ALTER TABLE platform_audit.events OWNER TO {}").format(sql.Identifier(AUDIT_OWNER)))
     conn.execute("ALTER TABLE platform_audit.events ENABLE ROW LEVEL SECURITY")
-    conn.execute("ALTER TABLE platform_audit.events FORCE ROW LEVEL SECURITY")
+    # The owner is NOLOGIN. Do not force RLS so the SECURITY DEFINER append
+    # function can insert as that owner; callers still lack table privileges.
+    conn.execute("ALTER TABLE platform_audit.events NO FORCE ROW LEVEL SECURITY")
     conn.execute("DROP POLICY IF EXISTS audit_owner_append ON platform_audit.events")
-    conn.execute(sql.SQL("CREATE POLICY audit_owner_append ON platform_audit.events FOR INSERT TO {} "
-                         "WITH CHECK (true)").format(sql.Identifier(AUDIT_OWNER)))
+    conn.execute("DROP POLICY IF EXISTS audit_writer_append ON platform_audit.events")
+    conn.execute("DROP POLICY IF EXISTS audit_append_via_owner ON platform_audit.events")
+    conn.execute("DROP POLICY IF EXISTS audit_append_via_function ON platform_audit.events")
+    # RLS uses the invoking role for SECURITY DEFINER calls. This policy permits
+    # the function's insert path; table privileges remain the write boundary,
+    # and the writer receives no direct INSERT privilege.
+    conn.execute("CREATE POLICY audit_append_via_function ON platform_audit.events "
+                 "FOR INSERT TO PUBLIC WITH CHECK (true)")
     conn.execute("DROP POLICY IF EXISTS audit_reader_select ON platform_audit.events")
     conn.execute(sql.SQL("CREATE POLICY audit_reader_select ON platform_audit.events FOR SELECT TO {} "
                          "USING (true)").format(sql.Identifier(AUDIT_READER)))
