@@ -356,6 +356,8 @@ Phase tasks:
 
 **Source update (October 2, 2026):** A restricted audit-reader collector publishes bounded, redacted Prometheus metrics for authentication failures, authorization denials, and successful membership changes. Rules preserve resource labels/severity, point operators to the latest durable audit-event ID, detect a stale collector and Alertmanager delivery failures; Alertmanager groups repeated events by stable resource rather than event ID. The SMTP playbook supplies destination configuration and a FIRING/RESOLVED test procedure. Real destination configuration, receipt, grouping, controlled delivery-failure observation and deployed audit correlation remain required before closing OPS-002-T01.
 
+**Controlled lab progress (October 2, 2026):** The configured SMTP synthetic delivery test succeeded. After repairing the audit collector's PostgreSQL placeholder parsing, controlled authentication-failure, authorization-denial, and privileged-change events fired their corresponding security rules. Record redacted notification receipt, grouped ongoing-incident behavior, delivery-failure visibility, and audit-event correlation before closing T01.
+
 
 ### OPS-003 — Monitor platform capacity
 

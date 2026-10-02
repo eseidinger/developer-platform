@@ -26,7 +26,7 @@ def security_event_rows(conn):
                    CASE
                      WHEN action = 'authentication' AND result = 'denied' THEN 'authentication_failure'
                      WHEN action = 'authorization' AND result = 'denied' THEN 'access_denial'
-                     WHEN action LIKE 'membership.%' AND result = 'succeeded' THEN 'privileged_change'
+                     WHEN action LIKE 'membership.%%' AND result = 'succeeded' THEN 'privileged_change'
                    END AS category
             FROM platform_audit.events
             WHERE occurred_at >= now() - make_interval(secs => %s)

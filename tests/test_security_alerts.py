@@ -17,6 +17,7 @@ class SecurityAlertTests(unittest.TestCase):
         self.assertIn("authentication_failure", query)
         self.assertIn("access_denial", query)
         self.assertIn("privileged_change", query)
+        self.assertIn("membership.%%", query)
         self.assertIn("make_interval", query)
 
     def test_render_uses_resource_labels_not_actor_or_event_detail(self):

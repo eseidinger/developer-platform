@@ -37,8 +37,11 @@ are still required.
   `403` on the next request and the outcomes were correlated with audit records.
 - [x] A platform administrator completed restricted inspection/export and a
   developer was denied operator access; audit export was redacted.
-- [ ] Complete deployed backup coverage, security-alert delivery/grouping, and
-  all remaining OPS-002 acceptance work.
+- [x] The SMTP synthetic delivery test succeeded and controlled authentication,
+  authorization-denial, and privileged-change events fired their security rules.
+- [ ] Complete deployed backup coverage, notification receipt/grouping,
+  delivery-failure visibility, audit correlation, and all remaining OPS-002
+  acceptance work.
 
 ## Bootstrap a fresh local identity service
 
@@ -238,3 +241,89 @@ secret references by name; it never returns secret values. Audit export requires
 an offset-bearing UTC time window no longer than 31 days and is capped at 10,000
 events. Use the JSON export for controlled evidence or `format=csv` for a
 redacted operator export.
+
+## Test security-event notifications
+
+Complete this exercise only after the SMTP destination has been configured using
+the [Alertmanager guide](../../operations/alertmanager/README.md). It supplies
+controlled evidence for OPS-002-T01. Use disposable identities/projects and do
+not copy tokens, Keycloak passwords, raw audit details, or Alertmanager
+configuration into evidence.
+
+### Preflight the audit collector
+
+The API writes the security-event metric file every 30 seconds through its
+restricted audit-reader role. On the deployed host, confirm that the file has a
+fresh collection timestamp before generating events:
+
+```bash
+cd /opt/developer-platform
+docker compose exec -T node-exporter sh -ec \
+  'grep platform_security_audit_collection_success /discovery/security-events.prom'
+```
+
+If this file is absent or the `SecurityAuditCollectionStale` alert is firing,
+repair the collector before continuing. The alert rules cannot prove event
+delivery without a fresh metric source.
+
+### Verify the notification destination
+
+Use the synthetic mail exercise from the Alertmanager guide first. It proves
+SMTP delivery but not the Prometheus security rules:
+
+```bash
+docker compose exec -T alertmanager amtool \
+  --alertmanager.url=http://127.0.0.1:9093 alert add \
+  alertname=PlatformEmailTest job=manual severity=info \
+  --annotation='summary="Operator-requested SMTP delivery test"' \
+  --end="$(date -u -d '+2 minutes' +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+Record receipt of the FIRING and RESOLVED messages. The normal group wait is 30
+seconds; the resolved message follows expiration and the configured group
+interval.
+
+### Generate and verify the security rules
+
+The repeated-failure rules require five matching events in the 15-minute window
+and remain pending for two minutes. Allow one collector cycle and one Prometheus
+scrape before that hold period. Alertmanager groups by alert name and stable
+resource labels, so further matching events should remain one ongoing incident.
+
+1. Generate five authentication failures against the same API target:
+
+   ```bash
+   for n in $(seq 1 5); do
+     curl -sS -o /dev/null -w '%{http_code}\n' \
+       https://platform.example.com/projects
+   done
+   ```
+
+   Substitute the configured platform domain. Each response must be `401`.
+
+2. Sign in as a disposable viewer through the portal, then attempt an
+   unauthorized project-grant change on the same project five times. Each result
+   must be `403`; this generates `RepeatedAccessDenials` without modifying a
+   grant.
+
+3. As a platform administrator, grant or revoke a disposable project role. This
+   creates a `PrivilegedChange` event without the repeated-event threshold.
+
+4. Inspect active rule state from the host:
+
+   ```bash
+   curl -sS http://127.0.0.1:9090/api/v1/alerts
+   ```
+
+   Confirm `RepeatedAuthenticationFailures`, `RepeatedAccessDenials`, and
+   `PrivilegedChange` contain the expected severity and resource labels. Confirm
+   their notifications arrive and that the repeated activity produces one
+   grouped ongoing incident rather than duplicate notifications.
+
+5. Use the portal's restricted audit export for the exact exercise time window.
+   Correlate each alert's resource labels and latest event ID with redacted audit
+   records. Do not retain raw principal IDs or credentials.
+
+The repeated-event alerts clear after their 15-minute event window no longer
+contains five events, plus rule evaluation. Document that delayed resolution;
+do not repeatedly generate denials solely to make the alert persist.

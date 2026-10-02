@@ -59,7 +59,7 @@ On the target, in a root shell:
 cd /opt/developer-platform
 docker compose exec -T alertmanager amtool --alertmanager.url=http://127.0.0.1:9093 alert add \
   alertname=PlatformEmailTest job=manual severity=info \
-  --annotation=summary='Operator-requested SMTP delivery test' \
+  --annotation='summary="Operator-requested SMTP delivery test"' \
   --end="$(date -u -d '+2 minutes' +%Y-%m-%dT%H:%M:%SZ)"
 ```
 
