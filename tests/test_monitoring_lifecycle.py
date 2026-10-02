@@ -56,9 +56,11 @@ class LifecycleTests(unittest.TestCase):
         patches = [patch.dict(os.environ, {
             "MONITORING_DISCOVERY_DIR": self.directory.name,
             "APPS_DOMAIN": "apps.localhost", "POSTGRES_IP": "172.30.80.10",
-            "PLATFORM_TOKEN": "a" * 32, "DATABASE_KEY": "b" * 32}),
+            "PLATFORM_TOKEN": "a" * 32, "DATABASE_KEY": "b" * 32,
+            "PLATFORM_AUDIT_PASSWORD": "c" * 32}),
             patch.object(main, "connect", return_value=self.catalog),
             patch.object(main, "runtime", self.runtime),
+            patch.object(main, "record_event", return_value=1),
             patch.object(main, "provision_database"), patch.object(main, "apply")]
         self.mocks = [p.start() for p in patches]
         for p in patches:
@@ -122,3 +124,13 @@ class LifecycleTests(unittest.TestCase):
         self.spec["probe_profile"] = "arbitrary"
         self.assertEqual(self.deploy().status_code, 422)
         self.assertEqual(self.catalog.rows, {})
+        rejected = self.mocks[3].call_args
+        self.assertEqual(rejected.args[1:5], ("request.validation", "platform-api", "smoke", "rejected"))
+
+    def test_mutations_and_authentication_denials_are_audited(self):
+        self.assertEqual(self.deploy().status_code, 200)
+        success = self.mocks[3].call_args
+        self.assertEqual(success.args[1:5], ("project.provision", "project", "smoke", "succeeded"))
+        self.assertEqual(self.retire(headers={"Authorization": "Bearer wrong"}).status_code, 401)
+        denied = self.mocks[3].call_args
+        self.assertEqual(denied.args[1:5], ("authentication", "platform-api", None, "denied"))

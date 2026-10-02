@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
       PLATFORM_TOKEN: ${PLATFORM_TOKEN:?Run scripts/init.py}
       DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
+      PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
       KUBECONFIG: /run/platform/kubeconfig

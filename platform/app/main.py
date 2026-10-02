@@ -10,18 +10,22 @@ from contextlib import asynccontextmanager
 import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
 from kubernetes.client.exceptions import ApiException
 from pydantic import BaseModel, Field, field_validator
 
+from .audit import Actor, initialize as initialize_audit, record_event
 from .manifests import resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 
 log = logging.getLogger(__name__)
-auth = HTTPBearer()
+auth = HTTPBearer(auto_error=False)
 runtime = None
 
 def connect():
@@ -32,7 +36,7 @@ def connect():
 @asynccontextmanager
 async def lifespan(app):
     global runtime
-    for key in ("PLATFORM_TOKEN", "DATABASE_KEY"):
+    for key in ("PLATFORM_TOKEN", "DATABASE_KEY", "PLATFORM_AUDIT_PASSWORD"):
         if len(os.environ.get(key, "")) < 32:
             raise RuntimeError(key + " must contain at least 32 characters")
     with connect() as conn:
@@ -40,6 +44,7 @@ async def lifespan(app):
         conn.execute("""CREATE TABLE IF NOT EXISTS projects (
             name TEXT PRIMARY KEY, spec JSONB NOT NULL, status TEXT NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+        initialize_audit(conn)
     config.load_kube_config()
     runtime = dynamic.DynamicClient(ApiClient())
     stop = threading.Event()
@@ -53,9 +58,43 @@ async def lifespan(app):
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 
-def admin(credentials: HTTPAuthorizationCredentials = Depends(auth)):
-    if not hmac.compare_digest(credentials.credentials, os.environ["PLATFORM_TOKEN"]):
+def best_effort_audit(actor: Actor, action: str, target_kind: str, target_id: str | None,
+                      result: str, scope=None, detail=None):
+    try:
+        return record_event(actor, action, target_kind, target_id, result, scope, detail)
+    except Exception:
+        # Do not include backend error text: it may contain a credential or provider detail.
+        log.error("Could not record audit event action=%s result=%s", action, result)
+        return None
+
+
+def required_audit(actor: Actor, action: str, target_kind: str, target_id: str | None,
+                   result: str, scope=None, detail=None):
+    if best_effort_audit(actor, action, target_kind, target_id, result, scope, detail) is None:
+        raise HTTPException(503, "Operation outcome requires an audit record; verify state before retrying")
+
+
+def admin(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(auth)) -> Actor:
+    if not credentials or not hmac.compare_digest(credentials.credentials, os.environ["PLATFORM_TOKEN"]):
+        best_effort_audit(Actor("anonymous", None), "authentication", "platform-api", None, "denied",
+                          detail={"reason": "invalid_or_missing_bearer"})
         raise HTTPException(401, "Invalid administrator token")
+    actor = Actor("legacy-shared-token", "platform-admin-token")
+    request.state.audit_actor = actor
+    return actor
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_error(request: Request, exc: RequestValidationError):
+    actor = getattr(request.state, "audit_actor", None)
+    if actor and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
+        target_id = request.path_params.get("name")
+        if best_effort_audit(actor, "request.validation", "platform-api", target_id, "rejected",
+                             detail={"reason": "request_validation"}) is None:
+            return JSONResponse(status_code=503, content={
+                "detail": "Rejected request requires an audit record; retry after audit service recovery"
+            })
+    return await request_validation_exception_handler(request, exc)
 
 class Project(BaseModel):
     name: str
@@ -103,15 +142,17 @@ def ready():
         raise HTTPException(503, "Dependency unavailable")
     return {"status": "ready"}
 
-@app.get("/projects", dependencies=[Depends(admin)])
-def projects():
+@app.get("/projects")
+def projects(actor: Actor = Depends(admin)):
     with connect() as conn:
         rows = conn.execute("SELECT name, spec, status FROM projects ORDER BY name").fetchall()
     return [{"name": name, "spec": spec, "status": status} for name, spec, status in rows]
 
-@app.put("/projects/{name}", dependencies=[Depends(admin)])
-def provision(name: str, project: Project):
+@app.put("/projects/{name}")
+def provision(name: str, project: Project, actor: Actor = Depends(admin)):
     if name != project.name:
+        required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
+                       {"reason": "path_name_mismatch"})
         raise HTTPException(400, "Path and project name must match")
     try:
         with connect() as conn:
@@ -134,9 +175,13 @@ def provision(name: str, project: Project):
                 raise
             finally:
                 conn.execute("SELECT pg_advisory_unlock(731904)")
-    except Exception:
+    except Exception as exc:
+        required_audit(actor, "project.provision", "project", name, "failed", {"project": name},
+                       {"error_type": type(exc).__name__})
         log.error("Project reconciliation failed: %s", name)
         raise HTTPException(503, "Provisioning failed; retry the same PUT. Existing data is retained.")
+    required_audit(actor, "project.provision", "project", name, "succeeded", {"project": name},
+                   {"status": "applied", "image": project.image})
     return {"name": name, "status": "applied", "namespace": "project-" + name,
             "host": name + "." + os.environ["APPS_DOMAIN"]}
 
@@ -144,14 +189,18 @@ class Retirement(BaseModel):
     confirm_name: str
 
 
-@app.post("/projects/{name}/retire", dependencies=[Depends(admin)])
-def retire(name: str, confirmation: Retirement):
+@app.post("/projects/{name}/retire")
+def retire(name: str, confirmation: Retirement, actor: Actor = Depends(admin)):
     """Acknowledge manual workload removal; retain catalog, database, and role."""
     if name != confirmation.confirm_name:
+        required_audit(actor, "project.retire", "project", name, "rejected", {"project": name},
+                       {"reason": "confirmation_mismatch"})
         raise HTTPException(400, "Confirmation must match the project name")
     try:
         validate_name(name)
     except ValueError:
+        required_audit(actor, "project.retire", "project", name, "rejected", {"project": name},
+                       {"reason": "invalid_name"})
         raise HTTPException(400, "Invalid project name")
     try:
         with connect() as conn:
@@ -170,11 +219,18 @@ def retire(name: str, confirmation: Retirement):
                 publish_catalog(conn)
             finally:
                 conn.execute("SELECT pg_advisory_unlock(731904)")
-    except HTTPException:
+    except HTTPException as exc:
+        required_audit(actor, "project.retire", "project", name,
+                       "rejected" if exc.status_code < 500 else "failed", {"project": name},
+                       {"status_code": exc.status_code})
         raise
-    except Exception:
+    except Exception as exc:
+        required_audit(actor, "project.retire", "project", name, "failed", {"project": name},
+                       {"error_type": type(exc).__name__})
         log.error("Project retirement failed: %s", name)
         raise HTTPException(503, "Retirement incomplete; retry the same request. Existing data is retained.")
+    required_audit(actor, "project.retire", "project", name, "succeeded", {"project": name},
+                   {"status": "retired", "data_retained": True})
     return {"name": name, "status": "retired", "data_retained": True}
 
 

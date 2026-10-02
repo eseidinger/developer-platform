@@ -31,6 +31,11 @@ In the interactive documentation, use **Authorize** to supply the token.
 The token grants administrative access to all projects; do not distribute it to
 application users. The API does not return database passwords in project responses.
 
+This administrator boundary is transitional. The API now records its mutations,
+provisioning failures and rejected authentication through the durable audit boundary
+described below; individual OIDC identities and project-scoped roles remain Phase 1B
+work and replace this shared token before self-service is released.
+
 ## Create an application
 
 Run commands from the repository root. Load the local settings into a trusted shell:
@@ -212,6 +217,7 @@ updates and apply relevant settings to `.env` explicitly.
 | `EDGE_BIND_IP` | Proxy bind address; default `127.0.0.1`, public host setting `0.0.0.0` |
 | `PLATFORM_TOKEN` | Admin API token; at least 32 characters |
 | `DATABASE_KEY` | Master secret for deterministic project passwords; at least 32 characters |
+| `PLATFORM_AUDIT_PASSWORD` | Password for the restricted audit-event writer; at least 32 characters |
 | `POSTGRES_PASSWORD` | PostgreSQL administrator password |
 | `GRAFANA_PASSWORD` | Initial Grafana admin password |
 | `PLATFORM_SUBNET` | Private Docker subnet; default `172.30.80.0/24` |
@@ -226,6 +232,32 @@ previously provisioned project resources until they are reapplied. Updating
 The API's internal `POSTGRES_HOST` and `KUBECONFIG` settings are supplied by
 [its Compose module](compose.yaml). Bootstrap generates the controller kubeconfig
 in `.runtime/controller.kubeconfig` and mounts it read-only into the API container.
+
+## Audit records and retention
+
+At startup, the API creates `platform_audit.events` and the no-login owner, reader,
+and writer database roles. API event writes use only the writer login, which can call
+the security-definer append function but has no table read, update, delete, truncate,
+or schema privileges. The table rejects update, delete, and truncate statements.
+Project database roles cannot connect to the `platform` database, and the API exposes
+no audit-record endpoint in this stage. OPS-001-T02 will add restricted operator
+inspection and time-filtered export.
+
+Event details recursively redact password, secret, token, authorization, credential,
+cookie, and key fields; bearer/basic credential strings are redacted as well. Store
+only stable actor identifiers, target/scope, action, result, and safe failure type;
+never put raw HTTP headers, access tokens, database passwords, or provider exception
+text into an event.
+
+The current retention policy is append-only with no automatic pruning: records remain
+online until an owner-approved retention procedure is introduced, and the scheduled
+encrypted platform backup captures the database state. This deliberately favors
+investigation durability over an unverified deletion job. PostgreSQL superusers and
+host/root operators remain a trusted administrative boundary and can bypass ordinary
+database controls; off-host encrypted backups and restricted host access are the
+current tamper-evidence and recovery safeguards. Record a controlled live check of
+the append-only permissions, backup coverage, and storage growth before closing
+OPS-001-T01.
 
 ## Troubleshooting
 
@@ -258,6 +290,7 @@ defines the workload resources and can be tested without a live cluster. [app/mo
 From the repository root:
 
 ```bash
+python3 -m pip install -r platform/requirements-dev.txt
 python3 -m unittest discover -s tests -v
 python3 -m compileall -q platform scripts
 bash -n scripts/up.sh scripts/down.sh

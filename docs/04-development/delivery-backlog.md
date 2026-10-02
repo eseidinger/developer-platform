@@ -327,6 +327,8 @@ Phase tasks:
 
 **Task evidence (B-2026-09-26):** T01/T02 — source absent for durable actor-attributed audit, restricted inspection/export and retention/tamper controls; latest project status and generic logs are insufficient. Local acceptance unverified. Record authentication/denial/grant changes with mutations, and release the access boundary together with OPS-004-T01.
 
+**Source update (October 2, 2026):** The Python baseline now defines an append-only `platform_audit.events` table, redaction, a restricted writer role/security-definer append function, and mutation/provisioning-failure/authentication-denial event hooks. It records the legacy shared-token credential identity, not individual users; grant changes, OIDC identities, restricted inspection/export, deployment, backup coverage, and controlled live permission checks remain open. This update does not close OPS-001-T01 or T02.
+
 
 ### OPS-002 — Receive security event notifications
 

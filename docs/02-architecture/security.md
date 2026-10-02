@@ -4,7 +4,7 @@ Status: implemented administrator boundary followed by the accepted ADR-004 secu
 
 ## Current security boundary
 
-One shared `PLATFORM_TOKEN` authorizes all project operations; it provides neither user attribution nor project-scoped access. Health/readiness, OpenAPI/docs and the certificate gate are unauthenticated. No durable security audit exists. The following role model is a target, not a current permission matrix.
+One shared `PLATFORM_TOKEN` authorizes all project operations; it provides neither user attribution nor project-scoped access. Health/readiness, OpenAPI/docs and the certificate gate are unauthenticated. Source now contains an append-only, redacted `platform_audit.events` boundary for authenticated mutations, provisioning failures and authentication denials, but it still records the shared credential rather than an individual. Its deployment and operational acceptance are unverified. The following role model is a target, not a current permission matrix.
 
 The provisioner connects as PostgreSQL `postgres`. Its Kubernetes ServiceAccount has cluster-wide get/list/create/patch/update permissions for the allowed resource kinds, including namespaces, Secrets and Deployments. RBAC does not restrict it to `project-*` names. It has no delete verb or mounted Docker socket, but it remains privileged infrastructure. The external controller uses a long-lived token Secret; bootstrap also enables Kubernetes Secret encryption. See [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
 
