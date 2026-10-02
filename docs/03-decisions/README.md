@@ -9,7 +9,7 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 | [001](ADR-001-platform-api-abstraction.md) | Technology-independent API and provider abstraction | Accepted principle; implementation details proposed |
 | [002](ADR-002-docker-vs-kubernetes.md) | Docker, hybrid, or Kubernetes | Accepted hybrid starting topology; expansion sequence proposed |
 | [003](ADR-003-postgresql-provisioning.md) | PostgreSQL provisioning and human access | Proposed; database/Secret provisioning inspected in source |
-| [004](ADR-004-identity-and-access-management.md) | Generic OIDC with Keycloak reference deployment and platform-owned authorization | Accepted October 2, 2026; implementation pending |
+| [004](ADR-004-identity-and-access-management.md) | Generic OIDC with Keycloak reference deployment and platform-owned authorization | Accepted October 2, 2026; source implementation, deployment acceptance pending |
 | [005](ADR-005-observability-watchdog.md) | Monitoring and independent watchdog | Proposed; implementation scope established |
 | [006](ADR-006-python-quarkus-evolution.md) | Kotlin catalog, Quarkus control plane, and Python automation roles | Accepted target direction October 1, 2026; implementation pending |
 | [007](ADR-007-ui-api-deployment.md) | Combined or separate UI/API deployment | Proposed |

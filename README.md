@@ -18,8 +18,8 @@ External web hosting: PHP/MySQL watchdog ← systemd heartbeat from the host
 - Compose modules for the proxy, persistence, monitoring, and control plane.
 - k3d with one server and two agents; the API listens only on loopback, with
   persistent PostgreSQL data stored outside the cluster.
-- Authenticated admin API: list projects and provision/update them using
-  idempotent PUT requests. Each project gets a database and login, Secret,
+- OIDC-authenticated platform API with individual principals, platform-owned
+  project grants, revocation, and redacted audit events. Each project gets a database and login, Secret,
   Namespace, Deployment, Service, Ingress, Quota, LimitRange, and NetworkPolicy.
 - Unprivileged workloads without Kubernetes API tokens, with read-only root
   filesystems and restricted network access.
@@ -29,10 +29,9 @@ External web hosting: PHP/MySQL watchdog ← systemd heartbeat from the host
   [application availability monitoring](infrastructure/monitoring/README.md).
 
 This is a working foundation for administration and lab use on a single host.
-A self-service portal, OIDC/Keycloak, tenant-specific user permissions, automated
-deletion workflows, and an asynchronous provisioning worker are not yet implemented.
-The admin API and its Kubernetes ServiceAccount are privileged infrastructure
-components. Never share the admin token with project users.
+A self-service portal, automated deletion workflows, and an asynchronous
+provisioning worker are not yet implemented. The API and its Kubernetes
+ServiceAccount remain privileged infrastructure components.
 
 See the [platform guide](platform/README.md) for API usage, project lifecycle,
 application requirements, configuration, and troubleshooting.
@@ -47,14 +46,23 @@ k3d containers.
 ```bash
 python3 scripts/init.py
 python3 scripts/install-k3d.py
+# Create the initial Keycloak user and set its immutable ID as PLATFORM_BOOTSTRAP_SUBJECT in .env.
+docker compose up -d postgres keycloak-db-init keycloak proxy
 bash scripts/up.sh
 python3 scripts/smoke.py
 ```
 
 `init.py` generates random secrets in a private `.env` file excluded from version
-control. It does not overwrite an existing configuration. k3d is installed locally
+control. It does not overwrite existing values. k3d is installed locally
 within the project with checksum verification. Bootstrap leaves the default
 kubectl context unchanged; the admin kubeconfig is in `.runtime/admin.kubeconfig`.
+
+Sign in to [identity.localhost](http://identity.localhost) as Keycloak `admin`
+with `KEYCLOAK_ADMIN_PASSWORD` from `.env`, create the initial individual user in
+the `platform` realm, and set that user's **ID** as `PLATFORM_BOOTSTRAP_SUBJECT`.
+The first API startup turns it into the one platform-admin grant; remove the setting
+afterward. The reference `platform-cli` client requires PKCE or device authorization
+and issues access tokens for audience `platform-api`.
 
 Locally, the proxy binds only to 127.0.0.1. The API is available at
 [localhost:8000/docs](http://localhost:8000/docs); Grafana is available at
@@ -71,10 +79,11 @@ not that the application is ready; the smoke test also checks the rollout.
 ## Create a project
 
 ```bash
-# Load the token from .env in a trusted shell:
-eval "$(python3 scripts/env.py)"
+# Export a short-lived OIDC access token obtained through the configured Keycloak realm.
+# It is deliberately not stored in .env.
+export PLATFORM_ACCESS_TOKEN='…'
 curl --fail-with-body -X PUT http://127.0.0.1:8000/projects/hello \
-  -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
   -H 'Content-Type: application/json' --data-binary @examples/project.json
 ```
 
@@ -150,7 +159,7 @@ Current procedures: [deployment and lifecycle](docs/05-operations/deployment.md)
 
 ```bash
 docker compose config --quiet
-python3 -m pip install -r tests/requirements.txt
+python3 -m pip install -r platform/requirements-dev.txt
 python3 -m unittest discover -s tests -v
 python3 scripts/check-monitoring.py
 python3 -m unittest discover -s operations/backup/tests -v

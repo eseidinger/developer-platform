@@ -1,6 +1,6 @@
 # ADR-004 – Central Identity, Separate Authorization
 
-Created: September 25, 2026. Accepted: October 2, 2026. Status: **Accepted; implementation pending**.
+Created: September 25, 2026. Accepted: October 2, 2026. Status: **Accepted; source implementation exists, deployment acceptance pending**.
 
 ## Context
 
@@ -47,6 +47,6 @@ Reject invalid signature, issuer, audience and expired/not-yet-valid tokens. Pro
 
 Prove `viewer` cannot mutate, `developer` cannot retire projects or manage grants, `project-admin` cannot cross project boundaries, and only `platform-admin` can administer all project grants. Verify application roles cannot create platform permissions, platform roles do not grant hosted-application business access, service identities cannot impersonate people, and no audit or export contains a bearer token or secret claim.
 
-Record the exact reference-provider version, realm/client configuration, redirect URIs, key-rotation behavior, backup coverage and controlled lab acceptance evidence before closing Phase 1B. Accepting this ADR does not complete OPS-001, OPS-002 or OPS-004.
+Source now contains the provider-neutral JWT verifier, platform-owned grant tables and checks, Keycloak 26.4.1 reference Compose profile, one-time bootstrap grant, and redacted audit hooks. Record the exact deployed provider version, realm/client configuration, redirect URIs, key-rotation behavior, backup coverage and controlled lab acceptance evidence before closing Phase 1B. This source update does not complete OPS-001, OPS-002 or OPS-004.
 
 Details: [Security](../02-architecture/security.md), [Phase 3](../04-development/phase-3-developer-experience.md).

@@ -1,4 +1,4 @@
-"""Trusted administrator API. Not a public multi-tenant control plane."""
+"""OIDC-authenticated, project-scoped platform API."""
 import hashlib
 import hmac
 import logging
@@ -21,12 +21,17 @@ from kubernetes.client.exceptions import ApiException
 from pydantic import BaseModel, Field, field_validator
 
 from .audit import Actor, initialize as initialize_audit, record_event
+from .authorization import (bootstrap_platform_admin, grant as grant_role, initialize as initialize_authorization,
+                            is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
+                            upsert_principal)
+from .identity import AuthenticationError, Principal, configured_verifier
 from .manifests import resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
 runtime = None
+verifier = None
 
 def connect():
     return psycopg.connect(host=os.environ["POSTGRES_HOST"], dbname="platform",
@@ -35,16 +40,22 @@ def connect():
 
 @asynccontextmanager
 async def lifespan(app):
-    global runtime
-    for key in ("PLATFORM_TOKEN", "DATABASE_KEY", "PLATFORM_AUDIT_PASSWORD"):
+    global runtime, verifier
+    for key in ("DATABASE_KEY", "PLATFORM_AUDIT_PASSWORD"):
         if len(os.environ.get(key, "")) < 32:
             raise RuntimeError(key + " must contain at least 32 characters")
+    verifier = configured_verifier()
     with connect() as conn:
         conn.execute("REVOKE ALL ON DATABASE platform FROM PUBLIC")
         conn.execute("""CREATE TABLE IF NOT EXISTS projects (
             name TEXT PRIMARY KEY, spec JSONB NOT NULL, status TEXT NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
         initialize_audit(conn)
+        initialize_authorization(conn)
+        bootstrap = bootstrap_platform_admin(conn, verifier.issuer)
+    if bootstrap:
+        required_audit(Actor("bootstrap", bootstrap.audit_id), "membership.bootstrap", "platform-grant",
+                       bootstrap.audit_id, "succeeded", {"scope": "platform"}, {"role": "platform-admin"})
     config.load_kube_config()
     runtime = dynamic.DynamicClient(ApiClient())
     stop = threading.Event()
@@ -74,14 +85,47 @@ def required_audit(actor: Actor, action: str, target_kind: str, target_id: str |
         raise HTTPException(503, "Operation outcome requires an audit record; verify state before retrying")
 
 
-def admin(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(auth)) -> Actor:
-    if not credentials or not hmac.compare_digest(credentials.credentials, os.environ["PLATFORM_TOKEN"]):
+def actor_for(principal: Principal) -> Actor:
+    return Actor("oidc", principal.audit_id)
+
+
+def current_principal(request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(auth)) -> Principal:
+    if not credentials:
         best_effort_audit(Actor("anonymous", None), "authentication", "platform-api", None, "denied",
                           detail={"reason": "invalid_or_missing_bearer"})
-        raise HTTPException(401, "Invalid administrator token")
-    actor = Actor("legacy-shared-token", "platform-admin-token")
-    request.state.audit_actor = actor
-    return actor
+        raise HTTPException(401, "Missing bearer token")
+    try:
+        principal = verifier.verify(credentials.credentials)
+    except AuthenticationError:
+        best_effort_audit(Actor("anonymous", None), "authentication", "platform-api", None, "denied",
+                          detail={"reason": "invalid_bearer"})
+        raise HTTPException(401, "Invalid OIDC access token")
+    with connect() as conn:
+        upsert_principal(conn, principal)
+    request.state.audit_actor = actor_for(principal)
+    return principal
+
+
+def require_permission(principal: Principal, permission: str, project: str | None = None) -> None:
+    with connect() as conn:
+        allowed = is_allowed(conn, principal, permission, project)
+    if allowed:
+        return
+    actor = actor_for(principal)
+    required_audit(actor, "authorization", "project" if project else "platform", project, "denied",
+                   {"project": project} if project else {"scope": "platform"}, {"permission": permission})
+    raise HTTPException(403, "Not authorized for this operation")
+
+
+def require_platform_admin(principal: Principal) -> None:
+    with connect() as conn:
+        allowed = is_platform_admin(conn, principal)
+    if allowed:
+        return
+    actor = actor_for(principal)
+    required_audit(actor, "authorization", "platform", None, "denied", {"scope": "platform"},
+                   {"permission": "platform-admin"})
+    raise HTTPException(403, "Platform administrator permission is required")
 
 
 @app.exception_handler(RequestValidationError)
@@ -143,13 +187,15 @@ def ready():
     return {"status": "ready"}
 
 @app.get("/projects")
-def projects(actor: Actor = Depends(admin)):
+def projects(principal: Principal = Depends(current_principal)):
     with connect() as conn:
-        rows = conn.execute("SELECT name, spec, status FROM projects ORDER BY name").fetchall()
+        rows = projects_for_principal(conn, principal)
     return [{"name": name, "spec": spec, "status": status} for name, spec, status in rows]
 
 @app.put("/projects/{name}")
-def provision(name: str, project: Project, actor: Actor = Depends(admin)):
+def provision(name: str, project: Project, principal: Principal = Depends(current_principal)):
+    actor = actor_for(principal)
+    require_permission(principal, "change", name)
     if name != project.name:
         required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
                        {"reason": "path_name_mismatch"})
@@ -178,7 +224,7 @@ def provision(name: str, project: Project, actor: Actor = Depends(admin)):
     except Exception as exc:
         required_audit(actor, "project.provision", "project", name, "failed", {"project": name},
                        {"error_type": type(exc).__name__})
-        log.error("Project reconciliation failed: %s", name)
+        log.error("Project reconciliation failed: %s (%s)", name, type(exc).__name__)
         raise HTTPException(503, "Provisioning failed; retry the same PUT. Existing data is retained.")
     required_audit(actor, "project.provision", "project", name, "succeeded", {"project": name},
                    {"status": "applied", "image": project.image})
@@ -190,8 +236,10 @@ class Retirement(BaseModel):
 
 
 @app.post("/projects/{name}/retire")
-def retire(name: str, confirmation: Retirement, actor: Actor = Depends(admin)):
+def retire(name: str, confirmation: Retirement, principal: Principal = Depends(current_principal)):
     """Acknowledge manual workload removal; retain catalog, database, and role."""
+    actor = actor_for(principal)
+    require_permission(principal, "retire", name)
     if name != confirmation.confirm_name:
         required_audit(actor, "project.retire", "project", name, "rejected", {"project": name},
                        {"reason": "confirmation_mismatch"})
@@ -227,11 +275,87 @@ def retire(name: str, confirmation: Retirement, actor: Actor = Depends(admin)):
     except Exception as exc:
         required_audit(actor, "project.retire", "project", name, "failed", {"project": name},
                        {"error_type": type(exc).__name__})
-        log.error("Project retirement failed: %s", name)
+        log.error("Project retirement failed: %s (%s)", name, type(exc).__name__)
         raise HTTPException(503, "Retirement incomplete; retry the same request. Existing data is retained.")
     required_audit(actor, "project.retire", "project", name, "succeeded", {"project": name},
                    {"status": "retired", "data_retained": True})
     return {"name": name, "status": "retired", "data_retained": True}
+
+
+class ProjectGrant(BaseModel):
+    issuer: str = Field(min_length=1, max_length=2048)
+    subject: str = Field(min_length=1, max_length=1024)
+    role: Literal["viewer", "developer", "project-admin"]
+    display_name: str | None = Field(default=None, max_length=512)
+
+
+class GrantReference(BaseModel):
+    issuer: str = Field(min_length=1, max_length=2048)
+    subject: str = Field(min_length=1, max_length=1024)
+
+
+class PlatformGrant(ProjectGrant):
+    role: Literal["platform-admin"]
+
+
+@app.put("/projects/{name}/grants")
+def put_project_grant(name: str, grant: ProjectGrant, principal: Principal = Depends(current_principal)):
+    actor = actor_for(principal)
+    require_permission(principal, "grant", name)
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+            required_audit(actor, "membership.grant", "project", name, "rejected", {"project": name},
+                           {"reason": "unknown_project"})
+            raise HTTPException(404, "Unknown project")
+        grant_role(conn, Principal(grant.issuer, grant.subject, grant.display_name), "project", name, grant.role)
+    required_audit(actor, "membership.grant", "principal", grant.issuer + "|" + grant.subject, "succeeded",
+                   {"project": name}, {"role": grant.role})
+    return {"project": name, "issuer": grant.issuer, "subject": grant.subject, "role": grant.role}
+
+
+@app.delete("/projects/{name}/grants")
+def delete_project_grant(name: str, grant: GrantReference, principal: Principal = Depends(current_principal)):
+    actor = actor_for(principal)
+    require_permission(principal, "grant", name)
+    with connect() as conn:
+        removed = revoke_role(conn, grant.issuer, grant.subject, "project", name)
+    if not removed:
+        required_audit(actor, "membership.revoke", "principal", grant.issuer + "|" + grant.subject, "rejected",
+                       {"project": name}, {"reason": "unknown_grant"})
+        raise HTTPException(404, "Unknown project grant")
+    required_audit(actor, "membership.revoke", "principal", grant.issuer + "|" + grant.subject, "succeeded",
+                   {"project": name})
+    return {"project": name, "issuer": grant.issuer, "subject": grant.subject, "revoked": True}
+
+
+@app.put("/platform/grants")
+def put_platform_grant(grant: PlatformGrant, principal: Principal = Depends(current_principal)):
+    actor = actor_for(principal)
+    require_platform_admin(principal)
+    with connect() as conn:
+        grant_role(conn, Principal(grant.issuer, grant.subject, grant.display_name), "platform", None, grant.role)
+    required_audit(actor, "membership.grant", "principal", grant.issuer + "|" + grant.subject, "succeeded",
+                   {"scope": "platform"}, {"role": grant.role})
+    return {"issuer": grant.issuer, "subject": grant.subject, "role": grant.role}
+
+
+@app.delete("/platform/grants")
+def delete_platform_grant(grant: GrantReference, principal: Principal = Depends(current_principal)):
+    actor = actor_for(principal)
+    require_platform_admin(principal)
+    if principal.issuer == grant.issuer and principal.subject == grant.subject:
+        required_audit(actor, "membership.revoke", "principal", actor.identifier, "rejected", {"scope": "platform"},
+                       {"reason": "self_revocation"})
+        raise HTTPException(409, "A platform administrator cannot revoke its own final access")
+    with connect() as conn:
+        removed = revoke_role(conn, grant.issuer, grant.subject, "platform", None)
+    if not removed:
+        required_audit(actor, "membership.revoke", "principal", grant.issuer + "|" + grant.subject, "rejected",
+                       {"scope": "platform"}, {"reason": "unknown_grant"})
+        raise HTTPException(404, "Unknown platform grant")
+    required_audit(actor, "membership.revoke", "principal", grant.issuer + "|" + grant.subject, "succeeded",
+                   {"scope": "platform"})
+    return {"issuer": grant.issuer, "subject": grant.subject, "revoked": True}
 
 
 @app.get("/internal/tls", include_in_schema=False)

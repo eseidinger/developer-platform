@@ -11,6 +11,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
 from fastapi.testclient import TestClient
 from kubernetes.client.exceptions import ApiException
 from app import main
+from app.identity import AuthenticationError, Principal
 
 
 class Catalog:
@@ -36,6 +37,8 @@ class Catalog:
         elif query.startswith("SELECT status FROM"):
             row = self.rows.get(params[0])
             self.result = [(row[1],)] if row else []
+        elif query.startswith("SELECT 1 FROM projects"):
+            self.result = [(1,)] if params[0] in self.rows else []
         return self
 
     def fetchall(self):
@@ -56,16 +59,22 @@ class LifecycleTests(unittest.TestCase):
         patches = [patch.dict(os.environ, {
             "MONITORING_DISCOVERY_DIR": self.directory.name,
             "APPS_DOMAIN": "apps.localhost", "POSTGRES_IP": "172.30.80.10",
-            "PLATFORM_TOKEN": "a" * 32, "DATABASE_KEY": "b" * 32,
-            "PLATFORM_AUDIT_PASSWORD": "c" * 32}),
+            "DATABASE_KEY": "b" * 32,
+            "PLATFORM_AUDIT_PASSWORD": "c" * 32, "OIDC_ISSUER": "https://issuer.example",
+            "OIDC_AUDIENCE": "platform-api", "OIDC_JWKS_URL": "https://issuer.example/jwks",
+            "PLATFORM_BOOTSTRAP_SUBJECT": "bootstrap-subject"}),
             patch.object(main, "connect", return_value=self.catalog),
             patch.object(main, "runtime", self.runtime),
             patch.object(main, "record_event", return_value=1),
+            patch.object(main, "is_allowed", return_value=True),
+            patch.object(main, "verifier"),
             patch.object(main, "provision_database"), patch.object(main, "apply")]
         self.mocks = [p.start() for p in patches]
         for p in patches:
             self.addCleanup(p.stop)
-        self.headers = {"Authorization": "Bearer " + "a" * 32}
+        self.principal = Principal("https://issuer.example", "person-1", "person")
+        self.mocks[5].verify.return_value = self.principal
+        self.headers = {"Authorization": "Bearer valid-token"}
         self.spec = {"name": "smoke", "image": "example:v1", "probe_profile": "hello-world"}
 
     def targets(self):
@@ -90,7 +99,9 @@ class LifecycleTests(unittest.TestCase):
     def test_retire_requires_auth_confirmation_and_absent_namespace(self):
         self.deploy()
         self.assertIn(self.retire(headers={}).status_code, (401, 403))
+        self.mocks[5].verify.side_effect = AuthenticationError()
         self.assertEqual(self.retire(headers={"Authorization": "Bearer wrong"}).status_code, 401)
+        self.mocks[5].verify.side_effect = None
         self.assertEqual(self.retire(confirmation="different").status_code, 400)
         self.assertEqual(self.retire().status_code, 409)
         self.runtime.resources.get.return_value.get.side_effect = ApiException(status=403)
@@ -131,6 +142,26 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.deploy().status_code, 200)
         success = self.mocks[3].call_args
         self.assertEqual(success.args[1:5], ("project.provision", "project", "smoke", "succeeded"))
+        self.mocks[5].verify.side_effect = AuthenticationError()
         self.assertEqual(self.retire(headers={"Authorization": "Bearer wrong"}).status_code, 401)
         denied = self.mocks[3].call_args
         self.assertEqual(denied.args[1:5], ("authentication", "platform-api", None, "denied"))
+
+    def test_grant_revocation_blocks_the_next_project_request_and_is_audited(self):
+        self.deploy()
+        grant = {"issuer": "https://issuer.example", "subject": "person-2", "role": "developer"}
+        with patch.object(main, "grant_role") as grant_role:
+            response = self.client.put("/projects/smoke/grants", json=grant, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        grant_role.assert_called_once()
+        event = self.mocks[3].call_args
+        self.assertEqual(event.args[1:5], ("membership.grant", "principal", "https://issuer.example|person-2", "succeeded"))
+        with patch.object(main, "revoke_role", return_value=True) as revoke_role:
+            response = self.client.request("DELETE", "/projects/smoke/grants", json={
+                "issuer": "https://issuer.example", "subject": "person-2"}, headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        revoke_role.assert_called_once()
+        self.mocks[4].return_value = False
+        self.assertEqual(self.deploy().status_code, 403)
+        denied = self.mocks[3].call_args
+        self.assertEqual(denied.args[1:5], ("authorization", "project", "smoke", "denied"))

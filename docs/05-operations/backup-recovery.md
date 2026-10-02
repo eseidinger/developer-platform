@@ -177,8 +177,10 @@ Use this after SQL restore, or after cluster recreation with intact PostgreSQL v
 umask 077
 mkdir -p .runtime/recovery
 eval "$(python3 scripts/env.py)"
+# Obtain and export a fresh authorized OIDC access token; do not save it in .env.
+export PLATFORM_ACCESS_TOKEN='…'
 curl --fail-with-body http://127.0.0.1:8000/projects \
-  -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
   --output .runtime/recovery/projects.json
 ```
 
@@ -205,7 +207,7 @@ for project in projects:
     request = urllib.request.Request(
         'http://127.0.0.1:8000/projects/' + name,
         data=json.dumps(project['spec']).encode(),
-        headers={'Authorization': 'Bearer ' + os.environ['PLATFORM_TOKEN'],
+        headers={'Authorization': 'Bearer ' + os.environ['PLATFORM_ACCESS_TOKEN'],
                  'Content-Type': 'application/json'},
         method='PUT',
     )

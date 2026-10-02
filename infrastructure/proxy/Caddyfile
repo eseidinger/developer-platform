@@ -7,6 +7,9 @@
 {$PLATFORM_DOMAIN} {
 	reverse_proxy platform-api:8000
 }
+{$IDENTITY_DOMAIN} {
+	reverse_proxy keycloak:8080
+}
 http://*.{$APPS_DOMAIN} {
 	@local host *.apps.localhost
 	handle @local {

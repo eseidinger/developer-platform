@@ -1,9 +1,9 @@
 # Docker-based Developer Platform Lab: platform guide
 
 The platform API provisions applications on the lab's Kubernetes cluster and
-creates a PostgreSQL database for each project. It is intended for trusted
-administrators. The current interface is a REST API with interactive documentation;
-there is no self-service portal or tenant-specific authorization.
+creates a PostgreSQL database for each project. The current interface is a REST API
+with interactive documentation; it has no portal, but it does enforce individual
+OIDC identities and platform-owned project grants.
 
 For installation and prerequisites, start with the [main README](../README.md).
 See [architecture](../docs/02-architecture/infrastructure.md) for isolation and availability limits,
@@ -19,6 +19,7 @@ After `bash scripts/up.sh` completes, these local endpoints are available:
 | `http://localhost:8000/openapi.json` | OpenAPI schema |
 | `http://localhost:8000/healthz` | API process health |
 | `http://localhost:8000/readyz` | Database and Kubernetes connectivity |
+| `http://identity.localhost` | Keycloak reference identity service |
 | `http://localhost:3000` | Grafana; username `admin`, password from `.env` |
 | `http://localhost:9090` | Prometheus |
 
@@ -26,29 +27,33 @@ The API and monitoring host ports bind to loopback. For a public deployment, Cad
 routes the configured `PLATFORM_DOMAIN` to the API over HTTPS. Application requests
 follow Caddy → k3d load balancer → Traefik → project Service → application pod.
 
-Project endpoints require the `PLATFORM_TOKEN` from `.env` as a bearer token.
-In the interactive documentation, use **Authorize** to supply the token.
-The token grants administrative access to all projects; do not distribute it to
-application users. The API does not return database passwords in project responses.
+Project endpoints require a short-lived OIDC access token. In the interactive
+documentation, use **Authorize** to supply that token. The API validates its issuer,
+signature, audience and lifetime, then uses the issuer/subject pair to look up a
+platform-owned grant. It does not accept the old shared administrator token and does
+not return database passwords in project responses.
 
-This administrator boundary is transitional. The API now records its mutations,
-provisioning failures and rejected authentication through the durable audit boundary
-described below; individual OIDC identities and project-scoped roles remain Phase 1B
-work and replace this shared token before self-service is released.
+The reference Keycloak realm is `platform` and its public client is `platform-cli`.
+Create individual users in Keycloak; never create a shared developer account. Before
+the first API start, set `PLATFORM_BOOTSTRAP_SUBJECT` to the immutable Keycloak user
+ID (`sub`) for the first platform administrator. The API writes this one-time grant
+to PostgreSQL and will not recreate it on later starts. Remove the bootstrap setting
+after recording the controlled setup evidence.
 
 ## Create an application
 
-Run commands from the repository root. Load the local settings into a trusted shell:
+Run commands from the repository root. Export a short-lived access token from the
+configured OIDC client; do not put it in `.env`:
 
 ```bash
-eval "$(python3 scripts/env.py)"
+export PLATFORM_ACCESS_TOKEN='…'
 ```
 
 Create the example application:
 
 ```bash
 curl --fail-with-body -X PUT http://127.0.0.1:8000/projects/hello \
-  -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
   --data-binary @examples/project.json
 ```
@@ -127,7 +132,7 @@ List stored projects and their latest specifications:
 
 ```bash
 curl --fail-with-body http://127.0.0.1:8000/projects \
-  -H "Authorization: Bearer $PLATFORM_TOKEN"
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"
 ```
 
 Each list entry contains `name`, `spec`, and `status`, ordered by project name.
@@ -194,9 +199,11 @@ access before network rules converge; this lab is intended for trusted workloads
 | --- | --- | --- |
 | `GET /healthz` | None | 200 with `{"status":"ok"}` when the process responds |
 | `GET /readyz` | None | 200 with `{"status":"ready"}` when database and Kubernetes checks pass; otherwise 503 |
-| `GET /projects` | Admin bearer token | 200 with the stored project list |
-| `PUT /projects/{name}` | Admin bearer token | 200 with the applied project name, namespace, and host |
-| `POST /projects/{name}/retire` | Admin bearer token and matching `confirm_name` | 200 with retained-data retirement; 409 while namespace exists |
+| `GET /projects` | OIDC `viewer` or stronger grant | 200 with only authorized projects |
+| `PUT /projects/{name}` | OIDC `developer` or stronger project grant; platform-admin creates projects | 200 with the applied project name, namespace, and host |
+| `POST /projects/{name}/retire` | OIDC `project-admin` or `platform-admin`, plus matching `confirm_name` | 200 with retained-data retirement; 409 while namespace exists |
+| `PUT` / `DELETE /projects/{name}/grants` | OIDC `project-admin` or `platform-admin` for that project | Create, change, or revoke a project grant |
+| `PUT` / `DELETE /platform/grants` | OIDC `platform-admin` | Create or revoke another platform-admin grant |
 | `GET /internal/tls?domain=...` | None; used by Caddy | 200 for a project host whose stored status is `applied`; 403 for an unauthorized host |
 
 The TLS authorization route is excluded from OpenAPI and does not provision projects.
@@ -215,9 +222,15 @@ updates and apply relevant settings to `.env` explicitly.
 | `APPS_DOMAIN` | Application domain suffix; default `apps.localhost` |
 | `TLS_EMAIL` | Contact email Caddy uses for certificate authority registration |
 | `EDGE_BIND_IP` | Proxy bind address; default `127.0.0.1`, public host setting `0.0.0.0` |
-| `PLATFORM_TOKEN` | Admin API token; at least 32 characters |
 | `DATABASE_KEY` | Master secret for deterministic project passwords; at least 32 characters |
 | `PLATFORM_AUDIT_PASSWORD` | Password for the restricted audit-event writer; at least 32 characters |
+| `IDENTITY_DOMAIN` | Keycloak hostname through Caddy; default `identity.localhost` |
+| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak bootstrap administrator password |
+| `KEYCLOAK_DB_PASSWORD` | Password for Keycloak's restricted PostgreSQL role |
+| `OIDC_ISSUER` | OIDC issuer; default `http://<IDENTITY_DOMAIN>/realms/platform` |
+| `OIDC_AUDIENCE` | Required access-token audience; default `platform-api` |
+| `OIDC_JWKS_URL` | Internal JWKS URL; default points to the Keycloak service |
+| `PLATFORM_BOOTSTRAP_SUBJECT` | One-time immutable subject for the first platform-admin grant; remove after bootstrap |
 | `POSTGRES_PASSWORD` | PostgreSQL administrator password |
 | `GRAFANA_PASSWORD` | Initial Grafana admin password |
 | `PLATFORM_SUBNET` | Private Docker subnet; default `172.30.80.0/24` |
@@ -232,6 +245,8 @@ previously provisioned project resources until they are reapplied. Updating
 The API's internal `POSTGRES_HOST` and `KUBECONFIG` settings are supplied by
 [its Compose module](compose.yaml). Bootstrap generates the controller kubeconfig
 in `.runtime/controller.kubeconfig` and mounts it read-only into the API container.
+Keycloak uses its own PostgreSQL role and database, both included in the encrypted
+platform database backup.
 
 ## Audit records and retention
 

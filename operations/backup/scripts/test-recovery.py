@@ -183,6 +183,9 @@ def main():
     stage = 'recovery configuration guard'
     try:
         cfg = settings(root)
+        access_token = os.environ.get('PLATFORM_ACCESS_TOKEN')
+        if not access_token:
+            raise RuntimeError('PLATFORM_ACCESS_TOKEN is required for authorized recovery checks')
         if cfg.get('EDGE_BIND_IP') != '127.0.0.1' or cfg.get('APPS_DOMAIN') != 'apps.localhost' or cfg.get('PLATFORM_DOMAIN') != 'platform.localhost':
             raise RuntimeError('Requires recovery-only loopback and localhost domains')
         stage = 'bundle checksums'
@@ -195,7 +198,7 @@ def main():
             if json.loads(request('http://127.0.0.1:8000/readyz')).get('status') != 'ready':
                 raise RuntimeError('API not ready')
         retry(ready)
-        projects = json.loads(request('http://127.0.0.1:8000/projects', {'Authorization': 'Bearer ' + cfg['PLATFORM_TOKEN']}))
+        projects = json.loads(request('http://127.0.0.1:8000/projects', {'Authorization': 'Bearer ' + access_token}))
         if not any(v['name'] == args.project for v in projects):
             raise RuntimeError('Project missing from restored catalog')
         report['checks'].append(stage)

@@ -1,10 +1,10 @@
 # Security and Identity
 
-Status: implemented administrator boundary followed by the accepted ADR-004 security design. Keycloak, individual platform identities and scoped grants are not implemented.
+Status: source implementation of the accepted ADR-004 identity and grant boundary; deployment and controlled lab acceptance remain open.
 
 ## Current security boundary
 
-One shared `PLATFORM_TOKEN` authorizes all project operations; it provides neither user attribution nor project-scoped access. Health/readiness, OpenAPI/docs and the certificate gate are unauthenticated. Source now contains an append-only, redacted `platform_audit.events` boundary for authenticated mutations, provisioning failures and authentication denials, but it still records the shared credential rather than an individual. Its deployment and operational acceptance are unverified. The following role model is a target, not a current permission matrix.
+The API validates individual OIDC access tokens against a configured issuer, audience and JWKS endpoint, then resolves every request against platform-owned PostgreSQL grants keyed by immutable issuer/subject pairs. Keycloak is the supported lab reference provider, but the API does not depend on Keycloak-specific token claims or APIs. The one-time host-side bootstrap subject creates the first platform-admin grant; a shared `PLATFORM_TOKEN` is no longer accepted for project operations. Health/readiness, OpenAPI/docs and the certificate gate remain unauthenticated. Source also contains an append-only, redacted `platform_audit.events` boundary for mutations, denials and membership changes. Deployment and operational acceptance are unverified.
 
 The provisioner connects as PostgreSQL `postgres`. Its Kubernetes ServiceAccount has cluster-wide get/list/create/patch/update permissions for the allowed resource kinds, including namespaces, Secrets and Deployments. RBAC does not restrict it to `project-*` names. It has no delete verb or mounted Docker socket, but it remains privileged infrastructure. The external controller uses a long-lived token Secret; bootstrap also enables Kubernetes Secret encryption. See [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
 
@@ -29,7 +29,7 @@ Platform users do not automatically receive Kubernetes access. The provisioner u
 | project-admin | Yes | Yes | Yes | Project-scoped; separate confirmation for data deletion |
 | platform-admin | All project scopes | Yes | Yes | All project grants; separate confirmation for data deletion |
 
-Later phases may add operator or organization roles without weakening these permissions. Keycloak authenticates the principal, but platform-owned bindings authorize project access. Bindings use the immutable OIDC issuer/subject pair rather than mutable usernames or email addresses. A platform role never grants hosted-application business-data access.
+Later phases may add operator or organization roles without weakening these permissions. Keycloak authenticates the principal, but platform-owned bindings authorize project access. Bindings use the immutable OIDC issuer/subject pair rather than mutable usernames or email addresses. The API reads grants on every request, so a revoked binding denies the next request. A platform role never grants hosted-application business-data access.
 
 Database read/write permissions are separate grants and do not follow automatically from log/deployment permissions. Even an administrator does not automatically receive business-data access to a hosted application.
 

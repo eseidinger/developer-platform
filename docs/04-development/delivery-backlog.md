@@ -389,6 +389,8 @@ Phase tasks:
 
 **Decision update (October 2, 2026):** [ADR-004](../03-decisions/ADR-004-identity-and-access-management.md) accepts a provider-neutral OIDC boundary with Keycloak as the supported lab reference, platform-owned grants, immutable issuer/subject principal keys, and `viewer`, `developer`, `project-admin` and `platform-admin` roles. This resolves the prerequisite design choice but supplies no OPS-004 implementation or acceptance evidence.
 
+**Source update (October 2, 2026):** The Python baseline now validates configured OIDC JWT issuer/signature/audience/lifetime through a generic JWKS verifier, stores principals and project/platform grants in PostgreSQL, and checks those grants on every request. It provides audited grant/revocation endpoints, filters project lists by grants, and records authorization denials; revocation is effective on the next request because no permission cache exists. A Keycloak 26.4.1 Compose reference profile supplies the lab issuer without becoming the authorization source. Deployment, real Keycloak login/JWKS rotation, operator bootstrap, restricted user acceptance, and backup verification remain open. This update does not close OPS-004-T01.
+
 
 ### OPS-005 — Enforce project policies and quotas
 

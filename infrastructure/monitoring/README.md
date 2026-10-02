@@ -86,10 +86,10 @@ PostgreSQL data and roles outside Kubernetes are retained.
 kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello get all,ingress
 # Execute only after deciding to retire this application:
 kubectl --kubeconfig .runtime/admin.kubeconfig delete namespace project-hello --wait=true
-# Load the administrator token in a trusted shell with tracing disabled.
-eval "$(python3 scripts/env.py)"
+# Export an authorized short-lived OIDC access token in a trusted shell with tracing disabled.
+export PLATFORM_ACCESS_TOKEN='…'
 curl --fail-with-body -X POST http://127.0.0.1:8000/projects/hello/retire \
-  -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
   -H 'Content-Type: application/json' \
   --data '{"confirm_name":"hello"}'
 ```

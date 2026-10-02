@@ -5,9 +5,12 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
-      PLATFORM_TOKEN: ${PLATFORM_TOKEN:?Run scripts/init.py}
       DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
       PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
+      OIDC_ISSUER: ${OIDC_ISSUER:-http://${IDENTITY_DOMAIN:-identity.localhost}/realms/platform}
+      OIDC_AUDIENCE: ${OIDC_AUDIENCE:-platform-api}
+      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/platform/protocol/openid-connect/certs}
+      PLATFORM_BOOTSTRAP_SUBJECT: ${PLATFORM_BOOTSTRAP_SUBJECT:-}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
       KUBECONFIG: /run/platform/kubeconfig

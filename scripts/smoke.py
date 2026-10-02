@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Exercise the local stack. Creates/updates the explicitly named smoke project."""
 import json
+import os
 import subprocess
 import time
 import urllib.error
@@ -8,10 +9,13 @@ import urllib.request
 from env import settings
 
 cfg = settings()
+access_token = os.environ.get("PLATFORM_ACCESS_TOKEN")
+if not access_token:
+    raise SystemExit("Set a short-lived OIDC PLATFORM_ACCESS_TOKEN before running this check")
 def request(path, body=None, token=True):
     headers = {"Content-Type": "application/json"}
     if token:
-        headers["Authorization"] = "Bearer " + cfg["PLATFORM_TOKEN"]
+        headers["Authorization"] = "Bearer " + access_token
     req = urllib.request.Request("http://127.0.0.1:8000" + path,
         data=json.dumps(body).encode() if body else None,
         method="PUT" if body else "GET", headers=headers)

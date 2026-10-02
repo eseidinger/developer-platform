@@ -14,7 +14,7 @@ The API publishes discovery before provisioning side effects and repeats publica
 
 Exact `APPS_DOMAIN=apps.localhost` uses `http://proxy/` with the application's hostname parameter, avoiding container-loopback resolution. Other domains use the public HTTPS URL and certificate validation. Both originate on the platform host, outside k3d but inside the same host/network failure domain.
 
-`POST /projects/{name}/retire` requires the admin token, matching name confirmation and an absent project namespace. It retains SQL data/login/spec and removes discovery membership. Manual namespace removal alone never removes the target. PUT explicitly reactivates a retired entry. Bulk recovery replay skips retired entries; deliberately selecting one for PUT reactivates it.
+`POST /projects/{name}/retire` requires an OIDC `project-admin` or `platform-admin` grant, matching name confirmation and an absent project namespace. It retains SQL data/login/spec and removes discovery membership. Manual namespace removal alone never removes the target. PUT explicitly reactivates a retired entry. Bulk recovery replay skips retired entries; deliberately selecting one for PUT reactivates it.
 
 ## Alternatives and consequences
 

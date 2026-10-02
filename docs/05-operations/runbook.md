@@ -14,16 +14,16 @@ kubectl --kubeconfig .runtime/admin.kubeconfig get nodes -o wide
 kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 ```
 
-`/healthz` is process health; `/readyz` executes a SQL query and reads the `platform-system` namespace using the controller credential. It does not check every node or workload. PostgreSQL readiness is not a data-integrity or application-permission check. Record time, host, code revision (`git rev-parse HEAD`), affected project, latest spec, and observed symptoms. The current API has no operation IDs, revision history, durable job steps, or per-user audit trail. Preserve available logs and redact credentials before sharing them.
+`/healthz` is process health; `/readyz` executes a SQL query and reads the `platform-system` namespace using the controller credential. It does not check every node or workload. PostgreSQL readiness is not a data-integrity or application-permission check. Record time, host, code revision (`git rev-parse HEAD`), affected project, latest spec, and observed symptoms. The current API has no operation IDs, revision history, or durable job steps; it does record redacted per-principal audit events. Preserve available logs and redact credentials before sharing them.
 
 ## Provisioning stuck or failed
 
-In a trusted shell with tracing disabled, load the admin credentials and list stored projects:
+In a trusted shell with tracing disabled, export a short-lived authorized OIDC access token and list stored projects:
 
 ```bash
-eval "$(python3 scripts/env.py)"
+export PLATFORM_ACCESS_TOKEN='…'
 curl --fail-with-body http://127.0.0.1:8000/projects \
-  -H "Authorization: Bearer $PLATFORM_TOKEN"
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"
 docker compose logs --tail=100 platform-api postgres
 ```
 
@@ -42,7 +42,7 @@ After fixing permissions, image, quota, or dependency failures, repeat PUT with 
 
 ```bash
 curl --fail-with-body -X PUT http://127.0.0.1:8000/projects/hello \
-  -H "Authorization: Bearer $PLATFORM_TOKEN" \
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
   -H 'Content-Type: application/json' --data-binary @examples/project.json
 kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello rollout status deployment/hello --timeout=180s
 ```
@@ -107,7 +107,7 @@ Attribute growth before removing anything. Never remove unidentified volumes. Fo
 
 ## Compromised credential or access revocation
 
-The API uses one shared administrator token; individual user revocation and scoped audit are not implemented. Coordinate replacement of `PLATFORM_TOKEN` in `.env` and recreate the API container so it receives the new environment. Revoke access to the old credential at its distribution points.
+Revoke a project or platform grant through the authorized API, then verify the affected principal's next request returns `403` and inspect the corresponding redacted audit event. Token expiry/revocation at the identity provider is a separate control; platform authorization does not wait for a token to expire after a grant is removed. The one-time `PLATFORM_BOOTSTRAP_SUBJECT` is host configuration, not an API credential; remove it after first startup.
 
 Preserve `DATABASE_KEY` during recovery. Changing it changes derived Secrets but does not update existing PostgreSQL role passwords; rotation requires coordinated role-password and workload-Secret changes. Follow the [platform configuration notes](../../platform/README.md#configuration). The root [operations notes](../../README.md#operations) describe controller-token rotation. Never include secret values in incident records.
 

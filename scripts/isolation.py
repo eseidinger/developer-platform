@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 """Live DB/NetworkPolicy checks; requires successful smoke.py and local API image."""
 import json
+import os
 import subprocess
 import time
 import urllib.request
 from env import settings
 
 cfg = settings()
+access_token = os.environ.get("PLATFORM_ACCESS_TOKEN")
+if not access_token:
+    raise SystemExit("Set a short-lived OIDC PLATFORM_ACCESS_TOKEN before running this check")
 project = {"name": "isolation", "image": "hashicorp/http-echo:1.0.0", "port": 5678}
 req = urllib.request.Request("http://127.0.0.1:8000/projects/isolation",
     data=json.dumps(project).encode(), method="PUT",
-    headers={"Authorization": "Bearer " + cfg["PLATFORM_TOKEN"], "Content-Type": "application/json"})
+    headers={"Authorization": "Bearer " + access_token, "Content-Type": "application/json"})
 with urllib.request.urlopen(req, timeout=60) as response:
     assert response.status == 200
 kubectl = ["kubectl", "--kubeconfig", ".runtime/admin.kubeconfig"]

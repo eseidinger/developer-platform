@@ -142,7 +142,10 @@ https://*.apps.localhost {
         time.sleep(2)
     else:
         raise RuntimeError('API readiness timed out')
-    headers = {'Authorization': 'Bearer ' + values['PLATFORM_TOKEN'], 'Content-Type': 'application/json'}
+    access_token = os.environ.get('PLATFORM_ACCESS_TOKEN')
+    if not access_token:
+        raise RuntimeError('PLATFORM_ACCESS_TOKEN is required for authorized project recovery')
+    headers = {'Authorization': 'Bearer ' + access_token, 'Content-Type': 'application/json'}
     with urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/projects', headers=headers), timeout=15) as response:
         catalog = json.load(response)
     for name in projects:

@@ -3,6 +3,7 @@ include:
   - infrastructure/proxy/compose.yaml
   - persistence/compose.yaml
   - infrastructure/monitoring/compose.yaml
+  - identity/compose.yaml
   - platform/compose.yaml
 networks:
   platform:
