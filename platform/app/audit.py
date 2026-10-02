@@ -56,6 +56,14 @@ def audit_connect():
     )
 
 
+def audit_reader_connect():
+    """Connect with the role limited to reading redacted audit events."""
+    return psycopg.connect(
+        host=os.environ["POSTGRES_HOST"], dbname="platform", user=AUDIT_READER,
+        password=os.environ["PLATFORM_AUDIT_READER_PASSWORD"], connect_timeout=5, autocommit=True,
+    )
+
+
 def initialize(conn) -> None:
     """Create the audit boundary from the privileged bootstrap connection."""
     for role in (AUDIT_OWNER, AUDIT_WRITER, AUDIT_READER):
@@ -65,6 +73,9 @@ def initialize(conn) -> None:
     conn.execute(sql.SQL("ALTER ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
                          "NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD {}")
                  .format(sql.Identifier(AUDIT_WRITER), sql.Literal(os.environ["PLATFORM_AUDIT_PASSWORD"])))
+    conn.execute(sql.SQL("ALTER ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+                         "NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD {}")
+                 .format(sql.Identifier(AUDIT_READER), sql.Literal(os.environ["PLATFORM_AUDIT_READER_PASSWORD"])))
     conn.execute("CREATE SCHEMA IF NOT EXISTS platform_audit")
     conn.execute(sql.SQL("ALTER SCHEMA platform_audit OWNER TO {}").format(sql.Identifier(AUDIT_OWNER)))
     conn.execute("""CREATE TABLE IF NOT EXISTS platform_audit.events (

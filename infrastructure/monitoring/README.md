@@ -61,6 +61,27 @@ The shared rules cover:
 - `ApplicationDiscoveryStale`: missing discovery metrics, a publication timestamp
   older than two minutes, or a textfile collector error, sustained for three minutes.
 
+## Security-event alerts
+
+The API separately reads its append-only audit table through the restricted audit
+reader login every 30 seconds. It publishes only bounded resource/category counts,
+the latest event ID, and occurrence timestamp to the same read-only monitoring
+volume. It never publishes bearer tokens, actor identities, or event details.
+The shared rules alert on five authentication failures or authorization denials
+against the same affected resource within 15 minutes, and immediately report a
+successful privileged membership change. Each alert carries severity, Alertmanager
+start time, affected resource labels, and a durable-event reference: query
+`platform_security_latest_event_id` with the same labels, then inspect that ID in
+`platform_audit.events` through the restricted operator procedure.
+
+`SecurityAuditCollectionStale` detects a failed audit-metric collector rather than
+silently treating absent evidence as healthy. Prometheus also scrapes Alertmanager;
+`AlertmanagerNotificationFailed` exposes its failed-delivery counter. That alert can
+be affected by the same failed destination, so operators must also inspect the
+counter and container logs. Alertmanager groups by alert type and stable affected
+resource labels, not event ID: repeated activity stays in one ongoing incident
+while the metric retains the latest supporting event.
+
 Scrapes run every 30 seconds; rule evaluation and Alertmanager grouping add
 latency. Discovery can become stale while a long provisioning request holds the
 shared lock. The resulting alert identifies lack of fresh discovery, not proof

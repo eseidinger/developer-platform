@@ -46,3 +46,44 @@ groups:
           severity: warning
         annotations:
           summary: 'Application monitoring discovery is stale or unavailable'
+  - name: security-events
+    rules:
+      - alert: RepeatedAuthenticationFailures
+        expr: platform_security_events_in_window{category="authentication_failure"} >= 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Repeated authentication failures at {{ $labels.target_kind }} {{ $labels.target_id }}'
+          description: 'At least {{ $value }} invalid or missing bearer attempts in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+      - alert: RepeatedAccessDenials
+        expr: platform_security_events_in_window{category="access_denial"} >= 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Repeated access denials for {{ $labels.target_kind }} {{ $labels.target_id }}'
+          description: 'At least {{ $value }} denied authorization attempts in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+      - alert: PrivilegedChange
+        expr: platform_security_events_in_window{category="privileged_change"} > 0
+        for: 0m
+        labels:
+          severity: info
+        annotations:
+          summary: 'Privileged membership change affecting {{ $labels.target_kind }} {{ $labels.target_id }}'
+          description: 'A grant, revocation, or bootstrap was recorded in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+      - alert: SecurityAuditCollectionStale
+        expr: (time() - platform_security_audit_collection_success > 120) or absent(platform_security_audit_collection_success)
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Security audit metric collection is stale or unavailable'
+      - alert: AlertmanagerNotificationFailed
+        expr: increase(alertmanager_notifications_failed_total[10m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: 'Alertmanager notification delivery has failed'
+          description: 'Inspect Alertmanager logs and alertmanager_notifications_failed_total; this alert can be affected by the same broken destination.'

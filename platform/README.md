@@ -224,6 +224,7 @@ updates and apply relevant settings to `.env` explicitly.
 | `EDGE_BIND_IP` | Proxy bind address; default `127.0.0.1`, public host setting `0.0.0.0` |
 | `DATABASE_KEY` | Master secret for deterministic project passwords; at least 32 characters |
 | `PLATFORM_AUDIT_PASSWORD` | Password for the restricted audit-event writer; at least 32 characters |
+| `PLATFORM_AUDIT_READER_PASSWORD` | Password for the restricted audit-event reader used by security metrics; at least 32 characters |
 | `IDENTITY_DOMAIN` | Keycloak hostname through Caddy; default `identity.localhost` |
 | `KEYCLOAK_ADMIN_PASSWORD` | Keycloak bootstrap administrator password |
 | `KEYCLOAK_DB_PASSWORD` | Password for Keycloak's restricted PostgreSQL role |
@@ -250,13 +251,14 @@ platform database backup.
 
 ## Audit records and retention
 
-At startup, the API creates `platform_audit.events` and the no-login owner, reader,
-and writer database roles. API event writes use only the writer login, which can call
+At startup, the API creates `platform_audit.events` and the no-login owner plus
+restricted reader and writer database roles. API event writes use only the writer login, which can call
 the security-definer append function but has no table read, update, delete, truncate,
 or schema privileges. The table rejects update, delete, and truncate statements.
 Project database roles cannot connect to the `platform` database, and the API exposes
-no audit-record endpoint in this stage. OPS-001-T02 will add restricted operator
-inspection and time-filtered export.
+no audit-record endpoint in this stage. The separate reader login is used only to
+derive bounded, redacted security-alert metrics. OPS-001-T02 will add restricted
+operator inspection and time-filtered export.
 
 Event details recursively redact password, secret, token, authorization, credential,
 cookie, and key fields; bearer/basic credential strings are redacted as well. Store

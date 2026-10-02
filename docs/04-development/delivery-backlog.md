@@ -327,7 +327,7 @@ Phase tasks:
 
 **Task evidence (B-2026-09-26):** T01/T02 — source absent for durable actor-attributed audit, restricted inspection/export and retention/tamper controls; latest project status and generic logs are insufficient. Local acceptance unverified. Record authentication/denial/grant changes with mutations, and release the access boundary together with OPS-004-T01.
 
-**Source update (October 2, 2026):** The Python baseline now defines an append-only `platform_audit.events` table, redaction, a restricted writer role/security-definer append function, and mutation/provisioning-failure/authentication-denial event hooks. It records the legacy shared-token credential identity, not individual users; grant changes, OIDC identities, restricted inspection/export, deployment, backup coverage, and controlled live permission checks remain open. This update does not close OPS-001-T01 or T02.
+**Source update (October 2, 2026):** The Python baseline now defines an append-only `platform_audit.events` table, redaction, restricted writer/reader roles, a security-definer append function, and mutation/provisioning-failure/authentication-denial/grant-change hooks attributed to immutable OIDC principals. Restricted inspection/export, deployed backup coverage, and controlled live permission checks remain open. This update does not close OPS-001-T01 or T02.
 
 
 ### OPS-002 — Receive security event notifications
@@ -347,6 +347,8 @@ Phase tasks:
 - [ ] **OPS-002-T01 · 1B** — Configure authentication-failure, denial and privileged-change rules; link severity/time/resources to supporting events; test destinations, delivery-failure visibility and grouping that preserves ongoing incidents. Prerequisites: OPS-001-T01; OPS-007-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source absent for security-event rules and evidence-linked notification workflow; no audit event model feeds it. Local acceptance unverified. General alert-rule files and watchdog mail fixtures (EV-07–10) are supporting infrastructure, not security-alert acceptance.
+
+**Source update (October 2, 2026):** A restricted audit-reader collector publishes bounded, redacted Prometheus metrics for authentication failures, authorization denials, and successful membership changes. Rules preserve resource labels/severity, point operators to the latest durable audit-event ID, detect a stale collector and Alertmanager delivery failures; Alertmanager groups repeated events by stable resource rather than event ID. The SMTP playbook supplies destination configuration and a FIRING/RESOLVED test procedure. Real destination configuration, receipt, grouping, controlled delivery-failure observation and deployed audit correlation remain required before closing OPS-002-T01.
 
 
 ### OPS-003 — Monitor platform capacity

@@ -112,3 +112,49 @@ tests:
       - eval_time: 6m
         alertname: ApplicationDiscoveryStale
         exp_alerts: []
+  - name: repeated security activity is resource scoped
+    interval: 1m
+    input_series:
+      - series: 'platform_security_events_in_window{category="authentication_failure",target_kind="platform-api",target_id="",project=""}'
+        values: '5+0x4'
+      - series: 'platform_security_events_in_window{category="access_denial",target_kind="project",target_id="demo",project="demo"}'
+        values: '5+0x4'
+      - series: 'platform_security_events_in_window{category="privileged_change",target_kind="principal",target_id="issuer|person",project=""}'
+        values: '1+0x4'
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: RepeatedAuthenticationFailures
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: RepeatedAuthenticationFailures
+        exp_alerts:
+          - exp_labels:
+              category: authentication_failure
+              target_kind: platform-api
+              severity: warning
+            exp_annotations:
+              summary: 'Repeated authentication failures at platform-api '
+              description: 'At least 5 invalid or missing bearer attempts in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+      - eval_time: 2m
+        alertname: RepeatedAccessDenials
+        exp_alerts:
+          - exp_labels:
+              category: access_denial
+              target_kind: project
+              target_id: demo
+              project: demo
+              severity: warning
+            exp_annotations:
+              summary: Repeated access denials for project demo
+              description: 'At least 5 denied authorization attempts in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+      - eval_time: 0m
+        alertname: PrivilegedChange
+        exp_alerts:
+          - exp_labels:
+              category: privileged_change
+              target_kind: principal
+              target_id: issuer|person
+              severity: info
+            exp_annotations:
+              summary: Privileged membership change affecting principal issuer|person
+              description: 'A grant, revocation, or bootstrap was recorded in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'

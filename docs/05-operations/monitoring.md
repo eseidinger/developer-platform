@@ -6,7 +6,7 @@ Status: operational draft based on [ADR-005](../03-decisions/ADR-005-observabili
 
 The [runbook](runbook.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbook.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../operations/watchdog/README.md) and [deployment playbooks guide](../../operations/watchdog/ansible/README.md).
 
-Prometheus has five configured jobs: itself, node-exporter, kube-state-metrics, blackbox-exporter and catalog-discovered applications. Alloy collects host Docker JSON logs; explicit k3d application log collection and workload usage metrics remain absent.
+Prometheus has six configured jobs: itself, node-exporter, kube-state-metrics, blackbox-exporter, Alertmanager and catalog-discovered applications. Alloy collects host Docker JSON logs; explicit k3d application log collection and workload usage metrics remain absent.
 
 Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; selected synthetic and scrape-failure FIRING/RESOLVED receipt has operator-reported evidence; application-rule acceptance remains open; notification-delivery-failure injection is an accepted limitation under ADR-011.
 
@@ -21,6 +21,25 @@ The remaining sections describe intended operational coverage, including capabil
 ## Application availability probes
 
 [Application monitoring](../../infrastructure/monitoring/README.md) defines catalog-driven blackbox exporter targets, shared Prometheus rules, Alertmanager delivery, explicit retirement and local verification. The probe runs alongside Prometheus outside k3d. Public domains use HTTPS/status/content checks from the platform host; local `apps.localhost` uses HTTP routing through Caddy. Neither provides an independent outside-network vantage point. Existing external heartbeat/backup channels remain separate. Live deployment and outage/recovery receipt for these application rules remain acceptance work.
+
+## Security-event notifications
+
+The API derives bounded Prometheus textfile metrics from `platform_audit.events`
+using the restricted audit-reader login. Metrics cover repeated authentication
+failures, access denials, and successful privileged membership changes, retaining
+only event category, affected resource, timestamp, count, and latest event ID.
+Prometheus adds severity and Alertmanager supplies notification time. Operators
+correlate a notification to `platform_security_latest_event_id` and the durable
+audit record, never raw token or identity data.
+
+Alertmanager groups by alert name and stable affected-resource labels, so repeated
+activity remains one ongoing incident while fresh supporting evidence is visible in
+the metric. `AlertmanagerNotificationFailed` observes failed notifier attempts.
+It cannot guarantee its own delivery when the same destination fails; inspect the
+counter and local logs as documented by the [SMTP guide](../../operations/alertmanager/README.md).
+Source rules and local tests exist, but destination setup, FIRING/RESOLVED receipt,
+grouping, controlled delivery-failure observation and deployed audit correlation
+remain OPS-002-T01 acceptance work.
 
 ## Minimum coverage
 

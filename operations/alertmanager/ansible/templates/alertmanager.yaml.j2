@@ -7,7 +7,7 @@ global:
   smtp_force_implicit_tls: {{ (alertmanager_smtp_encryption == 'implicit_tls') | to_json }}
 route:
   receiver: operator-email
-  group_by: [alertname, job]
+  group_by: [alertname, job, category, target_kind, target_id, project]
   group_wait: {{ alertmanager_group_wait | default('30s') | to_json }}
   group_interval: {{ alertmanager_group_interval | default('5m') | to_json }}
   repeat_interval: {{ alertmanager_repeat_interval | default('4h') | to_json }}

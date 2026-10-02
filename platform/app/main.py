@@ -27,6 +27,7 @@ from .authorization import (bootstrap_platform_admin, grant as grant_role, initi
 from .identity import AuthenticationError, Principal, configured_verifier
 from .manifests import resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
+from .security_alerts import security_alert_loop
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -41,7 +42,7 @@ def connect():
 @asynccontextmanager
 async def lifespan(app):
     global runtime, verifier
-    for key in ("DATABASE_KEY", "PLATFORM_AUDIT_PASSWORD"):
+    for key in ("DATABASE_KEY", "PLATFORM_AUDIT_PASSWORD", "PLATFORM_AUDIT_READER_PASSWORD"):
         if len(os.environ.get(key, "")) < 32:
             raise RuntimeError(key + " must contain at least 32 characters")
     verifier = configured_verifier()
@@ -61,11 +62,17 @@ async def lifespan(app):
     stop = threading.Event()
     worker = threading.Thread(target=discovery_loop, args=(stop, connect, log), daemon=True)
     worker.start()
+    security_worker = threading.Thread(
+        target=security_alert_loop,
+        args=(stop, os.environ.get("MONITORING_DISCOVERY_DIR", "/var/lib/platform-monitoring"), log), daemon=True,
+    )
+    security_worker.start()
     try:
         yield
     finally:
         stop.set()
         worker.join(timeout=6)
+        security_worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 

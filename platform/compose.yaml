@@ -7,6 +7,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
       DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
       PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
+      PLATFORM_AUDIT_READER_PASSWORD: ${PLATFORM_AUDIT_READER_PASSWORD:?Add the generated value from .env.example to .env}
       OIDC_ISSUER: ${OIDC_ISSUER:-http://${IDENTITY_DOMAIN:-identity.localhost}/realms/platform}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-platform-api}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/platform/protocol/openid-connect/certs}

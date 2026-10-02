@@ -1,6 +1,6 @@
 route:
   receiver: local-only
-  group_by: [alertname, job]
+  group_by: [alertname, job, category, target_kind, target_id, project]
   group_wait: 30s
   repeat_interval: 4h
 # Configure SMTP/webhook delivery before using this for operational alerting.
