@@ -39,9 +39,11 @@ are still required.
   developer was denied operator access; audit export was redacted.
 - [x] The SMTP synthetic delivery test succeeded and controlled authentication,
   authorization-denial, and privileged-change events fired their security rules.
-- [ ] Complete deployed backup coverage, notification receipt/grouping,
-  delivery-failure visibility, audit correlation, and all remaining OPS-002
-  acceptance work.
+- [x] Real security-rule notifications were received and repeated events stayed
+  one grouped ongoing incident. Retained evidence is not required for these
+  owner-confirmed checks.
+- [x] The controlled notification-delivery-failure exercise is omitted from
+  this Phase 1B task by owner direction.
 
 ## Bootstrap a fresh local identity service
 

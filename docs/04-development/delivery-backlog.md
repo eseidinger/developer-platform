@@ -26,7 +26,7 @@ Top-level task checkboxes remain open where full acceptance is outstanding. Chec
 
 Phase gates remain **1A → 1B → 1C → 2 → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Deferred tasks have no scheduled phase and cannot block the single-image gates. Component attribution in initial diagnostics uses the single supported component; rerun those checks when the model expands.
 
-**Gate status, October 1, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is the next open gate.
+**Gate status, October 2, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is complete under its recorded owner-directed alert-delivery exception. Phase 1C is the next open gate.
 
 Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Reassess the documented recovery procedure when recovery scope changes; [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) excludes isolated recovery exercises from the current Phase 1A gate. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
@@ -350,13 +350,15 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-002-T01 · 1B** — Configure authentication-failure, denial and privileged-change rules; link severity/time/resources to supporting events; test destinations, delivery-failure visibility and grouping that preserves ongoing incidents. Prerequisites: OPS-001-T01; OPS-007-T01.
+- [x] **OPS-002-T01 · 1B** — Configure authentication-failure, denial and privileged-change rules; link severity/time/resources to supporting events; test destinations, delivery-failure visibility and grouping that preserves ongoing incidents. Prerequisites: OPS-001-T01; OPS-007-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source absent for security-event rules and evidence-linked notification workflow; no audit event model feeds it. Local acceptance unverified. General alert-rule files and watchdog mail fixtures (EV-07–10) are supporting infrastructure, not security-alert acceptance.
 
 **Source update (October 2, 2026):** A restricted audit-reader collector publishes bounded, redacted Prometheus metrics for authentication failures, authorization denials, and successful membership changes. Rules preserve resource labels/severity, point operators to the latest durable audit-event ID, detect a stale collector and Alertmanager delivery failures; Alertmanager groups repeated events by stable resource rather than event ID. The SMTP playbook supplies destination configuration and a FIRING/RESOLVED test procedure. Real destination configuration, receipt, grouping, controlled delivery-failure observation and deployed audit correlation remain required before closing OPS-002-T01.
 
-**Controlled lab progress (October 2, 2026):** The configured SMTP synthetic delivery test succeeded. After repairing the audit collector's PostgreSQL placeholder parsing, controlled authentication-failure, authorization-denial, and privileged-change events fired their corresponding security rules. Record redacted notification receipt, grouped ongoing-incident behavior, delivery-failure visibility, and audit-event correlation before closing T01.
+**Controlled lab progress (October 2, 2026):** The configured SMTP synthetic delivery test succeeded. After repairing the audit collector's PostgreSQL placeholder parsing, controlled authentication-failure, authorization-denial, and privileged-change events fired their corresponding security rules.
+
+**Owner-directed closure (October 2, 2026):** Real notifications for the authentication-failure, authorization-denial, and privileged-change rules were received successfully, and repeated events remained one grouped ongoing incident. The owner does not require separate retained evidence for these confirmations. The controlled notification-delivery-failure exercise is omitted from this Phase 1B task by owner direction; Alertmanager's failure counter/rule remains implemented for operational use.
 
 
 ### OPS-003 — Monitor platform capacity

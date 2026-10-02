@@ -1,6 +1,6 @@
 # Phase 1 – Foundation and Usable Vertical Slice
 
-Status: Phase 1A complete under ADR-011, ADR-016, and ADR-017; Phase 1B and 1C remain open. See [backlog task evidence](delivery-backlog.md#evidence-conventions) for the dated implementation baseline and verification limits. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
+Status: Phase 1A complete under ADR-011, ADR-016, and ADR-017; Phase 1B complete under its recorded owner-directed alert-delivery exception; Phase 1C remains open. See [backlog task evidence](delivery-backlog.md#evidence-conventions) for the dated implementation baseline and verification limits. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
 
 Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 
@@ -10,7 +10,7 @@ Create, update, observe, and deliberately remove a web application with PostgreS
 
 ## Ordered work packages and acceptance gates
 
-The [delivery backlog](delivery-backlog.md) supplies binding acceptance criteria and the [development plan](development-plan.md#backlog-delivery-commitments) maps every story. Gate 1A is complete; deliver 1B then 1C in order. Under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md), use controlled, reversible checks on the existing lab; do not require a separate test platform or watchdog. [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) omits isolated recovery exercises and recurring full-restoration scheduling from Phase 1A.
+The [delivery backlog](delivery-backlog.md) supplies binding acceptance criteria and the [development plan](development-plan.md#backlog-delivery-commitments) maps every story. Gates 1A and 1B are complete; deliver 1C next. Under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md), use controlled, reversible checks on the existing lab; do not require a separate test platform or watchdog. [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) omits isolated recovery exercises and recurring full-restoration scheduling from Phase 1A.
 
 ### 1A — Operational protection
 
