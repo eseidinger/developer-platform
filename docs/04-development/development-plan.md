@@ -1,6 +1,6 @@
 # Development Plan and Architectural Evolution
 
-As of October 1, 2026. Future phases are proposals without confirmed dates.
+As of October 2, 2026. Future phases are proposals without confirmed dates.
 
 ## Architectural evolution
 
@@ -16,6 +16,7 @@ As of October 1, 2026. Future phases are proposals without confirmed dates.
 | September 24, 2026 | AI focus on operations/development; ApplicationSpec defined | Extensions above the same API |
 | September 25, 2026 | Structured documentation established | Separate architecture, decisions, and planning |
 | October 1, 2026 | Kotlin/Spring catalog, Quarkus control plane, and Python automation roles selected | Target ownership boundaries accepted; staged implementation and migration remain open |
+| October 2, 2026 | Generic OIDC boundary accepted with Keycloak as the supported lab reference | Platform-owned project grants and Phase 1B roles selected; implementation and acceptance remain open |
 
 ## Implementation status
 
@@ -106,10 +107,11 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 |---|---|---|
 | Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](delivery-backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
 | Polyglot service rollout | Specify catalog/control-plane/job/event contracts and migration/rollback packages; satisfy ADR-006 transition gates | Logical seams in Phase 1C; extraction and cutover in Phase 2 |
-| Identity provider, roles, and realm model | Explicitly accept the detailed ADR-004 approach | Minimal IAM in Phase 1; expansion in Phase 3 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
 | Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |
 | RPO/RTO, retention, capacity | Backup policy is selected (24-hour RPO, four-hour RTO, 14/8/6 retention); [ADR-017](../03-decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits full-horizon retention evidence from Phase 1A, so measure recovery, retention, and capacity against targets | Before production-like acceptance |
+
+[ADR-004](../03-decisions/ADR-004-identity-and-access-management.md) resolves the identity-provider, Phase 1B role and realm-model decision: use a generic OIDC contract, Keycloak as the supported lab reference, and platform-owned project grants. Implementation and acceptance remain OPS-001/002/004 work; hosted-application client automation and richer access experience remain Phase 3 work.
 
 The project owner decides scope and ADRs; implementation and operations provide evidence. Specific delivery owners, dates, and capacity commitments remain unassigned; the project owner is the sole alert responder.
 

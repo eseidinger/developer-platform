@@ -24,7 +24,7 @@ Maintain the documented replacement-host procedure and independently recoverable
 
 ### 1B — Accountable access and security events
 
-Release scoped individual authentication and durable audit together. Choose the identity/membership source and explicitly resolve applicable IAM decisions without requiring the richer Phase 3 experience.
+Release scoped individual authentication and durable audit together. Apply the accepted [ADR-004](../03-decisions/ADR-004-identity-and-access-management.md) boundary: provider-neutral OIDC with Keycloak as the supported lab reference, immutable issuer/subject principals, and platform-owned memberships and grants. Do not require the richer Phase 3 experience.
 
 - Enforce viewer/developer/administrative permissions for every project/environment operation, including logs, metrics, secrets and jobs. A developer never uses the shared administrator token. Revoke a platform grant and prove the next request is denied and audited.
 - Record actor, scope, timestamp, action, target, revision/operation where applicable, and result. Include authentication/access failures, privileged operations and membership changes. Redact secrets; define retention and tamper protection, restrict access, and prove developers cannot alter audit records.

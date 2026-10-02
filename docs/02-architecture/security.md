@@ -1,6 +1,6 @@
 # Security and Identity
 
-Status: implemented administrator boundary followed by a target security design. Keycloak, individual platform identities and scoped grants are not implemented.
+Status: implemented administrator boundary followed by the accepted ADR-004 security design. Keycloak, individual platform identities and scoped grants are not implemented.
 
 ## Current security boundary
 
@@ -20,19 +20,20 @@ Catalog-to-control-plane calls use a service identity and return stable IDs plus
 
 Platform users do not automatically receive Kubernetes access. The provisioner uses separate infrastructure credentials with the smallest practical scope and operation set.
 
-## Initial role model
+## Phase 1B role model
 
 | Role | Read | Deployment/configuration | Operations | Grants / data deletion |
 |---|---|---|---|---|
 | viewer | Authorized status, redacted logs/metrics | No | No | No |
 | developer | Yes | Authorized scopes, no privilege escalation | As explicitly permitted | No |
-| operator | Yes | Operational changes | Restart, scale, rollback within scope | No |
 | project-admin | Yes | Yes | Yes | Project-scoped; separate confirmation for data deletion |
-| organization-owner | Organization administration | Through explicit bindings | Through explicit bindings | Memberships and projects |
+| platform-admin | All project scopes | Yes | Yes | All project grants; separate confirmation for data deletion |
+
+Later phases may add operator or organization roles without weakening these permissions. Keycloak authenticates the principal, but platform-owned bindings authorize project access. Bindings use the immutable OIDC issuer/subject pair rather than mutable usernames or email addresses. A platform role never grants hosted-application business-data access.
 
 Database read/write permissions are separate grants and do not follow automatically from log/deployment permissions. Even an administrator does not automatically receive business-data access to a hosted application.
 
-OIDC identities use stable issuer and subject identifiers, not only mutable display names. Validate token signatures, issuer, audience, and validity. Browser/CLI and machine-to-machine flows use suitable separate clients. Frontends contain no client secrets.
+OIDC identities use stable issuer and subject identifiers, not only mutable display names. Validate token signatures, issuer, audience, and validity. Human CLI clients use Authorization Code with PKCE or Device Authorization; machine-to-machine flows use separate service identities and explicit grants. Frontends contain no client secrets. Keycloak is the supported lab reference deployment, while API authentication remains provider-neutral OIDC.
 
 ## Resources and secrets
 

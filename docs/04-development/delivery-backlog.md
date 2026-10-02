@@ -385,6 +385,8 @@ Phase tasks:
 
 **Task evidence (B-2026-09-26):** T01 — source absent for individual scoped identities, memberships, roles, grant revocation and audit. The [platform guide](../../platform/README.md) correctly describes a single administrator bearer token granting all-project access. Infrastructure database/network restrictions do not supply user authorization. Local end-user acceptance unverified; the inspected smoke script's unauthenticated rejection does not test scoped access.
 
+**Decision update (October 2, 2026):** [ADR-004](../03-decisions/ADR-004-identity-and-access-management.md) accepts a provider-neutral OIDC boundary with Keycloak as the supported lab reference, platform-owned grants, immutable issuer/subject principal keys, and `viewer`, `developer`, `project-admin` and `platform-admin` roles. This resolves the prerequisite design choice but supplies no OPS-004 implementation or acceptance evidence.
+
 
 ### OPS-005 — Enforce project policies and quotas
 
@@ -714,9 +716,11 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. Runtime logins own their database; no separate human identity, controlled tunnel, grant audit or session revocation workflow exists (F-09/UC-03).
 
-- [ ] **PLAN-009 · 3** — Automate hosted-application OIDC clients/redirect URIs; demonstrate platform/application role separation and no implicit platform-admin access. Record the blocking decision while the implementation choice remains open; F-10 acceptance is still required for Phase 3 completion. Prerequisites: Phase 2 gate; ADR-004 acceptance.
+- [ ] **PLAN-009 · 3** — Automate hosted-application OIDC clients/redirect URIs against the accepted provider-neutral OIDC boundary; demonstrate platform/application role separation and no implicit platform-admin access. F-10 acceptance is required for Phase 3 completion. Prerequisites: Phase 2 gate; ADR-004 acceptance.
 
-  **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No OIDC provider/client automation or platform/application role-separation flow exists. ADR-004 remains proposed.
+  **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No OIDC provider/client automation or platform/application role-separation flow exists. ADR-004 was proposed at this baseline.
+
+  **Decision update (October 2, 2026):** ADR-004 accepts a generic OIDC contract with Keycloak as the supported lab reference and platform-owned authorization. This resolves the blocking design choice but supplies no implementation or acceptance evidence for PLAN-009.
 
 - [ ] **PLAN-010 · 4.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 3 gate; scoped data/audit evidence.
 

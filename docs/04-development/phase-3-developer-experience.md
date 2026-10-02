@@ -13,7 +13,7 @@ Offer the catalog and control-plane lifecycle as understandable self-service. An
 - Provide a portal that uses the catalog for application metadata/ownership and the control plane for deployments, redacted configuration, logs, and operations; do not reproduce either service's authorization rules in the UI.
 - Provide a CLI over the same versioned public contracts, with understandable errors and progress.
 - Create a web-application/PostgreSQL template, preferably as one deployable artifact.
-- Resolve the ADR-004 implementation decision, then automate OIDC clients and redirect URIs for hosted applications. F-10 remains a Phase 3 requirement while the implementation choice is open; deferring that requirement requires an explicit scope amendment.
+- Extend the accepted ADR-004 boundary by automating OIDC clients and controlled redirect URIs for hosted applications while preserving the separation between platform and application permissions. F-10 remains a Phase 3 requirement; deferring it requires an explicit scope amendment.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
 - Make ownership, roles, and the distinction between application and platform permissions visible.
 - At phase entry, review the deferred multi-component backlog against a concrete use case and measured capacity. Design independent updates, per-component results/configuration/secrets and a versioned migration path before scheduling implementation. Record the scheduling decision or continued deferral and next review trigger in the development plan; avoid hidden schema changes.

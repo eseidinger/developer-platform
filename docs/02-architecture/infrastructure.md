@@ -13,7 +13,7 @@ The available Ubuntu host has **16 vCPUs and 32 GB RAM**. The hybrid design runs
 | Target application catalog | Docker placement proposed; not implemented | Kotlin/Spring Boot service for application metadata, ownership, environments, dependencies, and grants |
 | Target control plane | Docker placement proposed; not implemented | Quarkus service for deployment intent, policy, operations, runtime status, and events |
 | Target automation workers | Docker placement proposed; not implemented | Python execution of approved provider operations with scoped credentials |
-| Identity provider | Dedicated service; Keycloak proposed | Authentication and client identities |
+| Identity provider | Dedicated service; generic OIDC boundary with Keycloak selected for the supported lab profile; not implemented | Authentication and client identities; platform grants remain platform-owned |
 | PostgreSQL | Docker outside k3d, persistent volume | Platform metadata and separate project databases |
 | Workload compute | k3d with project namespaces; implemented | Applications, services, secrets, and Traefik ingress; environment model remains proposed |
 | Observability | Docker outside k3d; implemented | Prometheus, Grafana, Loki, Alertmanager; data sources are provisioned, dashboards are not |
