@@ -104,9 +104,10 @@ The manual procedure is below.
 
 1. Copy the repository to `/opt/developer-platform` and install the prerequisites.
 2. Run `python3 scripts/init.py`, then configure `.env`:
-   `PLATFORM_DOMAIN=platform.example.com`, `APPS_DOMAIN=apps.example.com`,
+   `PLATFORM_DOMAIN=platform.example.com`, `APPS_DOMAIN=apps.example.com`, and
+   `IDENTITY_DOMAIN=identity.example.com`,
    a valid `TLS_EMAIL`, and `EDGE_BIND_IP=0.0.0.0`.
-3. Point DNS for the platform and `*.apps.example.com` to the host IP.
+3. Point DNS for the platform, identity service, and `*.apps.example.com` to the host IP.
    Allow public access only to SSH from the admin network and TCP ports 80/443;
    UDP port 443 is optional for HTTP/3. Account for Docker port publishing in
    the firewall configuration.

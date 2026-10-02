@@ -164,3 +164,30 @@ def record_event(actor: Actor, action: str, target_kind: str, target_id: str | N
             Jsonb(redact(scope or {})), result, revision, operation_id, Jsonb(redact(detail or {})),
         )).fetchone()
     return row[0]
+
+
+AUDIT_EXPORT_COLUMNS = (
+    "id", "occurred_at", "actor_kind", "actor_id", "action", "target_kind", "target_id",
+    "scope", "result", "revision", "operation_id", "detail",
+)
+
+
+def read_events(start, end, limit: int) -> list[dict[str, Any]]:
+    """Read a bounded, redacted audit window through the audit-reader role."""
+    with audit_reader_connect() as conn:
+        rows = conn.execute("""SELECT id, occurred_at, actor_kind, actor_id, action, target_kind, target_id,
+                                     scope, result, revision, operation_id, detail
+            FROM platform_audit.events
+            WHERE occurred_at >= %s AND occurred_at < %s
+            ORDER BY occurred_at, id
+            LIMIT %s""", (start, end, limit)).fetchall()
+    events = []
+    for row in rows:
+        event = dict(zip(AUDIT_EXPORT_COLUMNS, row))
+        event["occurred_at"] = event["occurred_at"].isoformat()
+        # Redact again at the read boundary so a legacy or manually inserted row
+        # cannot disclose a credential through an operator export.
+        event["scope"] = redact(event["scope"])
+        event["detail"] = redact(event["detail"])
+        events.append(event)
+    return events

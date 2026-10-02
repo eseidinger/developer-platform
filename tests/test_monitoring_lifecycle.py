@@ -4,6 +4,7 @@ import os
 import sys
 import tempfile
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -166,3 +167,38 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.deploy().status_code, 403)
         denied = self.mocks[3].call_args
         self.assertEqual(denied.args[1:5], ("authorization", "project", "smoke", "denied"))
+
+    def test_operator_inspection_and_export_are_platform_admin_only(self):
+        self.deploy()
+        with patch.object(main, "is_platform_admin", return_value=True), \
+             patch.object(main, "grants_for_project", return_value=[
+                 ("https://issuer.example", "person-2", "Viewer", "viewer", datetime.now(timezone.utc))
+             ]), \
+             patch.object(main, "read_events", return_value=[{
+                 "id": 9, "occurred_at": "2026-10-02T00:00:00+00:00", "actor_kind": "oidc",
+                 "actor_id": "issuer|person-1", "action": "authorization", "target_kind": "project",
+                 "target_id": "smoke", "scope": {"project": "smoke"}, "result": "denied",
+                 "revision": None, "operation_id": None, "detail": {"reason": "denied"}
+             }]):
+            permissions = self.client.get("/operator/projects/smoke/permissions", headers=self.headers)
+            self.assertEqual(permissions.status_code, 200)
+            self.assertEqual(permissions.json()["grants"][0]["role"], "viewer")
+            security = self.client.get("/operator/projects/smoke/security-configuration", headers=self.headers)
+            self.assertEqual(security.status_code, 200)
+            self.assertFalse(security.json()["workload_security"]["service_account_token_automount"])
+            exported = self.client.get("/operator/audit/events", headers=self.headers, params={
+                "start": "2026-10-02T00:00:00Z", "end": "2026-10-02T01:00:00Z", "format": "csv"})
+            self.assertEqual(exported.status_code, 200)
+            self.assertIn("occurred_at", exported.text)
+            self.assertIn("authorization", exported.text)
+        with patch.object(main, "is_platform_admin", return_value=False):
+            self.assertEqual(self.client.get("/operator/projects/smoke/permissions", headers=self.headers).status_code, 403)
+
+    def test_audit_export_rejects_unbounded_or_offsetless_windows(self):
+        with patch.object(main, "is_platform_admin", return_value=True):
+            response = self.client.get("/operator/audit/events", headers=self.headers, params={
+                "start": "2026-10-02T00:00:00", "end": "2026-10-02T01:00:00"})
+            self.assertEqual(response.status_code, 400)
+            response = self.client.get("/operator/audit/events", headers=self.headers, params={
+                "start": "2026-10-01T00:00:00Z", "end": "2026-11-02T00:00:01Z"})
+            self.assertEqual(response.status_code, 400)

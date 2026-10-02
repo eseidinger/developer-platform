@@ -206,3 +206,25 @@ corresponding redacted audit events through the restricted operator procedure.
 Time-filtered audit inspection/export, deployed backup coverage, security-alert
 delivery evidence, and the remaining OPS-001/002/004 acceptance criteria are
 separate required work; do not mark Phase 1B complete from this runbook alone.
+
+## Automate restricted inspection and export checks
+
+The non-mutating check below verifies the platform-admin inspection surfaces,
+the bounded audit export's redaction, and, when supplied, developer denial. It
+prints only pass/fail assertions; it never prints tokens, response bodies, or
+audit identities. Run it with the disposable project and short-lived tokens
+already obtained above:
+
+```bash
+export PLATFORM_ADMIN_TOKEN="$ADMIN_TOKEN"
+export PHASE1B_PROJECT="$A"
+export DEVELOPER_TOKEN='…' # optional; enables the 403 assertions
+.venv/bin/python scripts/check-phase-1b-security.py
+```
+
+The API allows only platform administrators to use `/operator/*`. The inspection
+result reports the managed workload security and network-policy contract and
+secret references by name; it never returns secret values. Audit export requires
+an offset-bearing UTC time window no longer than 31 days and is capped at 10,000
+events. Use the JSON export for controlled evidence or `format=csv` for a
+redacted operator export.

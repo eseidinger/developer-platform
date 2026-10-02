@@ -1,10 +1,11 @@
 import sys
 import unittest
+from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
-from app.audit import Actor, REDACTED, record_event, redact
+from app.audit import Actor, REDACTED, read_events, record_event, redact
 
 
 class AuditTests(unittest.TestCase):
@@ -31,3 +32,18 @@ class AuditTests(unittest.TestCase):
         params = conn.execute.call_args.args[1]
         self.assertEqual(params[0:5], ("oidc", "https://issuer.example|person-1", "project.provision", "project", "demo"))
         self.assertEqual(params[-1].obj["token"], REDACTED)
+
+    def test_read_events_uses_reader_and_redacts_legacy_values(self):
+        conn = MagicMock()
+        conn.__enter__.return_value = conn
+        occurred = datetime(2026, 10, 2, tzinfo=timezone.utc)
+        conn.execute.return_value.fetchall.return_value = [
+            (7, occurred, "oidc", "issuer|subject", "audit.export", "audit", None,
+             {"project": "demo"}, "succeeded", None, None, {"token": "must-not-export"})
+        ]
+        with patch("app.audit.audit_reader_connect", return_value=conn):
+            events = read_events(occurred, occurred, 10)
+        self.assertEqual(events[0]["id"], 7)
+        self.assertEqual(events[0]["occurred_at"], occurred.isoformat())
+        self.assertEqual(events[0]["detail"]["token"], REDACTED)
+        self.assertNotIn("must-not-export", str(events))

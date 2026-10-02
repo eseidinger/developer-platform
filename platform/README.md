@@ -258,10 +258,12 @@ At startup, the API creates `platform_audit.events` and the no-login owner plus
 restricted reader and writer database roles. API event writes use only the writer login, which can call
 the security-definer append function but has no table read, update, delete, truncate,
 or schema privileges. The table rejects update, delete, and truncate statements.
-Project database roles cannot connect to the `platform` database, and the API exposes
-no audit-record endpoint in this stage. The separate reader login is used only to
-derive bounded, redacted security-alert metrics. OPS-001-T02 will add restricted
-operator inspection and time-filtered export.
+Project database roles cannot connect to the `platform` database. Only a
+`platform-admin` may call the `/operator/*` inspection endpoints: project-grant
+inspection, managed workload/network-security configuration inspection, and a
+bounded time-filtered audit export. The API reads exports through the separate
+reader login and redacts again before returning JSON or CSV. Project members,
+including project administrators, cannot access these endpoints.
 
 Event details recursively redact password, secret, token, authorization, credential,
 cookie, and key fields; bearer/basic credential strings are redacted as well. Store

@@ -30,7 +30,7 @@ kubectl is also installed at `/usr/local/bin/kubectl` for host administration.
 For example, run `sudo kubectl --kubeconfig /opt/developer-platform/.runtime/admin.kubeconfig get nodes`.
 
 Existing `.env` secrets, volumes, and project state are preserved. Inventory values
-manage only `PLATFORM_DOMAIN`, `APPS_DOMAIN`, `TLS_EMAIL`, and `EDGE_BIND_IP`.
+manage only `PLATFORM_DOMAIN`, `APPS_DOMAIN`, `IDENTITY_DOMAIN`, `TLS_EMAIL`, and `EDGE_BIND_IP`.
 Other settings retain their generated or existing values. For a custom subnet or
 K3S image, prepare the target `.env` using `scripts/init.py` and edit it before the
 first deployment. Existing clusters are not automatically upgraded by bootstrap.
@@ -46,6 +46,7 @@ Useful inventory overrides:
 | `platform_kubectl_version` | `v1.36.4` | kubectl release compatible with the default Kubernetes 1.36 cluster |
 | `platform_domain` | `platform.localhost` | Platform API domain |
 | `platform_apps_domain` | `apps.localhost` | Application domain suffix |
+| `platform_identity_domain` | `identity.localhost` | Keycloak/OIDC issuer domain; configure its DNS to the platform host |
 | `platform_tls_email` | `admin@example.com` | ACME contact email |
 | `platform_edge_bind_ip` | `127.0.0.1` | Use `0.0.0.0` for public ingress |
 

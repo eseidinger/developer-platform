@@ -58,7 +58,7 @@ Without `--volumes`, teardown retains Compose service volumes, including Postgre
 
 `bash scripts/down.sh --volumes` deletes persistent Compose service data as well as the cluster. It is a deliberate disposable-lab reset, not a recovery or routine upgrade step. Both teardown modes preserve `.env`, local backups, and installed tools.
 
-Configure the [watchdog and heartbeat](../../operations/watchdog/ansible/README.md) and [off-host backup process](backup-recovery.md) separately. Installation alone does not verify notification receipt or recoverability.
+Configure the [watchdog and heartbeat](../../operations/watchdog/ansible/README.md) and [off-host backup process](backup-recovery.md) separately. For an existing lab's one-time OIDC transition, follow the [deployed Keycloak bootstrap](keycloak-bootstrap.md) procedure. Installation alone does not verify notification receipt or recoverability.
 
 ## Target installation and release procedures
 

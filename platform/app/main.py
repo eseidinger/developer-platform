@@ -4,6 +4,9 @@ import hmac
 import logging
 import os
 import threading
+import csv
+import io
+from datetime import datetime, timedelta, timezone
 from typing import Literal
 from contextlib import asynccontextmanager
 
@@ -13,16 +16,16 @@ from psycopg.types.json import Jsonb
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
 from kubernetes.client.exceptions import ApiException
 from pydantic import BaseModel, Field, field_validator
 
-from .audit import Actor, initialize as initialize_audit, record_event
+from .audit import Actor, initialize as initialize_audit, read_events, record_event
 from .authorization import (bootstrap_platform_admin, grant as grant_role, initialize as initialize_authorization,
-                            is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
+                            grants_for_project, is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
                             upsert_principal)
 from .identity import AuthenticationError, Principal, configured_verifier
 from .manifests import resources, validate_name
@@ -198,6 +201,81 @@ def projects(principal: Principal = Depends(current_principal)):
     with connect() as conn:
         rows = projects_for_principal(conn, principal)
     return [{"name": name, "spec": spec, "status": status} for name, spec, status in rows]
+
+
+def _operator_audit(principal: Principal, action: str, target_id: str | None, detail: dict):
+    require_platform_admin(principal)
+    required_audit(actor_for(principal), action, "audit" if action.startswith("audit.") else "project", target_id,
+                   "succeeded", {"scope": "platform"}, detail)
+
+
+@app.get("/operator/projects/{name}/permissions")
+def inspect_project_permissions(name: str, principal: Principal = Depends(current_principal)):
+    """Inspect project grants; this is intentionally unavailable to project members."""
+    _operator_audit(principal, "security.permissions.inspect", name, {"project": name})
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+            raise HTTPException(404, "Unknown project")
+        rows = grants_for_project(conn, name)
+    return {"project": name, "grants": [
+        {"issuer": issuer, "subject": subject, "display_name": display_name, "role": role,
+         "granted_at": granted_at.isoformat()} for issuer, subject, display_name, role, granted_at in rows
+    ]}
+
+
+@app.get("/operator/projects/{name}/security-configuration")
+def inspect_project_security_configuration(name: str, principal: Principal = Depends(current_principal)):
+    """Return the safe, managed workload and network policy contract for a project."""
+    _operator_audit(principal, "security.configuration.inspect", name, {"project": name})
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+            raise HTTPException(404, "Unknown project")
+    managed = resources(name, "inspection.invalid", 8080, os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], "")
+    selected = {item["kind"]: item for item in managed if item["kind"] in {
+        "Namespace", "ResourceQuota", "LimitRange", "NetworkPolicy", "Deployment"
+    }}
+    deployment = selected["Deployment"]
+    container = deployment["spec"]["template"]["spec"]["containers"][0]
+    return {
+        "project": name,
+        "namespace": selected["Namespace"],
+        "resource_quota": selected["ResourceQuota"]["spec"],
+        "limit_range": selected["LimitRange"]["spec"],
+        "network_policy": selected["NetworkPolicy"]["spec"],
+        "workload_security": {
+            "pod": deployment["spec"]["template"]["spec"]["securityContext"],
+            "container": container["securityContext"],
+            "service_account_token_automount": deployment["spec"]["template"]["spec"]["automountServiceAccountToken"],
+            "secret_references": [entry["secretRef"]["name"] for entry in container.get("envFrom", [])],
+        },
+    }
+
+
+@app.get("/operator/audit/events")
+def export_audit_events(start: datetime, end: datetime, format: Literal["json", "csv"] = "json",
+                        limit: int = Query(default=1000, ge=1, le=10000),
+                        principal: Principal = Depends(current_principal)):
+    """Export a bounded UTC audit window without secret values."""
+    if start.tzinfo is None or end.tzinfo is None:
+        raise HTTPException(400, "start and end must include a UTC offset")
+    start, end = start.astimezone(timezone.utc), end.astimezone(timezone.utc)
+    if end <= start or end - start > timedelta(days=31):
+        raise HTTPException(400, "Select a positive audit window no longer than 31 days")
+    _operator_audit(principal, "audit.export", None, {"start": start.isoformat(), "end": end.isoformat(), "format": format})
+    events = read_events(start, end, limit)
+    if format == "json":
+        return {"start": start.isoformat(), "end": end.isoformat(), "events": events}
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=("id", "occurred_at", "actor_kind", "actor_id", "action",
+                                                 "target_kind", "target_id", "scope", "result", "revision",
+                                                 "operation_id", "detail"), extrasaction="ignore")
+    writer.writeheader()
+    for event in events:
+        row = event.copy()
+        row["scope"] = str(row["scope"])
+        row["detail"] = str(row["detail"])
+        writer.writerow(row)
+    return PlainTextResponse(output.getvalue(), media_type="text/csv")
 
 @app.put("/projects/{name}")
 def provision(name: str, project: Project, principal: Principal = Depends(current_principal)):

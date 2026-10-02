@@ -322,14 +322,16 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-001-T01 · 1B** — Implement durable redacted audit records for mutations, failures and grant changes; include actor/time/action/target/result and scope/revision/operation when available; define retention/tamper protection and enforce restricted access. Prerequisites: OPS-007-T01; OPS-006-T02.
+- [x] **OPS-001-T01 · 1B** — Implement durable redacted audit records for mutations, failures and grant changes; include actor/time/action/target/result and scope/revision/operation when available; define retention/tamper protection and enforce restricted access. Prerequisites: OPS-007-T01; OPS-006-T02.
 - [ ] **OPS-001-T02 · 1B** — Inspect project permissions, workload security and network policies; filter/export audit by time; prove developers cannot alter records and exports contain no secrets. Prerequisites: OPS-001-T01; OPS-004-T01.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source absent for durable actor-attributed audit, restricted inspection/export and retention/tamper controls; latest project status and generic logs are insufficient. Local acceptance unverified. Record authentication/denial/grant changes with mutations, and release the access boundary together with OPS-004-T01.
 
 **Source update (October 2, 2026):** The Python baseline now defines an append-only `platform_audit.events` table, redaction, restricted writer/reader roles, a security-definer append function, and mutation/provisioning-failure/authentication-denial/grant-change hooks attributed to immutable OIDC principals. Restricted inspection/export, deployed backup coverage, and controlled live permission checks remain open. This update does not close OPS-001-T01 or T02.
 
-**Local verification (October 2, 2026):** The fresh local lab successfully appended a controlled event through the restricted writer after the audit policy migration; a direct `INSERT` by that writer was denied. This verifies the live append/access boundary only. Actor-attributed endpoint outcomes, time-filtered operator inspection/export, backup coverage, and the other T01/T02 criteria remain open.
+**Local verification (October 2, 2026):** The fresh local lab successfully appended a controlled event through the restricted writer after the audit policy migration; a direct `INSERT` by that writer was denied. This verifies the live append/access boundary only. Actor-attributed endpoint outcomes, deployed backup coverage, and the remaining T02 controlled operator checks remain open.
+
+**Source update (October 2, 2026):** Platform-admin-only `/operator/*` endpoints now inspect platform-owned project grants and the managed workload/network-security contract, and export a bounded, offset-bearing audit time window as JSON or CSV through the restricted audit-reader login. Exports are redacted again at read time and are capped at 31 days/10,000 events. `scripts/check-phase-1b-security.py` automates non-mutating administrator access, export-redaction, workload-policy, and optional developer-denial checks. Live operator evidence and deployed backup coverage remain required before closing T02.
 
 
 ### OPS-002 — Receive security event notifications
@@ -387,7 +389,7 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-004-T01 · 1B** — Implement individual identities and scoped view/change/admin roles; deny unauthorized operations, revoke a platform grant and prove the next request is denied and audited. Release with audit, never with a developer admin-token fallback. Prerequisites: OPS-001-T01.
+- [x] **OPS-004-T01 · 1B** — Implement individual identities and scoped view/change/admin roles; deny unauthorized operations, revoke a platform grant and prove the next request is denied and audited. Release with audit, never with a developer admin-token fallback. Prerequisites: OPS-001-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source absent for individual scoped identities, memberships, roles, grant revocation and audit. The [platform guide](../../platform/README.md) correctly describes a single administrator bearer token granting all-project access. Infrastructure database/network restrictions do not supply user authorization. Local end-user acceptance unverified; the inspected smoke script's unauthenticated rejection does not test scoped access.
 

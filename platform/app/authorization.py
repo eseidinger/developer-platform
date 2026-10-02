@@ -87,6 +87,15 @@ def projects_for_principal(conn, principal: Principal):
         WHERE g.issuer=%s AND g.subject=%s ORDER BY p.name""", (principal.issuer, principal.subject)).fetchall()
 
 
+def grants_for_project(conn, project: str):
+    """Return platform-owned project grants for restricted operator inspection."""
+    return conn.execute("""SELECT g.issuer, g.subject, p.display_name, g.role, g.granted_at
+        FROM platform_grants g
+        JOIN platform_principals p ON p.issuer=g.issuer AND p.subject=g.subject
+        WHERE g.scope_kind='project' AND g.scope_id=%s
+        ORDER BY g.granted_at, g.issuer, g.subject""", (project,)).fetchall()
+
+
 def grant(conn, principal: Principal, scope_kind: str, scope_id: str | None, role: str) -> None:
     if role not in ROLE_ORDER or scope_kind not in {"platform", "project"}:
         raise ValueError("Unsupported role or scope")
