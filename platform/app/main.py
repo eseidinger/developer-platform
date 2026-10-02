@@ -16,7 +16,7 @@ from psycopg.types.json import Jsonb
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
@@ -78,6 +78,25 @@ async def lifespan(app):
         security_worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
+
+
+@app.get("/", include_in_schema=False)
+def portal():
+    """Serve the Keycloak PKCE portal without embedding credentials in the API."""
+    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "portal.html"))
+
+
+@app.get("/portal/config", include_in_schema=False)
+def portal_config(request: Request):
+    """Publish non-secret browser OIDC configuration for the same-origin portal."""
+    issuer = os.environ.get("OIDC_ISSUER", "https://" + os.environ.get("IDENTITY_DOMAIN", "identity.localhost") + "/realms/platform")
+    if request.url.hostname in {"localhost", "127.0.0.1"}:
+        redirect_uri = str(request.base_url)
+    else:
+        # The proxy terminates public HTTPS and forwards HTTP to Uvicorn, so
+        # request.base_url would otherwise produce an invalid HTTP callback.
+        redirect_uri = "https://" + os.environ.get("PLATFORM_DOMAIN", "platform.localhost") + "/"
+    return {"issuer": issuer, "client_id": "platform-portal", "redirect_uri": redirect_uri}
 
 def best_effort_audit(actor: Actor, action: str, target_kind: str, target_id: str | None,
                       result: str, scope=None, detail=None):

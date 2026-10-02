@@ -38,6 +38,7 @@ services:
       KC_HTTP_ENABLED: "true"
       KC_HOSTNAME: https://${IDENTITY_DOMAIN:-identity.localhost}
       KC_PROXY_HEADERS: xforwarded
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
     volumes:
       - ./realm-platform.json:/opt/keycloak/data/import/realm-platform.json:ro
     networks: [platform]
@@ -46,3 +47,35 @@ services:
         condition: service_completed_successfully
     mem_limit: 1g
     cpus: 1
+
+  keycloak-realm-init:
+    image: quay.io/keycloak/keycloak:26.4.1
+    restart: "no"
+    entrypoint: ["/bin/sh", "-ec"]
+    command:
+      - |
+        until /opt/keycloak/bin/kcadm.sh config credentials --server http://keycloak:8080 --realm master \
+          --user admin --password "$$KEYCLOAK_ADMIN_PASSWORD"; do sleep 2; done
+        client_id="$$(/opt/keycloak/bin/kcadm.sh get clients -r platform -q clientId=platform-portal --fields id \
+          | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')"
+        if [ -z "$$client_id" ]; then
+          /opt/keycloak/bin/kcadm.sh create clients -r platform \
+            -s clientId=platform-portal -s name='Developer Platform Portal' -s enabled=true \
+            -s protocol=openid-connect -s publicClient=true -s standardFlowEnabled=true \
+            -s directAccessGrantsEnabled=false
+          client_id="$$(/opt/keycloak/bin/kcadm.sh get clients -r platform -q clientId=platform-portal --fields id \
+            | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')"
+        fi
+        test -n "$$client_id"
+        /opt/keycloak/bin/kcadm.sh update "clients/$$client_id" -r platform \
+          -s "redirectUris=[\"https://$$PLATFORM_DOMAIN/*\",\"http://localhost/*\",\"http://localhost:8000/*\",\"http://127.0.0.1:8000/*\",\"https://platform.localhost/*\"]" \
+          -s "webOrigins=[\"https://$$PLATFORM_DOMAIN\",\"http://localhost\",\"http://localhost:8000\",\"http://127.0.0.1:8000\",\"https://platform.localhost\"]" \
+          -s 'attributes={"pkce.code.challenge.method":"S256"}' \
+          -s 'protocolMappers=[{"name":"platform-api audience","protocol":"openid-connect","protocolMapper":"oidc-audience-mapper","consentRequired":false,"config":{"included.client.audience":"platform-api","id.token.claim":"false","access.token.claim":"true"}}]'
+    environment:
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run scripts/init.py}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
+    networks: [platform]
+    depends_on:
+      keycloak:
+        condition: service_started

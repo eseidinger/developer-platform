@@ -12,6 +12,7 @@ services:
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-platform-api}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/platform/protocol/openid-connect/certs}
       PLATFORM_BOOTSTRAP_SUBJECT: ${PLATFORM_BOOTSTRAP_SUBJECT:-}
+      PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
       KUBECONFIG: /run/platform/kubeconfig
@@ -22,6 +23,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      keycloak-realm-init:
+        condition: service_completed_successfully
     ports: ["127.0.0.1:8000:8000"]
     read_only: true
     tmpfs: ["/tmp"]

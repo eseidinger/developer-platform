@@ -9,6 +9,12 @@ Run from the repository root. Use disposable project names and separate human
 accounts. Do not put access tokens, Keycloak passwords, user-subject lists, or
 audit-reader credentials in Git, `.env`, shell history, or evidence output.
 
+The [access-validation portal](../../platform/README.md#access-validation-portal)
+offers the same API actions through browser PKCE login after Keycloak bootstrap.
+It is useful for the project/grant/revocation and restricted-inspection portions
+of this runbook; create the separate Keycloak test users first and retain only
+redacted HTTP results as evidence.
+
 ## Executed local validation — October 2, 2026
 
 The following controlled checks completed on the local lab. They are local
@@ -23,12 +29,16 @@ are still required.
   the restricted writer succeeded, while a direct writer `INSERT` was denied.
 - [x] Disposable authorization project A exists and received separate `viewer`,
   `developer`, and `project-admin` grants.
-- [ ] Obtain separate viewer/developer/project-admin tokens and execute the
+- [x] The browser PKCE portal completed Keycloak login for the deployed
+  identity provider without retaining an access token outside the browser tab.
+- [x] Separate viewer/developer/project-admin users completed the
   role-denial/cross-project matrix.
-- [ ] Grant, revoke, and prove immediate denial for a second platform-admin
-  token; correlate the request outcomes with durable audit records.
-- [ ] Complete restricted audit inspection/export, backup coverage, security
-  alert delivery/grouping, and all remaining OPS-001/002/004 acceptance work.
+- [x] A second platform-admin grant was revoked; its unchanged token received
+  `403` on the next request and the outcomes were correlated with audit records.
+- [x] A platform administrator completed restricted inspection/export and a
+  developer was denied operator access; audit export was redacted.
+- [ ] Complete deployed backup coverage, security-alert delivery/grouping, and
+  all remaining OPS-002 acceptance work.
 
 ## Bootstrap a fresh local identity service
 

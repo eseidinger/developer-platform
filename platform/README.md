@@ -1,9 +1,9 @@
 # Docker-based Developer Platform Lab: platform guide
 
 The platform API provisions applications on the lab's Kubernetes cluster and
-creates a PostgreSQL database for each project. The current interface is a REST API
-with interactive documentation; it has no portal, but it does enforce individual
-OIDC identities and platform-owned project grants.
+creates a PostgreSQL database for each project. The current interface includes a
+small browser portal plus a REST API with interactive documentation. Both enforce
+individual OIDC identities and platform-owned project grants.
 
 For installation and prerequisites, start with the [main README](../README.md).
 See [architecture](../docs/02-architecture/infrastructure.md) for isolation and availability limits,
@@ -15,6 +15,7 @@ After `bash scripts/up.sh` completes, these local endpoints are available:
 
 | Endpoint | Purpose |
 | --- | --- |
+| `http://localhost:8000/` | Keycloak login and Phase 1B access-validation portal |
 | `http://localhost:8000/docs` | Interactive API documentation |
 | `http://localhost:8000/openapi.json` | OpenAPI schema |
 | `http://localhost:8000/healthz` | API process health |
@@ -42,6 +43,21 @@ after recording the controlled setup evidence.
 
 For the full local bootstrap, Device Authorization with PKCE, scoped-role, and
 revocation evidence procedure, see the [Phase 1B access-validation runbook](../docs/05-operations/phase-1b-access-validation.md).
+
+## Access-validation portal
+
+Open the platform root URL after Keycloak bootstrap completes. The portal uses
+the `platform-portal` public Keycloak client with Authorization Code + PKCE; it
+keeps the access token only in browser memory and never displays it. On each
+deployment, `keycloak-realm-init` reconciles the client to the configured exact
+`PLATFORM_DOMAIN` redirect URI and web origin.
+
+The portal can create/reapply disposable projects, grant or revoke project and
+platform roles, list accessible projects, and call the restricted
+operator-inspection and redacted audit-export endpoints. Create distinct test
+users in Keycloak first, then sign in separately as each user to record the
+viewer/developer/project-admin denial matrix. It does not administer Keycloak
+users or store test subjects, evidence, or credentials.
 
 ## Create an application
 
