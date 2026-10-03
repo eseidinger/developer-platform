@@ -59,14 +59,14 @@ def observe_usage(runtime: Any, project: str, log, now: datetime | None = None) 
             containers = _get(item, "containers") or []
             pods.append({
                 "name": _get(_get(item, "metadata"), "name"),
-                "cpu_millicores": sum(parse_cpu(_get(_get(c, "usage"), "cpu")) for c in containers),
+                "cpu_millicores": round(sum(parse_cpu(_get(_get(c, "usage"), "cpu")) for c in containers), 3),
                 "memory_bytes": sum(parse_memory(_get(_get(c, "usage"), "memory")) for c in containers),
                 "sampled_at": sampled.isoformat()})
     except Exception as exc:
         log.error("Pod metrics malformed project=%s error_type=%s", project, type(exc).__name__)
         return _result("unavailable", "MetricsApiUnavailable", now)
     pods.sort(key=lambda p: p["name"])
-    totals = {"cpu_millicores": sum(p["cpu_millicores"] for p in pods),
+    totals = {"cpu_millicores": round(sum(p["cpu_millicores"] for p in pods), 3),
               "memory_bytes": sum(p["memory_bytes"] for p in pods)}
     if oldest > STALE_AFTER_SECONDS:
         return _result("stale", "SampleOlderThan%ds" % STALE_AFTER_SECONDS, now, pods, totals)
