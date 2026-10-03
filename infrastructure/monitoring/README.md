@@ -91,9 +91,21 @@ There is no additional external watchdog monitor. The existing heartbeat checks
 API and Prometheus readiness; it does not prove Alertmanager delivery. Watchdog
 silent failure remains accepted under [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md).
 
-## Explicit retirement after manual workload removal
+## Retirement
 
-The platform still has no automated destructive project deletion workflow. An
+Preferred: preview, then confirm with the returned `scope_token`; the platform deletes
+the namespace itself and keeps the database, role and catalog.
+
+```bash
+curl -sS -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" http://127.0.0.1:8000/projects/hello/retirement-preview
+curl -sS -X POST http://127.0.0.1:8000/projects/hello/retire \
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" -H 'Content-Type: application/json' \
+  --data '{"confirm_name":"hello","scope_token":"<token>"}'   # 202 retiring: repeat until 200
+```
+
+### Manual removal (no token)
+
+An
 administrator deliberately removes a project's namespace, then records retirement
 using the API. A namespace that still exists (including one terminating) blocks
 retirement. Kubernetes access failures also block it. Accidental namespace loss

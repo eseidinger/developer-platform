@@ -1,0 +1,26 @@
+"""Retirement scope: what removal deletes, what it keeps, and the token that pins that scope."""
+import hashlib
+
+from .manifests import resources
+
+DOCUMENTATION_ADDRESS = "192.0.2.1"
+
+
+def scope_token(name: str, revision: int) -> str:
+    """Fingerprint of the removal scope; any new revision changes it and forces a new preview."""
+    return hashlib.sha256(f"retire:{name}:{revision}".encode()).hexdigest()[:32]
+
+
+def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
+    # Only kinds and names are used; the placeholder address and password never leave this function.
+    manifests = resources(name, spec.get("resolved_image", spec["image"]), spec.get("port", 8080),
+                          domain, DOCUMENTATION_ADDRESS, "unused", spec.get("resources"))
+    database = "project_" + name.replace("-", "_")
+    return {
+        "project": name,
+        "revision": revision,
+        "removes": [{"kind": m["kind"], "name": m["metadata"]["name"]} for m in manifests],
+        "route": name + "." + domain,
+        "retains": {"database": database, "role": database, "catalog_and_revisions": True},
+        "scope_token": scope_token(name, revision),
+    }

@@ -38,6 +38,7 @@ from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
 from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
+from .retirement import removal_scope
 from .security_alerts import security_alert_loop
 
 log = logging.getLogger(__name__)
@@ -704,11 +705,71 @@ def operation_status(operation_id: UUID, principal: Principal = Depends(current_
 
 class Retirement(BaseModel):
     confirm_name: str
+    scope_token: Optional[str] = Field(default=None, max_length=128)
+
+
+ACTIVE_OPERATION_SQL = """SELECT 1
+    FROM application_operations o
+    JOIN project_applications a ON a.application_id=o.application_id
+    JOIN project_environments e ON e.environment_id=a.environment_id
+    JOIN projects p ON p.project_id=e.project_id
+    WHERE p.name=%s AND o.state IN ('queued', 'running')
+    LIMIT 1"""
+
+
+def current_retirement_scope(conn, name):
+    row = conn.execute("""SELECT max(r.revision), (array_agg(r.spec ORDER BY r.revision DESC))[1]
+        FROM projects p
+        JOIN project_environments e ON e.project_id=p.project_id
+        JOIN project_applications a ON a.environment_id=e.environment_id
+        JOIN application_revisions r ON r.application_id=a.application_id
+        WHERE p.name=%s""", (name,)).fetchone()
+    if row is None or row[0] is None:
+        return None
+    return removal_scope(name, row[0], row[1], os.environ["APPS_DOMAIN"])
+
+
+def namespace_exists(name):
+    try:
+        runtime.resources.get(api_version="v1", kind="Namespace").get(name="project-" + name)
+    except ApiException as exc:
+        if exc.status != 404:
+            raise
+        return False
+    return True
+
+
+@app.get("/projects/{name}/retirement-preview")
+def retirement_preview(name: str, principal: Principal = Depends(current_principal)):
+    """Show what retirement would remove and keep; the token pins this scope for confirmation."""
+    actor = actor_for(principal)
+    require_permission(principal, "retire", name)
+    try:
+        validate_name(name)
+    except ValueError:
+        raise HTTPException(400, "Invalid project name")
+    with connect() as conn:
+        status = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
+        scope = current_retirement_scope(conn, name) if status else None
+        active = bool(status and conn.execute(ACTIVE_OPERATION_SQL, (name,)).fetchone())
+    if scope is None:
+        required_audit(actor, "project.retire.preview", "project", name, "rejected",
+                       {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    blockers = (["active_operation"] if active else []) + (["already_retired"] if status[0] == "retired" else [])
+    required_audit(actor, "project.retire.preview", "project", name, "succeeded",
+                   {"project": name}, {"revision": scope["revision"], "blockers": blockers})
+    return {**scope, "status": status[0], "blockers": blockers}
 
 
 @app.post("/projects/{name}/retire")
 def retire(name: str, confirmation: Retirement, principal: Principal = Depends(current_principal)):
-    """Acknowledge manual workload removal; retain catalog, database, and role."""
+    """Retire a project, keeping its catalog entry, database and role.
+
+    With the `scope_token` from the preview the platform deletes the project namespace itself; a
+    namespace that is still terminating answers 202 and the identical request is retried. Without
+    a token the namespace must already have been removed manually.
+    """
     actor = actor_for(principal)
     require_permission(principal, "retire", name)
     if name != confirmation.confirm_name:
@@ -721,30 +782,40 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
         required_audit(actor, "project.retire", "project", name, "rejected", {"project": name},
                        {"reason": "invalid_name"})
         raise HTTPException(400, "Invalid project name")
+    retiring = False
     try:
         with connect() as conn:
             conn.execute("SELECT pg_advisory_lock(731904)")
             try:
                 if not conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone():
                     raise HTTPException(404, "Unknown project")
-                active_operation = conn.execute("""SELECT 1
-                    FROM application_operations o
-                    JOIN project_applications a ON a.application_id=o.application_id
-                    JOIN project_environments e ON e.environment_id=a.environment_id
-                    JOIN projects p ON p.project_id=e.project_id
-                    WHERE p.name=%s AND o.state IN ('queued', 'running')
-                    LIMIT 1""", (name,)).fetchone()
-                if active_operation:
+                if conn.execute(ACTIVE_OPERATION_SQL, (name,)).fetchone():
                     raise HTTPException(409, "Wait for active application operations before retirement")
-                try:
-                    runtime.resources.get(api_version="v1", kind="Namespace").get(name="project-" + name)
-                except ApiException as exc:
-                    if exc.status != 404:
-                        raise
+                scope = current_retirement_scope(conn, name)
+                if confirmation.scope_token is not None:
+                    if scope is None or not hmac.compare_digest(confirmation.scope_token, scope["scope_token"]):
+                        required_audit(actor, "project.retire", "project", name, "rejected",
+                                       {"project": name}, {"reason": "scope_changed"})
+                        return JSONResponse(status_code=409, content={
+                            "detail": "The project changed since the preview; request a new preview",
+                            "code": "scope_changed"})
+                    runtime.resources.get(api_version="v1", kind="Namespace").delete(name="project-" + name)
+                    required_audit(actor, "project.retire.requested", "project", name, "succeeded",
+                                   {"project": name}, {"revision": scope["revision"]})
+                if namespace_exists(name):
+                    if confirmation.scope_token is None:
+                        raise HTTPException(409, "Remove the project namespace and wait for deletion before retirement")
+                    retiring = True
                 else:
-                    raise HTTPException(409, "Remove the project namespace and wait for deletion before retirement")
-                conn.execute("UPDATE projects SET status='retired',updated_at=now() WHERE name=%s", (name,))
-                publish_catalog(conn)
+                    with conn.transaction():
+                        conn.execute("UPDATE projects SET status='retired',updated_at=now() WHERE name=%s", (name,))
+                        if scope is not None:
+                            conn.execute("""INSERT INTO project_retirements(project_id, inventory)
+                                SELECT project_id, %s FROM projects WHERE name=%s
+                                ON CONFLICT(project_id) DO UPDATE
+                                SET inventory=excluded.inventory, retired_at=now()""",
+                                         (Jsonb({"revision": scope["revision"], **scope["retains"]}), name))
+                    publish_catalog(conn)
             finally:
                 conn.execute("SELECT pg_advisory_unlock(731904)")
     except HTTPException as exc:
@@ -757,9 +828,14 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                        {"error_type": type(exc).__name__})
         log.error("Project retirement failed: %s (%s)", name, type(exc).__name__)
         raise HTTPException(503, "Retirement incomplete; retry the same request. Existing data is retained.")
+    if retiring:
+        return JSONResponse(status_code=202, content={
+            "name": name, "status": "retiring", "data_retained": True,
+            "detail": "Namespace deletion is in progress; repeat the same request to complete retirement"})
     required_audit(actor, "project.retire", "project", name, "succeeded", {"project": name},
                    {"status": "retired", "data_retained": True})
-    return {"name": name, "status": "retired", "data_retained": True}
+    return {"name": name, "status": "retired", "data_retained": True,
+            "retained": scope["retains"] if scope else None}
 
 
 class ProjectGrant(BaseModel):

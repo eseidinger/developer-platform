@@ -435,6 +435,78 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.deploy().status_code, 202)
         self.assertEqual(self.targets(), [])
 
+    def preview(self):
+        return self.client.get("/projects/smoke/retirement-preview", headers=self.headers)
+
+    def confirmed_retire(self, token):
+        return self.client.post("/projects/smoke/retire", headers=self.headers,
+                                json={"confirm_name": "smoke", "scope_token": token})
+
+    def test_retirement_preview_lists_removed_and_retained_scope(self):
+        self.assertEqual(self.preview().status_code, 404)
+        self.deploy()
+        blocked = self.preview().json()
+        self.assertEqual(blocked["blockers"], ["active_operation"])
+        self.complete_operations()
+        body = self.preview().json()
+        self.assertEqual(body["blockers"], [])
+        self.assertEqual(body["route"], "smoke.apps.localhost")
+        kinds = {(item["kind"], item["name"]) for item in body["removes"]}
+        self.assertTrue({("Namespace", "project-smoke"), ("Deployment", "smoke"), ("Ingress", "smoke"),
+                         ("Secret", "database")} <= kinds)
+        self.assertEqual(body["retains"]["database"], "project_smoke")
+        self.assertNotIn("PGPASSWORD", json.dumps(body))
+        self.assertEqual(self.preview().json()["scope_token"], body["scope_token"])
+
+    def test_confirmed_retirement_deletes_namespace_waits_for_termination_and_records_inventory(self):
+        self.deploy()
+        self.complete_operations()
+        token = self.preview().json()["scope_token"]
+        namespaces = self.runtime.resources.get.return_value
+        namespaces.get.return_value = object()
+        pending = self.confirmed_retire(token)
+        self.assertEqual(pending.status_code, 202)
+        self.assertEqual(pending.json()["status"], "retiring")
+        namespaces.delete.assert_called_with(name="project-smoke")
+        self.assertNotEqual(self.catalog.rows["smoke"][1], "retired")
+        namespaces.get.side_effect = ApiException(status=404)
+        done = self.confirmed_retire(token)
+        self.assertEqual(done.status_code, 200)
+        self.assertEqual(done.json()["retained"]["database"], "project_smoke")
+        self.assertEqual(self.catalog.rows["smoke"][1], "retired")
+        self.assertTrue(any(isinstance(e, str) and e.startswith("INSERT INTO project_retirements")
+                            for e in self.catalog.events))
+        self.assertEqual(self.targets(), [])
+        actions = [call.args[1] for call in self.mocks[3].call_args_list]
+        self.assertIn("project.retire.requested", actions)
+        self.assertEqual(actions.count("project.retire"), 1)
+
+    def test_changed_scope_invalidates_the_token_without_deleting_anything(self):
+        self.deploy()
+        self.complete_operations()
+        token = self.preview().json()["scope_token"]
+        self.spec["image"] = "example:v2"
+        self.deploy()
+        self.complete_operations()
+        response = self.confirmed_retire(token)
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.json()["code"], "scope_changed")
+        self.runtime.resources.get.return_value.delete.assert_not_called()
+        self.assertEqual(self.confirmed_retire("0" * 32).status_code, 409)
+        self.assertEqual(self.catalog.rows["smoke"][1], "provisioning")
+
+    def test_confirmed_retirement_failure_is_retryable_and_keeps_the_project(self):
+        self.deploy()
+        self.complete_operations()
+        token = self.preview().json()["scope_token"]
+        namespaces = self.runtime.resources.get.return_value
+        namespaces.delete.side_effect = ApiException(status=500)
+        self.assertEqual(self.confirmed_retire(token).status_code, 503)
+        self.assertNotEqual(self.catalog.rows["smoke"][1], "retired")
+        namespaces.delete.side_effect = None
+        namespaces.get.side_effect = ApiException(status=404)
+        self.assertEqual(self.confirmed_retire(token).status_code, 200)
+
     def test_retirement_publish_failure_reconciles_from_durable_status(self):
         self.deploy()
         self.complete_operations()

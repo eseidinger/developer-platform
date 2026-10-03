@@ -66,6 +66,11 @@ def initialize(conn) -> None:
             WHERE actor_issuer IS NULL OR actor_subject IS NULL""")
         conn.execute("ALTER TABLE application_operations ALTER COLUMN actor_issuer SET NOT NULL")
         conn.execute("ALTER TABLE application_operations ALTER COLUMN actor_subject SET NOT NULL")
+        conn.execute("""CREATE TABLE IF NOT EXISTS project_retirements (
+            project_id UUID PRIMARY KEY REFERENCES projects(project_id) ON DELETE RESTRICT,
+            retired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            inventory JSONB NOT NULL
+        )""")
         conn.execute("""CREATE INDEX IF NOT EXISTS application_operations_pending_idx
             ON application_operations(state, created_at)
             WHERE state IN ('queued', 'running')""")

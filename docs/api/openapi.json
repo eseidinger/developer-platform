@@ -396,6 +396,18 @@
           "confirm_name": {
             "title": "Confirm Name",
             "type": "string"
+          },
+          "scope_token": {
+            "anyOf": [
+              {
+                "maxLength": 128,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Scope Token"
           }
         },
         "required": [
@@ -1092,7 +1104,7 @@
     },
     "/projects/{name}/retire": {
       "post": {
-        "description": "Acknowledge manual workload removal; retain catalog, database, and role.",
+        "description": "Retire a project, keeping its catalog entry, database and role.\n\nWith the `scope_token` from the preview the platform deletes the project namespace itself; a\nnamespace that is still terminating answers 202 and the identical request is retried. Without\na token the namespace must already have been removed manually.",
         "operationId": "retire_projects__name__retire_post",
         "parameters": [
           {
@@ -1141,6 +1153,49 @@
           }
         ],
         "summary": "Retire"
+      }
+    },
+    "/projects/{name}/retirement-preview": {
+      "get": {
+        "description": "Show what retirement would remove and keep; the token pins this scope for confirmation.",
+        "operationId": "retirement_preview_projects__name__retirement_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retirement Preview"
       }
     },
     "/projects/{name}/revisions": {
