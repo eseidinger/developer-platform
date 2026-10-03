@@ -281,7 +281,7 @@
 
         - name: Resolve the source revision being installed
           ansible.builtin.shell: |
-            set -e
+            set -eo pipefail
             rev=$(git -C "{{ platform_source_dir }}" rev-parse HEAD 2>/dev/null || echo unknown)
             if [ -n "$(git -C "{{ platform_source_dir }}" status --porcelain 2>/dev/null)" ]; then rev="$rev+dirty"; fi
             echo "$rev"
@@ -292,12 +292,24 @@
 
         - name: Collect tool versions and running images
           ansible.builtin.shell: |
-            set -e
+            set -eo pipefail
             echo "docker=$(docker version --format '{{ '{{' }}.Server.Version{{ '}}' }}')"
             echo "compose=$(docker compose version --short)"
             echo "k3d=$(.runtime/bin/k3d version | head -1)"
             echo "kubectl=$(.runtime/bin/kubectl version --client | head -1)"
-            docker compose images --format '{{ '{{' }}.Service{{ '}}' }}={{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }}@{{ '{{' }}.ID{{ '}}' }}' | sed 's/^/image./'
+            docker compose images --format json | python3 -c '
+            import json, sys
+            raw = sys.stdin.read().strip()
+            try:
+                rows = json.loads(raw)
+            except ValueError:
+                rows = [json.loads(line) for line in raw.splitlines() if line.strip()]
+            if isinstance(rows, dict):
+                rows = [rows]
+            for r in sorted(rows, key=lambda r: r.get("ContainerName", "")):
+                name = r.get("ContainerName", "").replace("developer-platform-", "")
+                print("image.%s=%s:%s@%s" % (name, r.get("Repository"), r.get("Tag"), r.get("ID")))
+            '
           args:
             chdir: "{{ platform_install_dir }}"
             executable: /bin/bash
