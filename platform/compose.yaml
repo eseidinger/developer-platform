@@ -15,6 +15,8 @@ services:
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
+      IMAGE_REGISTRIES: ${IMAGE_REGISTRIES:-docker.io,ghcr.io,quay.io}
+      DRIFT_SCAN_INTERVAL_SECONDS: ${DRIFT_SCAN_INTERVAL_SECONDS:-300}
       KUBECONFIG: /run/platform/kubeconfig
     volumes:
       - monitoring_discovery:/var/lib/platform-monitoring
