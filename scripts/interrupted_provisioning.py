@@ -2,9 +2,9 @@
 """Live check: kill the API right after a project database is created, then repeat the request.
 
 Run from the repository root on the lab host with a short-lived PLATFORM_ACCESS_TOKEN.
-Needs `docker compose`, the local API image and the lab kubeconfig. Creates the project
-`crashdrill` (retire it afterwards). It retries with a fresh project name until the kill
-lands while the operation is still running.
+Needs `docker compose`, the local API image and the lab kubeconfig. Creates a project named
+`crashdrill<n>` (retire it afterwards). The k3d server container is paused so the worker is
+stuck on its first Kubernetes apply, after the database exists, when the API is killed.
 """
 import json
 import os
@@ -67,33 +67,36 @@ def operation_states(name):
         WHERE p.name='%s'""" % name)
 
 
+K3D_SERVER = "k3d-workloads-server-0"
+
+
 def interrupted_attempt(name, spec):
     db = "project_" + name.replace("-", "_")
-    accepted = call("/projects/" + name, spec)
-    deadline = time.monotonic() + 60
-    while psql("postgres", "SELECT 1 FROM pg_database WHERE datname='%s'" % db) != "1":
-        if time.monotonic() > deadline:
-            raise SystemExit("Database was never created for " + name)
-    subprocess.run(compose + ["kill", "platform-api"], check=True)
-    states = operation_states(name)
+    # A paused Kubernetes API makes the worker hang on its first apply, after the database exists.
+    subprocess.run(["docker", "pause", K3D_SERVER], check=True)
+    try:
+        accepted = call("/projects/" + name, spec)
+        deadline = time.monotonic() + 60
+        while psql("postgres", "SELECT 1 FROM pg_database WHERE datname='%s'" % db) != "1":
+            if time.monotonic() > deadline:
+                raise SystemExit("Database was never created for " + name)
+            time.sleep(0.2)
+        time.sleep(2)
+        states = operation_states(name)
+        subprocess.run(compose + ["kill", "platform-api"], check=True)
+    finally:
+        subprocess.run(["docker", "unpause", K3D_SERVER], check=False)
     return accepted, db, states
 
 
 subprocess.run([".runtime/bin/k3d", "image", "import",
     "developer-platform-platform-api:latest", "-c", "workloads"], check=True)
-for attempt in range(1, 6):
-    name = "crashdrill" if attempt == 1 else "crashdrill%d" % attempt
-    spec = {"name": name, "image": "hashicorp/http-echo:1.0.0", "port": 5678,
-            "probe_profile": "hello-world"}
-    accepted, db, states = interrupted_attempt(name, spec)
-    print("attempt", attempt, name, "operations after kill:", states)
-    if states.startswith("running"):
-        break
-    # The operation finished before the kill landed; restore the API and try a fresh project.
-    subprocess.run(compose + ["up", "-d", "platform-api"], check=True)
-    wait_api()
-else:
-    raise SystemExit("Could not interrupt an operation mid-flight in 5 attempts")
+name = "crashdrill" + str(int(time.time()) % 100000)
+spec = {"name": name, "image": "hashicorp/http-echo:1.0.0", "port": 5678,
+        "probe_profile": "hello-world"}
+accepted, db, states = interrupted_attempt(name, spec)
+print("operations after kill:", states)
+assert states.startswith("running"), "operation was not interrupted mid-flight: " + states
 
 marker = "marker-" + str(int(time.time()))
 psql(db, "CREATE TABLE crash_check (marker text); INSERT INTO crash_check VALUES ('%s')" % marker)
