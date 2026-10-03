@@ -57,6 +57,36 @@ class BackupTests(unittest.TestCase):
         self.assertIn([self.job.docker, 'start', 'grafana'], calls)
         self.assertFalse((self.job.state / 'resume.json').exists())
 
+    def kubectl_listing(self, items):
+        (self.root / '.runtime').mkdir(exist_ok=True)
+        (self.root / '.runtime/admin.kubeconfig').write_text('x')
+        return patch.object(self.job, 'command', return_value=json.dumps({'items': items}).encode())
+
+    def test_project_secrets_are_captured_privately_for_project_namespaces_only(self):
+        bundle = self.root / 'bundle'; bundle.mkdir()
+        items = [
+            {'metadata': {'namespace': 'project-smoke', 'annotations': {
+                'platform.example/changed-API_KEY': 't', 'other': 'x'}}, 'data': {'API_KEY': 'dmFsdWU='}},
+            {'metadata': {'namespace': 'platform-system'}, 'data': {'A': 'Yg=='}},
+            {'metadata': {'namespace': 'project-empty'}, 'data': {}}]
+        with self.kubectl_listing(items) as command:
+            self.job.project_secrets(bundle)
+        argv = command.call_args.args[0]
+        self.assertIn('metadata.name=app-secrets', argv)
+        stored = json.loads((bundle / 'project-secrets.json').read_text())
+        self.assertEqual(stored['projects'], {'smoke': {
+            'data': {'API_KEY': 'dmFsdWU='}, 'annotations': {'platform.example/changed-API_KEY': 't'}}})
+        self.assertEqual((bundle / 'project-secrets.json').stat().st_mode & 0o777, 0o600)
+
+    def test_secret_capture_fails_closed(self):
+        bundle = self.root / 'bundle'; bundle.mkdir()
+        with self.assertRaises(backup.BackupError):
+            self.job.project_secrets(bundle)
+        with self.kubectl_listing([]), patch.object(self.job, 'command', side_effect=backup.BackupError('x')):
+            with self.assertRaises(backup.BackupError):
+                self.job.project_secrets(bundle)
+        self.assertFalse((bundle / 'project-secrets.json').exists())
+
     def test_resume_attempts_all_services_and_preserves_intent_on_failure(self):
         backup.atomic_json(self.job.state / 'resume.json', ['proxy', 'grafana'])
         with patch.object(self.job, 'command', side_effect=[backup.BackupError('failed'), b'']) as command:

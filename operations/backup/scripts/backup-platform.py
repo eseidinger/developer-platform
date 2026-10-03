@@ -149,9 +149,38 @@ class Job:
                 if process.wait() != 0:
                     raise BackupError('database capture failed')
 
+    def project_secrets(self, bundle):
+        """Write every project's app-secrets into the bundle; restic encrypts the bundle before upload.
+
+        Failing closed: a bundle that silently lacked secrets would look like a valid recovery point.
+        """
+        kubeconfig = self.root / '.runtime/admin.kubeconfig'
+        if not kubeconfig.is_file():
+            raise BackupError('cluster credentials missing')
+        kubectl = self.config.get('kubectl') or shutil.which('kubectl') or '/usr/local/bin/kubectl'
+        listing = json.loads(self.command([kubectl, '--kubeconfig', str(kubeconfig), 'get', 'secrets',
+                                           '--all-namespaces', '--field-selector', 'metadata.name=app-secrets',
+                                           '-o', 'json'], timeout=60))
+        projects = {}
+        for item in listing.get('items', []):
+            metadata = item.get('metadata', {})
+            namespace = metadata.get('namespace', '')
+            if not namespace.startswith('project-') or not item.get('data'):
+                continue
+            projects[namespace[len('project-'):]] = {
+                'data': item['data'],
+                'annotations': {k: v for k, v in (metadata.get('annotations') or {}).items()
+                                if k.startswith('platform.example/changed-')}}
+        target = bundle / 'project-secrets.json'
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        with os.fdopen(fd, 'w') as output:
+            json.dump({'format': 1, 'projects': projects}, output, sort_keys=True)
+
     def capture(self, bundle):
         self.stage = 'database capture'
         self.dump(bundle)
+        self.stage = 'project secret capture'
+        self.project_secrets(bundle)
         self.stage = 'configuration capture'
         with tarfile.open(bundle / 'platform-files.tar.gz', 'w:gz') as archive:
             for name in ['compose.yaml', '.env', 'scripts', 'platform', 'infrastructure', 'persistence']:

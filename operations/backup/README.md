@@ -886,3 +886,7 @@ marker evidence. Source receipts and captured status remain available under
 `.runtime/recovery-evidence/<inventory-host>/recovery-test-<unique-id>/` for diagnosis.
 A pending notification may produce a nonzero service exit even with a verified
 backup; the playbook reports the service exit code separately from snapshot proof.
+
+## Project secrets
+
+The bundle includes `project-secrets.json` (every project's `app-secrets`, mode 0600). It needs `kubectl` and `.runtime/admin.kubeconfig` on the backup host; capture fails if the cluster is unreachable. Treat restic repository access as access to these secrets. Recovery re-applies each selected project's secrets and restarts its pods. See ADR-015.

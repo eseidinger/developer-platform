@@ -43,6 +43,26 @@ def verify(bundle):
     return manifest
 
 
+def restore_project_secrets(bundle, name):
+    """Recreate one project's app-secrets from the bundle and restart its pods; values go via stdin only."""
+    path = bundle / 'project-secrets.json'
+    if not path.is_file():
+        return False
+    stored = json.loads(path.read_text()).get('projects', {}).get(name)
+    if not stored:
+        return False
+    secret = {'apiVersion': 'v1', 'kind': 'Secret', 'type': 'Opaque',
+              'metadata': {'name': 'app-secrets', 'namespace': 'project-' + name,
+                           'labels': {'platform.example/managed': 'true'},
+                           'annotations': stored.get('annotations') or {}},
+              'data': stored['data']}
+    kubectl = [str(ROOT / '.runtime/bin/kubectl'), '--kubeconfig', str(ROOT / '.runtime/admin.kubeconfig')]
+    run(kubectl + ['apply', '--server-side', '--force-conflicts', '--field-manager', 'platform-recovery',
+                   '-f', '-'], data=json.dumps(secret).encode())
+    run(kubectl + ['-n', 'project-' + name, 'rollout', 'restart', 'deployment/' + name])
+    return True
+
+
 def check_import_errors(stderr):
     # pg_dumpall meets the two objects created by the postgres image bootstrap.
     allowed = {'ERROR:  role "postgres" already exists', 'ERROR:  database "platform" already exists'}
@@ -171,6 +191,8 @@ https://*.apps.localhost {
             time.sleep(2)
         else:
             raise TimeoutError('Project reapply timed out; operation ' + accepted['operation_id'])
+        print('Project secrets restored for ' + name if restore_project_secrets(bundle, name)
+              else 'No project secrets in the bundle for ' + name)
     print('Restoration completed; run acceptance checks next.')
 
 
