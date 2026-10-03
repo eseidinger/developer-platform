@@ -12,5 +12,6 @@ all:
         platform_identity_domain: identity.example.com
         platform_tls_email: admin@example.com
         platform_edge_bind_ip: 0.0.0.0
-        # platform_image_registries: docker.io,ghcr.io,quay.io
-        # platform_drift_scan_interval_seconds: 300
+        platform_image_registries: docker.io,ghcr.io,quay.io  # optional
+        platform_drift_scan_interval_seconds: 300  # optional
+        platform_revision_retention: 25  # optional

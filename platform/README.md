@@ -172,7 +172,7 @@ For project `hello`, provisioning creates:
 ## Update and recover a project
 
 Send another PUT to the same URL with the complete specification to update its
-image or port. PUT accepts an optional `If-Match: <revision>` header (`0` for a new project); when it differs from the current desired revision the request returns 409 with `code: revision_conflict` and `current_revision`, with no side effects, and without the header the last writer wins. PUT is idempotent: repeating the same request reapplies the desired
+image or port. PUT accepts an optional `If-Match: <revision>` header (`0` for a new project); when it differs from the current desired revision the request returns 409 with `code: revision_conflict` and `current_revision`, with no side effects, and without the header the last writer wins. Each new revision prunes older ones beyond `REVISION_RETENTION` (default 25); the current revision, revisions with queued or running operations and the last successful restart are kept, and the pruned revisions' finished operations (and their status URLs) are removed with them. PUT is idempotent: repeating the same request reapplies the desired
 resources without deleting the database or changing its password, provided
 `DATABASE_KEY` remains unchanged.
 

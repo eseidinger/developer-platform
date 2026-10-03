@@ -17,6 +17,7 @@ services:
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
       IMAGE_REGISTRIES: ${IMAGE_REGISTRIES:-docker.io,ghcr.io,quay.io}
       DRIFT_SCAN_INTERVAL_SECONDS: ${DRIFT_SCAN_INTERVAL_SECONDS:-300}
+      REVISION_RETENTION: ${REVISION_RETENTION:-25}
       KUBECONFIG: /run/platform/kubeconfig
     volumes:
       - monitoring_discovery:/var/lib/platform-monitoring

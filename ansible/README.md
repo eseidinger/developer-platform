@@ -52,6 +52,7 @@ Useful inventory overrides:
 | `platform_edge_bind_ip` | `127.0.0.1` | Use `0.0.0.0` for public ingress |
 | `platform_image_registries` | `docker.io,ghcr.io,quay.io` | Comma-separated registries the API may resolve image tags from |
 | `platform_drift_scan_interval_seconds` | `300` | Seconds between background drift scans |
+| `platform_revision_retention` | `25` | Revisions kept per project; older ones and their finished operations are pruned |
 
 For an existing host with Docker, prefer `platform_install_docker: false` to
 avoid changing its package source. Conflicting distribution Docker packages are

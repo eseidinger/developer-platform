@@ -13,6 +13,7 @@
       EDGE_BIND_IP: "{{ platform_edge_bind_ip }}"
       IMAGE_REGISTRIES: "{{ platform_image_registries }}"
       DRIFT_SCAN_INTERVAL_SECONDS: "{{ platform_drift_scan_interval_seconds }}"
+      REVISION_RETENTION: "{{ platform_revision_retention }}"
 
   pre_tasks:
     - name: Apply defaults only when inventory has not configured them
@@ -26,6 +27,7 @@
         platform_edge_bind_ip: "{{ platform_edge_bind_ip | default('127.0.0.1') }}"
         platform_image_registries: "{{ platform_image_registries | default('docker.io,ghcr.io,quay.io') }}"
         platform_drift_scan_interval_seconds: "{{ platform_drift_scan_interval_seconds | default(300) }}"
+        platform_revision_retention: "{{ platform_revision_retention | default(25) }}"
         platform_install_docker: "{{ platform_install_docker | default(true) }}"
         platform_kubectl_version: "{{ platform_kubectl_version | default('v1.36.4') }}"
 
@@ -343,6 +345,7 @@
                 platform_edge_bind_ip: "{{ platform_edge_bind_ip }}"
                 platform_image_registries: "{{ platform_image_registries }}"
                 platform_drift_scan_interval_seconds: "{{ platform_drift_scan_interval_seconds | int }}"
+                platform_revision_retention: "{{ platform_revision_retention | int }}"
                 platform_install_docker: "{{ platform_install_docker | bool }}"
                 platform_kubectl_version: "{{ platform_kubectl_version }}"
               versions: "{{ platform_versions.stdout_lines | select('match', '^[a-z0-9._-]+=') | map('regex_replace', '^([^=]+)=(.*)$', '\\1: \\2') | list }}"

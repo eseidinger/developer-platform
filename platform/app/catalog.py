@@ -1,4 +1,5 @@
 """Stable catalog identities and immutable desired-application revisions."""
+import os
 from typing import Any
 from uuid import UUID
 
@@ -6,6 +7,7 @@ from psycopg.types.json import Jsonb
 
 
 DEFAULT_ENVIRONMENT = "default"
+DEFAULT_REVISION_RETENTION = 25
 
 
 def initialize(conn) -> None:
@@ -108,4 +110,36 @@ def ensure_default_application(conn, project_id: UUID, name: str,
     revision = 1 if latest is None else latest[0] + 1
     conn.execute("""INSERT INTO application_revisions(application_id, revision, spec)
         VALUES (%s, %s, %s)""", (application[0], revision, Jsonb(spec)))
+    prune_revisions(conn, application[0], revision, revision_retention())
     return application[0], revision
+
+
+def revision_retention() -> int:
+    try:
+        return max(1, int(os.environ.get("REVISION_RETENTION", DEFAULT_REVISION_RETENTION)))
+    except ValueError:
+        return DEFAULT_REVISION_RETENTION
+
+
+def prune_revisions(conn, application_id: UUID, latest: int, keep: int) -> None:
+    """Drop revisions older than the newest `keep`, except those a queued or running operation uses.
+
+    Finished operations of a pruned revision go with it; the audit log keeps the history. The last
+    successful restart is kept, because its ID is the marker that stops a deploy from rolling pods again.
+    """
+    cutoff = latest - keep
+    if cutoff < 1:
+        return
+    conn.execute("""DELETE FROM application_operations
+        WHERE application_id=%s AND revision<=%s
+        AND revision NOT IN (SELECT revision FROM application_operations
+            WHERE application_id=%s AND state IN ('queued', 'running'))
+        AND operation_id IS DISTINCT FROM (SELECT operation_id FROM application_operations
+            WHERE application_id=%s AND operation_kind='restart' AND state='succeeded'
+            ORDER BY completed_at DESC LIMIT 1)""",
+        (application_id, cutoff, application_id, application_id))
+    conn.execute("""DELETE FROM application_revisions r
+        WHERE r.application_id=%s AND r.revision<=%s
+        AND NOT EXISTS (SELECT 1 FROM application_operations o
+            WHERE o.application_id=r.application_id AND o.revision=r.revision)""",
+        (application_id, cutoff))
