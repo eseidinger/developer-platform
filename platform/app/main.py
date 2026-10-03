@@ -376,6 +376,80 @@ def provision(name: str, project: Project, principal: Principal = Depends(curren
     })
 
 
+@app.post("/projects/{name}/restart")
+def restart(name: str, principal: Principal = Depends(current_principal)):
+    """Queue a rolling restart of the current desired revision without changing the spec."""
+    actor = actor_for(principal)
+    require_permission(principal, "change", name)
+    try:
+        validate_name(name)
+    except ValueError:
+        required_audit(actor, "project.restart", "project", name, "rejected", {"project": name},
+                       {"reason": "invalid_name"})
+        raise HTTPException(400, "Invalid project name")
+    try:
+        with connect() as conn:
+            conn.execute("SELECT pg_advisory_lock(731904)")
+            try:
+                with conn.transaction():
+                    current = conn.execute("""SELECT p.project_id, p.status, a.application_id, r.revision, r.spec
+                        FROM projects p
+                        JOIN project_environments e ON e.project_id=p.project_id
+                        JOIN project_applications a ON a.environment_id=e.environment_id
+                        JOIN application_revisions r ON r.application_id=a.application_id
+                        WHERE p.name=%s ORDER BY r.revision DESC LIMIT 1""", (name,)).fetchone()
+                    if current is None:
+                        raise HTTPException(404, "Unknown project")
+                    project_id, project_status, application_id, revision, spec = current
+                    if project_status != "applied":
+                        raise HTTPException(409, "Only an applied project can be restarted")
+                    pending = conn.execute("""SELECT operation_id, state FROM application_operations
+                        WHERE application_id=%s AND revision=%s AND operation_kind=%s
+                        AND state IN ('queued', 'running')
+                        ORDER BY created_at DESC LIMIT 1""",
+                        (application_id, revision, "restart")).fetchone()
+                    if pending:
+                        operation_id, operation_state = pending
+                    else:
+                        envelope = {
+                            "project_id": str(project_id),
+                            "application_id": str(application_id),
+                            "project_slug": name,
+                            "revision": revision,
+                            "spec": spec,
+                        }
+                        queued = conn.execute("""INSERT INTO application_operations(
+                            application_id, revision, operation_kind, state, actor_issuer, actor_subject,
+                            envelope_version, envelope)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                            RETURNING operation_id""",
+                            (application_id, revision, "restart", "queued",
+                             principal.issuer, principal.subject, 1, Jsonb(envelope))).fetchone()
+                        if queued is None:
+                            raise RuntimeError("Could not persist restart operation")
+                        operation_id = queued[0]
+                        operation_state = "queued"
+            finally:
+                conn.execute("SELECT pg_advisory_unlock(731904)")
+    except HTTPException as exc:
+        required_audit(actor, "project.restart", "project", name, "rejected", {"project": name},
+                       {"status_code": exc.status_code})
+        raise
+    except Exception as exc:
+        required_audit(actor, "project.restart", "project", name, "failed", {"project": name},
+                       {"error_type": type(exc).__name__})
+        log.error("Project restart request failed: %s (%s)", name, type(exc).__name__)
+        raise HTTPException(503, "Restart request failed; retry the same request.")
+    required_audit(actor, "project.restart", "project", name, "succeeded", {"project": name},
+                   {"state": operation_state, "revision": revision, "operation_id": str(operation_id)})
+    return JSONResponse(status_code=202, content={
+        "operation_id": str(operation_id),
+        "state": operation_state,
+        "revision": revision,
+        "status_url": f"/v1/operations/{operation_id}",
+    })
+
+
 @app.get("/v1/operations/{operation_id}")
 def operation_status(operation_id: UUID, principal: Principal = Depends(current_principal)):
     with connect() as conn:

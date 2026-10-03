@@ -249,6 +249,7 @@ access before network rules converge; this lab is intended for trusted workloads
 | `GET /projects` | OIDC `viewer` or stronger grant | 200 with only authorized projects |
 | `PUT /projects/{name}` | OIDC `developer` or stronger project grant; platform-admin creates projects | 202 with queued operation ID, desired revision, and status URL |
 | `GET /v1/operations/{id}` | OIDC `viewer` or stronger grant on the owning project | 200 with apply outcome, revision, redacted result, and live readiness snapshot (replica counts, images, diagnostic reason) |
+| `POST /projects/{name}/restart` | OIDC `developer` or stronger project grant | 202 with a queued `restart` operation that rolls the current deployed revision without changing the spec; repeats reuse the pending operation; 404 unknown, 409 unless applied |
 | `POST /projects/{name}/retire` | OIDC `project-admin` or `platform-admin`, plus matching `confirm_name` | 200 with retained-data retirement; 409 while namespace exists or an operation is active |
 | `PUT` / `DELETE /projects/{name}/grants` | OIDC `project-admin` or `platform-admin` for that project | Create, change, or revoke a project grant |
 | `PUT` / `DELETE /platform/grants` | OIDC `platform-admin` | Create or revoke another platform-admin grant |

@@ -1,4 +1,5 @@
 """Durable deployment-operation execution with restart recovery."""
+import copy
 import logging
 import os
 import threading
@@ -19,6 +20,16 @@ def _audit_actor(issuer: str, subject: str) -> Actor:
     if issuer and subject:
         return Actor("oidc", issuer + "|" + subject)
     return Actor("worker", None)
+
+
+RESTART_ANNOTATION = "platform.example/restarted-by"
+
+
+def _with_restart_marker(manifest: dict[str, Any], marker: str) -> dict[str, Any]:
+    marked = copy.deepcopy(manifest)
+    template = marked["spec"]["template"].setdefault("metadata", {})
+    template.setdefault("annotations", {})[RESTART_ANNOTATION] = marker
+    return marked
 
 
 def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int,
@@ -73,6 +84,10 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         _finish_failed(conn, operation_id, actor, project, revision,
                        "project_retired", "rejected", False, log)
         return
+    if operation_kind == "restart" and project_status != "applied":
+        _finish_failed(conn, operation_id, actor, project, revision,
+                       "not_deployed", "rejected", False, log)
+        return
     expected_identity = {
         "project_id": str(project_id),
         "application_id": str(application_id),
@@ -80,18 +95,33 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         "revision": revision,
         "spec": desired[1],
     }
-    if operation_kind != "deploy" or envelope_version != 1 or envelope != expected_identity:
+    if operation_kind not in {"deploy", "restart"} or envelope_version != 1 or envelope != expected_identity:
         _finish_failed(conn, operation_id, actor, project, revision,
                        "invalid_operation_envelope", "rejected", True, log)
         return
 
     try:
-        publish_catalog(conn)
         password = password_for(project)
-        provision_database(conn, project, password)
         spec = desired[1]
-        for manifest in resources(project, spec["image"], spec["port"],
-                                 os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password):
+        manifests = resources(project, spec["image"], spec["port"],
+                              os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password)
+        if operation_kind == "restart":
+            # The marker is this operation's ID, so a reclaimed retry cannot restart twice.
+            marker = str(operation_id)
+            manifests = [_with_restart_marker(m, marker) for m in manifests if m["kind"] == "Deployment"]
+        else:
+            publish_catalog(conn)
+            provision_database(conn, project, password)
+            # Keep the last restart marker so server-side apply does not roll the pods again.
+            latest = conn.execute("""SELECT latest_restart.operation_id
+                FROM application_operations latest_restart
+                WHERE latest_restart.application_id=%s AND latest_restart.operation_kind='restart'
+                AND latest_restart.state='succeeded'
+                ORDER BY latest_restart.completed_at DESC LIMIT 1""", (application_id,)).fetchone()
+            if latest:
+                manifests = [_with_restart_marker(m, str(latest[0])) if m["kind"] == "Deployment" else m
+                             for m in manifests]
+        for manifest in manifests:
             apply(manifest)
     except Exception as exc:
         log.error("Deployment provider step failed operation_id=%s error_type=%s",
@@ -101,16 +131,17 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         return
 
     result: dict[str, Any] = {
-        "status": "applied",
+        "status": "restarted" if operation_kind == "restart" else "applied",
         "project": project,
         "namespace": "project-" + project,
         "host": project + "." + os.environ["APPS_DOMAIN"],
     }
     record_event(actor, "operation.execute", "operation", str(operation_id), "succeeded",
-                 {"project": project}, {"status": "applied"},
+                 {"project": project}, {"status": result["status"]},
                  revision=str(revision), operation_id=str(operation_id))
     with conn.transaction():
-        conn.execute("UPDATE projects SET status='applied',updated_at=now() WHERE name=%s", (project,))
+        if operation_kind == "deploy":
+            conn.execute("UPDATE projects SET status='applied',updated_at=now() WHERE name=%s", (project,))
         conn.execute("""UPDATE application_operations SET state='succeeded', result_version=1,
             result=%s, error_code=NULL, updated_at=now(), completed_at=now()
             WHERE operation_id=%s""", (Jsonb(result), operation_id))

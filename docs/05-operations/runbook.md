@@ -51,6 +51,10 @@ curl --fail-with-body "http://127.0.0.1:8000/v1/operations/$OPERATION_ID" \
 
 Operation state `succeeded` means Kubernetes resources were applied. Its live `readiness` snapshot reports replica counts, desired/Deployment images, active image references and IDs, and a reason such as `ImagePullBackOff`, `Unschedulable`, or `ProgressDeadlineExceeded`; inspect pod events/logs and HTTP behavior as needed. The worker reclaims an interrupted operation after restart and retries idempotent steps. Use the actual saved spec for an existing application; the sample would replace its image and port. [Recovery](backup-recovery.md#reapply-restored-projects) shows how to retrieve and reapply the stored catalog. PUT preserves existing databases, provided the configuration and database credentials remain compatible. Do not delete a database to repair a failed workload.
 
+## Restart an application
+
+`POST /projects/{name}/restart` (same `change` permission as PUT) queues a rolling restart of the current spec without creating a revision. It returns an operation ID; poll `GET /v1/operations/{id}`, where readiness reports `progressing` until the new pods are ready. Repeating the call while a restart is pending reuses that operation. Only `applied` projects can be restarted.
+
 ## Application unhealthy after deployment
 
 Inspect rollout, logs, pod events, image pulls, resource limits, probes, and database connectivity. Compare the desired image/port with your externally retained prior spec and migration records; the platform stores only the latest spec. A manual rollback is another PUT of a known compatible spec, followed by rollout and application verification. It does not roll back database schema changes.

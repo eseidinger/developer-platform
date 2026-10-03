@@ -36,6 +36,7 @@ class OperationConnection:
         self.attempt_count = 0
         self.operation_result = None
         self.error_code = None
+        self.last_restart = None
 
     def __enter__(self):
         return self
@@ -61,6 +62,8 @@ class OperationConnection:
         elif query.startswith("UPDATE application_operations SET state='running'"):
             self.state = "running"
             self.attempt_count += 1
+        elif query.startswith("SELECT latest_restart.operation_id"):
+            self.result = [(self.last_restart,)] if self.last_restart else []
         elif query.startswith("SELECT revision, spec FROM application_revisions"):
             self.result = [(self.current_revision, self.spec)]
         elif query.startswith("UPDATE projects SET status='failed'"):
@@ -84,13 +87,13 @@ class OperationConnection:
         return self.result[0] if self.result else None
 
 
-class OperationWorkerTests(unittest.TestCase):
+class OperationWorkerFixture(unittest.TestCase):
     def setUp(self):
         self.conn = OperationConnection()
         self.connect = Mock(return_value=self.conn)
         self.provision_database = Mock()
         self.apply = Mock()
-        self.resources = Mock(return_value=[{"kind": "Deployment"}])
+        self.resources = Mock(return_value=[self.secret(), self.deployment()])
         self.publish_catalog = Mock()
         self.log = Mock()
         self.environment = patch.dict(os.environ, {
@@ -106,12 +109,28 @@ class OperationWorkerTests(unittest.TestCase):
         self.audit_mock = self.audit_patch.start()
         self.addCleanup(self.audit_patch.stop)
 
+    @staticmethod
+    def secret():
+        return {"kind": "Secret", "metadata": {"name": "database"}}
+
+    @staticmethod
+    def deployment():
+        return {"kind": "Deployment", "metadata": {"name": "smoke"},
+                "spec": {"template": {"metadata": {"labels": {"app": "smoke"}}}}}
+
+    @staticmethod
+    def marker(manifest):
+        return manifest["spec"]["template"]["metadata"].get("annotations", {}).get(
+            "platform.example/restarted-by")
+
     def run_one(self):
         return process_one(
             self.connect, lambda name: "derived-password", self.provision_database,
             self.apply, self.resources, self.publish_catalog, self.log,
         )
 
+
+class OperationWorkerTests(OperationWorkerFixture):
     def test_reclaims_running_operation_after_worker_restart_and_completes_it(self):
         self.conn.state = "running"
 
@@ -124,7 +143,8 @@ class OperationWorkerTests(unittest.TestCase):
         self.provision_database.assert_called_once_with(
             self.conn, "smoke", "derived-password")
         self.resources.assert_called_once()
-        self.apply.assert_called_once_with({"kind": "Deployment"})
+        self.assertEqual([call.args[0] for call in self.apply.call_args_list],
+                         [self.secret(), self.deployment()])
         self.publish_catalog.assert_called_once_with(self.conn)
         self.assertEqual(self.audit_mock.call_args.kwargs["operation_id"], self.conn.operation_id)
 
@@ -162,6 +182,48 @@ class OperationWorkerTests(unittest.TestCase):
         self.assertNotIn("sensitive provider detail", str(self.conn.operation_result))
         self.assertEqual(self.audit_mock.call_args.args[4], "failed")
         self.log.error.assert_called()
+
+
+class RestartOperationTests(OperationWorkerFixture):
+    def setUp(self):
+        super().setUp()
+        self.conn.operation_kind = "restart"
+        self.conn.project_status = "applied"
+
+    def test_interrupted_restart_reapplies_only_the_deployment_with_its_operation_marker(self):
+        self.conn.state = "running"
+
+        self.assertTrue(self.run_one())
+
+        self.assertEqual(self.conn.state, "succeeded")
+        self.assertEqual(self.conn.attempt_count, 1)
+        self.assertEqual(self.conn.operation_result["status"], "restarted")
+        self.assertEqual(self.conn.project_status, "applied")
+        self.apply.assert_called_once()
+        self.assertEqual(self.marker(self.apply.call_args.args[0]), self.conn.operation_id)
+        self.provision_database.assert_not_called()
+        self.publish_catalog.assert_not_called()
+
+    def test_restart_of_a_project_that_is_not_applied_is_rejected_without_provider_calls(self):
+        self.conn.project_status = "failed"
+
+        self.assertTrue(self.run_one())
+
+        self.assertEqual(self.conn.state, "failed")
+        self.assertEqual(self.conn.error_code, "not_deployed")
+        self.assertEqual(self.conn.project_status, "failed")
+        self.apply.assert_not_called()
+
+    def test_later_deployment_keeps_the_latest_restart_marker_to_avoid_a_second_rollout(self):
+        self.conn.operation_kind = "deploy"
+        self.conn.last_restart = "restart-operation-0"
+
+        self.assertTrue(self.run_one())
+
+        secret, deployment = [call.args[0] for call in self.apply.call_args_list]
+        self.assertEqual(secret, self.secret())
+        self.assertEqual(self.marker(deployment), "restart-operation-0")
+        self.assertEqual(self.marker(self.deployment()), None)
 
 
 if __name__ == "__main__":

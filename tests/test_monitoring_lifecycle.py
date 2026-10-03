@@ -107,6 +107,12 @@ class Catalog:
                 operation_id, operation["revision"], operation["state"], operation["result_version"],
                 operation["result"], operation["error_code"], operation["project_name"], spec,
             )] if operation else []
+        elif query.startswith("SELECT p.project_id, p.status"):
+            name = params[0]
+            application_id = "application-" + name
+            revisions = self.revisions.get(application_id, [])
+            self.result = [(self.project_ids[name], self.rows[name][1], application_id,
+                            revisions[-1][0], revisions[-1][1])] if name in self.rows and revisions else []
         elif query.startswith("SELECT name, spec, status"):
             self.result = [(name, *row) for name, row in self.rows.items()]
         elif query.startswith("SELECT status FROM"):
@@ -248,6 +254,48 @@ class LifecycleTests(unittest.TestCase):
         observe.assert_called_once()
         self.assertEqual(self.mocks[3].call_args.args[1:5],
                          ("authorization", "project", "smoke", "denied"))
+
+    def restart(self):
+        return self.client.post("/projects/smoke/restart", headers=self.headers)
+
+    def deploy_applied(self):
+        self.assertEqual(self.deploy().status_code, 202)
+        self.complete_operations()
+        self.catalog.rows["smoke"] = (self.catalog.rows["smoke"][0], "applied")
+
+    def test_restart_accepts_an_operation_on_the_current_revision_without_provider_side_effects(self):
+        self.deploy_applied()
+        self.catalog.operations.clear()
+
+        first = self.restart()
+        second = self.restart()
+
+        self.assertEqual(first.status_code, 202)
+        self.assertEqual(second.json()["operation_id"], first.json()["operation_id"])
+        self.assertEqual(first.json()["revision"], 1)
+        self.assertEqual(first.json()["status_url"], "/v1/operations/" + first.json()["operation_id"])
+        operation = self.catalog.operations[first.json()["operation_id"]]
+        self.assertEqual(len(self.catalog.operations), 1)
+        self.assertEqual(operation["operation_kind"], "restart")
+        self.assertEqual(operation["state"], "queued")
+        self.assertEqual(operation["actor_subject"], "person-1")
+        self.assertEqual(operation["envelope"]["spec"], self.catalog.rows["smoke"][0])
+        self.assertEqual(self.catalog.rows["smoke"][1], "applied")
+        self.mocks[-2].assert_not_called()
+        self.mocks[-1].assert_not_called()
+        self.assertEqual(self.mocks[3].call_args.args[1:5], ("project.restart", "project", "smoke", "succeeded"))
+
+    def test_restart_requires_change_grant_and_an_applied_project(self):
+        self.assertEqual(self.restart().status_code, 404)
+        self.assertEqual(self.deploy().status_code, 202)
+        self.assertEqual(self.restart().status_code, 409)
+        self.complete_operations()
+        self.catalog.rows["smoke"] = (self.catalog.rows["smoke"][0], "applied")
+        self.catalog.operations.clear()
+        self.mocks[4].return_value = False
+        self.assertEqual(self.restart().status_code, 403)
+        self.assertEqual(self.catalog.operations, {})
+        self.assertEqual(self.mocks[4].call_args.args[1:], (self.principal, "change", "smoke"))
 
     def test_retirement_is_blocked_while_an_operation_is_active(self):
         self.assertEqual(self.deploy().status_code, 202)
