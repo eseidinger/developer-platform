@@ -22,6 +22,12 @@ def _result(state: str, reason: str | None, now: datetime, lines=None, truncated
             "unavailable_containers": unavailable, "observed_at": now.isoformat()}
 
 
+def _decode(response: Any) -> str:
+    """The raw body is decoded here because the client's own str deserialisation can mangle logs."""
+    data = response.data if hasattr(response, "data") else response
+    return data.decode("utf-8", errors="replace") if isinstance(data, bytes) else str(data or "")
+
+
 def _parse(text: str, pod: str, container: str, previous: bool) -> list[dict[str, Any]]:
     lines = []
     for raw in text.splitlines():
@@ -53,7 +59,7 @@ def observe_logs(runtime: Any, project: str, log, tail: int, since_seconds: int 
     if not pods:
         return _result("no_pods", "NoPodsForProject", now)
 
-    options = {"timestamps": True, "tail_lines": tail, "limit_bytes": MAX_BYTES_PER_CONTAINER}
+    options = {"_preload_content": False, "timestamps": True, "tail_lines": tail, "limit_bytes": MAX_BYTES_PER_CONTAINER}
     if since_seconds is not None:
         options["since_seconds"] = since_seconds
     lines, failed, waiting, attempted, truncated = [], 0, 0, 0, False
@@ -80,7 +86,7 @@ def observe_logs(runtime: Any, project: str, log, tail: int, since_seconds: int 
                     failed += 1
                     log.error("Pod log read failed project=%s error_type=%s", project, type(exc).__name__)
                     break
-                lines.extend(_parse(text or "", pod_name, container_name, previous))
+                lines.extend(_parse(_decode(text), pod_name, container_name, previous))
                 break
     if failed == attempted:
         return _result("unavailable", "LogApiUnavailable", now, unavailable=failed)

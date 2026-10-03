@@ -43,7 +43,8 @@ print("smoke logs: %d line(s) from %s/%s" % (len(body["lines"]), body["lines"][0
 
 marker = "log-drill-%d" % int(time.time())
 name = marker
-code = "import sys; print('failure-marker password=hunter2 ' + sys.argv[1], flush=True); sys.exit(3)"
+code = ("import sys; print('failure-marker password=hunter2 ' + sys.argv[1]); "
+        "print('second-line ' + sys.argv[1], flush=True); sys.exit(3)")
 pod = {"apiVersion": "v1", "kind": "Pod",
     "metadata": {"name": name, "namespace": "project-smoke", "labels": {"app.kubernetes.io/name": "smoke"}},
     "spec": {"restartPolicy": "Never", "automountServiceAccountToken": False,
@@ -69,7 +70,11 @@ try:
     assert found and "failure-marker" in found[0]["message"] and marker in found[0]["message"], body["lines"][-5:]
     assert "hunter2" not in found[0]["message"], found[0]
     assert found[0]["container"] == "failing"
-    print("failed instance diagnosed from its logs:", found[0]["message"])
+    assert len(found) == 2 and found[1]["message"] == "second-line " + marker, found
+    for line in found:
+        assert line["timestamp"].startswith("20") and line["timestamp"].endswith("Z"), line
+        assert "\\n" not in line["message"] and "'" not in line["message"], line
+    print("failed instance diagnosed from its logs:", [l["message"] for l in found])
 finally:
     subprocess.run(kubectl + ["-n", "project-smoke", "delete", "pod", name, "--wait=false"], check=True)
 print("PASS: logs attributed to pod/container, bounded and ordered, failure diagnosable, credential redacted, unauthenticated denied")

@@ -25,7 +25,8 @@ def setup(pods, outputs=None, error=None):
     if error is not None:
         api.read_namespaced_pod_log.side_effect = error
     else:
-        api.read_namespaced_pod_log.side_effect = lambda name, namespace, **kw: (outputs or {})[(name, kw["container"])]
+        api.read_namespaced_pod_log.side_effect = lambda name, namespace, **kw: Mock(
+            data=(outputs or {})[(name, kw["container"])].encode())
     return runtime, api
 
 
@@ -46,6 +47,14 @@ class LogTests(unittest.TestCase):
         kwargs = api.read_namespaced_pod_log.call_args.kwargs
         self.assertEqual((kwargs["tail_lines"], kwargs["timestamps"], kwargs["limit_bytes"]), (2, True, 262144))
         self.assertNotIn("since_seconds", kwargs)
+        self.assertIs(kwargs["_preload_content"], False)
+
+    def test_multi_line_output_with_non_ascii_text_stays_separate_lines(self):
+        runtime, api = setup([pod("a")], {("a", "app"):
+            "2026-10-03T11:00:01Z one \u00e4\n2026-10-03T11:00:02Z two\n"})
+        lines = observe_logs(runtime, "smoke", log, tail=10, since_seconds=None, api=api, now=NOW)["lines"]
+        self.assertEqual([(l["timestamp"], l["message"]) for l in lines],
+                         [("2026-10-03T11:00:01Z", "one \u00e4"), ("2026-10-03T11:00:02Z", "two")])
 
     def test_since_window_is_passed_to_the_log_api(self):
         runtime, api = setup([pod("a")], {("a", "app"): ""})
@@ -74,7 +83,7 @@ class LogTests(unittest.TestCase):
 
         def read(name, namespace, **kw):
             if kw.get("previous"):
-                return "2026-10-03T11:00:01Z crashed: boom\n"
+                return Mock(data=b"2026-10-03T11:00:01Z crashed: boom\n")
             raise ApiException(status=400)
         api.read_namespaced_pod_log.side_effect = read
         result = observe_logs(runtime, "smoke", log, tail=5, since_seconds=None, api=api, now=NOW)
