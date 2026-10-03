@@ -51,7 +51,8 @@ def resources(name, image, port, domain, database_ip, password):
                 {"to": [{"ipBlock": {"cidr": database_ip + "/32"}}],
                  "ports": [{"protocol": "TCP", "port": 5432}]}]}),
         obj("apps/v1", "Deployment", name, spec={
-            "replicas": 1, "selector": {"matchLabels": selector},
+            "replicas": 1, "progressDeadlineSeconds": 120,
+            "selector": {"matchLabels": selector},
             "template": {"metadata": {"labels": selector}, "spec": {
                 "automountServiceAccountToken": False,
                 "securityContext": {"runAsNonRoot": True, "runAsUser": 10001,

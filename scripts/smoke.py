@@ -24,11 +24,13 @@ def request(path, body=None, token=True):
 
 def wait_for_operation(accepted, timeout=300):
     deadline = monotonic() + timeout
+    last = "no status observed"
     while monotonic() < deadline:
         operation = request(accepted["status_url"])
         if operation["state"] == "failed":
             raise RuntimeError("Deployment failed; operation " + accepted["operation_id"])
         readiness = operation["readiness"]
+        last = "operation=" + operation["state"] + " readiness=" + readiness["state"] + " reason=" + str(readiness["reason"])
         print("operation", accepted["operation_id"], operation["state"], "readiness", readiness["state"], flush=True)
         if operation["state"] == "succeeded":
             if readiness["state"] == "ready":
@@ -38,7 +40,8 @@ def wait_for_operation(accepted, timeout=300):
                                    + accepted["operation_id"] + " reason="
                                    + str(readiness["reason"]))
         time.sleep(2)
-    raise TimeoutError("Application readiness observation timed out: " + accepted["operation_id"])
+    raise TimeoutError("Application readiness observation timed out: "
+                       + accepted["operation_id"] + " last " + last)
 
 for attempt in range(60):
     try:

@@ -31,5 +31,10 @@ class WorkloadContract(unittest.TestCase):
         self.assertEqual(quota["services.nodeports"], "0")
         self.assertEqual(quota["services.loadbalancers"], "0")
 
+    def test_rollout_fails_visibly_within_smoke_timeout(self):
+        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
+        deployment = next(d for d in docs if d["kind"] == "Deployment")["spec"]
+        self.assertEqual(deployment["progressDeadlineSeconds"], 120)
+
 if __name__ == "__main__":
     unittest.main()
