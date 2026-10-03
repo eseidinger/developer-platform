@@ -21,6 +21,16 @@ class WorkloadContract(unittest.TestCase):
         self.assertIn("namespaceSelector", ingress)
         self.assertIn("podSelector", ingress)
 
+    def test_configuration_becomes_plain_env_alongside_database_secret(self):
+        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret",
+                         None, {"B": "2", "A": "1"})
+        container = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
+        self.assertEqual(container["env"], [{"name": "A", "value": "1"}, {"name": "B", "value": "2"}])
+        self.assertEqual(container["envFrom"], [{"secretRef": {"name": "database"}}])
+        plain = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
+        self.assertNotIn("env", next(d for d in plain if d["kind"] == "Deployment")
+                         ["spec"]["template"]["spec"]["containers"][0])
+
     def test_restricted_workload_and_no_api_credentials(self):
         docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
         spec = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]

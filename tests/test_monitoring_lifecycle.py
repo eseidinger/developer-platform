@@ -123,7 +123,8 @@ class Catalog:
                            for revision, spec in reversed(self.revisions.get("application-" + params[0], []))]
         elif query.startswith("SELECT max(r.revision), (array_agg"):
             revisions = self.revisions.get("application-" + params[0], [])
-            self.result = [(revisions[-1][0], revisions[-1][1]) if revisions else (None, None)]
+            status = self.rows[params[0]][1] if params[0] in self.rows else None
+            self.result = [(revisions[-1][0], revisions[-1][1], status) if revisions else (None, None, None)]
         elif query.startswith("SELECT max(r.revision)"):
             revisions = self.revisions.get("application-" + params[0], [])
             self.result = [(revisions[-1][0] if revisions else None,)]
@@ -593,8 +594,8 @@ class LifecycleTests(unittest.TestCase):
                 "spec": {"application": {"runtime": {"type": "container", "image": "example:v1"}}}}
         scaled = {**base, "spec": {"application": {**base["spec"]["application"],
                                                     "scaling": {"minInstances": 1, "maxInstances": 3}}}}
-        configured = {**base, "spec": {**base["spec"], "configuration": {"values": {"A": "b"}}}}
-        cases = ((scaled, "unsupported_capability"), (configured, "unsupported_capability"),
+        cases = ((scaled, "unsupported_capability"),
+                 ({**base, "spec": {**base["spec"], "configuration": {"secrets": {}}}}, "unsupported_capability"),
                  ({**base, "apiVersion": "platform.example/v9"}, "invalid_spec"),
                  ({**self.spec, "scaling": 2}, "unsupported_capability"),
                  ({**self.spec, "probe_profile": "arbitrary"}, "invalid_spec"),
@@ -609,6 +610,40 @@ class LifecycleTests(unittest.TestCase):
         self.assertIn("docker.io", listed.json()["imageRegistries"])
         self.mocks[5].verify.side_effect = AuthenticationError()
         self.assertEqual(self.client.get("/v1/capabilities", headers=self.headers).status_code, 401)
+
+    def test_configuration_is_a_validated_revision_with_activation(self):
+        self.assertEqual(self.deploy().status_code, 202)
+        path = "/projects/smoke/configuration"
+        for values in ({"PGHOST": "x"}, {"DB_PASSWORD": "x"}, {"1A": "x"}, {"A": 1}, {"A": "x" * 1025},
+                       {"A": "-----BEGIN KEY-----"}):
+            with self.subTest(values=values):
+                response = self.client.put(path, json={"values": values}, headers=self.headers)
+                self.assertEqual((response.status_code, response.json()["code"]), (422, "invalid_configuration"))
+        self.assertEqual(len(self.catalog.revisions["application-smoke"]), 1)
+        self.assertEqual(self.client.put(path, json={"values": {"MODE": "fast"}},
+                                         headers={**self.headers, "If-Match": "5"}).status_code, 409)
+        changed = self.client.put(path, json={"values": {"MODE": "fast"}}, headers=self.headers)
+        self.assertEqual((changed.status_code, changed.json()["revision"], changed.json()["rollout_required"]),
+                         (202, 2, True))
+        self.assertEqual(self.catalog.revisions["application-smoke"][-1][1]["configuration"], {"MODE": "fast"})
+        audited = [c.args for c in self.mocks[3].call_args_list if c.args[1] == "project.configuration.update"]
+        self.assertNotIn("fast", json.dumps(audited, default=str))
+        self.runtime.resources.get.return_value.get.return_value = {
+            "spec": {"replicas": 1, "template": {"spec": {"containers": [{"env": []}]}}}, "status": {}}
+        shown = self.client.get(path, headers=self.headers).json()
+        self.assertEqual((shown["values"], shown["revision"], shown["activation"]["state"]),
+                         ({"MODE": "fast"}, 2, "pending"))
+        self.runtime.resources.get.return_value.get.return_value = {
+            "spec": {"replicas": 1, "template": {"spec": {"containers": [
+                {"env": [{"name": "MODE", "value": "fast"}]}]}}},
+            "status": {"updatedReplicas": 1, "readyReplicas": 1, "replicas": 1}}
+        self.assertEqual(self.client.get(path, headers=self.headers).json()["activation"]["state"], "active")
+        removed = self.client.put(path, json={"values": {}}, headers=self.headers)
+        self.assertEqual(removed.json()["revision"], 3)
+        self.assertNotIn("configuration", self.catalog.revisions["application-smoke"][-1][1])
+        self.mocks[4].return_value = False
+        self.assertEqual(self.client.get(path, headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.put(path, json={"values": {}}, headers=self.headers).status_code, 403)
 
     def test_unknown_project_field_rejected_before_catalog_mutation(self):
         self.spec["unexpected"] = "must not be ignored"

@@ -56,6 +56,11 @@ def observe_drift(runtime: Any, project: str, spec: dict, log) -> dict[str, Any]
             if _canonical(key, desired) != (None if observed is None else _canonical(key, observed)):
                 differences.append({"field": f"resources.{section}.{key}", "desired": desired,
                                     "observed": observed})
+    containers_env = {_field(e, "name"): _field(e, "value") for e in (_field(container, "env", []) or [])}
+    desired_env = spec.get("configuration") or {}
+    if containers_env != desired_env:
+        differences.append({"field": "configuration", "desired": sorted(desired_env),
+                            "observed": sorted(containers_env)})
     return {"state": "drifted" if differences else "in_sync", "differences": differences}
 
 

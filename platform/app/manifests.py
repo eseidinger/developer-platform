@@ -2,6 +2,8 @@
 import ipaddress
 import re
 
+from .config import env_list
+
 def validate_name(value):
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,30}[a-z0-9]|[a-z]", value):
         raise ValueError("Use 1-32 lowercase letters, digits or hyphens; start with a letter.")
@@ -48,7 +50,7 @@ def normalize_resources(value):
     return {section: {"cpu": f"{v['cpu']}m", "memory": f"{v['memory']}Mi"} for section, v in parsed.items()}
 
 
-def resources(name, image, port, domain, database_ip, password, workload_resources=None):
+def resources(name, image, port, domain, database_ip, password, workload_resources=None, configuration=None):
     validate_name(name)
     ipaddress.IPv4Address(database_ip)
     namespace = "project-" + name
@@ -102,6 +104,7 @@ def resources(name, image, port, domain, database_ip, password, workload_resourc
                 "containers": [{"name": "app", "image": image,
                     "ports": [{"containerPort": port}],
                     "envFrom": [{"secretRef": {"name": "database"}}],
+                    **({"env": env_list(configuration)} if configuration else {}),
                     "securityContext": {"allowPrivilegeEscalation": False,
                         "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
                     "resources": workload_resources or DEFAULT_RESOURCES,

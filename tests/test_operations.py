@@ -155,7 +155,7 @@ class OperationWorkerTests(OperationWorkerFixture):
                     self.conn.spec = {**self.conn.spec, "resources": resources}
                     self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
                 self.assertTrue(self.run_one())
-                self.assertEqual(self.resources.call_args.args[6:], (expected,))
+                self.assertEqual(self.resources.call_args.args[6:], (expected, None))
 
     def test_reclaims_running_operation_after_worker_restart_and_completes_it(self):
         self.conn.state = "running"

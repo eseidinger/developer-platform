@@ -3,6 +3,7 @@ from typing import List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
+from .config import normalize_configuration
 from .manifests import normalize_resources
 
 API_VERSION = "platform.example/v1alpha1"
@@ -63,8 +64,18 @@ class ExternalResource(_Strict):
     deletionPolicy: Literal["retain"]
 
 
+class Configuration(_Strict):
+    values: dict
+
+    @field_validator("values")
+    @classmethod
+    def check_values(cls, value):
+        return normalize_configuration(value)
+
+
 class Spec(_Strict):
     application: Application
+    configuration: Optional[Configuration] = None
     resources: Optional[List[ExternalResource]] = Field(default=None, max_length=1)
 
 
@@ -90,7 +101,7 @@ CAPABILITIES = {
         "resources": {"requests": "up to 1 CPU / 1Gi", "limits": "up to 2 CPU / 2Gi", "requestsMustNotExceedLimits": True},
         "health": {"readiness": {"profiles": ["status", "hello-world"], "customPath": False}},
         "externalResources": [{"type": "postgres", "profiles": ["shared-dev"], "deletionPolicies": ["retain"], "maxCount": 1}],
-        "configuration": {"values": False, "secrets": False, "bindings": ["PG"]},
+        "configuration": {"values": True, "maxValues": 50, "maxValueLength": 1024, "secrets": False, "bindings": ["PG"]},
     }},
 }
 
@@ -123,4 +134,6 @@ def to_flat(body):
         flat["probe_profile"] = application.health.readiness.profile
     if application.resources is not None:
         flat["resources"] = application.resources
+    if envelope.spec.configuration is not None:
+        flat["configuration"] = envelope.spec.configuration.values
     return flat

@@ -33,6 +33,7 @@ from .catalog import ensure_default_application, initialize as initialize_catalo
 from .images import ImageResolutionError, allowed_registries, resolve_image
 from .identity import AuthenticationError, Principal, configured_verifier
 from .spec import CAPABILITIES, ApplicationEnvelope, error_code, to_flat
+from .config import normalize_configuration, observe_activation
 from .manifests import normalize_resources, resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
@@ -208,11 +209,17 @@ class Project(BaseModel):
     port: int = Field(default=8080, ge=1024, le=65535)
     probe_profile: Literal["status", "hello-world"] = "status"
     resources: Optional[dict] = None
+    configuration: Optional[dict] = None
 
     @field_validator("resources")
     @classmethod
     def check_resources(cls, value):
         return None if value is None else normalize_resources(value)
+
+    @field_validator("configuration")
+    @classmethod
+    def check_configuration(cls, value):
+        return None if value is None else normalize_configuration(value)
 
     @field_validator("name")
     @classmethod
@@ -522,6 +529,95 @@ def drift(name: str, principal: Principal = Depends(current_principal)):
     required_audit(actor, "project.drift.detected" if result["state"] == "drifted" else "project.drift.inspect",
                    "project", name, "succeeded", {"project": name}, detail)
     return {"project": name, "revision": current[0], **result}
+
+
+class ConfigurationBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    values: dict
+
+
+def current_spec(name: str):
+    with connect() as conn:
+        return conn.execute("""SELECT max(r.revision), (array_agg(r.spec ORDER BY r.revision DESC))[1], p.status
+            FROM projects p
+            JOIN project_environments e ON e.project_id=p.project_id
+            JOIN project_applications a ON a.environment_id=e.environment_id
+            JOIN application_revisions r ON r.application_id=a.application_id
+            WHERE p.name=%s GROUP BY p.status""", (name,)).fetchone()
+
+
+@app.get("/projects/{name}/configuration")
+def get_configuration(name: str, principal: Principal = Depends(current_principal)):
+    """Desired configuration values and whether the running deployment has activated them."""
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    current = current_spec(name)
+    if current is None or current[0] is None:
+        required_audit(actor, "project.configuration.read", "project", name, "rejected",
+                       {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    values = current[1].get("configuration") or {}
+    activation = observe_activation(runtime, name, values)
+    required_audit(actor, "project.configuration.read", "project", name, "succeeded",
+                   {"project": name}, {"revision": current[0], "names": sorted(values)})
+    return {"project": name, "revision": current[0], "values": values, "activation": activation}
+
+
+@app.put("/projects/{name}/configuration")
+def put_configuration(name: str, body: ConfigurationBody,
+                      principal: Principal = Depends(current_principal),
+                      if_match: Optional[str] = Header(None)):
+    """Replace the configuration values: adds, updates and removes in one validated revision.
+
+    The change is a new desired revision (conditional on `If-Match`) that rolls the pods.
+    """
+    require_permission(principal, "change", name)
+    actor = actor_for(principal)
+    try:
+        expected = expected_revision(if_match)
+    except HTTPException:
+        required_audit(actor, "project.configuration.update", "project", name, "rejected",
+                       {"project": name}, {"reason": "invalid_if_match"})
+        raise
+    try:
+        values = normalize_configuration(body.values)
+    except ValueError as exc:
+        required_audit(actor, "project.configuration.update", "project", name, "rejected",
+                       {"project": name}, {"reason": "invalid_configuration", "names": sorted(map(str, body.values))})
+        return JSONResponse(status_code=422, content={"detail": str(exc), "code": "invalid_configuration"})
+    current = current_spec(name)
+    if current is None or current[0] is None:
+        required_audit(actor, "project.configuration.update", "project", name, "rejected",
+                       {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    if current[2] == "retired":
+        required_audit(actor, "project.configuration.update", "project", name, "rejected",
+                       {"project": name}, {"reason": "retired"})
+        raise HTTPException(409, "Project is retired")
+    spec = {k: v for k, v in current[1].items() if k != "configuration"}
+    if values:
+        spec["configuration"] = values
+    try:
+        with connect() as conn:
+            operation_id, operation_state, revision = queue_deploy(
+                conn, principal, name, spec, expected if expected is not None else current[0])
+    except RevisionConflict as conflict:
+        required_audit(actor, "project.configuration.update", "project", name, "rejected",
+                       {"project": name}, {"reason": "revision_conflict", "expected": expected,
+                                           "current": conflict.current})
+        return JSONResponse(status_code=409, content={
+            "detail": "The project changed since the expected revision; re-read it and retry",
+            "code": "revision_conflict", "current_revision": conflict.current})
+    except Exception as exc:
+        required_audit(actor, "project.configuration.update", "project", name, "failed",
+                       {"project": name}, {"error_type": type(exc).__name__})
+        raise HTTPException(503, "Configuration change failed; retry the same request.")
+    required_audit(actor, "project.configuration.update", "project", name, "succeeded",
+                   {"project": name}, {"revision": revision, "operation_id": str(operation_id),
+                                       "names": sorted(values)})
+    return JSONResponse(status_code=202, content={
+        "operation_id": str(operation_id), "state": operation_state, "revision": revision,
+        "rollout_required": True, "status_url": f"/v1/operations/{operation_id}"})
 
 
 class Rollback(BaseModel):

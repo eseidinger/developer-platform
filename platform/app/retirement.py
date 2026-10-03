@@ -14,7 +14,7 @@ def scope_token(name: str, revision: int) -> str:
 def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
     # Only kinds and names are used; the placeholder address and password never leave this function.
     manifests = resources(name, spec.get("resolved_image", spec["image"]), spec.get("port", 8080),
-                          domain, DOCUMENTATION_ADDRESS, "unused", spec.get("resources"))
+                          domain, DOCUMENTATION_ADDRESS, "unused", spec.get("resources"), spec.get("configuration"))
     database = "project_" + name.replace("-", "_")
     return {
         "project": name,

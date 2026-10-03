@@ -39,6 +39,11 @@ class EnvelopeContract(unittest.TestCase):
                 "spec": {"application": {"runtime": {"type": "container", "image": "x:1"}}}}
         self.assertEqual(spec.to_flat(body), {"name": "a", "image": "x:1"})
 
+    def test_configuration_values_map_to_flat_field(self):
+        app = envelope()["spec"]["application"]
+        body = envelope(spec={"application": app, "configuration": {"values": {"B": "2", "A": "1"}}})
+        self.assertEqual(spec.to_flat(body)["configuration"], {"A": "1", "B": "2"})
+
     def test_unsupported_versions_kinds_and_capabilities_are_rejected(self):
         app = envelope()["spec"]["application"]
         cases = {
@@ -57,7 +62,8 @@ class EnvelopeContract(unittest.TestCase):
                 {"name": "q", "type": "queue", "profile": "x", "deletionPolicy": "retain"}]}),
             "delete policy": envelope(spec={"application": app, "resources": [
                 {"name": "database", "type": "postgres", "profile": "shared-dev", "deletionPolicy": "delete"}]}),
-            "configuration": envelope(spec={"application": app, "configuration": {"values": {"A": "b"}}}),
+            "configuration secrets": envelope(spec={"application": app, "configuration": {"secrets": {}}}),
+            "reserved configuration": envelope(spec={"application": app, "configuration": {"values": {"PGHOST": "b"}}}),
             "readiness path": envelope(spec={"application": {**app, "health": {"readiness": {"path": "/x"}}}}),
         }
         for label, body in cases.items():
