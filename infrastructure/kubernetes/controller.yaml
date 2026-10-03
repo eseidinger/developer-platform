@@ -18,6 +18,10 @@ rules:
   - apiGroups: [""]
     resources: [namespaces, secrets, services, resourcequotas, limitranges]
     verbs: [get, list, create, patch, update]
+  # RBAC cannot scope delete by name; the admission policy below limits it to managed project namespaces.
+  - apiGroups: [""]
+    resources: [namespaces]
+    verbs: [delete]
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list]
@@ -40,6 +44,36 @@ subjects:
   - kind: ServiceAccount
     name: provisioner
     namespace: platform-system
+---
+# The provisioner may delete only platform-created project namespaces (retirement).
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicy
+metadata:
+  name: provisioner-namespace-delete
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: ["v1"]
+        operations: ["DELETE"]
+        resources: ["namespaces"]
+  validations:
+    - expression: >-
+        request.userInfo.username != 'system:serviceaccount:platform-system:provisioner' ||
+        (oldObject.metadata.name.startsWith('project-') &&
+        has(oldObject.metadata.labels) &&
+        'platform.example/managed' in oldObject.metadata.labels &&
+        oldObject.metadata.labels['platform.example/managed'] == 'true')
+      message: The provisioner may only delete managed project-* namespaces.
+---
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingAdmissionPolicyBinding
+metadata:
+  name: provisioner-namespace-delete
+spec:
+  policyName: provisioner-namespace-delete
+  validationActions: [Deny]
 ---
 # External controller credential; revoke by deleting this secret and re-bootstrap.
 apiVersion: v1

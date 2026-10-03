@@ -38,6 +38,12 @@ def psql(database, query):
     return result.stdout.strip()
 
 
+# The provisioner may delete project namespaces but nothing else (server-side dry run, deletes nothing).
+refused = subprocess.run(["kubectl", "--kubeconfig", ".runtime/controller.kubeconfig", "delete", "namespace",
+    "kube-system", "--dry-run=server"], capture_output=True, text=True)
+assert refused.returncode != 0 and "provisioner-namespace-delete" in refused.stderr, refused
+print("controller denied deleting kube-system by admission policy")
+
 status, preview = call("/projects/%s/retirement-preview" % name)
 assert status == 200 and not preview["blockers"], (status, preview)
 print("preview removes:", ", ".join(i["kind"] + "/" + i["name"] for i in preview["removes"]))

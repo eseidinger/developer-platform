@@ -12,7 +12,7 @@ A shared bearer token authorizes all project reads, PUTs and retirement acknowle
 
 A session-level PostgreSQL advisory lock (`731904`) serializes all provisioning, retirement and discovery publication across API processes. SQL uses autocommit; PostgreSQL and Kubernetes changes do not form one transaction. Kubernetes server-side apply uses field manager `developer-platform`. Retrying PUT repairs resources on request; no workload reconciler or persisted steps resume automatically.
 
-The API holds PostgreSQL administrator credentials and a long-lived Kubernetes ServiceAccount token. The ClusterRole permits get/list/create/patch/update for selected kinds across the cluster; it does not limit resource names to project namespaces. The API has no Docker socket and no Kubernetes delete permission. These are trusted infrastructure credentials, not tenant credentials.
+The API holds PostgreSQL administrator credentials and a long-lived Kubernetes ServiceAccount token. The ClusterRole permits get/list/create/patch/update for selected kinds across the cluster; it does not limit resource names to project namespaces. The API has no Docker socket. Its only Kubernetes delete permission is for namespaces, used by confirmed project retirement; a ValidatingAdmissionPolicy (`provisioner-namespace-delete`) rejects any namespace deletion by the provisioner unless the namespace is named `project-*` and labelled `platform.example/managed=true`. These are trusted infrastructure credentials, not tenant credentials.
 
 ## Alternatives and consequences
 
