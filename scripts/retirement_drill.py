@@ -38,15 +38,15 @@ def psql(database, query):
     return result.stdout.strip()
 
 
-# The provisioner may delete project namespaces but nothing else (server-side dry run, deletes nothing).
+# The provisioner may delete project namespaces but nothing else (kube-system is protected by Kubernetes itself, so use platform-system) (server-side dry run, deletes nothing).
 # The controller kubeconfig names the k3d container, which only resolves inside the Docker network.
 host_server = subprocess.run(["kubectl", "--kubeconfig", ".runtime/admin.kubeconfig", "config", "view", "--minify",
     "-o", "jsonpath={.clusters[0].cluster.server}"], capture_output=True, text=True, check=True).stdout
 refused = subprocess.run(["kubectl", "--kubeconfig", ".runtime/controller.kubeconfig", "--server", host_server,
-    "--tls-server-name", "kubernetes", "delete", "namespace", "kube-system", "--dry-run=server"],
+    "--tls-server-name", "kubernetes", "delete", "namespace", "platform-system", "--dry-run=server"],
     capture_output=True, text=True)
 assert refused.returncode != 0 and "provisioner-namespace-delete" in refused.stderr, refused
-print("controller denied deleting kube-system by admission policy")
+print("controller denied deleting platform-system by admission policy")
 
 status, preview = call("/projects/%s/retirement-preview" % name)
 assert status == 200 and not preview["blockers"], (status, preview)
