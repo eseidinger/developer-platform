@@ -206,6 +206,20 @@ class OperationWorkerTests(OperationWorkerFixture):
         self.assertEqual(self.conn.error_code, "provider_error")
         self.assertEqual(self.conn.project_status, "failed")
         self.assertNotIn("sensitive provider detail", str(self.conn.operation_result))
+        self.assertEqual(self.conn.operation_result, {
+            "error_code": "provider_error", "step": "apply:Secret", "error_type": "RuntimeError"})
+        self.assertEqual(self.audit_mock.call_args.args[6]["step"], "apply:Secret")
+
+    def test_provider_trace_keeps_numeric_http_status_only(self):
+        error = RuntimeError("token=abc")
+        error.status = 409
+        self.provision_database.side_effect = error
+
+        self.assertTrue(self.run_one())
+
+        self.assertEqual(self.conn.operation_result["step"], "database")
+        self.assertEqual(self.conn.operation_result["http_status"], 409)
+        self.assertNotIn("abc", str(self.conn.operation_result))
         self.assertEqual(self.audit_mock.call_args.args[4], "failed")
         self.log.error.assert_called()
 

@@ -34,9 +34,9 @@ def _with_restart_marker(manifest: dict[str, Any], marker: str) -> dict[str, Any
 
 def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int,
                    error_code: str, audit_result: str, mark_project_failed: bool,
-                   log: logging.Logger) -> None:
+                   log: logging.Logger, trace: dict[str, Any] | None = None) -> None:
     record_event(actor, "operation.execute", "operation", str(operation_id), audit_result,
-                 {"project": project}, {"error_code": error_code},
+                 {"project": project}, {"error_code": error_code, **(trace or {})},
                  revision=str(revision), operation_id=str(operation_id))
     with conn.transaction():
         if mark_project_failed:
@@ -44,8 +44,9 @@ def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int
         conn.execute("""UPDATE application_operations SET state='failed', result_version=1,
             result=%s, error_code=%s, updated_at=now(), completed_at=now()
             WHERE operation_id=%s""",
-            (Jsonb({"error_code": error_code}), error_code, operation_id))
-    log.error("Deployment operation failed operation_id=%s error_code=%s", operation_id, error_code)
+            (Jsonb({"error_code": error_code, **(trace or {})}), error_code, operation_id))
+    log.error("Deployment operation failed operation_id=%s error_code=%s trace=%s",
+              operation_id, error_code, trace or {})
 
 
 def _execute_locked(conn, operation_id, password_for: Callable, provision_database: Callable,
@@ -100,8 +101,10 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
                        "invalid_operation_envelope", "rejected", True, log)
         return
 
+    step = "password"
     try:
         password = password_for(project)
+        step = "manifests"
         spec = desired[1]
         manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
                               os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
@@ -111,7 +114,9 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
             marker = str(operation_id)
             manifests = [_with_restart_marker(m, marker) for m in manifests if m["kind"] == "Deployment"]
         else:
+            step = "catalog"
             publish_catalog(conn)
+            step = "database"
             provision_database(conn, project, password)
             # Keep the last restart marker so server-side apply does not roll the pods again.
             latest = conn.execute("""SELECT latest_restart.operation_id
@@ -123,12 +128,16 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
                 manifests = [_with_restart_marker(m, str(latest[0])) if m["kind"] == "Deployment" else m
                              for m in manifests]
         for manifest in manifests:
+            step = f"apply:{manifest['kind']}"
             apply(manifest)
     except Exception as exc:
-        log.error("Deployment provider step failed operation_id=%s error_type=%s",
-                  operation_id, type(exc).__name__)
+        # Only the step, exception class and numeric HTTP status are kept; the message may hold secrets.
+        trace: dict[str, Any] = {"step": step, "error_type": type(exc).__name__}
+        status = getattr(exc, "status", None)
+        if isinstance(status, int):
+            trace["http_status"] = status
         _finish_failed(conn, operation_id, actor, project, revision,
-                       "provider_error", "failed", True, log)
+                       "provider_error", "failed", True, log, trace)
         return
 
     result: dict[str, Any] = {
