@@ -81,6 +81,35 @@ class ApplicationEnvelope(_Strict):
         return self
 
 
+CAPABILITIES = {
+    "apiVersion": API_VERSION,
+    "environments": {"default": {
+        "runtime": {"types": ["container"], "registries": "see imageRegistries"},
+        "endpoints": {"protocols": ["http"], "exposure": ["public"], "maxCount": 1},
+        "scaling": {"minInstances": 1, "maxInstances": 1, "autoscaling": False},
+        "resources": {"requests": "up to 1 CPU / 1Gi", "limits": "up to 2 CPU / 2Gi", "requestsMustNotExceedLimits": True},
+        "health": {"readiness": {"profiles": ["status", "hello-world"], "customPath": False}},
+        "externalResources": [{"type": "postgres", "profiles": ["shared-dev"], "deletionPolicies": ["retain"], "maxCount": 1}],
+        "configuration": {"values": False, "secrets": False, "bindings": ["PG"]},
+    }},
+}
+
+
+def error_code(body, errors):
+    """Stable machine-readable code for a rejected PUT body."""
+    envelope = isinstance(body, dict) and ("apiVersion" in body or "kind" in body)
+    for error in errors:
+        # Union validation tags each error's location with the branch it came from.
+        loc = tuple(str(part) for part in error.get("loc", ()))
+        branch = loc[1] if len(loc) > 1 else ""
+        if envelope and "ApplicationEnvelope" in branch:
+            if loc[-1] not in ("apiVersion", "kind") and error.get("type") in ("extra_forbidden", "literal_error"):
+                return "unsupported_capability"
+        elif not envelope and branch == "Project" and error.get("type") == "extra_forbidden":
+            return "unsupported_capability"
+    return "invalid_spec"
+
+
 def to_flat(body):
     """Return the flat project fields for an envelope; flat bodies pass through unchanged."""
     if not isinstance(body, dict) or "apiVersion" not in body and "kind" not in body:

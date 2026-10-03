@@ -1085,6 +1085,28 @@
         "summary": "Ready"
       }
     },
+    "/v1/capabilities": {
+      "get": {
+        "description": "Declare what a deployment spec may request in each environment.",
+        "operationId": "capabilities_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Capabilities"
+      }
+    },
     "/v1/operations/{operation_id}": {
       "get": {
         "operationId": "operation_status_v1_operations__operation_id__get",

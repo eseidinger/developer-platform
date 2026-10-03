@@ -146,7 +146,7 @@ resolver supports wildcard localhost names. Public applications use
 | `image` | Yes | Container image reference, 2–512 characters under the current regex. An explicit tag or digest is recommended but not enforced. |
 | `port` | No | Container TCP port, 1024–65535; defaults to 8080. |
 | `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
-| `resources` | No | `{"requests": {"cpu", "memory"}, "limits": {"cpu", "memory"}}`; CPU as `250m` or `0.25`, memory as `Mi`/`Gi`. Omitted values default to requests `100m`/`128Mi` and limits `500m`/`256Mi`. Requests must not exceed limits; maxima are requests 1 CPU/1Gi and limits 2 CPU/2Gi (a rolling update briefly runs two pods within the namespace quota). Invalid values return 422. Stored canonically (`250m`, `512Mi`), so equivalent spellings reuse the revision. |
+| `resources` | No | `{"requests": {"cpu", "memory"}, "limits": {"cpu", "memory"}}`; CPU as `250m` or `0.25`, memory as `Mi`/`Gi`. Omitted values default to requests `100m`/`128Mi` and limits `500m`/`256Mi`. Requests must not exceed limits; maxima are requests 1 CPU/1Gi and limits 2 CPU/2Gi (a rolling update briefly runs two pods within the namespace quota). Invalid values return 422. Spec rejections return 422 with a stable `code`: `unsupported_capability` (a field or value outside the declared capabilities) or `invalid_spec` (anything else malformed). Stored canonically (`250m`, `512Mi`), so equivalent spellings reuse the revision. |
 
 Unknown project request fields are rejected with `422` before catalog or provider side effects. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/02-architecture/application-spec.md) is a future contract, not an input format for this endpoint.
 
@@ -250,6 +250,7 @@ access before network rules converge; this lab is intended for trusted workloads
 | `GET /healthz` | None | 200 with `{"status":"ok"}` when the process responds |
 | `GET /readyz` | None | 200 with `{"status":"ready"}` when database and Kubernetes checks pass; otherwise 503 |
 | `GET /projects` | OIDC `viewer` or stronger grant | 200 with only authorized projects |
+| `GET /v1/capabilities` | Any authenticated principal | Declared capabilities per environment (runtime, endpoints, scaling, resources, health, external resources, configuration) and the allowed image registries |
 | `PUT /projects/{name}` | OIDC `developer` or stronger project grant; platform-admin creates projects | 202 with queued operation ID, desired revision, and status URL; the image tag is first resolved to a digest (422 unknown tag/unsupported registry, 503 registry unreachable) |
 | `GET /v1/operations/{id}` | OIDC `viewer` or stronger grant on the owning project | 200 with apply outcome, revision, redacted result, and live readiness snapshot (replica counts, images, diagnostic reason) |
 | `POST /projects/{name}/restart` | OIDC `developer` or stronger project grant | 202 with a queued `restart` operation that rolls the current deployed revision without changing the spec; repeats reuse the pending operation; 404 unknown, 409 unless applied |

@@ -16,6 +16,7 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -29,9 +30,9 @@ from .authorization import (bootstrap_platform_admin, grant as grant_role, initi
                             grants_for_project, is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
                             upsert_principal)
 from .catalog import ensure_default_application, initialize as initialize_catalog
-from .images import ImageResolutionError, resolve_image
+from .images import ImageResolutionError, allowed_registries, resolve_image
 from .identity import AuthenticationError, Principal, configured_verifier
-from .spec import ApplicationEnvelope, to_flat
+from .spec import CAPABILITIES, ApplicationEnvelope, error_code, to_flat
 from .manifests import normalize_resources, resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
@@ -181,6 +182,10 @@ async def validation_error(request: Request, exc: RequestValidationError):
             return JSONResponse(status_code=503, content={
                 "detail": "Rejected request requires an audit record; retry after audit service recovery"
             })
+    if request.method == "PUT" and request.url.path.startswith("/projects/") and request.url.path.count("/") == 2:
+        return JSONResponse(status_code=422, content={
+            "detail": jsonable_encoder(exc.errors()),
+            "code": error_code(getattr(exc, "body", None), exc.errors())})
     return await request_validation_exception_handler(request, exc)
 
 class Project(BaseModel):
@@ -242,6 +247,12 @@ def projects(principal: Principal = Depends(current_principal)):
     with connect() as conn:
         rows = projects_for_principal(conn, principal)
     return [{"name": name, "spec": spec, "status": status} for name, spec, status in rows]
+
+
+@app.get("/v1/capabilities")
+def capabilities(principal: Principal = Depends(current_principal)):
+    """Declare what a deployment spec may request in each environment."""
+    return {**CAPABILITIES, "imageRegistries": sorted(allowed_registries())}
 
 
 def _operator_audit(principal: Principal, action: str, target_id: str | None, detail: dict):

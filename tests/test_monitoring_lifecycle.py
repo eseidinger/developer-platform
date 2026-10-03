@@ -379,6 +379,28 @@ class LifecycleTests(unittest.TestCase):
                                  ("request.validation", "platform-api", "smoke", "rejected"))
         self.assertEqual(self.catalog.rows, {})
 
+    def test_rejections_carry_stable_codes_and_capabilities_are_published(self):
+        base = {"apiVersion": "platform.example/v1alpha1", "kind": "Application", "metadata": {"name": "smoke"},
+                "spec": {"application": {"runtime": {"type": "container", "image": "example:v1"}}}}
+        scaled = {**base, "spec": {"application": {**base["spec"]["application"],
+                                                    "scaling": {"minInstances": 1, "maxInstances": 3}}}}
+        configured = {**base, "spec": {**base["spec"], "configuration": {"values": {"A": "b"}}}}
+        cases = ((scaled, "unsupported_capability"), (configured, "unsupported_capability"),
+                 ({**base, "apiVersion": "platform.example/v9"}, "invalid_spec"),
+                 ({**self.spec, "scaling": 2}, "unsupported_capability"),
+                 ({**self.spec, "probe_profile": "arbitrary"}, "invalid_spec"),
+                 ({**self.spec, "port": 80}, "invalid_spec"))
+        for body, code in cases:
+            with self.subTest(body=body):
+                response = self.client.put("/projects/smoke", json=body, headers=self.headers)
+                self.assertEqual((response.status_code, response.json()["code"]), (422, code))
+        listed = self.client.get("/v1/capabilities", headers=self.headers)
+        self.assertEqual(listed.status_code, 200)
+        self.assertFalse(listed.json()["environments"]["default"]["scaling"]["autoscaling"])
+        self.assertIn("docker.io", listed.json()["imageRegistries"])
+        self.mocks[5].verify.side_effect = AuthenticationError()
+        self.assertEqual(self.client.get("/v1/capabilities", headers=self.headers).status_code, 401)
+
     def test_unknown_project_field_rejected_before_catalog_mutation(self):
         self.spec["unexpected"] = "must not be ignored"
 

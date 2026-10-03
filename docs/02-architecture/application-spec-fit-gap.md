@@ -26,8 +26,8 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 | Item | State | Work |
 |---|---|---|
 | Unknown fields | Rejected (`extra="forbid"`) | Keep in the envelope. |
-| Public `namespace` in responses | Exposed by the project listing | Remove from public output; it is an implementation detail. |
-| Capability profiles | None declared | Publish a per-environment list and reject spec features outside it with a stable error code. |
+| Public `namespace` in responses | Not in `/projects` or operation output; only the platform-admin security-configuration inspection returns the Namespace manifest | Done; no public change needed. |
+| Capability profiles | `GET /v1/capabilities` publishes the `default` environment profile; PUT rejections return `code` `unsupported_capability` or `invalid_spec` | Implemented; the profile is static code, not yet per-environment configuration. |
 | Revision identity | Spec equality with the resolved digest | Keep; extend the equality to resource fields. |
 | Idempotency and conflicts | Same-revision reuse only | PLAN-003 (expected revision, idempotency keys). |
 
