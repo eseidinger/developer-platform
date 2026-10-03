@@ -360,6 +360,26 @@ class LifecycleTests(unittest.TestCase):
         self.mocks[-2].assert_not_called()
         self.mocks[-1].assert_not_called()
 
+    def test_unsupported_capabilities_are_rejected_before_any_side_effect(self):
+        unsupported = {
+            "scaling": {"min": 1, "max": 3},
+            "object_storage": {"bucket": "assets"},
+            "messaging": {"queue": "jobs"},
+            "cache": {"size": "1Gi"},
+            "components": [{"image": "other"}],
+            "resources": {"cpu": "4"},
+            "environment": {"LOG": "debug"},
+        }
+        for field, value in unsupported.items():
+            with self.subTest(field=field):
+                self.spec[field] = value
+                self.assertEqual(self.deploy().status_code, 422)
+                del self.spec[field]
+        self.assertEqual(self.catalog.rows, {})
+        self.assertEqual(self.catalog.operations, {})
+        self.mocks[-2].assert_not_called()
+        self.mocks[-1].assert_not_called()
+
     def test_mutations_and_authentication_denials_are_audited(self):
         self.assertEqual(self.deploy().status_code, 202)
         success = self.mocks[3].call_args
