@@ -228,6 +228,21 @@ class LifecycleTests(unittest.TestCase):
         self.mocks[-2].assert_not_called()
         self.mocks[-1].assert_not_called()
 
+    def test_rollback_to_a_revision_without_resources_is_listed_and_reapplied(self):
+        self.deploy()
+        app_id = next(iter(self.catalog.application_ids.values()))
+        legacy = {k: v for k, v in self.catalog.revisions[app_id][0][1].items() if k != "resources"}
+        self.catalog.revisions[app_id][0] = (1, legacy)
+        self.spec["image"] = "example:v2"
+        self.deploy()
+        self.complete_operations()
+
+        listing = self.client.get("/projects/smoke/revisions", headers=self.headers).json()
+        self.assertIsNone(listing["revisions"][1]["resources"])
+        response = self.rollback(1)
+        self.assertEqual((response.status_code, response.json()["revision"]), (202, 3))
+        self.assertEqual(self.catalog.revisions[app_id][2][1], legacy)
+
     def test_rollback_rejects_unknown_revisions_stale_if_match_and_retired_projects(self):
         self.deploy()
         self.complete_operations()
