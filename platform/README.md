@@ -138,6 +138,8 @@ resolver supports wildcard localhost names. Public applications use
 
 ## Project specification
 
+`PUT /projects/{name}` accepts either the flat body below or a versioned envelope (`apiVersion: platform.example/v1alpha1`, `kind: Application`; see [ApplicationSpec](../docs/02-architecture/application-spec.md)). The generated API contract is [docs/api/openapi.json](../docs/api/openapi.json); refresh it with `scripts/export_openapi.py` after API changes (a test fails when it is stale).
+
 | Field | Required | Contract |
 | --- | --- | --- |
 | `name` | Yes | 1–32 lowercase letters, digits, or hyphens; start with a letter and end with a letter or digit. Must match the URL path. |

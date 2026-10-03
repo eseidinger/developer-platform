@@ -6,7 +6,7 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 
 | Draft field | Current behaviour | Disposition | Decision / work |
 |---|---|---|---|
-| `apiVersion`, `kind` | Flat JSON body; no public version | new | Accept a versioned envelope alongside the flat body; flat body is treated as `v1alpha1` with a documented sunset. Publish an OpenAPI schema. |
+| `apiVersion`, `kind` | Implemented: envelope accepted next to the flat body; OpenAPI committed at `docs/api/openapi.json` | implemented | Accept a versioned envelope alongside the flat body; flat body is treated as `v1alpha1` with a documented sunset. Publish an OpenAPI schema. |
 | `metadata.name` | `name` path and body field, validated slug | map | Keep the slug; must equal the path parameter. |
 | `metadata.project`, `metadata.environment` | One project per slug; one default environment, internal only | reject | Accept only `project == name` and `environment == default` until multi-environment work; reject other values. |
 | `runtime.type` | Always a container | map | Accept only `container`. |
@@ -34,8 +34,8 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 ## Open decisions
 
 1. ~~CPU and memory semantics.~~ Decided on explicit `requests` and `limits` with defaults equal to the earlier fixed values, so existing projects do not change.
-2. **Flat body sunset.** How long the flat body is accepted next to the envelope.
-3. **Endpoint and health fields in the first envelope.** Whether `health.readiness` ships in the first version or stays with `probe_profile`.
+2. **Flat body sunset.** (Both forms are accepted today.) How long the flat body is accepted next to the envelope.
+3. ~~Health in the first envelope.~~ Interim `health.readiness.profile` (same values as `probe_profile`); `path`/`port` are rejected until supported.
 
 ## Proposed order
 

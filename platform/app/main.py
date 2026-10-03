@@ -7,7 +7,7 @@ import threading
 import csv
 import io
 from datetime import datetime, timedelta, timezone
-from typing import Literal, Optional
+from typing import Literal, Optional, Union
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -22,7 +22,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
 from kubernetes.client.exceptions import ApiException
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from .audit import Actor, initialize as initialize_audit, read_events, record_event, redact
 from .authorization import (bootstrap_platform_admin, grant as grant_role, initialize as initialize_authorization,
@@ -31,6 +31,7 @@ from .authorization import (bootstrap_platform_admin, grant as grant_role, initi
 from .catalog import ensure_default_application, initialize as initialize_catalog
 from .images import ImageResolutionError, resolve_image
 from .identity import AuthenticationError, Principal, configured_verifier
+from .spec import ApplicationEnvelope, to_flat
 from .manifests import normalize_resources, resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
@@ -318,7 +319,16 @@ def export_audit_events(start: datetime, end: datetime, format: Literal["json", 
     return PlainTextResponse(output.getvalue(), media_type="text/csv")
 
 @app.put("/projects/{name}")
-def provision(name: str, project: Project, principal: Principal = Depends(current_principal)):
+def provision(name: str, body: Union[ApplicationEnvelope, Project],
+              principal: Principal = Depends(current_principal)):
+    """Accept the flat project body or a versioned `Application` envelope."""
+    if isinstance(body, ApplicationEnvelope):
+        try:
+            project = Project.model_validate(to_flat(body.model_dump(exclude_none=True)))
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors(include_context=False))
+    else:
+        project = body
     actor = actor_for(principal)
     require_permission(principal, "change", name)
     if name != project.name:

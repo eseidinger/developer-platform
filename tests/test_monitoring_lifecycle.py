@@ -351,6 +351,34 @@ class LifecycleTests(unittest.TestCase):
         rejected = self.mocks[3].call_args
         self.assertEqual(rejected.args[1:5], ("request.validation", "platform-api", "smoke", "rejected"))
 
+    def test_versioned_envelope_is_accepted_and_shares_revisions_with_the_flat_body(self):
+        envelope = {"apiVersion": "platform.example/v1alpha1", "kind": "Application",
+                    "metadata": {"name": "smoke"},
+                    "spec": {"application": {"runtime": {"type": "container", "image": "example:v1"}}}}
+        first = self.client.put("/projects/smoke", json=envelope, headers=self.headers)
+        self.assertEqual(first.status_code, 202)
+        stored = self.catalog.rows["smoke"][0]
+        self.assertEqual((stored["image"], stored["port"], stored["probe_profile"]), ("example:v1", 8080, "status"))
+        self.complete_operations()
+        flat = self.client.put("/projects/smoke", json={"name": "smoke", "image": "example:v1"}, headers=self.headers)
+        self.assertEqual(flat.json()["revision"], first.json()["revision"])
+
+    def test_invalid_envelopes_are_rejected_and_audited_before_catalog_mutation(self):
+        base = {"apiVersion": "platform.example/v1alpha1", "kind": "Application", "metadata": {"name": "smoke"},
+                "spec": {"application": {"runtime": {"type": "container", "image": "example:v1"}}}}
+        for label, body in (
+                ("version", {**base, "apiVersion": "platform.example/v9"}),
+                ("project", {**base, "metadata": {"name": "smoke", "project": "other"}}),
+                ("scaling", {**base, "spec": {"application": {**base["spec"]["application"],
+                                                               "scaling": {"minInstances": 1, "maxInstances": 2}}}}),
+                ("resources", {**base, "spec": {"application": {**base["spec"]["application"],
+                                                                 "resources": {"limits": {"cpu": "9"}}}}})):
+            with self.subTest(label):
+                self.assertEqual(self.client.put("/projects/smoke", json=body, headers=self.headers).status_code, 422)
+                self.assertEqual(self.mocks[3].call_args.args[1:5],
+                                 ("request.validation", "platform-api", "smoke", "rejected"))
+        self.assertEqual(self.catalog.rows, {})
+
     def test_unknown_project_field_rejected_before_catalog_mutation(self):
         self.spec["unexpected"] = "must not be ignored"
 
