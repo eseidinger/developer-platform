@@ -99,7 +99,9 @@ print("operations after kill:", states)
 assert states.startswith("running"), "operation was not interrupted mid-flight: " + states
 
 marker = "marker-" + str(int(time.time()))
-psql(db, "CREATE TABLE crash_check (marker text); INSERT INTO crash_check VALUES ('%s')" % marker)
+# Own the table as the project role, as the application would.
+psql(db, "CREATE TABLE crash_check (marker text); INSERT INTO crash_check VALUES ('%s'); "
+         'ALTER TABLE crash_check OWNER TO "%s"' % (marker, db))
 roles_before = psql("postgres", "SELECT count(*) FROM pg_roles WHERE rolname='%s'" % db)
 print("database", db, "exists with marker", marker, "roles:", roles_before)
 
