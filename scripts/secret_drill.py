@@ -86,8 +86,32 @@ print("rotated -> pods restarted and active")
 
 status, text = call("GET", path)
 listing = json.loads(text)
-assert [s["name"] for s in listing["secrets"]] == [NAME] and listing["secrets"][0]["changed_at"], listing
+entry = listing["secrets"][0]
+assert [s["name"] for s in listing["secrets"]] == [NAME] and entry["changed_at"], listing
+assert (entry["version"], entry["state"]) == (2, "rotating"), entry
 seen.append(text)
+held = kubectl("get", "secret", "app-secrets-previous", "-o", "jsonpath={.data." + NAME + "}").stdout
+assert base64.b64decode(held).decode() == MARK, "previous value not held outside the mounted Secret"
+assert "app-secrets-previous" not in kubectl("get", "deploy", PROJECT, "-o", "json").stdout
+print("rotation holds the previous value (version 1) outside the mounted Secret")
+
+status, text = call("POST", f"{path}/{NAME}/revert")
+assert status == 202, (status, text)
+seen.append(wait_active())
+current = kubectl("get", "secret", "app-secrets", "-o", "jsonpath={.data." + NAME + "}").stdout
+assert base64.b64decode(current).decode() == MARK, "revert did not restore the previous value"
+assert json.loads(call("GET", path)[1])["secrets"][0]["version"] == 3
+print("reverted -> previous value current again as version 3")
+
+status, text = call("PUT", f"{path}/{NAME}", {"value": SECOND})
+assert status == 202, (status, text)
+seen.append(wait_active())
+status, text = call("POST", f"{path}/{NAME}/confirm")
+assert status == 200 and json.loads(text)["state"] == "active", (status, text)
+seen.append(text)
+assert kubectl("get", "secret", "app-secrets-previous", "-o", "jsonpath={.data}").stdout in ("", "{}")
+assert call("POST", f"{path}/{NAME}/confirm")[0] == 409
+print("confirmed after adoption -> previous value revoked")
 for extra in ("/revisions", "/configuration", "/drift"):
     seen.append(call("GET", f"/projects/{PROJECT}{extra}")[1])
 

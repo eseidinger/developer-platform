@@ -41,8 +41,8 @@ from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
 from .logs import observe_logs
-from .secrets import (SecretsUnavailable, MAX_SECRETS, observe_secret_activation, read_secret, remove_secret,
-                      roll_pods, validate_secret_name, validate_secret_value, write_secret)
+from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
+                      remove_secret, revert_secret, roll_pods, validate_secret_name, validate_secret_value, write_secret)
 from .retirement import removal_scope
 from .security_alerts import security_alert_loop
 
@@ -722,6 +722,61 @@ def delete_secret(name: str, secret: str, principal: Principal = Depends(current
     except SecretsUnavailable:
         secrets_unavailable(actor, "project.secret.delete", name)
     required_audit(actor, "project.secret.delete", "project", name, "succeeded", {"project": name},
+                   {"name": secret, "rollout_started": rolled})
+    return JSONResponse(status_code=202, content={
+        "name": secret, "rollout_required": True, "rollout_started": rolled})
+
+
+@app.post("/projects/{name}/secrets/{secret}/confirm")
+def confirm_secret_rotation(name: str, secret: str, principal: Principal = Depends(current_principal)):
+    """Revoke the previous value once the pods run the new one."""
+    actor, _ = secrets_project(name, principal, "change", "project.secret.confirm")
+    try:
+        validate_secret_name(secret)
+        stored = read_secret(runtime, name)
+        entry = next((s for s in (stored or {}).get("secrets", []) if s["name"] == secret), None)
+        if entry is None:
+            raise HTTPException(404, "Unknown secret")
+        if entry["state"] != "rotating":
+            required_audit(actor, "project.secret.confirm", "project", name, "rejected", {"project": name},
+                           {"reason": "no_previous_version", "name": secret})
+            return JSONResponse(status_code=409, content={
+                "detail": "No previous version is held", "code": "no_previous_version"})
+        activation = observe_secret_activation(runtime, name, stored["version"])
+        if activation["state"] != "active":
+            required_audit(actor, "project.secret.confirm", "project", name, "rejected", {"project": name},
+                           {"reason": "not_adopted", "name": secret})
+            return JSONResponse(status_code=409, content={
+                "detail": "The pods do not run the new version yet", "code": "not_adopted",
+                "activation": activation})
+        confirm_secret(runtime, name, secret)
+    except ValueError:
+        raise HTTPException(404, "Unknown secret")
+    except SecretsUnavailable:
+        secrets_unavailable(actor, "project.secret.confirm", name)
+    required_audit(actor, "project.secret.confirm", "project", name, "succeeded", {"project": name},
+                   {"name": secret, "version": entry["version"]})
+    return {"name": secret, "version": entry["version"], "state": "active"}
+
+
+@app.post("/projects/{name}/secrets/{secret}/revert")
+def revert_secret_rotation(name: str, secret: str, principal: Principal = Depends(current_principal)):
+    """Make the previous value current again and restart the pods."""
+    actor, _ = secrets_project(name, principal, "change", "project.secret.revert")
+    try:
+        validate_secret_name(secret)
+        version = revert_secret(runtime, name, secret)
+        if version is None:
+            required_audit(actor, "project.secret.revert", "project", name, "rejected", {"project": name},
+                           {"reason": "no_previous_version", "name": secret})
+            return JSONResponse(status_code=409, content={
+                "detail": "No previous version is held", "code": "no_previous_version"})
+        rolled = roll_pods(runtime, name, version)
+    except ValueError:
+        raise HTTPException(404, "Unknown secret")
+    except SecretsUnavailable:
+        secrets_unavailable(actor, "project.secret.revert", name)
+    required_audit(actor, "project.secret.revert", "project", name, "succeeded", {"project": name},
                    {"name": secret, "rollout_started": rolled})
     return JSONResponse(status_code=202, content={
         "name": secret, "rollout_required": True, "rollout_started": rolled})

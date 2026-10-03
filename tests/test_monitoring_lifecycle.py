@@ -669,6 +669,19 @@ class LifecycleTests(unittest.TestCase):
         everything = listed.text + json.dumps([c.args for c in self.mocks[3].call_args_list], default=str)
         self.assertNotIn(value, everything)
         self.assertTrue(any(c.args[1] == "project.secret.set" for c in self.mocks[3].call_args_list))
+        self.assertEqual((listed.json()["secrets"][0]["version"], listed.json()["secrets"][0]["state"]), (2, "rotating"))
+        confirm = f"{base}/DB_PASSWORD/confirm"
+        fake.deployment["status"]["updatedReplicas"] = 0
+        self.assertEqual(self.client.post(confirm, headers=self.headers).json()["code"], "not_adopted")
+        fake.deployment["status"]["updatedReplicas"] = 1
+        self.assertEqual(self.client.post(confirm, headers=self.headers).json()["state"], "active")
+        self.assertEqual(self.client.post(confirm, headers=self.headers).json()["code"], "no_previous_version")
+        self.assertEqual(self.client.post(f"{base}/DB_PASSWORD/revert", headers=self.headers).json()["code"],
+                         "no_previous_version")
+        self.client.put(f"{base}/DB_PASSWORD", json={"value": value + "3"}, headers=self.headers)
+        reverted = self.client.post(f"{base}/DB_PASSWORD/revert", headers=self.headers)
+        self.assertEqual((reverted.status_code, fake.secret["data"]["DB_PASSWORD"]), (202, value + "2"))
+        self.assertEqual(self.client.post(f"{base}/MISSING/confirm", headers=self.headers).status_code, 404)
         configured = self.client.put("/projects/smoke/configuration", json={"values": {"DB_PASSWORD": "x"}},
                                      headers=self.headers)
         self.assertEqual(configured.status_code, 422)
@@ -682,6 +695,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.client.get(base, headers=self.headers).status_code, 403)
         self.assertEqual(self.client.put(f"{base}/A", json={"value": "x"}, headers=self.headers).status_code, 403)
         self.assertEqual(self.client.delete(f"{base}/A", headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.post(f"{base}/A/confirm", headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.post(f"{base}/A/revert", headers=self.headers).status_code, 403)
 
     def test_unknown_project_field_rejected_before_catalog_mutation(self):
         self.spec["unexpected"] = "must not be ignored"

@@ -14,42 +14,51 @@ class FakeCluster:
     """Minimal Secret and Deployment API that stores what the platform writes."""
 
     def __init__(self):
-        self.secret = None
+        self.secrets = {}
         self.version = 0
         self.deployment = {"spec": {"replicas": 1, "template": {"metadata": {}}},
                            "status": {"updatedReplicas": 1, "readyReplicas": 1, "replicas": 1}}
         self.patches = []
         self.resources = Mock()
 
-    def _bump(self):
+    @property
+    def secret(self):
+        return self.secrets.get("app-secrets")
+
+    @property
+    def previous(self):
+        return self.secrets.get("app-secrets-previous")
+
+    def _bump(self, stored):
         self.version += 1
-        self.secret["metadata"]["resourceVersion"] = str(self.version)
-        return json.loads(json.dumps(self.secret))
+        stored["metadata"]["resourceVersion"] = str(self.version)
+        return json.loads(json.dumps(stored))
 
     def secret_api(self):
         api = Mock()
 
         def get(name, namespace):
-            if self.secret is None:
+            if name not in self.secrets:
                 raise ApiException(status=404)
-            return json.loads(json.dumps(self.secret))
+            return json.loads(json.dumps(self.secrets[name]))
 
         def create(body, namespace):
-            self.secret = {"metadata": body["metadata"], "data": dict(body["stringData"])}
-            return self._bump()
+            data = {**body.get("data", {}), **body.get("stringData", {})}
+            self.secrets[body["metadata"]["name"]] = {"metadata": body["metadata"], "data": data}
+            return self._bump(self.secrets[body["metadata"]["name"]])
 
         def patch(body, name, namespace, content_type):
-            if self.secret is None:
+            if name not in self.secrets:
                 raise ApiException(status=404)
+            stored = self.secrets[name]
             self.patches.append(body)
-            self.secret["data"].update(body.get("stringData", {}))
+            stored["data"].update(body.get("stringData", {}))
             for key, value in (body.get("data") or {}).items():
-                if value is None:
-                    self.secret["data"].pop(key, None)
-            annotations = self.secret["metadata"].setdefault("annotations", {})
+                stored["data"].pop(key, None) if value is None else stored["data"].__setitem__(key, value)
+            annotations = stored["metadata"].setdefault("annotations", {})
             for key, value in body["metadata"]["annotations"].items():
                 annotations.pop(key, None) if value is None else annotations.__setitem__(key, value)
-            return self._bump()
+            return self._bump(stored)
         api.get, api.create, api.patch = get, create, patch
         return api
 
@@ -96,6 +105,41 @@ class SecretStoreTests(unittest.TestCase):
         self.assertEqual(secrets.observe_secret_activation(fake, "smoke", again)["state"], "pending")
         secrets.roll_pods(fake, "smoke", again)
         self.assertEqual(secrets.observe_secret_activation(fake, "smoke", again)["state"], "active")
+
+    def test_rotation_keeps_previous_value_outside_the_mounted_secret_until_confirmed(self):
+        fake = cluster()
+        secrets.write_secret(fake, "smoke", "API_TOKEN", "one")
+        self.assertIsNone(fake.previous)
+        self.assertEqual(secrets.read_secret(fake, "smoke")["secrets"][0]["state"], "active")
+        secrets.write_secret(fake, "smoke", "API_TOKEN", "two")
+        self.assertEqual(fake.previous["data"], {"API_TOKEN": "one"})
+        self.assertEqual(fake.secret["data"], {"API_TOKEN": "two"})
+        entry = secrets.read_secret(fake, "smoke")["secrets"][0]
+        self.assertEqual((entry["version"], entry["state"]), (2, "rotating"))
+        self.assertNotIn("one", json.dumps(secrets.read_secret(fake, "smoke")))
+        self.assertTrue(secrets.confirm_secret(fake, "smoke", "API_TOKEN"))
+        self.assertEqual(fake.previous["data"], {})
+        self.assertFalse(secrets.confirm_secret(fake, "smoke", "API_TOKEN"))
+        self.assertEqual(secrets.read_secret(fake, "smoke")["secrets"][0]["state"], "active")
+
+    def test_revert_restores_previous_value_as_new_version(self):
+        fake = cluster()
+        self.assertIsNone(secrets.revert_secret(fake, "smoke", "API_TOKEN"))
+        secrets.write_secret(fake, "smoke", "API_TOKEN", "one")
+        secrets.write_secret(fake, "smoke", "API_TOKEN", "two")
+        self.assertIsNotNone(secrets.revert_secret(fake, "smoke", "API_TOKEN"))
+        self.assertEqual(fake.secret["data"], {"API_TOKEN": "one"})
+        self.assertEqual(fake.previous["data"], {})
+        self.assertEqual(secrets.read_secret(fake, "smoke")["secrets"][0]["version"], 3)
+
+    def test_remove_and_new_value_discard_stale_previous(self):
+        fake = cluster()
+        secrets.write_secret(fake, "smoke", "A_KEY", "one")
+        secrets.write_secret(fake, "smoke", "A_KEY", "two")
+        secrets.remove_secret(fake, "smoke", "A_KEY")
+        self.assertEqual(fake.previous["data"], {})
+        secrets.write_secret(fake, "smoke", "A_KEY", "three")
+        self.assertEqual(secrets.read_secret(fake, "smoke")["secrets"][0]["version"], 1)
 
     def test_remove_and_missing_deployment(self):
         fake = cluster()

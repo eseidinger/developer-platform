@@ -2,6 +2,7 @@
 import hashlib
 
 from .manifests import SECRET_NAME, resources
+from .secrets import PREVIOUS_SECRET_NAME
 
 DOCUMENTATION_ADDRESS = "192.0.2.1"
 
@@ -20,7 +21,7 @@ def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
         "project": name,
         "revision": revision,
         "removes": [{"kind": m["kind"], "name": m["metadata"]["name"]} for m in manifests]
-                   + [{"kind": "Secret", "name": SECRET_NAME}],
+                   + [{"kind": "Secret", "name": SECRET_NAME}, {"kind": "Secret", "name": PREVIOUS_SECRET_NAME}],
         "route": name + "." + domain,
         "retains": {"database": database, "role": database, "catalog_and_revisions": True},
         "scope_token": scope_token(name, revision),
