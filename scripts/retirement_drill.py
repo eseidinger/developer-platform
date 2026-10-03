@@ -39,8 +39,12 @@ def psql(database, query):
 
 
 # The provisioner may delete project namespaces but nothing else (server-side dry run, deletes nothing).
-refused = subprocess.run(["kubectl", "--kubeconfig", ".runtime/controller.kubeconfig", "delete", "namespace",
-    "kube-system", "--dry-run=server"], capture_output=True, text=True)
+# The controller kubeconfig names the k3d container, which only resolves inside the Docker network.
+host_server = subprocess.run(["kubectl", "--kubeconfig", ".runtime/admin.kubeconfig", "config", "view", "--minify",
+    "-o", "jsonpath={.clusters[0].cluster.server}"], capture_output=True, text=True, check=True).stdout
+refused = subprocess.run(["kubectl", "--kubeconfig", ".runtime/controller.kubeconfig", "--server", host_server,
+    "--tls-server-name", "kubernetes", "delete", "namespace", "kube-system", "--dry-run=server"],
+    capture_output=True, text=True)
 assert refused.returncode != 0 and "provisioner-namespace-delete" in refused.stderr, refused
 print("controller denied deleting kube-system by admission policy")
 
