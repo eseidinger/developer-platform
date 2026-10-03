@@ -1,36 +1,35 @@
 # Provisioning Sequence
 
-Status: current request flow followed by the future asynchronous contract. [Software architecture](../software-architecture.md).
+Status: current queued-operation API and in-process worker followed by the future service contract. [Software architecture](../software-architecture.md).
 
-## Current synchronous PUT
+## Current asynchronous acceptance and execution
 
 ```mermaid
 sequenceDiagram
-    actor Admin as Administrator
+    actor Dev as Developer
     participant API as FastAPI
     participant PG as PostgreSQL
-    participant Files as Discovery volume
+    participant Worker as Python worker thread
     participant K8s as Kubernetes API
-    Admin->>API: PUT project spec + admin bearer token
-    API->>API: Validate supported fields
+    Dev->>API: PUT project spec + OIDC bearer token
+    API->>API: Authenticate, authorize, validate
     API->>PG: Acquire global session advisory lock
-    API->>PG: Store latest spec / provisioning (autocommit)
-    API->>Files: Publish all non-retired catalog targets
-    API->>PG: Ensure project login and database
-    API->>K8s: Server-side apply fixed resources
-    alt All steps completed
-        API->>PG: Store applied
-        API->>PG: Release lock
-        API-->>Admin: 200 applied, namespace and host
-        Note over Admin,K8s: Rollout readiness is checked separately
-    else Provisioning error
-        API->>PG: Attempt to store failed and release lock
-        API-->>Admin: 503; repeat the same PUT
-        Note over PG,K8s: Existing resources/data remain; no automatic rollback
-    end
+    API->>PG: BEGIN: persist spec, revision, queued operation
+    API->>PG: COMMIT; release lock
+    API-->>Dev: 202 operation ID + status URL
+    Worker->>PG: Claim queued or interrupted operation under advisory lock
+    Worker->>PG: Recheck actor grant and latest revision
+    Worker->>PG: Publish monitoring and ensure database
+    Worker->>K8s: Server-side apply fixed resources
+    Worker->>PG: Persist applied result or sanitized failure
+    Dev->>API: GET /v1/operations/{id}
+    API->>PG: Resolve project and current grant
+    API->>K8s: Observe deployment and ready pod images
+    API-->>Dev: Authorized apply outcome and live readiness snapshot
+    Note over Dev,K8s: Readiness is separate from the persisted apply outcome
 ```
 
-Process termination can leave `provisioning`. Early dependency failures may prevent a catalog update. The monitoring-only thread periodically republishes discovery; it does not resume provisioning. Retirement separately acknowledges an already absent namespace and retains SQL/catalog data. See [ADR-012](../../03-decisions/ADR-012-admin-provisioning-baseline.md) and [ADR-014](../../03-decisions/ADR-014-catalog-availability-monitoring.md).
+The worker reclaims a `running` operation when the prior process releases its session lock, retrying idempotent steps from the start. The monitoring-only thread also republishes discovery but does not reconcile workloads. Retirement separately acknowledges an already absent namespace, rejects active operations, and retains SQL/catalog data. See [ADR-012](../../03-decisions/ADR-012-admin-provisioning-baseline.md) and [ADR-014](../../03-decisions/ADR-014-catalog-availability-monitoring.md).
 
 ## Target asynchronous contract
 

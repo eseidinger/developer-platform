@@ -34,7 +34,7 @@ Target telemetry uses stable project, environment and application IDs plus catal
 
 ## Status and operational evidence
 
-The current catalog stores `provisioning`, `applied`, `failed` or `retired`; it does not transition with ongoing workload health. Probe success is a separate observation. Future `RUNNING` requires observed readiness of the desired revision, with missing/stale telemetry distinguished from health.
+The current catalog stores `provisioning`, `applied`, `failed` or `retired`; it does not transition with ongoing workload health. Authorized operation reads now provide a live readiness snapshot, separate from the apply outcome, including desired/ready counts, deployment/active images and diagnostic reason. This is an on-demand observation, not a persisted catalog health transition or continuous observer; Kubernetes/API errors are reported as unknown rather than healthy.
 
 Selected heartbeat, SMTP, scrape-rule and backup DOWN/UP notifications have operator-reported receipt in the backlog. Application probe fixtures do not establish live application-rule delivery or complete host/cluster failure acceptance. Continue controlled checks on the existing lab under [ADR-010](../03-decisions/ADR-010-single-environment-lab.md); no duplicate installation is required.
 

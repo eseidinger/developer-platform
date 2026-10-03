@@ -191,6 +191,7 @@ python3 - <<'PYTHON'
 import json
 import os
 import re
+import time
 import urllib.request
 from pathlib import Path
 
@@ -212,10 +213,23 @@ for project in projects:
         method='PUT',
     )
     with urllib.request.urlopen(request, timeout=180) as response:
-        result = json.load(response)
-    if result.get('status') != 'applied':
-        raise RuntimeError('Unexpected provisioning result for ' + name)
-    print(name + ': applied; rollout and data verification still required')
+        accepted = json.load(response)
+    deadline = time.monotonic() + 300
+    while time.monotonic() < deadline:
+        status_request = urllib.request.Request(
+            'http://127.0.0.1:8000' + accepted['status_url'],
+            headers={'Authorization': 'Bearer ' + os.environ['PLATFORM_ACCESS_TOKEN']},
+        )
+        with urllib.request.urlopen(status_request, timeout=15) as response:
+            operation = json.load(response)
+        if operation['state'] == 'succeeded':
+            print(name + ': applied; rollout and data verification still required')
+            break
+        if operation['state'] == 'failed':
+            raise RuntimeError('Project reapply failed; operation ' + accepted['operation_id'])
+        time.sleep(2)
+    else:
+        raise TimeoutError('Project reapply timed out; operation ' + accepted['operation_id'])
 PYTHON
 ```
 

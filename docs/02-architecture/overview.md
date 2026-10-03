@@ -4,9 +4,9 @@ Status: current lab summary plus target architecture. The technology-independent
 
 ## Implemented lab
 
-The [FastAPI service](../../platform/app/main.py) accepts synchronous administrator PUT requests for one image, HTTP endpoint and mandatory PostgreSQL database per project. A project name also identifies its application; there are no separately addressable environments or components. It stores only the latest spec and provisioning status in PostgreSQL and directly applies Kubernetes manifests. Docker runs shared services; it is not an application compute provider.
+The [FastAPI service](../../platform/app/main.py) accepts authorized PUT requests for one image, HTTP endpoint and mandatory PostgreSQL database per project. Existing project names remain public slugs while internal project, default-environment and application IDs are persisted with numbered desired revisions. PUT atomically queues a versioned operation and returns `202 Accepted`; `GET /v1/operations/{id}` checks current project-view authorization. An in-process Python worker applies queued operations and recovers interrupted work after restart. Docker runs shared services; it is not an application compute provider.
 
-A global PostgreSQL advisory lock serializes provisioning and retirement. Recovery requires repeating PUT; there is no durable provisioning worker, revision history or audit model. A background thread rebuilds monitoring discovery only. `applied` means resource application completed, not that the workload is ready. See [the current API guide](../../platform/README.md) and [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
+A global PostgreSQL advisory lock serializes provisioning and retirement. The worker persists operation outcomes and reclaims interrupted work; operation state `succeeded` means resource application completed, not that the workload is ready. Authorized operation reads include a live Kubernetes readiness snapshot with replica counts, images and rollout reason. The separate discovery thread rebuilds monitoring targets but does not reconcile workloads or persist health transitions. See [the current API guide](../../platform/README.md) and [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
 
 ## Target architecture
 

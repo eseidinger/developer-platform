@@ -14,7 +14,7 @@ kubectl --kubeconfig .runtime/admin.kubeconfig get nodes -o wide
 kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 ```
 
-`/healthz` is process health; `/readyz` executes a SQL query and reads the `platform-system` namespace using the controller credential. It does not check every node or workload. PostgreSQL readiness is not a data-integrity or application-permission check. Record time, host, code revision (`git rev-parse HEAD`), affected project, latest spec, and observed symptoms. The current API has no operation IDs, revision history, or durable job steps; it does record redacted per-principal audit events. Preserve available logs and redact credentials before sharing them.
+`/healthz` is process health; `/readyz` executes a SQL query and reads the `platform-system` namespace using the controller credential. It does not check every node or workload. PostgreSQL readiness is not a data-integrity or application-permission check. Record time, host, code revision (`git rev-parse HEAD`), affected project, latest spec, and observed symptoms. The API persists desired revisions and operations; authorized operation reads include a live readiness snapshot, while the project catalog status remains an apply/lifecycle state. Preserve available logs and redact credentials before sharing them.
 
 ## Provisioning stuck or failed
 
@@ -27,7 +27,7 @@ curl --fail-with-body http://127.0.0.1:8000/projects \
 docker compose logs --tail=100 platform-api postgres
 ```
 
-`provisioning` can remain after process termination. `failed` records a provisioning error; `applied` means resource application completed, not that the workload is healthy. Early dependency failures can prevent any status update. Check the dependency commands above and inspect existing Kubernetes resources before retrying after an ambiguous timeout.
+`provisioning` can remain after process termination. Operation `failed` records a provider/authorization failure; operation `succeeded` means resources were applied, not that the workload is healthy. Inspect the operation's separate `readiness` snapshot: `progressing`, `failed`, `not_found`, and `unknown` are not successful health results. Early dependency failures can prevent any status update. Check the dependency commands above and inspect existing Kubernetes resources before retrying after an ambiguous timeout.
 
 For the example project `hello` (substitute the actual project and namespace):
 
@@ -38,16 +38,18 @@ kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello get events --sor
 kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello logs deployment/hello --tail=100
 ```
 
-After fixing permissions, image, quota, or dependency failures, repeat PUT with the project's complete intended spec. For the unchanged sample:
+If an operation fails, fix permissions, image, quota, or dependency problems, then repeat PUT with the project's complete intended spec. It returns an operation ID and status URL:
 
 ```bash
-curl --fail-with-body -X PUT http://127.0.0.1:8000/projects/hello \
+curl --fail-with-body -i -X PUT http://127.0.0.1:8000/projects/hello \
   -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
   -H 'Content-Type: application/json' --data-binary @examples/project.json
-kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello rollout status deployment/hello --timeout=180s
+OPERATION_ID=69fb09ef-5136-4c8a-8ec1-c57467192b9a
+curl --fail-with-body "http://127.0.0.1:8000/v1/operations/$OPERATION_ID" \
+  -H "Authorization: ******"
 ```
 
-Use the actual saved spec for an existing application; the sample would replace its image and port. [Recovery](backup-recovery.md#reapply-restored-projects) shows how to retrieve and reapply the stored catalog. There is no background worker to resume. PUT preserves existing databases, provided the configuration and database credentials remain compatible. Do not delete a database to repair a failed workload.
+Operation state `succeeded` means Kubernetes resources were applied. Its live `readiness` snapshot reports replica counts, desired/Deployment images, active image references and IDs, and a reason such as `ImagePullBackOff`, `Unschedulable`, or `ProgressDeadlineExceeded`; inspect pod events/logs and HTTP behavior as needed. The worker reclaims an interrupted operation after restart and retries idempotent steps. Use the actual saved spec for an existing application; the sample would replace its image and port. [Recovery](backup-recovery.md#reapply-restored-projects) shows how to retrieve and reapply the stored catalog. PUT preserves existing databases, provided the configuration and database credentials remain compatible. Do not delete a database to repair a failed workload.
 
 ## Application unhealthy after deployment
 

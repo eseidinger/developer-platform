@@ -29,8 +29,9 @@ External web hosting: PHP/MySQL watchdog ← systemd heartbeat from the host
   [application availability monitoring](infrastructure/monitoring/README.md).
 
 This is a working foundation for administration and lab use on a single host.
-A self-service portal, automated deletion workflows, and an asynchronous
-provisioning worker are not yet implemented. The API and its Kubernetes
+A full self-service portal and automated deletion workflows are not yet
+implemented. The Python worker executes durable deployment operations and
+reclaims interrupted operations after restart. The API and its Kubernetes
 ServiceAccount remain privileged infrastructure components.
 
 See the [platform guide](platform/README.md) for API usage, project lifecycle,

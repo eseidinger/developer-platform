@@ -4,9 +4,11 @@ import os
 import sys
 import tempfile
 import unittest
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import Mock, patch
+from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
 from fastapi.testclient import TestClient
@@ -18,7 +20,13 @@ from app.identity import AuthenticationError, Principal
 class Catalog:
     def __init__(self):
         self.rows = {}
+        self.project_ids = {}
+        self.environment_ids = {}
+        self.application_ids = {}
+        self.revisions = {}
+        self.operations = {}
         self.result = []
+        self.events = []
 
     def __enter__(self):
         return self
@@ -26,13 +34,79 @@ class Catalog:
     def __exit__(self, *args):
         pass
 
+    @contextmanager
+    def transaction(self):
+        self.events.append("transaction.begin")
+        try:
+            yield
+        except Exception:
+            self.events.append("transaction.rollback")
+            raise
+        else:
+            self.events.append("transaction.commit")
+
     def execute(self, query, params=()):
+        self.events.append(query)
         if query.startswith("INSERT INTO projects"):
             name, spec = params
             self.rows[name] = (spec.obj, "provisioning")
+            project_id = self.project_ids.setdefault(name, "project-id-" + name)
+            self.result = [(project_id,)]
         elif query.startswith("UPDATE projects SET status="):
             status = query.split("status='")[1].split("'")[0]
             self.rows[params[0]] = (self.rows[params[0]][0], status)
+        elif query.startswith("INSERT INTO project_environments"):
+            project_id, name = params
+            key = (project_id, name)
+            self.result = [(self.environment_ids.setdefault(key, "environment-" + project_id),)]
+        elif query.startswith("INSERT INTO project_applications"):
+            environment_id, name = params
+            key = (environment_id, name)
+            self.result = [(self.application_ids.setdefault(key, "application-" + name),)]
+        elif query.startswith("SELECT revision, spec FROM application_revisions"):
+            application_id = params[0]
+            revisions = self.revisions.get(application_id, [])
+            self.result = [(revisions[-1][0], revisions[-1][1])] if revisions else []
+        elif query.startswith("INSERT INTO application_revisions"):
+            application_id, revision, spec = params
+            self.revisions.setdefault(application_id, []).append((revision, spec.obj))
+        elif query.startswith("SELECT operation_id, state FROM application_operations"):
+            application_id, revision, operation_kind = params
+            pending = [(operation_id, operation) for operation_id, operation in self.operations.items()
+                       if operation["application_id"] == application_id
+                       and operation["revision"] == revision
+                       and operation["operation_kind"] == operation_kind
+                       and operation["state"] in {"queued", "running"}]
+            self.result = [(pending[-1][0], pending[-1][1]["state"])] if pending else []
+        elif query.startswith("SELECT 1") and "FROM application_operations" in query:
+            project_name = params[0]
+            active = any(operation["project_name"] == project_name
+                         and operation["state"] in {"queued", "running"}
+                         for operation in self.operations.values())
+            self.result = [(1,)] if active else []
+        elif query.startswith("INSERT INTO application_operations"):
+            (application_id, revision, operation_kind, state, actor_issuer, actor_subject,
+             envelope_version, envelope) = params
+            operation_id = str(uuid4())
+            application_key = next(key for key, app_id in self.application_ids.items()
+                                   if app_id == application_id)
+            self.operations[operation_id] = {
+                "application_id": application_id, "revision": revision, "operation_kind": operation_kind,
+                "state": state, "envelope_version": envelope_version, "envelope": envelope.obj,
+                "actor_issuer": actor_issuer, "actor_subject": actor_subject,
+                "project_name": application_key[1], "result_version": None, "result": None, "error_code": None,
+            }
+            self.result = [(operation_id,)]
+        elif "FROM application_operations" in query:
+            operation_id = str(params[0])
+            operation = self.operations.get(operation_id)
+            revision_specs = self.revisions.get(operation["application_id"], []) if operation else []
+            spec = next((spec for revision, spec in revision_specs
+                         if revision == operation["revision"]), None)
+            self.result = [(
+                operation_id, operation["revision"], operation["state"], operation["result_version"],
+                operation["result"], operation["error_code"], operation["project_name"], spec,
+            )] if operation else []
         elif query.startswith("SELECT name, spec, status"):
             self.result = [(name, *row) for name, row in self.rows.items()]
         elif query.startswith("SELECT status FROM"):
@@ -89,17 +163,100 @@ class LifecycleTests(unittest.TestCase):
         return self.client.post("/projects/smoke/retire", json={"confirm_name": confirmation},
                                 headers=self.headers if headers is None else headers)
 
-    def test_deploy_retry_and_failed_rollout_keep_one_target(self):
-        self.assertEqual(self.deploy().status_code, 200)
-        self.assertEqual(self.deploy().status_code, 200)
-        self.assertEqual(len(self.targets()), 1)
-        self.mocks[-1].side_effect = RuntimeError("apply failed")
-        self.assertEqual(self.deploy().status_code, 503)
-        self.assertEqual(self.catalog.rows["smoke"][1], "failed")
-        self.assertEqual(len(self.targets()), 1)
+    def complete_operations(self):
+        for operation in self.catalog.operations.values():
+            operation["state"] = "succeeded"
+
+    def test_repeated_queued_deploy_reuses_operation_without_provider_side_effects(self):
+        first = self.deploy()
+        self.assertEqual(first.status_code, 202)
+        second = self.deploy()
+        self.assertEqual(second.status_code, 202)
+        self.assertEqual(first.json()["operation_id"], second.json()["operation_id"])
+        app_id = next(iter(self.catalog.application_ids.values()))
+        self.assertEqual([revision for revision, _ in self.catalog.revisions[app_id]], [1])
+        self.assertEqual(len(self.catalog.operations), 1)
+        self.mocks[-2].assert_not_called()
+        self.mocks[-1].assert_not_called()
+
+    def test_changed_spec_adds_immutable_revision_and_keeps_identity(self):
+        self.assertEqual(self.deploy().status_code, 202)
+        project_id = self.catalog.project_ids["smoke"]
+        environment_id = next(iter(self.catalog.environment_ids.values()))
+        app_id = next(iter(self.catalog.application_ids.values()))
+        self.spec["image"] = "example:v2"
+        self.assertEqual(self.deploy().status_code, 202)
+        self.assertEqual(self.catalog.project_ids["smoke"], project_id)
+        self.assertEqual(next(iter(self.catalog.environment_ids.values())), environment_id)
+        self.assertEqual(next(iter(self.catalog.application_ids.values())), app_id)
+        revisions = self.catalog.revisions[app_id]
+        self.assertEqual([revision for revision, _ in revisions], [1, 2])
+        self.assertEqual([spec["image"] for _, spec in revisions], ["example:v1", "example:v2"])
+
+    def test_deploy_persists_revision_and_versioned_operation_before_returning_accepted(self):
+        response = self.deploy()
+
+        self.assertEqual(response.status_code, 202)
+        body = response.json()
+        operation_id = body["operation_id"]
+        self.assertEqual(body["status_url"], f"/v1/operations/{operation_id}")
+        operation = self.catalog.operations[operation_id]
+        self.assertEqual(operation["state"], "queued")
+        self.assertEqual(operation["envelope_version"], 1)
+        self.assertEqual(operation["envelope"]["spec"], {**self.spec, "port": 8080})
+        committed_at = self.catalog.events.index("transaction.commit")
+        revision_insert = next(index for index, event in enumerate(self.catalog.events)
+                               if event.startswith("INSERT INTO application_revisions"))
+        operation_insert = next(index for index, event in enumerate(self.catalog.events)
+                                if event.startswith("INSERT INTO application_operations"))
+        self.assertLess(revision_insert, committed_at)
+        self.assertLess(operation_insert, committed_at)
+        self.mocks[-2].assert_not_called()
+        self.mocks[-1].assert_not_called()
+
+    def test_operation_progress_uses_current_project_view_grant(self):
+        self.assertEqual(self.deploy().status_code, 202)
+        operation_id = next(iter(self.catalog.operations))
+        self.catalog.operations[operation_id]["state"] = "succeeded"
+        self.catalog.operations[operation_id]["result_version"] = 1
+        self.catalog.operations[operation_id]["result"] = {"api_token": "must-not-be-returned"}
+
+        readiness = {
+            "state": "ready",
+            "desired_replicas": 1,
+            "ready_replicas": 1,
+            "desired_image": "example:v1",
+            "deployment_image": "example:v1",
+            "active_images": ["example:v1"],
+            "active_image_ids": ["docker-pullable://example@sha256:abc"],
+            "reason": None,
+            "observed_at": "2026-10-03T00:00:00+00:00",
+        }
+        with patch.object(main, "observe_deployment", return_value=readiness) as observe:
+            response = self.client.get(f"/v1/operations/{operation_id}", headers=self.headers)
+            self.mocks[4].return_value = False
+            revoked_response = self.client.get(f"/v1/operations/{operation_id}", headers=self.headers)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["operation_id"], operation_id)
+        self.assertEqual(response.json()["state"], "succeeded")
+        self.assertEqual(response.json()["result"], {"api_token": "[REDACTED]"})
+        self.assertEqual(response.json()["readiness"], readiness)
+        observe.assert_called_once_with(self.runtime, "smoke", "example:v1", main.log)
+        self.assertEqual(self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke"))
+        self.assertEqual(revoked_response.status_code, 403)
+        observe.assert_called_once()
+        self.assertEqual(self.mocks[3].call_args.args[1:5],
+                         ("authorization", "project", "smoke", "denied"))
+
+    def test_retirement_is_blocked_while_an_operation_is_active(self):
+        self.assertEqual(self.deploy().status_code, 202)
+        self.assertEqual(self.retire().status_code, 409)
+        self.runtime.resources.get.assert_not_called()
 
     def test_retire_requires_auth_confirmation_and_absent_namespace(self):
         self.deploy()
+        self.complete_operations()
         self.assertIn(self.retire(headers={}).status_code, (401, 403))
         self.mocks[5].verify.side_effect = AuthenticationError()
         self.assertEqual(self.retire(headers={"Authorization": "Bearer wrong"}).status_code, 401)
@@ -108,11 +265,12 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.retire().status_code, 409)
         self.runtime.resources.get.return_value.get.side_effect = ApiException(status=403)
         self.assertEqual(self.retire().status_code, 503)
-        self.assertEqual(len(self.targets()), 1)
-        self.assertEqual(self.catalog.rows["smoke"][1], "applied")
+        self.assertFalse((Path(self.directory.name) / "applications.json").exists())
+        self.assertEqual(self.catalog.rows["smoke"][1], "provisioning")
 
     def test_retirement_retry_and_redeployment(self):
         self.deploy()
+        self.complete_operations()
         self.runtime.resources.get.return_value.get.side_effect = ApiException(status=404)
         response = self.retire()
         self.assertEqual(response.status_code, 200)
@@ -120,16 +278,16 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.targets(), [])
         self.assertIn("smoke", self.catalog.rows)
         self.assertEqual(self.retire().status_code, 200)
-        self.assertEqual(self.deploy().status_code, 200)
-        self.assertEqual(len(self.targets()), 1)
+        self.assertEqual(self.deploy().status_code, 202)
+        self.assertEqual(self.targets(), [])
 
     def test_retirement_publish_failure_reconciles_from_durable_status(self):
         self.deploy()
+        self.complete_operations()
         self.runtime.resources.get.return_value.get.side_effect = ApiException(status=404)
         with patch.object(main, "publish_catalog", side_effect=OSError):
             self.assertEqual(self.retire().status_code, 503)
         self.assertEqual(self.catalog.rows["smoke"][1], "retired")
-        self.assertEqual(len(self.targets()), 1)
         main.publish_catalog(self.catalog)
         self.assertEqual(self.targets(), [])
 
@@ -140,8 +298,22 @@ class LifecycleTests(unittest.TestCase):
         rejected = self.mocks[3].call_args
         self.assertEqual(rejected.args[1:5], ("request.validation", "platform-api", "smoke", "rejected"))
 
+    def test_unknown_project_field_rejected_before_catalog_mutation(self):
+        self.spec["unexpected"] = "must not be ignored"
+
+        response = self.deploy()
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(self.catalog.rows, {})
+        self.assertEqual(self.catalog.revisions, {})
+        self.assertEqual(self.catalog.operations, {})
+        rejected = self.mocks[3].call_args
+        self.assertEqual(rejected.args[1:5], ("request.validation", "platform-api", "smoke", "rejected"))
+        self.mocks[-2].assert_not_called()
+        self.mocks[-1].assert_not_called()
+
     def test_mutations_and_authentication_denials_are_audited(self):
-        self.assertEqual(self.deploy().status_code, 200)
+        self.assertEqual(self.deploy().status_code, 202)
         success = self.mocks[3].call_args
         self.assertEqual(success.args[1:5], ("project.provision", "project", "smoke", "succeeded"))
         self.mocks[5].verify.side_effect = AuthenticationError()

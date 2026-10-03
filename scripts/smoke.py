@@ -2,10 +2,10 @@
 """Exercise the local stack. Creates/updates the explicitly named smoke project."""
 import json
 import os
-import subprocess
 import time
 import urllib.error
 import urllib.request
+from time import monotonic
 from env import settings
 
 cfg = settings()
@@ -21,6 +21,23 @@ def request(path, body=None, token=True):
         method="PUT" if body else "GET", headers=headers)
     with urllib.request.urlopen(req, timeout=60) as response:
         return json.load(response)
+
+def wait_for_operation(accepted, timeout=300):
+    deadline = monotonic() + timeout
+    while monotonic() < deadline:
+        operation = request(accepted["status_url"])
+        if operation["state"] == "failed":
+            raise RuntimeError("Deployment failed; operation " + accepted["operation_id"])
+        readiness = operation["readiness"]
+        if operation["state"] == "succeeded":
+            if readiness["state"] == "ready":
+                return operation
+            if readiness["state"] == "failed":
+                raise RuntimeError("Deployment rollout failed; operation "
+                                   + accepted["operation_id"] + " reason="
+                                   + str(readiness["reason"]))
+        time.sleep(2)
+    raise TimeoutError("Application readiness observation timed out: " + accepted["operation_id"])
 
 for attempt in range(60):
     try:
@@ -38,11 +55,11 @@ except urllib.error.HTTPError as error:
     assert error.code in (401, 403)
 
 project = {"name": "smoke", "image": "hashicorp/http-echo:1.0.0", "port": 5678, "probe_profile": "hello-world"}
-assert request("/projects/smoke", project)["status"] == "applied"
-assert request("/projects/smoke", project)["status"] == "applied"
+first = request("/projects/smoke", project)
+second = request("/projects/smoke", project)
+assert first["operation_id"] == second["operation_id"]
+wait_for_operation(second)
 assert sum(p["name"] == "smoke" for p in request("/projects")) == 1
-subprocess.run(["kubectl", "--kubeconfig", ".runtime/admin.kubeconfig",
-    "-n", "project-smoke", "rollout", "status", "deployment/smoke", "--timeout=180s"], check=True)
 req = urllib.request.Request("http://127.0.0.1/", headers={"Host": "smoke." + cfg["APPS_DOMAIN"]})
 for attempt in range(30):
     try:

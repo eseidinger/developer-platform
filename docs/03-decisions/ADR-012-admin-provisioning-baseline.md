@@ -18,7 +18,7 @@ The API holds PostgreSQL administrator credentials and a long-lived Kubernetes S
 
 A durable job/revision model offers resumable work and concurrency checks but requires the state model and worker still planned in Phase 1C. Per-project locking could permit parallel provisioning, but the current global lock also serializes shared SQL and discovery effects.
 
-The baseline is simple to operate, but one slow request delays every project and discovery refresh. A later PUT can overwrite an earlier spec because there is no expected revision. Process termination can leave `provisioning`; `applied` does not establish rollout readiness. Unknown fields are ignored by the current model, and images are not resolved to digests. There are no scoped users, operation IDs or durable actor audit events.
+The baseline is simple to operate, but one slow request delays every project and discovery refresh. A later PUT can overwrite an earlier spec because there is no expected revision. Process termination can leave `provisioning`; `applied` does not establish rollout readiness. At the original assessment, unknown fields were ignored by the model; PLAN-001 now rejects them before catalog/provider side effects. Images are not resolved to digests. There are no scoped users, operation IDs or durable actor audit events in the original baseline.
 
 ## Evidence and evolution
 

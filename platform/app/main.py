@@ -9,6 +9,7 @@ import io
 from datetime import datetime, timedelta, timezone
 from typing import Literal
 from contextlib import asynccontextmanager
+from uuid import UUID
 
 import psycopg
 from psycopg import sql
@@ -21,15 +22,18 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
 from kubernetes.client.exceptions import ApiException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-from .audit import Actor, initialize as initialize_audit, read_events, record_event
+from .audit import Actor, initialize as initialize_audit, read_events, record_event, redact
 from .authorization import (bootstrap_platform_admin, grant as grant_role, initialize as initialize_authorization,
                             grants_for_project, is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
                             upsert_principal)
+from .catalog import ensure_default_application, initialize as initialize_catalog
 from .identity import AuthenticationError, Principal, configured_verifier
 from .manifests import resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
+from .operations import operation_loop
+from .readiness import observe_deployment
 from .security_alerts import security_alert_loop
 
 log = logging.getLogger(__name__)
@@ -54,6 +58,7 @@ async def lifespan(app):
         conn.execute("""CREATE TABLE IF NOT EXISTS projects (
             name TEXT PRIMARY KEY, spec JSONB NOT NULL, status TEXT NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+        initialize_catalog(conn)
         initialize_audit(conn)
         initialize_authorization(conn)
         bootstrap = bootstrap_platform_admin(conn, verifier.issuer)
@@ -70,12 +75,19 @@ async def lifespan(app):
         args=(stop, os.environ.get("MONITORING_DISCOVERY_DIR", "/var/lib/platform-monitoring"), log), daemon=True,
     )
     security_worker.start()
+    operation_worker = threading.Thread(
+        target=operation_loop,
+        args=(stop, connect, password_for, provision_database, apply, resources, publish_catalog, log),
+        daemon=True,
+    )
+    operation_worker.start()
     try:
         yield
     finally:
         stop.set()
         worker.join(timeout=6)
         security_worker.join(timeout=6)
+        operation_worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 
@@ -170,6 +182,8 @@ async def validation_error(request: Request, exc: RequestValidationError):
     return await request_validation_exception_handler(request, exc)
 
 class Project(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
     name: str
     image: str = Field(min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$")
     port: int = Field(default=8080, ge=1024, le=65535)
@@ -306,23 +320,45 @@ def provision(name: str, project: Project, principal: Principal = Depends(curren
         raise HTTPException(400, "Path and project name must match")
     try:
         with connect() as conn:
-            # Serialize reconciliations across API processes, including database creation.
+            # Serialize project revisions and active-operation deduplication.
             conn.execute("SELECT pg_advisory_lock(731904)")
             try:
-                conn.execute("""INSERT INTO projects(name,spec,status) VALUES (%s,%s,'provisioning')
-                    ON CONFLICT(name) DO UPDATE SET spec=excluded.spec,
-                    status='provisioning',updated_at=now()""", (name, Jsonb(project.model_dump())))
-                # Register before side effects; failed applications must remain monitored.
-                publish_catalog(conn)
-                password = password_for(name)
-                provision_database(conn, name, password)
-                for manifest in resources(name, project.image, project.port,
-                        os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password):
-                    apply(manifest)
-                conn.execute("UPDATE projects SET status='applied',updated_at=now() WHERE name=%s", (name,))
-            except Exception:
-                conn.execute("UPDATE projects SET status='failed',updated_at=now() WHERE name=%s", (name,))
-                raise
+                with conn.transaction():
+                    row = conn.execute("""INSERT INTO projects(name,spec,status) VALUES (%s,%s,'provisioning')
+                        ON CONFLICT(name) DO UPDATE SET spec=excluded.spec,
+                        status='provisioning',updated_at=now()
+                        RETURNING project_id""", (name, Jsonb(project.model_dump()))).fetchone()
+                    if row is None:
+                        raise RuntimeError("Could not resolve project identity")
+                    application_id, revision = ensure_default_application(
+                        conn, row[0], name, project.model_dump())
+                    pending = conn.execute("""SELECT operation_id, state FROM application_operations
+                        WHERE application_id=%s AND revision=%s AND operation_kind=%s
+                        AND state IN ('queued', 'running')
+                        ORDER BY created_at DESC LIMIT 1""",
+                        (application_id, revision, "deploy")).fetchone()
+                    if pending:
+                        operation_id = pending[0]
+                        operation_state = pending[1]
+                    else:
+                        envelope = {
+                            "project_id": str(row[0]),
+                            "application_id": str(application_id),
+                            "project_slug": name,
+                            "revision": revision,
+                            "spec": project.model_dump(),
+                        }
+                        queued = conn.execute("""INSERT INTO application_operations(
+                            application_id, revision, operation_kind, state, actor_issuer, actor_subject,
+                            envelope_version, envelope)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                            RETURNING operation_id""",
+                            (application_id, revision, "deploy", "queued",
+                             principal.issuer, principal.subject, 1, Jsonb(envelope))).fetchone()
+                        if queued is None:
+                            raise RuntimeError("Could not persist deployment operation")
+                        operation_id = queued[0]
+                        operation_state = "queued"
             finally:
                 conn.execute("SELECT pg_advisory_unlock(731904)")
     except Exception as exc:
@@ -331,9 +367,44 @@ def provision(name: str, project: Project, principal: Principal = Depends(curren
         log.error("Project reconciliation failed: %s (%s)", name, type(exc).__name__)
         raise HTTPException(503, "Provisioning failed; retry the same PUT. Existing data is retained.")
     required_audit(actor, "project.provision", "project", name, "succeeded", {"project": name},
-                   {"status": "applied", "image": project.image})
-    return {"name": name, "status": "applied", "namespace": "project-" + name,
-            "host": name + "." + os.environ["APPS_DOMAIN"]}
+                   {"state": operation_state, "revision": revision, "operation_id": str(operation_id)})
+    return JSONResponse(status_code=202, content={
+        "operation_id": str(operation_id),
+        "state": operation_state,
+        "revision": revision,
+        "status_url": f"/v1/operations/{operation_id}",
+    })
+
+
+@app.get("/v1/operations/{operation_id}")
+def operation_status(operation_id: UUID, principal: Principal = Depends(current_principal)):
+    with connect() as conn:
+        row = conn.execute("""SELECT o.operation_id, o.revision, o.state, o.result_version,
+                o.result, o.error_code, p.name, r.spec
+            FROM application_operations o
+            JOIN project_applications a ON a.application_id=o.application_id
+            JOIN project_environments e ON e.environment_id=a.environment_id
+            JOIN projects p ON p.project_id=e.project_id
+            JOIN application_revisions r
+                ON r.application_id=o.application_id AND r.revision=o.revision
+            WHERE o.operation_id=%s""", (operation_id,)).fetchone()
+    if row is None:
+        required_audit(actor_for(principal), "operation.inspect", "operation", str(operation_id),
+                       "rejected", detail={"reason": "not_found"})
+        raise HTTPException(404, "Unknown operation")
+    require_permission(principal, "view", row[6])
+    required_audit(actor_for(principal), "operation.inspect", "operation", str(operation_id),
+                   "succeeded", {"project": row[6]}, {"state": row[2], "revision": row[1]})
+    readiness = observe_deployment(runtime, row[6], row[7]["image"], log)
+    return {
+        "operation_id": str(row[0]),
+        "revision": row[1],
+        "state": row[2],
+        "result_version": row[3],
+        "result": redact(row[4]),
+        "error_code": row[5],
+        "readiness": readiness,
+    }
 
 class Retirement(BaseModel):
     confirm_name: str
@@ -360,6 +431,15 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
             try:
                 if not conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone():
                     raise HTTPException(404, "Unknown project")
+                active_operation = conn.execute("""SELECT 1
+                    FROM application_operations o
+                    JOIN project_applications a ON a.application_id=o.application_id
+                    JOIN project_environments e ON e.environment_id=a.environment_id
+                    JOIN projects p ON p.project_id=e.project_id
+                    WHERE p.name=%s AND o.state IN ('queued', 'running')
+                    LIMIT 1""", (name,)).fetchone()
+                if active_operation:
+                    raise HTTPException(409, "Wait for active application operations before retirement")
                 try:
                     runtime.resources.get(api_version="v1", kind="Namespace").get(name="project-" + name)
                 except ApiException as exc:

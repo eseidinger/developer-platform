@@ -91,19 +91,45 @@ With the default application domain, a successful response is:
 
 ```json
 {
-  "name": "hello",
-  "status": "applied",
-  "namespace": "project-hello",
-  "host": "hello.apps.localhost"
+  "operation_id": "69fb09ef-5136-4c8a-8ec1-c57467192b9a",
+  "state": "queued",
+  "revision": 1,
+  "status_url": "/v1/operations/69fb09ef-5136-4c8a-8ec1-c57467192b9a"
 }
 ```
 
-`applied` means Kubernetes accepted the resources. Check the rollout separately:
+The API returns `202 Accepted` after atomically persisting the desired revision
+and operation. The in-process worker applies the resources and the operation
+status reports `succeeded` or a sanitized failure code. The separate live
+`readiness` snapshot reports desired/ready replicas, the desired and applied
+Deployment images, images and image IDs running in ready pods, and a diagnostic reason.
+Readiness does not change the operation's apply outcome:
 
 ```bash
-kubectl --kubeconfig .runtime/admin.kubeconfig \
-  -n project-hello rollout status deployment/hello --timeout=180s
+OPERATION_ID=69fb09ef-5136-4c8a-8ec1-c57467192b9a
+curl --fail-with-body "http://127.0.0.1:8000/v1/operations/$OPERATION_ID" \
+  -H "Authorization: ******"
 curl --fail-with-body -H 'Host: hello.apps.localhost' http://127.0.0.1/
+```
+
+The operation response keeps the apply outcome separate from live observation.
+For example:
+
+```json
+{
+  "state": "succeeded",
+  "readiness": {
+    "state": "progressing",
+    "desired_replicas": 1,
+    "ready_replicas": 0,
+    "desired_image": "hashicorp/http-echo:1.0.0",
+    "deployment_image": "hashicorp/http-echo:1.0.0",
+    "active_images": [],
+    "active_image_ids": [],
+    "reason": "ImagePullBackOff",
+    "observed_at": "2026-10-03T12:00:00+00:00"
+  }
+}
 ```
 
 You can also open [hello.apps.localhost](http://hello.apps.localhost) if the local
@@ -119,7 +145,7 @@ resolver supports wildcard localhost names. Public applications use
 | `port` | No | Container TCP port, 1024–65535; defaults to 8080. |
 | `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
 
-Unknown fields are silently ignored by the current Pydantic model; they are not applied or rejected. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/02-architecture/application-spec.md) is a future contract, not an input format for this endpoint.
+Unknown project request fields are rejected with `422` before catalog or provider side effects. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/02-architecture/application-spec.md) is a future contract, not an input format for this endpoint.
 
 The API currently accepts no configuration fields for replicas, resource limits,
 custom environment variables, volumes, image pull secrets, or application commands.
@@ -159,17 +185,19 @@ The stored status describes provisioning rather than ongoing application health:
 
 | Status | Meaning | Next step |
 | --- | --- | --- |
-| `provisioning` | A request is applying resources, or the process stopped during provisioning. | If it remains stuck, inspect the API and repeat the PUT. |
+| `provisioning` | A desired revision is queued or being applied. A worker restart reclaims interrupted operations. | Follow its operation ID; retry the same request after resolving a failure. |
 | `applied` | The request completed resource application. | Check rollout and application behavior. |
 | `failed` | Provisioning encountered an error and recorded the failure. | Resolve the cause and repeat the same PUT. |
 | `retired` | Administrator acknowledged namespace removal; monitoring ended and SQL data/spec remain. | PUT explicitly reactivates the application. |
 
-Provisioning runs synchronously and is serialized with a PostgreSQL advisory lock.
-Database and Kubernetes operations do not form a single transaction. Partial failures
-can leave resources in place, and early failures may prevent a status from being
-recorded. There is no workload reconciler; repeat PUT to repair the desired state. A separate monitoring-only loop republishes application probe targets from the catalog.
+Revision and operation acceptance are serialized with a PostgreSQL advisory lock
+and committed together. The in-process worker executes provider changes outside
+that transaction under an operation lock and the shared lifecycle lock. Retrying
+an interrupted operation starts again from idempotent ensure steps. The separate
+monitoring-only loop republishes application probe targets but does not reconcile
+workloads.
 
-There is no automated project deletion endpoint. After deliberate manual namespace removal, authenticated `POST /projects/{name}/retire` with `{"confirm_name":"<name>"}` records retirement and removes monitoring while retaining SQL data and the catalog. See [application monitoring and retirement](../infrastructure/monitoring/README.md). For a complete lab reset, use
+There is no automated project deletion endpoint. After deliberate manual namespace removal, authenticated `POST /projects/{name}/retire` with `{"confirm_name":"<name>"}` records retirement and removes monitoring while retaining SQL data and the catalog. Retirement is rejected while a deployment operation is queued or running. See [application monitoring and retirement](../infrastructure/monitoring/README.md). For a complete lab reset, use
 `bash scripts/down.sh --volumes`, then bootstrap again. Running `down.sh` without
 `--volumes` retains the stored project catalog and databases, but removes Kubernetes
 workloads. Reapply the saved specifications after bootstrap as described in
@@ -219,15 +247,17 @@ access before network rules converge; this lab is intended for trusted workloads
 | `GET /healthz` | None | 200 with `{"status":"ok"}` when the process responds |
 | `GET /readyz` | None | 200 with `{"status":"ready"}` when database and Kubernetes checks pass; otherwise 503 |
 | `GET /projects` | OIDC `viewer` or stronger grant | 200 with only authorized projects |
-| `PUT /projects/{name}` | OIDC `developer` or stronger project grant; platform-admin creates projects | 200 with the applied project name, namespace, and host |
-| `POST /projects/{name}/retire` | OIDC `project-admin` or `platform-admin`, plus matching `confirm_name` | 200 with retained-data retirement; 409 while namespace exists |
+| `PUT /projects/{name}` | OIDC `developer` or stronger project grant; platform-admin creates projects | 202 with queued operation ID, desired revision, and status URL |
+| `GET /v1/operations/{id}` | OIDC `viewer` or stronger grant on the owning project | 200 with apply outcome, revision, redacted result, and live readiness snapshot (replica counts, images, diagnostic reason) |
+| `POST /projects/{name}/retire` | OIDC `project-admin` or `platform-admin`, plus matching `confirm_name` | 200 with retained-data retirement; 409 while namespace exists or an operation is active |
 | `PUT` / `DELETE /projects/{name}/grants` | OIDC `project-admin` or `platform-admin` for that project | Create, change, or revoke a project grant |
 | `PUT` / `DELETE /platform/grants` | OIDC `platform-admin` | Create or revoke another platform-admin grant |
 | `GET /internal/tls?domain=...` | None; used by Caddy | 200 for a project host whose stored status is `applied`; 403 for an unauthorized host |
 
 The TLS authorization route is excluded from OpenAPI and does not provision projects.
 A missing or invalid bearer token is rejected. PUT returns 400 if the URL and body
-names differ, 422 for invalid request fields, and 503 when provisioning fails.
+names differ, 422 for invalid request fields, and 503 when operation acceptance or
+its required audit record fails.
 
 ## Configuration
 
@@ -304,7 +334,7 @@ OPS-001-T01.
 | Bootstrap waits for PostgreSQL | `docker compose logs --tail=100 postgres`; old major-version data needs migration or a fresh lab volume. |
 | Bootstrap waits for Kubernetes | `kubectl --kubeconfig .runtime/admin.kubeconfig get nodes -o wide`; verify readiness and the actual node version. |
 | API container is healthy but requests fail | Check `/readyz`; the container health check uses `/healthz`, which does not test dependencies. |
-| PUT returns 503 | Inspect `docker compose logs --tail=100 platform-api`, PostgreSQL, and Kubernetes. Resolve the cause and repeat PUT. |
+| PUT returns 503 | Inspect `docker compose logs --tail=100 platform-api`, PostgreSQL, and audit availability. Resolve the acceptance failure and retry the same PUT. |
 | Project is applied but inaccessible | Check rollout, pod events, image pulls, listening port, and ingress hostname. |
 | Pod repeatedly restarts | Check logs for writes outside `/tmp`, permissions, probe failures, or memory limits. |
 | Application cannot reach an external API | Check its namespace NetworkPolicies; external egress is restricted by default. |

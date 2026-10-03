@@ -9,4 +9,4 @@ Diagrams are maintained directly in the repository as Markdown files containing 
 - [Component overview](../overview.md)
 - [Lifecycle state machine](../software-architecture.md)
 
-Each diagram declares its evidence level: topology shows inspected source configuration; provisioning separates the current synchronous request from its target worker flow; the component overview and lifecycle state machine are target states. None establishes live operational acceptance. Changes to topology or lifecycle must be accompanied by specification and ADR updates.
+Each diagram declares its evidence level: topology shows inspected source configuration; provisioning distinguishes the current in-process worker from the target worker service; the component overview and lifecycle state machine are target states. None establishes live operational acceptance. Changes to topology or lifecycle must be accompanied by specification and ADR updates.

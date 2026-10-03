@@ -154,9 +154,23 @@ https://*.apps.localhost {
             raise RuntimeError('Selected project absent from restored catalog')
         request = urllib.request.Request('http://127.0.0.1:8000/projects/' + name,
                                          headers=headers, data=json.dumps(selected[0]['spec']).encode(), method='PUT')
-        with urllib.request.urlopen(request, timeout=180) as response:
-            if json.load(response).get('status') != 'applied':
-                raise RuntimeError('Project reapply failed')
+        with urllib.request.urlopen(request, timeout=30) as response:
+            if response.status != 202:
+                raise RuntimeError('Project reapply was not accepted')
+            accepted = json.load(response)
+        deadline = time.monotonic() + 300
+        while time.monotonic() < deadline:
+            status_request = urllib.request.Request(
+                'http://127.0.0.1:8000' + accepted['status_url'], headers=headers)
+            with urllib.request.urlopen(status_request, timeout=15) as response:
+                operation = json.load(response)
+            if operation['state'] == 'succeeded':
+                break
+            if operation['state'] == 'failed':
+                raise RuntimeError('Project reapply failed; operation ' + accepted['operation_id'])
+            time.sleep(2)
+        else:
+            raise TimeoutError('Project reapply timed out; operation ' + accepted['operation_id'])
     print('Restoration completed; run acceptance checks next.')
 
 
