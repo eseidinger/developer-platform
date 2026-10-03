@@ -278,3 +278,51 @@
           until: platform_health.status | default(0) == 200
           retries: 30
           delay: 5
+
+        - name: Resolve the source revision being installed
+          ansible.builtin.shell: |
+            set -e
+            rev=$(git -C "{{ platform_source_dir }}" rev-parse HEAD 2>/dev/null || echo unknown)
+            if [ -n "$(git -C "{{ platform_source_dir }}" status --porcelain 2>/dev/null)" ]; then rev="$rev+dirty"; fi
+            echo "$rev"
+          delegate_to: localhost
+          become: false
+          register: platform_source_revision
+          changed_when: false
+
+        - name: Collect tool versions and running images
+          ansible.builtin.shell: |
+            set -e
+            echo "docker=$(docker version --format '{{ '{{' }}.Server.Version{{ '}}' }}')"
+            echo "compose=$(docker compose version --short)"
+            echo "k3d=$(.runtime/bin/k3d version | head -1)"
+            echo "kubectl=$(.runtime/bin/kubectl version --client | head -1)"
+            docker compose images --format '{{ '{{' }}.Service{{ '}}' }}={{ '{{' }}.Repository{{ '}}' }}:{{ '{{' }}.Tag{{ '}}' }}@{{ '{{' }}.ID{{ '}}' }}' | sed 's/^/image./'
+          args:
+            chdir: "{{ platform_install_dir }}"
+            executable: /bin/bash
+          register: platform_versions
+          changed_when: false
+
+        - name: Record the installation (versions and non-secret parameters only)
+          ansible.builtin.copy:
+            dest: "{{ platform_install_dir }}/.runtime/installation-record.json"
+            owner: root
+            group: root
+            mode: '0600'
+            content: "{{ record | to_nice_json }}\n"
+          vars:
+            record:
+              recorded_at: "{{ ansible_date_time.iso8601 }}"
+              source_revision: "{{ platform_source_revision.stdout | trim }}"
+              host:
+                distribution: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
+                architecture: "{{ ansible_facts['architecture'] }}"
+              parameters:
+                platform_domain: "{{ platform_domain }}"
+                platform_apps_domain: "{{ platform_apps_domain }}"
+                platform_identity_domain: "{{ platform_identity_domain }}"
+                platform_edge_bind_ip: "{{ platform_edge_bind_ip }}"
+                platform_install_docker: "{{ platform_install_docker | bool }}"
+                platform_kubectl_version: "{{ platform_kubectl_version }}"
+              versions: "{{ platform_versions.stdout_lines | select('match', '^[a-z0-9._-]+=') | map('regex_replace', '^([^=]+)=(.*)$', '\\1: \\2') | list }}"
