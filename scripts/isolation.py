@@ -16,7 +16,20 @@ req = urllib.request.Request("http://127.0.0.1:8000/projects/isolation",
     data=json.dumps(project).encode(), method="PUT",
     headers={"Authorization": "Bearer " + access_token, "Content-Type": "application/json"})
 with urllib.request.urlopen(req, timeout=60) as response:
-    assert response.status == 200
+    assert response.status == 202, response.status
+    accepted = json.load(response)
+for attempt in range(150):
+    status_req = urllib.request.Request("http://127.0.0.1:8000" + accepted["status_url"],
+        headers={"Authorization": "Bearer " + access_token})
+    with urllib.request.urlopen(status_req, timeout=60) as response:
+        operation = json.load(response)
+    if operation["state"] == "failed":
+        raise SystemExit("Deployment operation failed: " + accepted["operation_id"])
+    if operation["state"] == "succeeded" and operation["readiness"]["state"] == "ready":
+        break
+    time.sleep(2)
+else:
+    raise SystemExit("Deployment did not become ready: " + accepted["operation_id"])
 kubectl = ["kubectl", "--kubeconfig", ".runtime/admin.kubeconfig"]
 subprocess.run(kubectl + ["-n", "project-isolation", "rollout", "status",
     "deployment/isolation", "--timeout=180s"], check=True)
