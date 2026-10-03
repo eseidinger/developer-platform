@@ -88,6 +88,25 @@ This index lists execution tasks, not story completion promises. Task details an
 | 4 (after 4.5) | PLAN-015 |
 | Deferred | DEV-001-T02, DEV-002-T02, DEV-003-T03, DEV-006-T02, DEV-008-T02, DEV-009-T02, DEV-011-T02 |
 
+### Phase 1C story-task audit (October 3, 2026)
+
+Read-only review of the 1C tasks still open after PLAN-001 to PLAN-003, against the source at the audit commit and the evidence rows above. "Accepted" requires named live evidence for every criterion; nothing was run for this audit.
+
+| Task | Verdict | What exists | Gap |
+|---|---|---|---|
+| DEV-006-T01 | Accepted (ticked) | Readiness snapshot, bad-image, stalled and unschedulable reasons | None for T01 |
+| DEV-007-T01 | Partial | Persisted operations with outcomes, safe repeat PUT, interrupted-worker reclaim (EV-13) | The drill interrupted a running operation, not specifically after database creation; no data-loss check; prerequisite DEV-010-T01 is open |
+| DEV-010-T01 | Partial | Generated Secret with `PGHOST`/`PGUSER`/`PGPASSWORD`; `scripts/isolation.py` checks denied foreign and platform database access | No live application write/read; no data-preservation-across-redeploy check; isolation script not recorded as evidence |
+| DEV-011-T01 | Partial | `POST /projects/{name}/retire` with name confirmation, active-operation and namespace guards, audit, data retained | No preview of workload/routes/configuration, no scope-change invalidation, no persisted retained inventory; it acknowledges manual removal rather than performing it |
+| DEV-005-T01 | Partial | Readiness reports ready counts and image | No CPU/memory observation endpoint and no stale/missing-metric labels |
+| OPS-003-T01 | Not started in the API | Monitoring stack exists (Phase 1A) | No recorded measurement of host, shared-service, workload and storage consumption, system reserve or load baseline |
+| DEV-004-T01 | Not started | None | No log endpoint, attribution or cross-project denial test |
+| DEV-002-T01 | Not started | Capabilities declare `configuration.values: false` | No configuration CRUD |
+| DEV-003-T01 | Not started | Capabilities declare `secrets: false`; only generated database Secrets exist | No secret CRUD, binding or redaction proof |
+| DEV-003-T02 | Not started | None | Needs DEV-003-T01 |
+
+Smallest route to closing the data-path part of 1C: run and record the isolation script, add a live write/read-and-redeploy drill (DEV-010-T01), then the interrupt-after-database-creation drill (DEV-007-T01). Configuration, secrets and logs (DEV-002/003/004) are new features.
+
 ## Developer stories
 
 ### DEV-001 — Deploy applications with multiple components
@@ -202,7 +221,8 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **DEV-006-T01 · 1C** — Separate accepted desired state from observed readiness; show desired/ready counts and active image; exercise bad-image, unready, stalled and unschedulable rollout reasons. Prerequisites: PLAN-001; OPS-004-T01.
+- [x] **DEV-006-T01 · 1C** — Separate accepted desired state from observed readiness; show desired/ready counts and active image; exercise bad-image, unready, stalled and unschedulable rollout reasons. Prerequisites: PLAN-001; OPS-004-T01.
+  **Audit (October 3, 2026):** Accepted on live evidence: desired state is separate from observed readiness with desired/ready counts and active image (EV-13); bad-image `ErrImagePull`/`ImagePullBackOff` (EV-14); stalled rollout and unschedulable pods (EV-15); restart and repeat rollouts (EV-16, EV-18).
 - [ ] **DEV-006-T02 · Deferred** — Report readiness, counts, active image and failures independently for each component, including mixed healthy/failed deployments. Prerequisites: DEV-001-T02; DEV-006-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source partial: TCP probes and stored `provisioning/applied/failed` status exist. Synchronous PUT returns `200` after apply; `applied` does not mean ready, no observer updates it after rollout/dependency failure, and termination can leave `provisioning` until a repeated PUT. Local health acceptance unverified; the inspected smoke script waits for rollout but was not run in the baseline assessment. T02 — deferred, source absent, local unverified.
