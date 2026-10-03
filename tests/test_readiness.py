@@ -14,7 +14,7 @@ def condition(condition_type, status, reason=None):
     return {"type": condition_type, "status": status, "reason": reason}
 
 
-def deployment(*, ready=0, updated=0, conditions=None):
+def deployment(*, ready=0, updated=0, total=None, conditions=None):
     return {
         "metadata": {"generation": 2},
         "spec": {"replicas": 1, "template": {"spec": {"containers": [
@@ -24,6 +24,7 @@ def deployment(*, ready=0, updated=0, conditions=None):
             "observedGeneration": 2,
             "readyReplicas": ready,
             "updatedReplicas": updated,
+            "replicas": max(ready, updated) if total is None else total,
             "conditions": conditions or [condition("Progressing", "True", "NewReplicaSetAvailable")],
         },
     }
@@ -113,6 +114,22 @@ class ReadinessObservationTests(unittest.TestCase):
         self.assertEqual(result["state"], "progressing")
         self.assertEqual(result["reason"], "ImagePullBackOff")
         self.assertEqual(result["ready_replicas"], 0)
+
+    def test_old_ready_pod_does_not_make_a_stalled_new_rollout_ready(self):
+        self.deployment.value = deployment(ready=1, updated=1, total=2, conditions=[
+            condition("Progressing", "True", "ReplicaSetUpdated"),
+        ])
+        self.pods.value = {"items": [{
+            "status": {"containerStatuses": [{
+                "name": "app", "ready": False,
+                "state": {"waiting": {"reason": "ErrImagePull"}},
+            }]},
+        }]}
+
+        result = self.observe()
+
+        self.assertEqual(result["state"], "progressing")
+        self.assertEqual(result["reason"], "ErrImagePull")
 
     def test_reports_unschedulable_pod_diagnostic(self):
         self.deployment.value = deployment()

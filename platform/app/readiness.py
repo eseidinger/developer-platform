@@ -132,8 +132,10 @@ def observe_deployment(runtime: Any, project: str, desired_image: str,
     generation = _field(metadata, "generation", 0) or 0
     observed_generation = _field(status, "observedGeneration", 0) or 0
     updated_replicas = _field(status, "updatedReplicas", 0) or 0
+    total_replicas = _field(status, "replicas", 0) or 0
     if (desired_replicas > 0 and ready_replicas >= desired_replicas
             and updated_replicas >= desired_replicas
+            and total_replicas <= updated_replicas
             and observed_generation >= generation
             and deployment_image == desired_image):
         return _snapshot("ready", desired_image, **base, active_images=images,
