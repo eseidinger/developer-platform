@@ -29,6 +29,7 @@ def wait_for_operation(accepted, timeout=300):
         if operation["state"] == "failed":
             raise RuntimeError("Deployment failed; operation " + accepted["operation_id"])
         readiness = operation["readiness"]
+        print("operation", accepted["operation_id"], operation["state"], "readiness", readiness["state"], flush=True)
         if operation["state"] == "succeeded":
             if readiness["state"] == "ready":
                 return operation
@@ -43,10 +44,11 @@ for attempt in range(60):
     try:
         request("/readyz")
         break
-    except Exception:
+    except Exception as error:
+        print("waiting for API on 127.0.0.1:8000:", error, flush=True)
         time.sleep(2)
 else:
-    raise SystemExit("API dependencies not ready")
+    raise SystemExit("API dependencies not ready; run this on the lab host or tunnel ports 8000 and 80")
 
 try:
     request("/projects", token=False)
