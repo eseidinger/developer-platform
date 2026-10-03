@@ -720,7 +720,7 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
 - [ ] **PLAN-003 · 2** — Harden worker interruption, concurrent writes, revision retention and drift recovery; prove no duplicated resources/lost revisions and redacted traceable provider failures. Prerequisites: PLAN-002; DEV-007-T02.
 
-  **Progress (October 3, 2026):** Decision: concurrent writes use an optional `If-Match: <revision>` header on PUT; a stale value returns 409 `revision_conflict` with the current revision and no side effects, and omitting it keeps last-writer-wins (unit tests; live check in EV-23). Remaining: drift recovery, revision retention, redacted provider-failure traces.
+  **Progress (October 3, 2026):** Decision: concurrent writes use an optional `If-Match: <revision>` header on PUT; a stale value returns 409 `revision_conflict` with the current revision and no side effects, and omitting it keeps last-writer-wins (unit tests; live check in EV-23). Drift decision: report only, never auto-revert; `GET /projects/{name}/drift` reports image, replica and resource differences and audits `project.drift.detected` (unit tests only; no periodic scan yet). Remaining: live drift evidence, a periodic drift scan, , revision retention, redacted provider-failure traces.
 
   **Task evidence (B-2026-09-26):** Source partial; local workflow acceptance unverified. A global advisory lock serializes cooperating API requests but supplies no expected-revision conflict check. Updates overwrite the only spec; stale clients can replace intent. Persistent idempotency keys, revision history, per-step recovery and drift reconciliation are absent.
 

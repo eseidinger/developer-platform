@@ -250,6 +250,7 @@ access before network rules converge; this lab is intended for trusted workloads
 | `GET /healthz` | None | 200 with `{"status":"ok"}` when the process responds |
 | `GET /readyz` | None | 200 with `{"status":"ready"}` when database and Kubernetes checks pass; otherwise 503 |
 | `GET /projects` | OIDC `viewer` or stronger grant | 200 with only authorized projects |
+| `GET /projects/{name}/drift` | `view` grant | Compares the live Deployment (image, replicas, CPU/memory) with the desired revision and returns `in_sync`, `drifted` with per-field differences, `not_found` or `unknown`. Report only: it never changes the cluster; drift is audited as `project.drift.detected`. Re-apply with PUT or restart |
 | `GET /v1/capabilities` | Any authenticated principal | Declared capabilities per environment (runtime, endpoints, scaling, resources, health, external resources, configuration) and the allowed image registries |
 | `PUT /projects/{name}` | OIDC `developer` or stronger project grant; platform-admin creates projects | 202 with queued operation ID, desired revision, and status URL; the image tag is first resolved to a digest (422 unknown tag/unsupported registry, 503 registry unreachable) |
 | `GET /v1/operations/{id}` | OIDC `viewer` or stronger grant on the owning project | 200 with apply outcome, revision, redacted result, and live readiness snapshot (replica counts, images, diagnostic reason) |

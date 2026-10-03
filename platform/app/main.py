@@ -36,6 +36,7 @@ from .spec import CAPABILITIES, ApplicationEnvelope, error_code, to_flat
 from .manifests import normalize_resources, resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
+from .drift import observe_drift
 from .readiness import observe_deployment
 from .security_alerts import security_alert_loop
 
@@ -460,6 +461,30 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
         "revision": revision,
         "status_url": f"/v1/operations/{operation_id}",
     })
+
+
+@app.get("/projects/{name}/drift")
+def drift(name: str, principal: Principal = Depends(current_principal)):
+    """Compare the live Deployment with the desired revision; report only, never repair."""
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    with connect() as conn:
+        current = conn.execute("""SELECT max(r.revision), (array_agg(r.spec ORDER BY r.revision DESC))[1]
+            FROM projects p
+            JOIN project_environments e ON e.project_id=p.project_id
+            JOIN project_applications a ON a.environment_id=e.environment_id
+            JOIN application_revisions r ON r.application_id=a.application_id
+            WHERE p.name=%s""", (name,)).fetchone()
+    if current is None or current[0] is None:
+        required_audit(actor, "project.drift.inspect", "project", name, "rejected", {"project": name},
+                       {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    result = observe_drift(runtime, name, current[1], log)
+    detail = {"revision": current[0], "state": result["state"],
+              "fields": [d["field"] for d in result["differences"]]}
+    required_audit(actor, "project.drift.detected" if result["state"] == "drifted" else "project.drift.inspect",
+                   "project", name, "succeeded", {"project": name}, detail)
+    return {"project": name, "revision": current[0], **result}
 
 
 @app.post("/projects/{name}/restart")

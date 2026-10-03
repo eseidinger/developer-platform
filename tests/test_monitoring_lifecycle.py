@@ -113,6 +113,9 @@ class Catalog:
             revisions = self.revisions.get(application_id, [])
             self.result = [(self.project_ids[name], self.rows[name][1], application_id,
                             revisions[-1][0], revisions[-1][1])] if name in self.rows and revisions else []
+        elif query.startswith("SELECT max(r.revision), (array_agg"):
+            revisions = self.revisions.get("application-" + params[0], [])
+            self.result = [(revisions[-1][0], revisions[-1][1]) if revisions else (None, None)]
         elif query.startswith("SELECT max(r.revision)"):
             revisions = self.revisions.get("application-" + params[0], [])
             self.result = [(revisions[-1][0] if revisions else None,)]
@@ -212,6 +215,20 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(put().json()["revision"], 3)
         self.assertEqual(put("abc").status_code, 400)
         self.assertEqual(put("-1").status_code, 400)
+
+    def test_drift_is_reported_and_audited_without_changing_the_cluster(self):
+        self.assertEqual(self.client.get("/projects/smoke/drift", headers=self.headers).status_code, 404)
+        self.deploy()
+        drifted = {"state": "drifted", "differences": [{"field": "replicas", "desired": 1, "observed": 3}]}
+        with patch.object(main, "observe_drift", return_value=drifted) as observe:
+            response = self.client.get("/projects/smoke/drift", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"project": "smoke", "revision": 1, **drifted})
+        self.assertEqual(observe.call_args.args[1], "smoke")
+        actions = [call.args[1] for call in self.mocks[3].call_args_list]
+        self.assertIn("project.drift.detected", actions)
+        self.mocks[-1].assert_not_called()
+        self.runtime.resources.get.return_value.patch.assert_not_called()
 
     def test_changed_spec_adds_immutable_revision_and_keeps_identity(self):
         self.assertEqual(self.deploy().status_code, 202)

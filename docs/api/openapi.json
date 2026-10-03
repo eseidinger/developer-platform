@@ -887,6 +887,49 @@
         "summary": "Provision"
       }
     },
+    "/projects/{name}/drift": {
+      "get": {
+        "description": "Compare the live Deployment with the desired revision; report only, never repair.",
+        "operationId": "drift_projects__name__drift_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Drift"
+      }
+    },
     "/projects/{name}/grants": {
       "delete": {
         "operationId": "delete_project_grant_projects__name__grants_delete",
