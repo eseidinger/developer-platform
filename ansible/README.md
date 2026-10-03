@@ -50,6 +50,8 @@ Useful inventory overrides:
 | `platform_identity_domain` | `identity.localhost` | Keycloak/OIDC issuer domain; configure its DNS to the platform host |
 | `platform_tls_email` | `admin@example.com` | ACME contact email |
 | `platform_edge_bind_ip` | `127.0.0.1` | Use `0.0.0.0` for public ingress |
+| `platform_image_registries` | `docker.io,ghcr.io,quay.io` | Comma-separated registries the API may resolve image tags from |
+| `platform_drift_scan_interval_seconds` | `300` | Seconds between background drift scans |
 
 For an existing host with Docker, prefer `platform_install_docker: false` to
 avoid changing its package source. Conflicting distribution Docker packages are
