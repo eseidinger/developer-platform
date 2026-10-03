@@ -281,10 +281,12 @@
 
         - name: Resolve the source revision being installed
           ansible.builtin.shell: |
-            set -eo pipefail
+            set -e
             rev=$(git -C "{{ platform_source_dir }}" rev-parse HEAD 2>/dev/null || echo unknown)
             if [ -n "$(git -C "{{ platform_source_dir }}" status --porcelain 2>/dev/null)" ]; then rev="$rev+dirty"; fi
             echo "$rev"
+          args:
+            executable: /bin/bash
           delegate_to: localhost
           become: false
           register: platform_source_revision
