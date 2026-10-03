@@ -65,7 +65,8 @@ except urllib.error.HTTPError as error:
 project = {"name": "smoke", "image": "hashicorp/http-echo:1.0.0", "port": 5678, "probe_profile": "hello-world"}
 first = request("/projects/smoke", project)
 second = request("/projects/smoke", project)
-assert first["operation_id"] == second["operation_id"]
+# An unchanged spec reuses the revision; the operation is shared only while still active.
+assert first["revision"] == second["revision"]
 wait_for_operation(second)
 assert sum(p["name"] == "smoke" for p in request("/projects")) == 1
 host = "smoke." + cfg["APPS_DOMAIN"]
