@@ -38,6 +38,7 @@ from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
 from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
+from .usage import observe_usage
 from .retirement import removal_scope
 from .security_alerts import security_alert_loop
 
@@ -550,6 +551,23 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
          "image": r[2].get("resolved_image", r[2]["image"]), "port": r[2]["port"],
          "resources": r[2].get("resources")}
         for r in rows]}
+
+
+@app.get("/projects/{name}/resource-usage")
+def resource_usage(name: str, principal: Principal = Depends(current_principal)):
+    """Current CPU and memory per pod; missing, stale and unavailable metrics are labelled in `state`."""
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    with connect() as conn:
+        known = conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone()
+    if not known:
+        required_audit(actor, "project.usage.inspect", "project", name, "rejected",
+                       {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    usage = observe_usage(runtime, name, log)
+    required_audit(actor, "project.usage.inspect", "project", name, "succeeded",
+                   {"project": name}, {"state": usage["state"]})
+    return {"project": name, **usage}
 
 
 @app.post("/projects/{name}/rollback")

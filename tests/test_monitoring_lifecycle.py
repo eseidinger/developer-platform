@@ -255,6 +255,22 @@ class LifecycleTests(unittest.TestCase):
                                           headers=self.headers).status_code, 422)
         self.assertEqual(self.client.get("/projects/none/revisions", headers=self.headers).status_code, 404)
 
+    def test_resource_usage_requires_view_grant_labels_state_and_is_audited(self):
+        self.deploy()
+        self.complete_operations()
+        usage = {"state": "missing", "reason": "NoMetricsForProject", "pods": [], "totals": None}
+        with patch.object(main, "observe_usage", return_value=usage) as observe:
+            response = self.client.get("/projects/smoke/resource-usage", headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {"project": "smoke", **usage})
+            observe.assert_called_once_with(self.runtime, "smoke", main.log)
+            self.assertEqual(self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke"))
+            self.assertEqual(self.client.get("/projects/none/resource-usage", headers=self.headers).status_code, 404)
+            self.mocks[4].return_value = False
+            self.assertEqual(self.client.get("/projects/smoke/resource-usage", headers=self.headers).status_code, 403)
+        actions = [call.args[1] for call in self.mocks[3].call_args_list]
+        self.assertIn("project.usage.inspect", actions)
+
     def test_if_match_makes_updates_conditional_on_the_current_revision(self):
         def put(value=None):
             headers = dict(self.headers, **({"If-Match": value} if value is not None else {}))

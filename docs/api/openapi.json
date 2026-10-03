@@ -1059,6 +1059,49 @@
         "summary": "Put Project Grant"
       }
     },
+    "/projects/{name}/resource-usage": {
+      "get": {
+        "description": "Current CPU and memory per pod; missing, stale and unavailable metrics are labelled in `state`.",
+        "operationId": "resource_usage_projects__name__resource_usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resource Usage"
+      }
+    },
     "/projects/{name}/restart": {
       "post": {
         "description": "Queue a rolling restart of the current desired revision without changing the spec.",
