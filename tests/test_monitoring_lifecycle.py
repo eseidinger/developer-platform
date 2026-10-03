@@ -113,6 +113,14 @@ class Catalog:
             revisions = self.revisions.get(application_id, [])
             self.result = [(self.project_ids[name], self.rows[name][1], application_id,
                             revisions[-1][0], revisions[-1][1])] if name in self.rows and revisions else []
+        elif query.startswith("SELECT r.spec, p.status FROM projects"):
+            name, target = params
+            spec = next((spec for revision, spec in self.revisions.get("application-" + name, [])
+                         if revision == target), None)
+            self.result = [(spec, self.rows[name][1])] if spec is not None and name in self.rows else []
+        elif query.startswith("SELECT r.revision, r.created_at, r.spec"):
+            self.result = [(revision, datetime(2026, 10, 3, tzinfo=timezone.utc), spec)
+                           for revision, spec in reversed(self.revisions.get("application-" + params[0], []))]
         elif query.startswith("SELECT max(r.revision), (array_agg"):
             revisions = self.revisions.get("application-" + params[0], [])
             self.result = [(revisions[-1][0], revisions[-1][1]) if revisions else (None, None)]
@@ -194,6 +202,43 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(len(self.catalog.operations), 1)
         self.mocks[-2].assert_not_called()
         self.mocks[-1].assert_not_called()
+
+    def rollback(self, revision, **headers):
+        return self.client.post("/projects/smoke/rollback", json={"revision": revision},
+                                headers=dict(self.headers, **headers))
+
+    def test_rollback_reapplies_a_retained_spec_as_a_new_revision(self):
+        self.deploy()
+        self.spec["image"] = "example:v2"
+        self.deploy()
+        self.complete_operations()
+
+        listing = self.client.get("/projects/smoke/revisions", headers=self.headers).json()
+        self.assertEqual(listing["current_revision"], 2)
+        self.assertEqual([(r["revision"], r["current"]) for r in listing["revisions"]],
+                         [(2, True), (1, False)])
+        self.assertEqual(listing["revisions"][1]["image"], "example@" + self.digest)
+
+        response = self.rollback(1, **{"If-Match": "2"})
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["revision"], 3)
+        app_id = next(iter(self.catalog.application_ids.values()))
+        self.assertEqual(self.catalog.revisions[app_id][2][1], self.catalog.revisions[app_id][0][1])
+        self.assertEqual(self.catalog.rows["smoke"][0], self.catalog.revisions[app_id][0][1])
+        self.mocks[-2].assert_not_called()
+        self.mocks[-1].assert_not_called()
+
+    def test_rollback_rejects_unknown_revisions_stale_if_match_and_retired_projects(self):
+        self.deploy()
+        self.complete_operations()
+        self.assertEqual(self.rollback(9).status_code, 404)
+        self.assertEqual(self.rollback(1, **{"If-Match": "5"}).json()["code"], "revision_conflict")
+        self.assertEqual(self.rollback(1, **{"If-Match": "x"}).status_code, 400)
+        self.catalog.rows["smoke"] = (self.catalog.rows["smoke"][0], "retired")
+        self.assertEqual(self.rollback(1).status_code, 409)
+        self.assertEqual(self.client.post("/projects/smoke/rollback", json={"revision": 0},
+                                          headers=self.headers).status_code, 422)
+        self.assertEqual(self.client.get("/projects/none/revisions", headers=self.headers).status_code, 404)
 
     def test_if_match_makes_updates_conditional_on_the_current_revision(self):
         def put(value=None):

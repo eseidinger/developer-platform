@@ -356,6 +356,80 @@ def expected_revision(value: Optional[str]) -> Optional[int]:
     return int(text)
 
 
+class RevisionNotFound(Exception):
+    pass
+
+
+class ProjectRetired(Exception):
+    pass
+
+
+def queue_deploy(conn, principal: Principal, name: str, spec: Optional[dict],
+                 expected: Optional[int], target: Optional[int] = None):
+    """Persist a revision and its deploy operation under the global lock.
+
+    With `target`, the spec is read from that retained revision inside the lock, so pruning
+    cannot race with a rollback. Returns (operation_id, state, revision).
+    """
+    # Serialize project revisions and active-operation deduplication.
+    conn.execute("SELECT pg_advisory_lock(731904)")
+    try:
+        with conn.transaction():
+            if expected is not None:
+                current = conn.execute("""SELECT max(r.revision) FROM projects p
+                    JOIN project_environments e ON e.project_id=p.project_id
+                    JOIN project_applications a ON a.environment_id=e.environment_id
+                    JOIN application_revisions r ON r.application_id=a.application_id
+                    WHERE p.name=%s""", (name,)).fetchone()
+                current_revision = current[0] if current and current[0] is not None else 0
+                if current_revision != expected:
+                    raise RevisionConflict(current_revision)
+            if target is not None:
+                found = conn.execute("""SELECT r.spec, p.status FROM projects p
+                    JOIN project_environments e ON e.project_id=p.project_id
+                    JOIN project_applications a ON a.environment_id=e.environment_id
+                    JOIN application_revisions r ON r.application_id=a.application_id
+                    WHERE p.name=%s AND r.revision=%s""", (name, target)).fetchone()
+                if found is None:
+                    raise RevisionNotFound()
+                if found[1] == "retired":
+                    raise ProjectRetired()
+                spec = found[0]
+            row = conn.execute("""INSERT INTO projects(name,spec,status) VALUES (%s,%s,'provisioning')
+                ON CONFLICT(name) DO UPDATE SET spec=excluded.spec,
+                status='provisioning',updated_at=now()
+                RETURNING project_id""", (name, Jsonb(spec))).fetchone()
+            if row is None:
+                raise RuntimeError("Could not resolve project identity")
+            application_id, revision = ensure_default_application(conn, row[0], name, spec)
+            pending = conn.execute("""SELECT operation_id, state FROM application_operations
+                WHERE application_id=%s AND revision=%s AND operation_kind=%s
+                AND state IN ('queued', 'running')
+                ORDER BY created_at DESC LIMIT 1""",
+                (application_id, revision, "deploy")).fetchone()
+            if pending:
+                return pending[0], pending[1], revision
+            envelope = {
+                "project_id": str(row[0]),
+                "application_id": str(application_id),
+                "project_slug": name,
+                "revision": revision,
+                "spec": spec,
+            }
+            queued = conn.execute("""INSERT INTO application_operations(
+                application_id, revision, operation_kind, state, actor_issuer, actor_subject,
+                envelope_version, envelope)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING operation_id""",
+                (application_id, revision, "deploy", "queued",
+                 principal.issuer, principal.subject, 1, Jsonb(envelope))).fetchone()
+            if queued is None:
+                raise RuntimeError("Could not persist deployment operation")
+            return queued[0], "queued", revision
+    finally:
+        conn.execute("SELECT pg_advisory_unlock(731904)")
+
+
 @app.put("/projects/{name}")
 def provision(name: str, body: Union[ApplicationEnvelope, Project],
               principal: Principal = Depends(current_principal),
@@ -400,56 +474,8 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
     spec = {**project.model_dump(exclude_none=True), "resolved_image": resolved_image}
     try:
         with connect() as conn:
-            # Serialize project revisions and active-operation deduplication.
-            conn.execute("SELECT pg_advisory_lock(731904)")
-            try:
-                with conn.transaction():
-                    if expected is not None:
-                        current = conn.execute("""SELECT max(r.revision) FROM projects p
-                            JOIN project_environments e ON e.project_id=p.project_id
-                            JOIN project_applications a ON a.environment_id=e.environment_id
-                            JOIN application_revisions r ON r.application_id=a.application_id
-                            WHERE p.name=%s""", (name,)).fetchone()
-                        current_revision = current[0] if current and current[0] is not None else 0
-                        if current_revision != expected:
-                            raise RevisionConflict(current_revision)
-                    row = conn.execute("""INSERT INTO projects(name,spec,status) VALUES (%s,%s,'provisioning')
-                        ON CONFLICT(name) DO UPDATE SET spec=excluded.spec,
-                        status='provisioning',updated_at=now()
-                        RETURNING project_id""", (name, Jsonb(spec))).fetchone()
-                    if row is None:
-                        raise RuntimeError("Could not resolve project identity")
-                    application_id, revision = ensure_default_application(
-                        conn, row[0], name, spec)
-                    pending = conn.execute("""SELECT operation_id, state FROM application_operations
-                        WHERE application_id=%s AND revision=%s AND operation_kind=%s
-                        AND state IN ('queued', 'running')
-                        ORDER BY created_at DESC LIMIT 1""",
-                        (application_id, revision, "deploy")).fetchone()
-                    if pending:
-                        operation_id = pending[0]
-                        operation_state = pending[1]
-                    else:
-                        envelope = {
-                            "project_id": str(row[0]),
-                            "application_id": str(application_id),
-                            "project_slug": name,
-                            "revision": revision,
-                            "spec": spec,
-                        }
-                        queued = conn.execute("""INSERT INTO application_operations(
-                            application_id, revision, operation_kind, state, actor_issuer, actor_subject,
-                            envelope_version, envelope)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
-                            RETURNING operation_id""",
-                            (application_id, revision, "deploy", "queued",
-                             principal.issuer, principal.subject, 1, Jsonb(envelope))).fetchone()
-                        if queued is None:
-                            raise RuntimeError("Could not persist deployment operation")
-                        operation_id = queued[0]
-                        operation_state = "queued"
-            finally:
-                conn.execute("SELECT pg_advisory_unlock(731904)")
+            operation_id, operation_state, revision = queue_deploy(
+                conn, principal, name, spec, expected)
     except RevisionConflict as conflict:
         required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
                        {"reason": "revision_conflict", "expected": expected, "current": conflict.current})
@@ -493,6 +519,83 @@ def drift(name: str, principal: Principal = Depends(current_principal)):
     required_audit(actor, "project.drift.detected" if result["state"] == "drifted" else "project.drift.inspect",
                    "project", name, "succeeded", {"project": name}, detail)
     return {"project": name, "revision": current[0], **result}
+
+
+class Rollback(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    revision: int = Field(gt=0)
+
+
+@app.get("/projects/{name}/revisions")
+def revisions(name: str, principal: Principal = Depends(current_principal)):
+    """List the retained desired revisions, newest first."""
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    with connect() as conn:
+        rows = conn.execute("""SELECT r.revision, r.created_at, r.spec
+            FROM projects p
+            JOIN project_environments e ON e.project_id=p.project_id
+            JOIN project_applications a ON a.environment_id=e.environment_id
+            JOIN application_revisions r ON r.application_id=a.application_id
+            WHERE p.name=%s ORDER BY r.revision DESC""", (name,)).fetchall()
+    if not rows:
+        required_audit(actor, "project.revisions.list", "project", name, "rejected",
+                       {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    required_audit(actor, "project.revisions.list", "project", name, "succeeded",
+                   {"project": name}, {"count": len(rows)})
+    return {"project": name, "current_revision": rows[0][0], "revisions": [
+        {"revision": r[0], "created_at": r[1].isoformat(), "current": r[0] == rows[0][0],
+         "image": r[2].get("resolved_image", r[2]["image"]), "port": r[2]["port"],
+         "resources": r[2].get("resources")}
+        for r in rows]}
+
+
+@app.post("/projects/{name}/rollback")
+def rollback(name: str, body: Rollback, principal: Principal = Depends(current_principal),
+             if_match: Optional[str] = Header(None)):
+    """Re-apply a retained revision as a new revision; databases are never rolled back."""
+    actor = actor_for(principal)
+    require_permission(principal, "change", name)
+    try:
+        expected = expected_revision(if_match)
+    except HTTPException:
+        required_audit(actor, "project.rollback", "project", name, "rejected", {"project": name},
+                       {"reason": "invalid_if_match"})
+        raise
+    detail = {"target": body.revision}
+    try:
+        with connect() as conn:
+            operation_id, operation_state, revision = queue_deploy(
+                conn, principal, name, None, expected, target=body.revision)
+    except RevisionConflict as conflict:
+        required_audit(actor, "project.rollback", "project", name, "rejected", {"project": name},
+                       {**detail, "reason": "revision_conflict", "current": conflict.current})
+        return JSONResponse(status_code=409, content={
+            "detail": "The project changed since the expected revision; re-read it and retry",
+            "code": "revision_conflict", "current_revision": conflict.current})
+    except RevisionNotFound:
+        required_audit(actor, "project.rollback", "project", name, "rejected", {"project": name},
+                       {**detail, "reason": "revision_not_found"})
+        raise HTTPException(404, "Unknown project or revision; it may have been pruned")
+    except ProjectRetired:
+        required_audit(actor, "project.rollback", "project", name, "rejected", {"project": name},
+                       {**detail, "reason": "project_retired"})
+        raise HTTPException(409, "Retired projects cannot be rolled back")
+    except Exception as exc:
+        required_audit(actor, "project.rollback", "project", name, "failed", {"project": name},
+                       {**detail, "error_type": type(exc).__name__})
+        log.error("Rollback failed: %s (%s)", name, type(exc).__name__)
+        raise HTTPException(503, "Rollback failed; retry the same request. Existing data is retained.")
+    required_audit(actor, "project.rollback", "project", name, "succeeded", {"project": name},
+                   {**detail, "state": operation_state, "revision": revision,
+                    "operation_id": str(operation_id)})
+    return JSONResponse(status_code=202, content={
+        "operation_id": str(operation_id),
+        "state": operation_state,
+        "revision": revision,
+        "status_url": f"/v1/operations/{operation_id}",
+    })
 
 
 @app.post("/projects/{name}/restart")
