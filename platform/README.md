@@ -144,6 +144,7 @@ resolver supports wildcard localhost names. Public applications use
 | `image` | Yes | Container image reference, 2–512 characters under the current regex. An explicit tag or digest is recommended but not enforced. |
 | `port` | No | Container TCP port, 1024–65535; defaults to 8080. |
 | `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
+| `resources` | No | `{"requests": {"cpu", "memory"}, "limits": {"cpu", "memory"}}`; CPU as `250m` or `0.25`, memory as `Mi`/`Gi`. Omitted values default to requests `100m`/`128Mi` and limits `500m`/`256Mi`. Requests must not exceed limits; maxima are requests 1 CPU/1Gi and limits 2 CPU/2Gi (a rolling update briefly runs two pods within the namespace quota). Invalid values return 422. Stored canonically (`250m`, `512Mi`), so equivalent spellings reuse the revision. |
 
 Unknown project request fields are rejected with `422` before catalog or provider side effects. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/02-architecture/application-spec.md) is a future contract, not an input format for this endpoint.
 

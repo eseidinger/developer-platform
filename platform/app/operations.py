@@ -104,7 +104,8 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         password = password_for(project)
         spec = desired[1]
         manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
-                              os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password)
+                              os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
+                              spec.get("resources"))
         if operation_kind == "restart":
             # The marker is this operation's ID, so a reclaimed retry cannot restart twice.
             marker = str(operation_id)

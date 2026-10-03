@@ -101,7 +101,7 @@ The example produces `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB
 
 ## Contract work required for Phase 2
 
-The draft currently exposes one CPU/memory budget. It does not yet define separate requests and limits required by DEV-008 and OPS-005. Resolve those portable semantics, their validation, and the schema migration in PLAN-002 before accepting scaling/policy tasks; do not silently interpret one budget as two independently configurable values. The first profile remains one image and one HTTP endpoint, with a fixed replica count; multiple replicas do not imply multiple components.
+Decision (PLAN-002): `resources` uses explicit `requests` and `limits` for CPU and memory, with `requests <= limits` and defaults equal to the earlier fixed values; the example's single `cpu`/`memory` budget is superseded. The flat API accepts them today (see the project specification in the platform README); the enveloped form follows with the versioned envelope. Do not interpret one budget as two independent values. The first profile remains one image and one HTTP endpoint, with a fixed replica count; multiple replicas do not imply multiple components.
 
 ## Status and evolution
 

@@ -7,7 +7,7 @@ import threading
 import csv
 import io
 from datetime import datetime, timedelta, timezone
-from typing import Literal
+from typing import Literal, Optional
 from contextlib import asynccontextmanager
 from uuid import UUID
 
@@ -31,7 +31,7 @@ from .authorization import (bootstrap_platform_admin, grant as grant_role, initi
 from .catalog import ensure_default_application, initialize as initialize_catalog
 from .images import ImageResolutionError, resolve_image
 from .identity import AuthenticationError, Principal, configured_verifier
-from .manifests import resources, validate_name
+from .manifests import normalize_resources, resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
 from .readiness import observe_deployment
@@ -189,6 +189,12 @@ class Project(BaseModel):
     image: str = Field(min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$")
     port: int = Field(default=8080, ge=1024, le=65535)
     probe_profile: Literal["status", "hello-world"] = "status"
+    resources: Optional[dict] = None
+
+    @field_validator("resources")
+    @classmethod
+    def check_resources(cls, value):
+        return None if value is None else normalize_resources(value)
 
     @field_validator("name")
     @classmethod
@@ -332,7 +338,7 @@ def provision(name: str, project: Project, principal: Principal = Depends(curren
             "unavailable": "Image registry is unavailable; retry the same PUT",
         }
         raise HTTPException(status_code, messages[exc.reason])
-    spec = {**project.model_dump(), "resolved_image": resolved_image}
+    spec = {**project.model_dump(exclude_none=True), "resolved_image": resolved_image}
     try:
         with connect() as conn:
             # Serialize project revisions and active-operation deduplication.

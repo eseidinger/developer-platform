@@ -144,6 +144,19 @@ class OperationWorkerTests(OperationWorkerFixture):
                 self.assertTrue(self.run_one())
                 self.assertEqual(self.resources.call_args.args[1], expected)
 
+    def test_deploys_requested_resources_and_defaults_for_legacy_specs(self):
+        wanted = {"requests": {"cpu": "250m", "memory": "128Mi"}, "limits": {"cpu": "1000m", "memory": "512Mi"}}
+        for resources, expected in ((wanted, wanted), (None, None)):
+            with self.subTest(resources=resources):
+                self.conn = OperationConnection()
+                self.connect.return_value = self.conn
+                self.resources.reset_mock()
+                if resources:
+                    self.conn.spec = {**self.conn.spec, "resources": resources}
+                    self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
+                self.assertTrue(self.run_one())
+                self.assertEqual(self.resources.call_args.args[6:], (expected,))
+
     def test_reclaims_running_operation_after_worker_restart_and_completes_it(self):
         self.conn.state = "running"
 

@@ -402,6 +402,32 @@ class LifecycleTests(unittest.TestCase):
         self.digest = "sha256:" + "b" * 64
         self.assertEqual(self.deploy().json()["revision"], first + 1)
 
+    def test_resources_are_validated_normalized_and_recorded_in_the_revision(self):
+        plain = self.deploy().json()["revision"]
+        self.assertNotIn("resources", self.catalog.rows["smoke"][0])
+        self.complete_operations()
+        self.spec = {**self.spec, "resources": {"limits": {"cpu": "1", "memory": "1Gi"}}}
+        response = self.deploy()
+        self.assertEqual(response.status_code, 202)
+        self.assertEqual(response.json()["revision"], plain + 1)
+        self.assertEqual(self.catalog.rows["smoke"][0]["resources"],
+                         {"requests": {"cpu": "100m", "memory": "128Mi"},
+                          "limits": {"cpu": "1000m", "memory": "1024Mi"}})
+        self.complete_operations()
+        self.spec = {**self.spec, "resources": {"limits": {"cpu": "1000m", "memory": "1024Mi"}}}
+        self.assertEqual(self.deploy().json()["revision"], plain + 1)
+
+    def test_invalid_resources_are_rejected_before_any_side_effect(self):
+        before = dict(self.catalog.rows)
+        for resources in ({"requests": {"cpu": "2"}}, {"limits": {"memory": "9Gi"}}, {"limits": {"gpu": "1"}},
+                          {"requests": {"cpu": "500m"}, "limits": {"cpu": "250m"}}):
+            with self.subTest(resources=resources):
+                self.spec = {**self.spec, "resources": resources}
+                self.assertEqual(self.deploy().status_code, 422)
+        self.assertEqual(self.catalog.rows, before)
+        self.assertEqual(self.catalog.operations, {})
+        self.mocks[-2].assert_not_called()
+
     def test_resolution_failures_are_rejected_before_any_side_effect(self):
         for reason, status in (("not_found", 422), ("unsupported_registry", 422), ("unavailable", 503)):
             with self.subTest(reason=reason):

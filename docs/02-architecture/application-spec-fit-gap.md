@@ -14,7 +14,7 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 | `endpoints[].name/protocol/exposure` | One implicit public HTTP endpoint | reject | Accept exactly one `http` endpoint with `public` exposure; reject others. |
 | `endpoints[].port` | `port`, 1024–65535, default 8080 | implemented | Map to the endpoint port. |
 | `scaling` | Fixed single replica | reject | Accept `minInstances == maxInstances == 1`; reject autoscaling (see PLAN-004). |
-| `resources.cpu/memory` | Fixed `100m/128Mi` requests and `500m/256Mi` limits for every workload | new | Needs request and limit semantics (open decision below), validation against the namespace quota and LimitRange, and persisted revision fields. |
+| `resources.cpu/memory` | Fixed `100m/128Mi` requests and `500m/256Mi` limits for every workload | implemented (flat form) | Decided: explicit `requests`/`limits` with `requests <= limits`, defaults equal to the previous fixed values. Optional `resources` in the flat body is validated, canonicalized, stored in the revision and applied to the container; maxima keep two surge pods within the namespace quota. The enveloped `spec.application.resources` form follows with the envelope. |
 | `health.readiness` | `probe_profile` (`status`, `hello-world`) with fixed paths | map | Public `path`/`port` replace the profile; keep `probe_profile` as a deprecated alias. Path validation required. |
 | `spec.resources[type=postgres]` | A database is always provisioned | map | Make the single `postgres` resource explicit with profile `shared-dev` and `deletionPolicy: retain`; reject other types and profiles. |
 | `configuration.values` | Not supported | reject | Reject until implemented; then non-secret strings with name collision checks. |
@@ -33,7 +33,7 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 
 ## Open decisions
 
-1. **CPU and memory semantics.** Options: (a) a single `cpu`/`memory` value sets the limit and a fixed fraction sets the request; (b) explicit `requests` and `limits` with `requests <= limits`; (c) a single value for both (Guaranteed QoS). The draft's single budget cannot express DEV-008 and OPS-005. Recommended: (b), with defaults equal to today's values so existing projects do not change.
+1. ~~CPU and memory semantics.~~ Decided on explicit `requests` and `limits` with defaults equal to the earlier fixed values, so existing projects do not change.
 2. **Flat body sunset.** How long the flat body is accepted next to the envelope.
 3. **Endpoint and health fields in the first envelope.** Whether `health.readiness` ships in the first version or stays with `probe_profile`.
 

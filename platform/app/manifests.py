@@ -7,7 +7,48 @@ def validate_name(value):
         raise ValueError("Use 1-32 lowercase letters, digits or hyphens; start with a letter.")
     return value
 
-def resources(name, image, port, domain, database_ip, password):
+DEFAULT_RESOURCES = {"requests": {"cpu": "100m", "memory": "128Mi"},
+                     "limits": {"cpu": "500m", "memory": "256Mi"}}
+# Rolling updates briefly run two pods, so twice these maxima must fit the namespace quota.
+MAX_RESOURCES = {"requests": {"cpu": 1000, "memory": 1024}, "limits": {"cpu": 2000, "memory": 2048}}
+
+
+def _millicores(value):
+    text = str(value)
+    if re.fullmatch(r"[0-9]{1,5}m", text):
+        return int(text[:-1])
+    if re.fullmatch(r"[0-9]{1,2}(\.[0-9]{1,3})?", text):
+        return round(float(text) * 1000)
+    raise ValueError("CPU must look like 250m or 0.25")
+
+
+def _mebibytes(value):
+    match = re.fullmatch(r"([0-9]{1,5})(Mi|Gi)", str(value))
+    if not match:
+        raise ValueError("Memory must look like 256Mi or 1Gi")
+    return int(match[1]) * (1024 if match[2] == "Gi" else 1)
+
+
+def normalize_resources(value):
+    """Merge requested CPU/memory with the defaults and return canonical, validated values."""
+    if not isinstance(value, dict) or set(value) - {"requests", "limits"}:
+        raise ValueError("resources accepts only requests and limits")
+    parsed = {}
+    for section, defaults in DEFAULT_RESOURCES.items():
+        given = value.get(section) or {}
+        if not isinstance(given, dict) or set(given) - {"cpu", "memory"}:
+            raise ValueError(f"{section} accepts only cpu and memory")
+        merged = {**defaults, **given}
+        cpu, memory = _millicores(merged["cpu"]), _mebibytes(merged["memory"])
+        if not 0 < cpu <= MAX_RESOURCES[section]["cpu"] or not 0 < memory <= MAX_RESOURCES[section]["memory"]:
+            raise ValueError(f"{section} are outside the supported range")
+        parsed[section] = {"cpu": cpu, "memory": memory}
+    if any(parsed["requests"][k] > parsed["limits"][k] for k in ("cpu", "memory")):
+        raise ValueError("requests must not exceed limits")
+    return {section: {"cpu": f"{v['cpu']}m", "memory": f"{v['memory']}Mi"} for section, v in parsed.items()}
+
+
+def resources(name, image, port, domain, database_ip, password, workload_resources=None):
     validate_name(name)
     ipaddress.IPv4Address(database_ip)
     namespace = "project-" + name
@@ -63,8 +104,7 @@ def resources(name, image, port, domain, database_ip, password):
                     "envFrom": [{"secretRef": {"name": "database"}}],
                     "securityContext": {"allowPrivilegeEscalation": False,
                         "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
-                    "resources": {"requests": {"cpu": "100m", "memory": "128Mi"},
-                                  "limits": {"cpu": "500m", "memory": "256Mi"}},
+                    "resources": workload_resources or DEFAULT_RESOURCES,
                     "readinessProbe": {"tcpSocket": {"port": port}, "periodSeconds": 5},
                     "livenessProbe": {"tcpSocket": {"port": port}, "initialDelaySeconds": 30},
                     "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}]}],

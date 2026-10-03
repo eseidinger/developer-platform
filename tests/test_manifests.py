@@ -2,7 +2,7 @@ import sys
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
-from app.manifests import resources, validate_name
+from app.manifests import normalize_resources, resources, validate_name
 
 class WorkloadContract(unittest.TestCase):
     def test_rejects_namespace_and_identifier_injection(self):
@@ -35,6 +35,35 @@ class WorkloadContract(unittest.TestCase):
         docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
         deployment = next(d for d in docs if d["kind"] == "Deployment")["spec"]
         self.assertEqual(deployment["progressDeadlineSeconds"], 120)
+
+    def test_default_resources_are_unchanged(self):
+        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
+        container = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
+        self.assertEqual(container["resources"], {"requests": {"cpu": "100m", "memory": "128Mi"},
+                                                  "limits": {"cpu": "500m", "memory": "256Mi"}})
+
+    def test_requested_resources_reach_the_container(self):
+        wanted = normalize_resources({"requests": {"cpu": "0.25"}, "limits": {"cpu": "1", "memory": "1Gi"}})
+        self.assertEqual(wanted, {"requests": {"cpu": "250m", "memory": "128Mi"},
+                                  "limits": {"cpu": "1000m", "memory": "1024Mi"}})
+        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret", wanted)
+        container = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
+        self.assertEqual(container["resources"], wanted)
+
+    def test_invalid_resources_are_rejected(self):
+        bad = [{"requests": {"cpu": "600m"}, "limits": {"cpu": "500m"}},
+               {"requests": {"memory": "512Mi"}},
+               {"requests": {"cpu": "0"}},
+               {"requests": {"cpu": "1100m"}, "limits": {"cpu": "1500m"}},
+               {"limits": {"cpu": "2100m"}},
+               {"limits": {"memory": "3Gi"}},
+               {"limits": {"memory": "256MB"}},
+               {"limits": {"cpu": "fast"}},
+               {"limits": {"gpu": "1"}},
+               {"surprise": {}}]
+        for value in bad:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                normalize_resources(value)
 
 if __name__ == "__main__":
     unittest.main()
