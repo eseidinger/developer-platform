@@ -607,6 +607,7 @@ class LifecycleTests(unittest.TestCase):
         listed = self.client.get("/v1/capabilities", headers=self.headers)
         self.assertEqual(listed.status_code, 200)
         self.assertFalse(listed.json()["environments"]["default"]["scaling"]["autoscaling"])
+        self.assertTrue(listed.json()["environments"]["default"]["configuration"]["secrets"])
         self.assertIn("docker.io", listed.json()["imageRegistries"])
         self.mocks[5].verify.side_effect = AuthenticationError()
         self.assertEqual(self.client.get("/v1/capabilities", headers=self.headers).status_code, 401)

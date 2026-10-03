@@ -101,7 +101,7 @@ CAPABILITIES = {
         "resources": {"requests": "up to 1 CPU / 1Gi", "limits": "up to 2 CPU / 2Gi", "requestsMustNotExceedLimits": True},
         "health": {"readiness": {"profiles": ["status", "hello-world"], "customPath": False}},
         "externalResources": [{"type": "postgres", "profiles": ["shared-dev"], "deletionPolicies": ["retain"], "maxCount": 1}],
-        "configuration": {"values": True, "maxValues": 50, "maxValueLength": 1024, "secrets": False, "bindings": ["PG"]},
+        "configuration": {"values": True, "maxValues": 50, "maxValueLength": 1024, "secrets": True, "bindings": ["PG"]},
     }},
 }
 
