@@ -1,0 +1,44 @@
+# ApplicationSpec fit-gap
+
+Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v1alpha1 draft](application-spec.md) with the implemented `PUT /projects/{name}` contract and states one decision per field. Dispositions: **implemented**, **map** (exists internally, needs public form), **reject** (must fail validation until supported), **new** (work required).
+
+## Fields
+
+| Draft field | Current behaviour | Disposition | Decision / work |
+|---|---|---|---|
+| `apiVersion`, `kind` | Flat JSON body; no public version | new | Accept a versioned envelope alongside the flat body; flat body is treated as `v1alpha1` with a documented sunset. Publish an OpenAPI schema. |
+| `metadata.name` | `name` path and body field, validated slug | map | Keep the slug; must equal the path parameter. |
+| `metadata.project`, `metadata.environment` | One project per slug; one default environment, internal only | reject | Accept only `project == name` and `environment == default` until multi-environment work; reject other values. |
+| `runtime.type` | Always a container | map | Accept only `container`. |
+| `runtime.image` | `image`, validated and resolved to a digest at acceptance (`resolved_image`) | implemented | Digest is stored in the revision. Private registries remain unsupported. |
+| `endpoints[].name/protocol/exposure` | One implicit public HTTP endpoint | reject | Accept exactly one `http` endpoint with `public` exposure; reject others. |
+| `endpoints[].port` | `port`, 1024–65535, default 8080 | implemented | Map to the endpoint port. |
+| `scaling` | Fixed single replica | reject | Accept `minInstances == maxInstances == 1`; reject autoscaling (see PLAN-004). |
+| `resources.cpu/memory` | Fixed `100m/128Mi` requests and `500m/256Mi` limits for every workload | new | Needs request and limit semantics (open decision below), validation against the namespace quota and LimitRange, and persisted revision fields. |
+| `health.readiness` | `probe_profile` (`status`, `hello-world`) with fixed paths | map | Public `path`/`port` replace the profile; keep `probe_profile` as a deprecated alias. Path validation required. |
+| `spec.resources[type=postgres]` | A database is always provisioned | map | Make the single `postgres` resource explicit with profile `shared-dev` and `deletionPolicy: retain`; reject other types and profiles. |
+| `configuration.values` | Not supported | reject | Reject until implemented; then non-secret strings with name collision checks. |
+| `configuration.secrets` | Not supported | reject | Reject; needs a secret store (not in the current scope). |
+| `bindings` | Fixed `PG*` variables | map | Accept only the default `PG` binding until configurable prefixes land; document the migration to `DB_*`. |
+
+## Cross-cutting items
+
+| Item | State | Work |
+|---|---|---|
+| Unknown fields | Rejected (`extra="forbid"`) | Keep in the envelope. |
+| Public `namespace` in responses | Exposed by the project listing | Remove from public output; it is an implementation detail. |
+| Capability profiles | None declared | Publish a per-environment list and reject spec features outside it with a stable error code. |
+| Revision identity | Spec equality with the resolved digest | Keep; extend the equality to resource fields. |
+| Idempotency and conflicts | Same-revision reuse only | PLAN-003 (expected revision, idempotency keys). |
+
+## Open decisions
+
+1. **CPU and memory semantics.** Options: (a) a single `cpu`/`memory` value sets the limit and a fixed fraction sets the request; (b) explicit `requests` and `limits` with `requests <= limits`; (c) a single value for both (Guaranteed QoS). The draft's single budget cannot express DEV-008 and OPS-005. Recommended: (b), with defaults equal to today's values so existing projects do not change.
+2. **Flat body sunset.** How long the flat body is accepted next to the envelope.
+3. **Endpoint and health fields in the first envelope.** Whether `health.readiness` ships in the first version or stays with `probe_profile`.
+
+## Proposed order
+
+1. Decide the resources semantics, then add validation, persistence and tests.
+2. Add the envelope and OpenAPI, mapping the flat body.
+3. Remove the public `namespace` and add capability rejection with stable error codes.

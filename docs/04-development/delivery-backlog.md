@@ -716,7 +716,7 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26):** Source partial; local EV-01 validates names/manifests, not the draft contract. API output exposes `namespace` and implementation calls Kubernetes directly. Schema versioning, capabilities, configurable bindings/resource budgets and fit-gap evidence are absent. Tag-to-digest resolution is absent despite the ApplicationSpec target; include it when stabilizing deployment identity.
 
-  **Progress (October 3, 2026):** Tag-to-digest resolution is implemented in the API at acceptance (anonymous, allow-listed registries; unknown tag/unsupported registry 422, outage 503, no side effects; `resolved_image` stored in the revision and used for deployment and readiness), with unit tests. No live evidence yet. Fit-gap document, resource requests/limits, versioned envelope/OpenAPI and capability profiles remain open.
+  **Progress (October 3, 2026):** Tag-to-digest resolution is implemented in the API at acceptance (anonymous, allow-listed registries; unknown tag/unsupported registry 422, outage 503, no side effects; `resolved_image` stored in the revision and used for deployment and readiness), with unit tests. Live-verified in EV-19. The field-level [fit-gap](../02-architecture/application-spec-fit-gap.md) is written. Resource requests/limits decision pending; versioned envelope/OpenAPI and capability profiles remain open.
 
 - [ ] **PLAN-003 · 2** — Harden worker interruption, concurrent writes, revision retention and drift recovery; prove no duplicated resources/lost revisions and redacted traceable provider failures. Prerequisites: PLAN-002; DEV-007-T02.
 
