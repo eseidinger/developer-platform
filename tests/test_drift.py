@@ -1,6 +1,7 @@
 import logging
 import sys
 import unittest
+import unittest.mock
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -55,3 +56,40 @@ class DriftTests(unittest.TestCase):
         failed = observe_drift(runtime_with(error=ApiException(status=500)), "smoke", SPEC, self.log)
         self.assertEqual(failed["state"], "unknown")
         self.assertEqual(observe_drift(None, "smoke", SPEC, self.log)["state"], "unknown")
+
+
+class ScanTests(unittest.TestCase):
+    log = logging.getLogger("test")
+
+    def scan(self, rows, observations, state):
+        from app.drift import scan_once
+        events = []
+        conn = Mock()
+        conn.__enter__ = Mock(return_value=conn)
+        conn.__exit__ = Mock(return_value=False)
+        conn.execute.return_value.fetchall.return_value = rows
+        with unittest.mock.patch("app.drift.observe_drift", side_effect=observations):
+            scan_once(lambda: conn, Mock(), lambda *a: events.append(a[1:]) or 1, state, self.log)
+        return events
+
+    def test_audits_only_transitions_and_resolution(self):
+        rows = [("smoke", 4, SPEC)]
+        drifted = {"state": "drifted", "differences": [{"field": "replicas", "desired": 1, "observed": 2}]}
+        ok = {"state": "in_sync", "differences": []}
+        state = {}
+        first = self.scan(rows, [drifted], state)
+        self.assertEqual([e[0] for e in first], ["project.drift.detected"])
+        self.assertEqual(first[0][5], {"revision": 4, "fields": ["replicas"]})
+        self.assertEqual(self.scan(rows, [drifted], state), [])
+        self.assertEqual([e[0] for e in self.scan(rows, [ok], state)], ["project.drift.resolved"])
+        self.assertEqual(self.scan(rows, [ok], state), [])
+
+    def test_unknown_observations_keep_the_previous_state_and_vanished_projects_are_forgotten(self):
+        rows = [("smoke", 4, SPEC)]
+        drifted = {"state": "drifted", "differences": [{"field": "image", "desired": "a", "observed": "b"}]}
+        state = {}
+        self.scan(rows, [drifted], state)
+        self.assertEqual(self.scan(rows, [{"state": "unknown", "differences": []}], state), [])
+        self.assertEqual(self.scan(rows, [drifted], state), [])
+        self.scan([], [], state)
+        self.assertEqual(state, {})

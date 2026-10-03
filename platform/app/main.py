@@ -36,7 +36,7 @@ from .spec import CAPABILITIES, ApplicationEnvelope, error_code, to_flat
 from .manifests import normalize_resources, resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
-from .drift import observe_drift
+from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .security_alerts import security_alert_loop
 
@@ -85,6 +85,13 @@ async def lifespan(app):
         daemon=True,
     )
     operation_worker.start()
+    drift_worker = threading.Thread(
+        target=drift_loop,
+        args=(stop, connect, lambda: runtime, best_effort_audit, log,
+              float(os.environ.get("DRIFT_SCAN_INTERVAL_SECONDS", "300"))),
+        daemon=True,
+    )
+    drift_worker.start()
     try:
         yield
     finally:
@@ -92,6 +99,7 @@ async def lifespan(app):
         worker.join(timeout=6)
         security_worker.join(timeout=6)
         operation_worker.join(timeout=6)
+        drift_worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 

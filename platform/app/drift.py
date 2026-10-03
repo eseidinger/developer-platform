@@ -3,6 +3,7 @@ from typing import Any
 
 from kubernetes.client.exceptions import ApiException
 
+from .audit import Actor
 from .manifests import _mebibytes, _millicores, normalize_resources
 
 
@@ -56,3 +57,39 @@ def observe_drift(runtime: Any, project: str, spec: dict, log) -> dict[str, Any]
                 differences.append({"field": f"resources.{section}.{key}", "desired": desired,
                                     "observed": observed})
     return {"state": "drifted" if differences else "in_sync", "differences": differences}
+
+
+def scan_once(connect, runtime, audit, state: dict, log) -> None:
+    """Audit drift transitions for applied projects; `state` maps project -> drifted fields or None."""
+    with connect() as conn:
+        rows = conn.execute("""SELECT p.name, r.revision, r.spec
+            FROM projects p
+            JOIN project_environments e ON e.project_id=p.project_id
+            JOIN project_applications a ON a.environment_id=e.environment_id
+            JOIN LATERAL (SELECT revision, spec FROM application_revisions
+                WHERE application_id=a.application_id ORDER BY revision DESC LIMIT 1) r ON true
+            WHERE p.status='applied'""").fetchall()
+    for name in set(state) - {row[0] for row in rows}:
+        del state[name]
+    actor = Actor("system", "drift-scan")
+    for name, revision, spec in rows:
+        result = observe_drift(runtime, name, spec, log)
+        if result["state"] == "drifted":
+            fields = sorted(d["field"] for d in result["differences"])
+            if state.get(name) != fields:
+                state[name] = fields
+                audit(actor, "project.drift.detected", "project", name, "succeeded",
+                      {"project": name}, {"revision": revision, "fields": fields})
+        elif result["state"] == "in_sync" and state.get(name):
+            state[name] = None
+            audit(actor, "project.drift.resolved", "project", name, "succeeded",
+                  {"project": name}, {"revision": revision})
+
+
+def drift_loop(stop, connect, get_runtime, audit, log, interval: float) -> None:
+    state: dict = {}
+    while not stop.wait(interval):
+        try:
+            scan_once(connect, get_runtime(), audit, state, log)
+        except Exception as exc:
+            log.error("Drift scan failed error_type=%s", type(exc).__name__)
