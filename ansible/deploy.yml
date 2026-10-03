@@ -313,7 +313,7 @@
             content: "{{ record | to_nice_json }}\n"
           vars:
             record:
-              recorded_at: "{{ ansible_date_time.iso8601 }}"
+              recorded_at: "{{ ansible_facts['date_time']['iso8601'] }}"
               source_revision: "{{ platform_source_revision.stdout | trim }}"
               host:
                 distribution: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
