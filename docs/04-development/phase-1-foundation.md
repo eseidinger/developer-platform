@@ -1,6 +1,6 @@
 # Phase 1 – Foundation and Usable Vertical Slice
 
-Status: Phase 1A complete under ADR-011, ADR-016, and ADR-017; Phase 1B complete under its recorded owner-directed alert-delivery exception; Phase 1C remains open. See [backlog task evidence](delivery-backlog.md#evidence-conventions) for the dated implementation baseline and verification limits. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
+Status: Phase 1A complete under ADR-011, ADR-016, and ADR-017; Phase 1B complete under its recorded owner-directed alert-delivery exception; Phase 1C complete with the limits recorded in the backlog audit. See [backlog task evidence](delivery-backlog.md#evidence-conventions) for the dated implementation baseline and verification limits. Covers [F-01 through F-06, F-08, and N-01 through N-08](../01-product/requirements.md).
 
 Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 
