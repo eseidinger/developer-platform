@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 """Exercise the local stack. Creates/updates the explicitly named smoke project."""
+import http.client
 import json
 import os
+import socket
+import ssl
 import time
 import urllib.error
 import urllib.request
@@ -65,16 +68,30 @@ second = request("/projects/smoke", project)
 assert first["operation_id"] == second["operation_id"]
 wait_for_operation(second)
 assert sum(p["name"] == "smoke" for p in request("/projects")) == 1
-req = urllib.request.Request("http://127.0.0.1/", headers={"Host": "smoke." + cfg["APPS_DOMAIN"]})
+host = "smoke." + cfg["APPS_DOMAIN"]
+
+
+def edge_status():
+    # Connect to the local proxy but verify and route by the public hostname.
+    connection = http.client.HTTPSConnection(host, 443, timeout=10)
+    connection.sock = ssl.create_default_context().wrap_socket(
+        socket.create_connection(("127.0.0.1", 443), timeout=10), server_hostname=host
+    )
+    try:
+        connection.request("GET", "/", headers={"Host": host})
+        return connection.getresponse().status
+    finally:
+        connection.close()
+
+
 for attempt in range(30):
     try:
-        with urllib.request.urlopen(req, timeout=10) as response:
-            assert response.status == 200
+        status = edge_status()
+    except (OSError, ssl.SSLError):
+        status = None
+    if status == 200:
         break
-    except urllib.error.HTTPError as error:
-        if error.code not in (404, 502, 503, 504):
-            raise
-        time.sleep(2)
+    time.sleep(2)
 else:
     raise SystemExit("Ingress did not converge")
 print("PASS: authentication, readiness, idempotent provisioning, rollout and edge routing")
