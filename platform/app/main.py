@@ -39,6 +39,7 @@ from .operations import operation_loop
 from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
+from .logs import observe_logs
 from .retirement import removal_scope
 from .security_alerts import security_alert_loop
 
@@ -568,6 +569,25 @@ def resource_usage(name: str, principal: Principal = Depends(current_principal))
     required_audit(actor, "project.usage.inspect", "project", name, "succeeded",
                    {"project": name}, {"state": usage["state"]})
     return {"project": name, **usage}
+
+
+@app.get("/projects/{name}/logs")
+def project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
+                 since_seconds: Optional[int] = Query(None, ge=1, le=86400),
+                 principal: Principal = Depends(current_principal)):
+    """Recent timestamped log lines with pod and container attribution; never streams."""
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    with connect() as conn:
+        known = conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone()
+    if not known:
+        required_audit(actor, "project.logs.read", "project", name, "rejected",
+                       {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    result = observe_logs(runtime, name, log, tail, since_seconds)
+    required_audit(actor, "project.logs.read", "project", name, "succeeded",
+                   {"project": name}, {"state": result["state"], "lines": len(result["lines"])})
+    return {"project": name, **result}
 
 
 @app.post("/projects/{name}/rollback")

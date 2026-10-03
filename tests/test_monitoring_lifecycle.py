@@ -271,6 +271,25 @@ class LifecycleTests(unittest.TestCase):
         actions = [call.args[1] for call in self.mocks[3].call_args_list]
         self.assertIn("project.usage.inspect", actions)
 
+    def test_logs_require_view_grant_validate_limits_and_are_audited(self):
+        self.deploy()
+        self.complete_operations()
+        logs = {"state": "no_pods", "reason": "NoPodsForProject", "lines": [], "truncated": False}
+        with patch.object(main, "observe_logs", return_value=logs) as observe:
+            response = self.client.get("/projects/smoke/logs?tail=50&since_seconds=60", headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json(), {"project": "smoke", **logs})
+            observe.assert_called_once_with(self.runtime, "smoke", main.log, 50, 60)
+            self.assertEqual(self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke"))
+            for query in ("tail=0", "tail=1001", "since_seconds=0", "since_seconds=86401"):
+                self.assertEqual(self.client.get("/projects/smoke/logs?" + query, headers=self.headers).status_code, 422)
+            self.assertEqual(self.client.get("/projects/none/logs", headers=self.headers).status_code, 404)
+            self.mocks[4].return_value = False
+            self.assertEqual(self.client.get("/projects/smoke/logs", headers=self.headers).status_code, 403)
+        self.assertEqual(observe.call_count, 1)
+        actions = [call.args[1] for call in self.mocks[3].call_args_list]
+        self.assertIn("project.logs.read", actions)
+
     def test_if_match_makes_updates_conditional_on_the_current_revision(self):
         def put(value=None):
             headers = dict(self.headers, **({"If-Match": value} if value is not None else {}))

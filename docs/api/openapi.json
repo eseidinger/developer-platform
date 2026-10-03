@@ -1059,6 +1059,79 @@
         "summary": "Put Project Grant"
       }
     },
+    "/projects/{name}/logs": {
+      "get": {
+        "description": "Recent timestamped log lines with pod and container attribution; never streams.",
+        "operationId": "project_logs_projects__name__logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tail",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Tail",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since_seconds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 86400,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since Seconds"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Project Logs"
+      }
+    },
     "/projects/{name}/resource-usage": {
       "get": {
         "description": "Current CPU and memory per pod; missing, stale and unavailable metrics are labelled in `state`.",
