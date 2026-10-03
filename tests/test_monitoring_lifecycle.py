@@ -470,6 +470,7 @@ class LifecycleTests(unittest.TestCase):
         namespaces.delete.assert_called_with(name="project-smoke")
         self.assertNotEqual(self.catalog.rows["smoke"][1], "retired")
         namespaces.get.side_effect = ApiException(status=404)
+        namespaces.delete.side_effect = ApiException(status=404)
         done = self.confirmed_retire(token)
         self.assertEqual(done.status_code, 200)
         self.assertEqual(done.json()["retained"]["database"], "project_smoke")

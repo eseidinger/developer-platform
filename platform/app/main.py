@@ -799,7 +799,11 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                         return JSONResponse(status_code=409, content={
                             "detail": "The project changed since the preview; request a new preview",
                             "code": "scope_changed"})
-                    runtime.resources.get(api_version="v1", kind="Namespace").delete(name="project-" + name)
+                    try:
+                        runtime.resources.get(api_version="v1", kind="Namespace").delete(name="project-" + name)
+                    except ApiException as exc:
+                        if exc.status != 404:
+                            raise
                     required_audit(actor, "project.retire.requested", "project", name, "succeeded",
                                    {"project": name}, {"revision": scope["revision"]})
                 if namespace_exists(name):
