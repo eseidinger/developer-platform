@@ -9,6 +9,8 @@ def validate_name(value):
         raise ValueError("Use 1-32 lowercase letters, digits or hyphens; start with a letter.")
     return value
 
+# Holds user-supplied secret values; written only through the secrets API, never by a deploy.
+SECRET_NAME = "app-secrets"
 DEFAULT_RESOURCES = {"requests": {"cpu": "100m", "memory": "128Mi"},
                      "limits": {"cpu": "500m", "memory": "256Mi"}}
 # Rolling updates briefly run two pods, so twice these maxima must fit the namespace quota.
@@ -103,7 +105,8 @@ def resources(name, image, port, domain, database_ip, password, workload_resourc
                                     "seccompProfile": {"type": "RuntimeDefault"}},
                 "containers": [{"name": "app", "image": image,
                     "ports": [{"containerPort": port}],
-                    "envFrom": [{"secretRef": {"name": "database"}}],
+                    "envFrom": [{"secretRef": {"name": "database"}},
+                                {"secretRef": {"name": SECRET_NAME, "optional": True}}],
                     **({"env": env_list(configuration)} if configuration else {}),
                     "securityContext": {"allowPrivilegeEscalation": False,
                         "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},

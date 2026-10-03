@@ -14,7 +14,7 @@ from uuid import UUID
 import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -41,6 +41,8 @@ from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
 from .logs import observe_logs
+from .secrets import (SecretsUnavailable, MAX_SECRETS, observe_secret_activation, read_secret, remove_secret,
+                      roll_pods, validate_secret_name, validate_secret_value, write_secret)
 from .retirement import removal_scope
 from .security_alerts import security_alert_loop
 
@@ -590,6 +592,16 @@ def put_configuration(name: str, body: ConfigurationBody,
         required_audit(actor, "project.configuration.update", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    try:
+        stored = read_secret(runtime, name)
+    except SecretsUnavailable:
+        stored = None
+    clash = sorted(set(values) & {s["name"] for s in (stored or {}).get("secrets", [])})
+    if clash:
+        required_audit(actor, "project.configuration.update", "project", name, "rejected",
+                       {"project": name}, {"reason": "name_in_use", "names": clash})
+        return JSONResponse(status_code=409, content={
+            "detail": "These names are already secrets: " + ", ".join(clash), "code": "name_in_use"})
     if current[2] == "retired":
         required_audit(actor, "project.configuration.update", "project", name, "rejected",
                        {"project": name}, {"reason": "retired"})
@@ -618,6 +630,101 @@ def put_configuration(name: str, body: ConfigurationBody,
     return JSONResponse(status_code=202, content={
         "operation_id": str(operation_id), "state": operation_state, "revision": revision,
         "rollout_required": True, "status_url": f"/v1/operations/{operation_id}"})
+
+
+def secrets_project(name: str, principal: Principal, permission: str, action: str):
+    """Authorize and require an active project for the secret endpoints."""
+    require_permission(principal, permission, name)
+    actor = actor_for(principal)
+    current = current_spec(name)
+    if current is None or current[0] is None:
+        required_audit(actor, action, "project", name, "rejected", {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    if current[2] == "retired":
+        required_audit(actor, action, "project", name, "rejected", {"project": name}, {"reason": "retired"})
+        raise HTTPException(409, "Project is retired")
+    return actor, current
+
+
+def secrets_unavailable(actor, action: str, name: str):
+    required_audit(actor, action, "project", name, "failed", {"project": name}, {"error_type": "SecretsUnavailable"})
+    raise HTTPException(503, "Secrets are unavailable; retry the same request.")
+
+
+@app.get("/projects/{name}/secrets")
+def list_secrets(name: str, principal: Principal = Depends(current_principal)):
+    """Secret names and change times, never values, plus whether the pods run the current version."""
+    actor, _ = secrets_project(name, principal, "view", "project.secret.list")
+    try:
+        stored = read_secret(runtime, name)
+    except SecretsUnavailable:
+        secrets_unavailable(actor, "project.secret.list", name)
+    names = [s["name"] for s in (stored or {}).get("secrets", [])]
+    activation = observe_secret_activation(runtime, name, (stored or {}).get("version"))
+    required_audit(actor, "project.secret.list", "project", name, "succeeded", {"project": name},
+                   {"count": len(names)})
+    return {"project": name, "secrets": (stored or {}).get("secrets", []), "activation": activation}
+
+
+@app.put("/projects/{name}/secrets/{secret}")
+def set_secret(name: str, secret: str, body: dict = Body(...),
+               principal: Principal = Depends(current_principal)):
+    """Create or rotate one write-only secret; the pods restart to pick it up."""
+    actor, current = secrets_project(name, principal, "change", "project.secret.set")
+    detail = {"name": secret}
+    try:
+        validate_secret_name(secret)
+        if set(body) != {"value"}:
+            raise ValueError('body must be {"value": "..."}')
+        validate_secret_value(body["value"])
+    except ValueError as exc:
+        required_audit(actor, "project.secret.set", "project", name, "rejected", {"project": name},
+                       {"reason": "invalid_secret", **detail})
+        return JSONResponse(status_code=422, content={"detail": str(exc), "code": "invalid_secret"})
+    if secret in (current[1].get("configuration") or {}):
+        required_audit(actor, "project.secret.set", "project", name, "rejected", {"project": name},
+                       {"reason": "name_in_use", **detail})
+        return JSONResponse(status_code=409, content={
+            "detail": f"{secret} is already a configuration value", "code": "name_in_use"})
+    try:
+        stored = read_secret(runtime, name)
+        existing = {s["name"] for s in (stored or {}).get("secrets", [])}
+        if secret not in existing and len(existing) >= MAX_SECRETS:
+            required_audit(actor, "project.secret.set", "project", name, "rejected", {"project": name},
+                           {"reason": "too_many_secrets", **detail})
+            return JSONResponse(status_code=422, content={
+                "detail": f"at most {MAX_SECRETS} secrets", "code": "invalid_secret"})
+        version = write_secret(runtime, name, secret, body["value"])
+        rolled = roll_pods(runtime, name, version)
+    except SecretsUnavailable:
+        secrets_unavailable(actor, "project.secret.set", name)
+    required_audit(actor, "project.secret.set", "project", name, "succeeded", {"project": name},
+                   {"rotated": secret in existing, "rollout_started": rolled, **detail})
+    return JSONResponse(status_code=202, content={
+        "name": secret, "rotated": secret in existing, "rollout_required": True, "rollout_started": rolled})
+
+
+@app.delete("/projects/{name}/secrets/{secret}")
+def delete_secret(name: str, secret: str, principal: Principal = Depends(current_principal)):
+    """Remove one secret; the pods restart so the variable disappears."""
+    actor, _ = secrets_project(name, principal, "change", "project.secret.delete")
+    try:
+        validate_secret_name(secret)
+        stored = read_secret(runtime, name)
+        if secret not in {s["name"] for s in (stored or {}).get("secrets", [])}:
+            required_audit(actor, "project.secret.delete", "project", name, "rejected", {"project": name},
+                           {"reason": "not_found", "name": secret})
+            raise HTTPException(404, "Unknown secret")
+        version = remove_secret(runtime, name, secret)
+        rolled = roll_pods(runtime, name, version)
+    except ValueError:
+        raise HTTPException(404, "Unknown secret")
+    except SecretsUnavailable:
+        secrets_unavailable(actor, "project.secret.delete", name)
+    required_audit(actor, "project.secret.delete", "project", name, "succeeded", {"project": name},
+                   {"name": secret, "rollout_started": rolled})
+    return JSONResponse(status_code=202, content={
+        "name": secret, "rollout_required": True, "rollout_started": rolled})
 
 
 class Rollback(BaseModel):

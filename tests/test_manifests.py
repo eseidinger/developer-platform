@@ -26,7 +26,8 @@ class WorkloadContract(unittest.TestCase):
                          None, {"B": "2", "A": "1"})
         container = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
         self.assertEqual(container["env"], [{"name": "A", "value": "1"}, {"name": "B", "value": "2"}])
-        self.assertEqual(container["envFrom"], [{"secretRef": {"name": "database"}}])
+        self.assertEqual(container["envFrom"], [{"secretRef": {"name": "database"}},
+                                                {"secretRef": {"name": "app-secrets", "optional": True}}])
         plain = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
         self.assertNotIn("env", next(d for d in plain if d["kind"] == "Deployment")
                          ["spec"]["template"]["spec"]["containers"][0])

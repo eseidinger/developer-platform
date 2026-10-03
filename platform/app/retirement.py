@@ -1,7 +1,7 @@
 """Retirement scope: what removal deletes, what it keeps, and the token that pins that scope."""
 import hashlib
 
-from .manifests import resources
+from .manifests import SECRET_NAME, resources
 
 DOCUMENTATION_ADDRESS = "192.0.2.1"
 
@@ -19,7 +19,8 @@ def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
     return {
         "project": name,
         "revision": revision,
-        "removes": [{"kind": m["kind"], "name": m["metadata"]["name"]} for m in manifests],
+        "removes": [{"kind": m["kind"], "name": m["metadata"]["name"]} for m in manifests]
+                   + [{"kind": "Secret", "name": SECRET_NAME}],
         "route": name + "." + domain,
         "retains": {"database": database, "role": database, "catalog_and_revisions": True},
         "scope_token": scope_token(name, revision),

@@ -645,6 +645,44 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.client.get(path, headers=self.headers).status_code, 403)
         self.assertEqual(self.client.put(path, json={"values": {}}, headers=self.headers).status_code, 403)
 
+    def test_secrets_are_write_only_audited_by_name_and_roll_the_pods(self):
+        from test_secrets import cluster
+        fake = cluster()
+        self.runtime.resources = fake.resources
+        self.assertEqual(self.deploy().status_code, 202)
+        base = "/projects/smoke/secrets"
+        value = "hunter2-very-secret"
+        for name, body in (("PGHOST", {"value": "x"}), ("1A", {"value": "x"}), ("API_KEY", {"value": ""}),
+                           ("API_KEY", {"value": 5}), ("API_KEY", {"value": "x", "other": 1}), ("API_KEY", {})):
+            with self.subTest(name=name, body=body):
+                response = self.client.put(f"{base}/{name}", json=body, headers=self.headers)
+                self.assertEqual((response.status_code, response.json()["code"]), (422, "invalid_secret"))
+        self.assertIsNone(fake.secret)
+        response = self.client.put(f"{base}/DB_PASSWORD", json={"value": value}, headers=self.headers)
+        self.assertEqual((response.status_code, response.json()["rollout_required"],
+                          response.json()["rotated"]), (202, True, False))
+        self.assertEqual(self.client.put(f"{base}/DB_PASSWORD", json={"value": value + "2"},
+                                         headers=self.headers).json()["rotated"], True)
+        listed = self.client.get(base, headers=self.headers)
+        self.assertEqual([s["name"] for s in listed.json()["secrets"]], ["DB_PASSWORD"])
+        self.assertEqual(listed.json()["activation"]["state"], "active")
+        everything = listed.text + json.dumps([c.args for c in self.mocks[3].call_args_list], default=str)
+        self.assertNotIn(value, everything)
+        self.assertTrue(any(c.args[1] == "project.secret.set" for c in self.mocks[3].call_args_list))
+        configured = self.client.put("/projects/smoke/configuration", json={"values": {"DB_PASSWORD": "x"}},
+                                     headers=self.headers)
+        self.assertEqual(configured.status_code, 422)
+        self.client.put("/projects/smoke/configuration", json={"values": {"MODE": "a"}}, headers=self.headers)
+        self.assertEqual(self.client.put(f"{base}/MODE", json={"value": "x"}, headers=self.headers).status_code, 409)
+        self.assertEqual(self.client.delete(f"{base}/MISSING", headers=self.headers).status_code, 404)
+        self.assertEqual(self.client.delete(f"{base}/DB_PASSWORD", headers=self.headers).status_code, 202)
+        self.assertEqual(self.client.get(base, headers=self.headers).json()["secrets"], [])
+        self.assertEqual(self.client.get("/projects/other/secrets", headers=self.headers).status_code, 404)
+        self.mocks[4].return_value = False
+        self.assertEqual(self.client.get(base, headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.put(f"{base}/A", json={"value": "x"}, headers=self.headers).status_code, 403)
+        self.assertEqual(self.client.delete(f"{base}/A", headers=self.headers).status_code, 403)
+
     def test_unknown_project_field_rejected_before_catalog_mutation(self):
         self.spec["unexpected"] = "must not be ignored"
 
