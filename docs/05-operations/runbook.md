@@ -67,6 +67,23 @@ curl -fsS -H 'Host: demo.apps.<apps-domain>' http://127.0.0.1/
 
 Then restart it with `POST /projects/demo/restart`. To remove a demo project, delete its namespace (`kubectl --kubeconfig .runtime/admin.kubeconfig delete namespace project-demo`), then call `POST /projects/demo/retire` with `{"confirm_name":"demo"}` as `project-admin`; the SQL data and catalog entry are retained.
 
+## Day-2 application flow
+
+Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/projects/demo` and `-H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"` are implied. Each write returns 202 and `rollout_required`; check `activation` on the matching GET before relying on a change. Evidence: EV-30, EV-33 to EV-37 in the [backlog](../04-development/delivery-backlog.md); `scripts/config_drill.py`, `secret_drill.py`, `log_drill.py` and `retirement_drill.py` perform these flows end to end.
+
+| Task | Call | Check |
+| --- | --- | --- |
+| Inspect state | `GET $P/drift`, `GET $P/revisions` | `in_sync`, current revision |
+| Diagnose | `GET $P/logs?tail=100`, `GET $P/resource-usage` | Lines per pod/container; usage `state` is `ok` |
+| Change configuration | `PUT $P/configuration` body `{"values": {"MODE": "a"}}` (replaces the set; optional `If-Match: <revision>`) | `GET $P/configuration` shows `activation: active` |
+| Set or rotate a secret | `PUT $P/secrets/NAME` body `{"value": "..."}` | `GET $P/secrets` shows `version` and `state: rotating` once the pods are `active` |
+| Finish a rotation | `POST $P/secrets/NAME/confirm` after the application works with the new value | 200, previous value revoked |
+| Undo a rotation | `POST $P/secrets/NAME/revert` while `rotating` | New version, pods restart |
+| Roll back a release | `POST $P/rollback` body `{"revision": N}` | New operation `succeeded` |
+| Retire | `GET $P/retirement-preview`, then `POST $P/retire` with the `scope_token` and `confirm_name` | Repeat the POST until `200 retired`; database, role and catalog are retained |
+
+Failure responses: 401 no or expired token; 403 missing grant; 404 unknown project or secret; 400 retire confirmation does not match the project name; 409 `revision_conflict`, `scope_changed`, `name_in_use`, `not_adopted`, `no_previous_version` or a retired project; 422 `invalid_spec`, `unsupported_capability`, `invalid_configuration` or `invalid_secret`; 503 dependency unavailable, retry the same request. Secret values are never returned, logged or audited. Secrets are in the backup bundle (ADR-015); previous values are not.
+
 ## Restart an application
 
 `POST /projects/{name}/restart` (same `change` permission as PUT) queues a rolling restart of the current spec without creating a revision. It returns an operation ID; poll `GET /v1/operations/{id}`, where readiness reports `progressing` until the new pods are ready. Repeating the call while a restart is pending reuses that operation. Only `applied` projects can be restarted.
@@ -137,7 +154,7 @@ Preserve `DATABASE_KEY` during recovery. Changing it changes derived Secrets but
 
 Record affected resources, commands, results, actual recovery duration, and remaining uncertainty. Verify an application request, database write/read, and relevant recovery notifications.
 
-Revision-bound rollback, resumable operation IDs, retained-resource deletion inventories, and per-user audit investigation remain target procedures in the [software architecture](../02-architecture/software-architecture.md). They cannot be used as current incident prerequisites.
+Per-user audit investigation and the richer portal and CLI workflows remain target procedures in the [software architecture](../02-architecture/software-architecture.md). They cannot be used as current incident prerequisites.
 
 
 ## Scheduled backup failed or interrupted

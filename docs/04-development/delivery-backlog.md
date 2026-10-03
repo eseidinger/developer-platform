@@ -105,6 +105,8 @@ Read-only review of the 1C tasks still open after PLAN-001 to PLAN-003, against 
 | DEV-003-T01 | Done | `GET`/`PUT`/`DELETE /projects/{name}/secrets` (`view`/`change` grants): write-only values held only in the project `app-secrets` Secret, injected as env vars, restart on change, names-only audit (EV-35) | Audit and foreign-project denial are unit-tested, not shown live |
 | DEV-003-T02 | Done | Versioned rotation: previous value held unmounted until `confirm` after pod adoption, or `revert` (EV-37); secrets in the verified backup bundle (EV-36) | Client reconnection is not observable (adoption plus explicit confirm); restore of secrets is unit-tested only; previous values are not backed up |
 
+**Gate audit, October 3, 2026 (documentation bullet):** the minimal API flow, deployment versions, installation parameters (EV-17), operational commands and failure responses are documented in the [runbook day-2 flow](../05-operations/runbook.md#day-2-application-flow) and the [platform README](../../platform/README.md#api-reference); each flow has a live drill (EV-30, EV-33 to EV-37). Left for later by owner decision: live proof of denial for a user without grants and of the audit rows (`scripts/access_audit_drill.py`, written, not run), live stale/missing/unavailable telemetry states, `not_adopted`, fail-closed backup, and secret restore into a rebuilt cluster (unit-tested only; isolated recovery drills deferred under ADR-016).
+
 Smallest route to closing the data-path part of 1C: run and record the isolation script, add a live write/read-and-redeploy drill (DEV-010-T01), then the interrupt-after-database-creation drill (DEV-007-T01). Configuration, secrets and logs (DEV-002/003/004) are new features.
 
 ## Developer stories
