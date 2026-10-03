@@ -720,6 +720,8 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
 - [ ] **PLAN-003 · 2** — Harden worker interruption, concurrent writes, revision retention and drift recovery; prove no duplicated resources/lost revisions and redacted traceable provider failures. Prerequisites: PLAN-002; DEV-007-T02.
 
+  **Progress (October 3, 2026):** Decision: concurrent writes use an optional `If-Match: <revision>` header on PUT; a stale value returns 409 `revision_conflict` with the current revision and no side effects, and omitting it keeps last-writer-wins (unit tests only). Remaining: live evidence, drift recovery, revision retention, redacted provider-failure traces.
+
   **Task evidence (B-2026-09-26):** Source partial; local workflow acceptance unverified. A global advisory lock serializes cooperating API requests but supplies no expected-revision conflict check. Updates overwrite the only spec; stale clients can replace intent. Persistent idempotency keys, revision history, per-step recovery and drift reconciliation are absent.
 
 - [ ] **PLAN-004 · 2** — Add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: PLAN-002; PLAN-003; Phase 2 retained-backlog packages.

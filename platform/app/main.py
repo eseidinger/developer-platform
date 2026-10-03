@@ -14,7 +14,7 @@ from uuid import UUID
 import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
-from fastapi import Depends, FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
@@ -329,10 +329,33 @@ def export_audit_events(start: datetime, end: datetime, format: Literal["json", 
         writer.writerow(row)
     return PlainTextResponse(output.getvalue(), media_type="text/csv")
 
+class RevisionConflict(Exception):
+    def __init__(self, current: int):
+        self.current = current
+
+
+def expected_revision(value: Optional[str]) -> Optional[int]:
+    """Parse `If-Match: <revision>` (0 means the project must not exist yet)."""
+    if value is None:
+        return None
+    text = value.strip()
+    if text.startswith("W/"):
+        text = text[2:]
+    text = text.strip('"')
+    if not text.isascii() or not text.isdigit():
+        raise HTTPException(400, "If-Match must be a revision number")
+    return int(text)
+
+
 @app.put("/projects/{name}")
 def provision(name: str, body: Union[ApplicationEnvelope, Project],
-              principal: Principal = Depends(current_principal)):
-    """Accept the flat project body or a versioned `Application` envelope."""
+              principal: Principal = Depends(current_principal),
+              if_match: Optional[str] = Header(None)):
+    """Accept the flat project body or a versioned `Application` envelope.
+
+    An optional `If-Match: <revision>` header makes the update conditional on the
+    current desired revision; a stale value returns 409 with the current revision.
+    """
     if isinstance(body, ApplicationEnvelope):
         try:
             project = Project.model_validate(to_flat(body.model_dump(exclude_none=True)))
@@ -342,6 +365,12 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
         project = body
     actor = actor_for(principal)
     require_permission(principal, "change", name)
+    try:
+        expected = expected_revision(if_match)
+    except HTTPException:
+        required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
+                       {"reason": "invalid_if_match"})
+        raise
     if name != project.name:
         required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
                        {"reason": "path_name_mismatch"})
@@ -366,6 +395,15 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
             conn.execute("SELECT pg_advisory_lock(731904)")
             try:
                 with conn.transaction():
+                    if expected is not None:
+                        current = conn.execute("""SELECT max(r.revision) FROM projects p
+                            JOIN project_environments e ON e.project_id=p.project_id
+                            JOIN project_applications a ON a.environment_id=e.environment_id
+                            JOIN application_revisions r ON r.application_id=a.application_id
+                            WHERE p.name=%s""", (name,)).fetchone()
+                        current_revision = current[0] if current and current[0] is not None else 0
+                        if current_revision != expected:
+                            raise RevisionConflict(current_revision)
                     row = conn.execute("""INSERT INTO projects(name,spec,status) VALUES (%s,%s,'provisioning')
                         ON CONFLICT(name) DO UPDATE SET spec=excluded.spec,
                         status='provisioning',updated_at=now()
@@ -403,6 +441,12 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
                         operation_state = "queued"
             finally:
                 conn.execute("SELECT pg_advisory_unlock(731904)")
+    except RevisionConflict as conflict:
+        required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
+                       {"reason": "revision_conflict", "expected": expected, "current": conflict.current})
+        return JSONResponse(status_code=409, content={
+            "detail": "The project changed since the expected revision; re-read it and retry",
+            "code": "revision_conflict", "current_revision": conflict.current})
     except Exception as exc:
         required_audit(actor, "project.provision", "project", name, "failed", {"project": name},
                        {"error_type": type(exc).__name__})

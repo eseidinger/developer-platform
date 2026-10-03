@@ -113,6 +113,9 @@ class Catalog:
             revisions = self.revisions.get(application_id, [])
             self.result = [(self.project_ids[name], self.rows[name][1], application_id,
                             revisions[-1][0], revisions[-1][1])] if name in self.rows and revisions else []
+        elif query.startswith("SELECT max(r.revision)"):
+            revisions = self.revisions.get("application-" + params[0], [])
+            self.result = [(revisions[-1][0] if revisions else None,)]
         elif query.startswith("SELECT name, spec, status"):
             self.result = [(name, *row) for name, row in self.rows.items()]
         elif query.startswith("SELECT status FROM"):
@@ -188,6 +191,27 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(len(self.catalog.operations), 1)
         self.mocks[-2].assert_not_called()
         self.mocks[-1].assert_not_called()
+
+    def test_if_match_makes_updates_conditional_on_the_current_revision(self):
+        def put(value=None):
+            headers = dict(self.headers, **({"If-Match": value} if value is not None else {}))
+            return self.client.put("/projects/smoke", json=self.spec, headers=headers)
+
+        self.assertEqual(put("1").status_code, 409)
+        self.assertEqual(put("0").status_code, 202)
+        self.spec["image"] = "example:v2"
+        stale = put("0")
+        self.assertEqual(stale.status_code, 409)
+        self.assertEqual(stale.json()["code"], "revision_conflict")
+        self.assertEqual(stale.json()["current_revision"], 1)
+        app_id = next(iter(self.catalog.application_ids.values()))
+        self.assertEqual([revision for revision, _ in self.catalog.revisions[app_id]], [1])
+        self.assertEqual(self.catalog.rows["smoke"][0]["image"], "example:v1")
+        self.assertEqual(put('"1"').json()["revision"], 2)
+        self.spec["image"] = "example:v3"
+        self.assertEqual(put().json()["revision"], 3)
+        self.assertEqual(put("abc").status_code, 400)
+        self.assertEqual(put("-1").status_code, 400)
 
     def test_changed_spec_adds_immutable_revision_and_keeps_identity(self):
         self.assertEqual(self.deploy().status_code, 202)

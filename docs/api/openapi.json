@@ -812,7 +812,7 @@
     },
     "/projects/{name}": {
       "put": {
-        "description": "Accept the flat project body or a versioned `Application` envelope.",
+        "description": "Accept the flat project body or a versioned `Application` envelope.\n\nAn optional `If-Match: <revision>` header makes the update conditional on the\ncurrent desired revision; a stale value returns 409 with the current revision.",
         "operationId": "provision_projects__name__put",
         "parameters": [
           {
@@ -822,6 +822,22 @@
             "schema": {
               "title": "Name",
               "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
             }
           }
         ],
