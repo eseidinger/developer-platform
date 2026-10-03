@@ -154,6 +154,10 @@ class LifecycleTests(unittest.TestCase):
         self.mocks = [p.start() for p in patches]
         for p in patches:
             self.addCleanup(p.stop)
+        self.digest = "sha256:" + "a" * 64
+        resolver = patch.object(main, "resolve_image", side_effect=lambda image: image.split(":")[0] + "@" + self.digest)
+        self.resolver = resolver.start()
+        self.addCleanup(resolver.stop)
         self.principal = Principal("https://issuer.example", "person-1", "person")
         self.mocks[5].verify.return_value = self.principal
         self.headers = {"Authorization": "Bearer valid-token"}
@@ -209,7 +213,8 @@ class LifecycleTests(unittest.TestCase):
         operation = self.catalog.operations[operation_id]
         self.assertEqual(operation["state"], "queued")
         self.assertEqual(operation["envelope_version"], 1)
-        self.assertEqual(operation["envelope"]["spec"], {**self.spec, "port": 8080})
+        self.assertEqual(operation["envelope"]["spec"],
+                         {**self.spec, "port": 8080, "resolved_image": "example@" + self.digest})
         committed_at = self.catalog.events.index("transaction.commit")
         revision_insert = next(index for index, event in enumerate(self.catalog.events)
                                if event.startswith("INSERT INTO application_revisions"))
@@ -248,7 +253,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(response.json()["state"], "succeeded")
         self.assertEqual(response.json()["result"], {"api_token": "[REDACTED]"})
         self.assertEqual(response.json()["readiness"], readiness)
-        observe.assert_called_once_with(self.runtime, "smoke", "example:v1", main.log)
+        observe.assert_called_once_with(self.runtime, "smoke", "example@" + self.digest, main.log)
         self.assertEqual(self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke"))
         self.assertEqual(revoked_response.status_code, 403)
         observe.assert_called_once()
@@ -375,6 +380,35 @@ class LifecycleTests(unittest.TestCase):
                 self.spec[field] = value
                 self.assertEqual(self.deploy().status_code, 422)
                 del self.spec[field]
+        self.assertEqual(self.catalog.rows, {})
+        self.assertEqual(self.catalog.operations, {})
+        self.mocks[-2].assert_not_called()
+        self.mocks[-1].assert_not_called()
+
+    def test_accepted_revision_records_the_resolved_digest_reference(self):
+        response = self.deploy()
+
+        self.assertEqual(response.status_code, 202)
+        stored = self.catalog.rows["smoke"][0]
+        self.assertEqual(stored["image"], "example:v1")
+        self.assertEqual(stored["resolved_image"], "example@" + self.digest)
+        self.assertEqual(self.catalog.operations[response.json()["operation_id"]]["envelope"]["spec"], stored)
+
+    def test_unchanged_tag_digest_reuses_revision_and_moved_tag_creates_one(self):
+        first = self.deploy().json()["revision"]
+        self.complete_operations()
+        self.assertEqual(self.deploy().json()["revision"], first)
+        self.complete_operations()
+        self.digest = "sha256:" + "b" * 64
+        self.assertEqual(self.deploy().json()["revision"], first + 1)
+
+    def test_resolution_failures_are_rejected_before_any_side_effect(self):
+        for reason, status in (("not_found", 422), ("unsupported_registry", 422), ("unavailable", 503)):
+            with self.subTest(reason=reason):
+                self.resolver.side_effect = main.ImageResolutionError(reason)
+                self.assertEqual(self.deploy().status_code, status)
+                rejected = self.mocks[3].call_args
+                self.assertEqual(rejected.args[1:5], ("project.provision", "project", "smoke", "rejected"))
         self.assertEqual(self.catalog.rows, {})
         self.assertEqual(self.catalog.operations, {})
         self.mocks[-2].assert_not_called()

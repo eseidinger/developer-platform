@@ -29,6 +29,7 @@ from .authorization import (bootstrap_platform_admin, grant as grant_role, initi
                             grants_for_project, is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
                             upsert_principal)
 from .catalog import ensure_default_application, initialize as initialize_catalog
+from .images import ImageResolutionError, resolve_image
 from .identity import AuthenticationError, Principal, configured_verifier
 from .manifests import resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
@@ -318,6 +319,20 @@ def provision(name: str, project: Project, principal: Principal = Depends(curren
         required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
                        {"reason": "path_name_mismatch"})
         raise HTTPException(400, "Path and project name must match")
+    # Resolve before taking locks or writing so registry failures have no side effects.
+    try:
+        resolved_image = resolve_image(project.image)
+    except ImageResolutionError as exc:
+        status_code = 503 if exc.reason == "unavailable" else 422
+        required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
+                       {"reason": "image_" + exc.reason})
+        messages = {
+            "not_found": "Image tag or digest was not found in its registry",
+            "unsupported_registry": "Image registry is not supported by this platform",
+            "unavailable": "Image registry is unavailable; retry the same PUT",
+        }
+        raise HTTPException(status_code, messages[exc.reason])
+    spec = {**project.model_dump(), "resolved_image": resolved_image}
     try:
         with connect() as conn:
             # Serialize project revisions and active-operation deduplication.
@@ -327,11 +342,11 @@ def provision(name: str, project: Project, principal: Principal = Depends(curren
                     row = conn.execute("""INSERT INTO projects(name,spec,status) VALUES (%s,%s,'provisioning')
                         ON CONFLICT(name) DO UPDATE SET spec=excluded.spec,
                         status='provisioning',updated_at=now()
-                        RETURNING project_id""", (name, Jsonb(project.model_dump()))).fetchone()
+                        RETURNING project_id""", (name, Jsonb(spec))).fetchone()
                     if row is None:
                         raise RuntimeError("Could not resolve project identity")
                     application_id, revision = ensure_default_application(
-                        conn, row[0], name, project.model_dump())
+                        conn, row[0], name, spec)
                     pending = conn.execute("""SELECT operation_id, state FROM application_operations
                         WHERE application_id=%s AND revision=%s AND operation_kind=%s
                         AND state IN ('queued', 'running')
@@ -346,7 +361,7 @@ def provision(name: str, project: Project, principal: Principal = Depends(curren
                             "application_id": str(application_id),
                             "project_slug": name,
                             "revision": revision,
-                            "spec": project.model_dump(),
+                            "spec": spec,
                         }
                         queued = conn.execute("""INSERT INTO application_operations(
                             application_id, revision, operation_kind, state, actor_issuer, actor_subject,
@@ -469,7 +484,7 @@ def operation_status(operation_id: UUID, principal: Principal = Depends(current_
     require_permission(principal, "view", row[6])
     required_audit(actor_for(principal), "operation.inspect", "operation", str(operation_id),
                    "succeeded", {"project": row[6]}, {"state": row[2], "revision": row[1]})
-    readiness = observe_deployment(runtime, row[6], row[7]["image"], log)
+    readiness = observe_deployment(runtime, row[6], row[7].get("resolved_image", row[7]["image"]), log)
     return {
         "operation_id": str(row[0]),
         "revision": row[1],

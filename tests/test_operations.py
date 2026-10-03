@@ -131,6 +131,19 @@ class OperationWorkerFixture(unittest.TestCase):
 
 
 class OperationWorkerTests(OperationWorkerFixture):
+    def test_deploys_the_resolved_digest_reference_and_falls_back_for_legacy_specs(self):
+        digest_image = "example@sha256:" + "a" * 64
+        for resolved, expected in ((digest_image, digest_image), (None, "example:v1")):
+            with self.subTest(resolved=resolved):
+                self.conn = OperationConnection()
+                self.connect.return_value = self.conn
+                self.resources.reset_mock()
+                if resolved:
+                    self.conn.spec = {**self.conn.spec, "resolved_image": resolved}
+                    self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
+                self.assertTrue(self.run_one())
+                self.assertEqual(self.resources.call_args.args[1], expected)
+
     def test_reclaims_running_operation_after_worker_restart_and_completes_it(self):
         self.conn.state = "running"
 
