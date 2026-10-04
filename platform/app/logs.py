@@ -38,7 +38,7 @@ def _parse(text: str, pod: str, container: str, previous: bool) -> list[dict[str
 
 
 def observe_logs(runtime: Any, project: str, log, tail: int, since_seconds: int | None,
-                 api: Any = None, now: datetime | None = None) -> dict[str, Any]:
+                 api: Any = None, now: datetime | None = None, component: str | None = None) -> dict[str, Any]:
     """Read recent timestamped log lines for a project from the Kubernetes log API.
 
     `state` is `ok`, `no_pods`, `no_output` or `unavailable`. A container that has not started
@@ -50,8 +50,10 @@ def observe_logs(runtime: Any, project: str, log, tail: int, since_seconds: int 
         return _result("unavailable", "LogApiUnavailable", now)
     namespace = "project-" + project
     try:
+        selector = ("platform.example/component=" + component if component
+                    else "app.kubernetes.io/name=" + project)
         pods = _get(runtime.resources.get(api_version="v1", kind="Pod").get(
-            namespace=namespace, label_selector="app.kubernetes.io/name=" + project), "items") or []
+            namespace=namespace, label_selector=selector), "items") or []
         api = api or CoreV1Api(runtime.client)
     except Exception as exc:
         log.error("Pod log query failed project=%s error_type=%s", project, type(exc).__name__)

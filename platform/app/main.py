@@ -41,6 +41,7 @@ from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
 from .logs import observe_logs
+from .component_status import observe_components
 from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
                       remove_secret, revert_secret, roll_pods, validate_secret_name, validate_secret_value, write_secret)
 from .retirement import removal_scope
@@ -566,6 +567,25 @@ def drift(name: str, principal: Principal = Depends(current_principal)):
     return {"project": name, "revision": current[0], **result}
 
 
+@app.get("/projects/{name}/components")
+def component_status(name: str, principal: Principal = Depends(current_principal)):
+    """Live, per-component status for a v1alpha2 application revision."""
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    current = current_spec(name)
+    if current is None or current[0] is None:
+        required_audit(actor, "project.components.read", "project", name, "rejected",
+                       {"project": name}, {"reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    components = current[1].get("components")
+    if components is None:
+        raise HTTPException(409, "Component status requires a v1alpha2 application revision")
+    result = observe_components(runtime, name, components, log)
+    required_audit(actor, "project.components.read", "project", name, "succeeded",
+                   {"project": name}, {"revision": current[0], "count": len(components)})
+    return {"project": name, "revision": current[0], **result}
+
+
 class ConfigurationBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     values: dict
@@ -866,6 +886,7 @@ def resource_usage(name: str, principal: Principal = Depends(current_principal))
 @app.get("/projects/{name}/logs")
 def project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
                  since_seconds: Optional[int] = Query(None, ge=1, le=86400),
+                 component: Optional[str] = Query(None, pattern=r"^[a-z][a-z0-9-]{0,31}$"),
                  principal: Principal = Depends(current_principal)):
     """Recent timestamped log lines with pod and container attribution; never streams."""
     require_permission(principal, "view", name)
@@ -876,9 +897,19 @@ def project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
         required_audit(actor, "project.logs.read", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
-    result = observe_logs(runtime, name, log, tail, since_seconds)
+    if component is not None:
+        current = current_spec(name)
+        available = {item["name"] for item in ((current[1] or {}).get("components") if current else [])}
+        if component not in available:
+            required_audit(actor, "project.logs.read", "project", name, "rejected",
+                           {"project": name}, {"reason": "unknown_component", "component": component})
+            raise HTTPException(404, "Unknown component")
+        result = observe_logs(runtime, name, log, tail, since_seconds, component=component)
+    else:
+        result = observe_logs(runtime, name, log, tail, since_seconds)
     required_audit(actor, "project.logs.read", "project", name, "succeeded",
-                   {"project": name}, {"state": result["state"], "lines": len(result["lines"])})
+                   {"project": name}, {"state": result["state"], "lines": len(result["lines"]),
+                    "component": component})
     return {"project": name, **result}
 
 

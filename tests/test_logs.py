@@ -110,6 +110,14 @@ class LogTests(unittest.TestCase):
         observe_logs(runtime, "smoke", log, tail=5, since_seconds=None, api=api, now=NOW)
         self.assertEqual(api.read_namespaced_pod_log.call_count, MAX_PODS)
 
+    def test_component_logs_select_only_the_component_pods(self):
+        runtime, api = setup([pod("worker-1")], {("worker-1", "app"): "2026-10-03T11:00:01Z done\n"})
+        result = observe_logs(runtime, "smoke", log, tail=5, since_seconds=None, api=api, now=NOW,
+                              component="worker")
+        self.assertEqual(result["lines"][0]["message"], "done")
+        runtime.resources.get.return_value.get.assert_called_with(
+            namespace="project-smoke", label_selector="platform.example/component=worker")
+
 
 if __name__ == "__main__":
     unittest.main()
