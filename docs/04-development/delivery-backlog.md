@@ -11,6 +11,8 @@ Status: open delivery requirements and authoritative task/evidence register. The
   each of which can have its own deployment.
 - **Scheduled component:** a one-shot application component started by the platform from
   a declared recurring cron schedule; it is not a continuously running service.
+- **Deployment credential:** a revocable OIDC machine identity and platform grant used
+  by CI; it is distinct from a person's token and from infrastructure credentials.
 - Story IDs are permanent references. `DEV` identifies developer stories and `OPS`
   identifies operator stories. New stories receive the next unused number in their
   category; reordering or removing stories must not renumber existing IDs.
@@ -26,7 +28,7 @@ Each task belongs to exactly one phase or sub-gate; story IDs remain the overall
 
 Top-level task checkboxes remain open where full acceptance is outstanding. Checked progress criteria below record narrower verified outcomes; they do not close the parent task or phase. Task evidence below distinguishes partial or absent source implementation, verified local checks, and operational acceptance. Close a task only after its listed outcome is verified and record date, revision, environment, results and limitations beside it. Link shared checks by evidence ID. Update implementation findings here when code changes; other documents link here rather than maintain a separate status assessment. Close a story only when every original acceptance criterion passes. A Phase 3 design decision does not close deferred implementation tasks.
 
-Phase gates are **1A → 1B → 1C → 2A → 2B → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Phase 2A is the prioritized multi-service/scheduled-component increment. Deferred tasks have no scheduled phase. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
+Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Phase 2A is the prioritized multi-service/scheduled-component increment; Phase 2B adds CI deployment credentials; the former Phase 2B work is now Phase 2C. Deferred tasks have no scheduled phase. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
 
 **Gate status, October 4, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is complete under its recorded owner-directed alert-delivery exception. Phase 1C is complete as of October 3, 2026: all ten tasks are checked with live evidence (EV-30 to EV-37), and the unit-tested-only items and the not-yet-run access/audit drill are recorded owner-accepted limits in the Phase 1C audit below. Phase 2A is the next gate.
 
@@ -81,7 +83,8 @@ This index lists execution tasks, not story completion promises. Task details an
 | 1B | OPS-001-T01, OPS-001-T02, OPS-002-T01, OPS-004-T01 |
 | 1C | DEV-002-T01, DEV-003-T01, DEV-003-T02, DEV-004-T01, DEV-005-T01, DEV-006-T01, DEV-007-T01, DEV-010-T01, DEV-011-T01, OPS-003-T01, PLAN-001 |
 | 2A | DEV-001-T01, DEV-001-T02, DEV-001-T03, DEV-006-T02, DEV-011-T02 |
-| 2B | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003, PLAN-004, PLAN-005 |
+| 2B | DEV-012-T01, DEV-012-T02, DEV-012-T03 |
+| 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003, PLAN-004, PLAN-005 |
 | 3 | PLAN-006, PLAN-007, PLAN-008, PLAN-009 |
 | 4.1 | PLAN-010 |
 | 4.2 | PLAN-011 |
@@ -192,7 +195,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [x] **DEV-004-T01 · 1C** — Collect timestamped single-component logs with project/component/instance attribution; demonstrate authorized failure diagnosis and cross-project denial. Prerequisites: OPS-004-T01; PLAN-001.
-- [ ] **DEV-004-T02 · 2B** — Add search, follow and project/component/instance/time filters; retrieve terminated-instance logs, show retention, and prove direct backend access cannot bypass authorization. Prerequisites: DEV-004-T01.
+- [ ] **DEV-004-T02 · 2C** — Add search, follow and project/component/instance/time filters; retrieve terminated-instance logs, show retention, and prove direct backend access cannot bypass authorization. Prerequisites: DEV-004-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source partial through [Alloy](../../infrastructure/monitoring/config.alloy) host Docker JSON logs. Explicit Kubernetes application-log collection inside k3d and project/environment/revision attribution are absent, as are authorized log endpoints. T02 — source absent for the requested query/retention workflow. Local task acceptance is unverified for both; shared dashboards do not enforce project boundaries.
 
@@ -211,7 +214,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [x] **DEV-005-T01 · 1C** — Expose basic authorized resource and CPU/memory observations; explicitly label missing or stale metrics. Prerequisites: OPS-004-T01; PLAN-001.
-- [ ] **DEV-005-T02 · 2B** — List deployments, instances, services, routes and attached data services; compare actual CPU/memory with requests, limits and quotas, including missing-data tests. Prerequisites: DEV-005-T01; OPS-003-T02; OPS-005-T01.
+- [ ] **DEV-005-T02 · 2C** — List deployments, instances, services, routes and attached data services; compare actual CPU/memory with requests, limits and quotas, including missing-data tests. Prerequisites: DEV-005-T01; OPS-003-T02; OPS-005-T01.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source partial: infrastructure metrics and Kubernetes object-state collection exist, but authorized resource/metric endpoints, workload usage comparisons and missing-data behavior are absent. [Prometheus](../../infrastructure/monitoring/prometheus.yaml) has no container resource-usage scrape; Grafana has data sources but no provisioned dashboards. Local workflow acceptance unverified; EV-04 establishes configuration only.
 
@@ -253,7 +256,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [x] **DEV-007-T01 · 1C** — Persist operation outcomes and safe retries; interrupt after database creation, repeat the same request and prove no duplicated resources or lost data. Prerequisites: PLAN-001; DEV-010-T01.
-- [ ] **DEV-007-T02 · 2B** — Select/reapply retained revisions and observe recovery rollout; report missing old secrets/dependencies and prove application rollback does not revert database contents or migrations. Prerequisites: DEV-007-T01; DEV-003-T02; DEV-006-T01.
+- [ ] **DEV-007-T02 · 2C** — Select/reapply retained revisions and observe recovery rollout; report missing old secrets/dependencies and prove application rollback does not revert database contents or migrations. Prerequisites: DEV-007-T01; DEV-003-T02; DEV-006-T01.
   **Progress (October 3, 2026):** `GET /projects/{name}/revisions` lists retained revisions and `POST /projects/{name}/rollback` re-applies one (its stored spec and image digest) as a new revision through the normal deploy path; application-only, databases and roles are untouched (unit tests; live check pending). Open: observed recovery rollout evidence, and reporting missing old secrets/dependencies (no user secrets exist yet).
 
 **Task evidence (B-2026-09-26):** T01 — source partial: database/role existence checks, deterministic credentials, server-side Kubernetes apply and a global PostgreSQL advisory lock support manual repeat PUT without intended database deletion. No persisted steps, automatic recovery worker or interruption acceptance exists. T02 — source absent: only the latest spec is retained; no revision selection, rollback or missing-secret dependency workflow. Both local acceptance results are unverified; EV-01 does not test durable recovery. PLAN-003 covers stale writes and concurrency hardening.
@@ -272,7 +275,7 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **DEV-008-T01 · 2B** — Change fixed replicas and CPU/memory requests/limits for one component; test explained quota rejection and host-capacity scheduling diagnostics. Prerequisites: PLAN-002; OPS-005-T02; DEV-006-T01.
+- [ ] **DEV-008-T01 · 2C** — Change fixed replicas and CPU/memory requests/limits for one component; test explained quota rejection and host-capacity scheduling diagnostics. Prerequisites: PLAN-002; OPS-005-T02; DEV-006-T01.
 - [ ] **DEV-008-T02 · Deferred** — Scale and allocate resources independently per component, retaining quota and scheduling failure attribution. Prerequisites: DEV-001-T02; DEV-008-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source partial through fixed [manifest](../../platform/app/manifests.py) replica/resource settings and namespace quotas; configurable scaling/resource requests/limits and scheduling diagnostics are absent. EV-01 verifies selected fixed quota settings only, not scaling acceptance. T02 — deferred, source absent, local unverified.
@@ -292,7 +295,7 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **DEV-009-T01 · 2B** — Implement declared public/private exposure and outbound destinations; show URLs/TLS state, explain policy denials, and verify public-to-private changes remove obsolete ingress. Prerequisites: OPS-005-T02; PLAN-001.
+- [ ] **DEV-009-T01 · 2C** — Implement declared public/private exposure and outbound destinations; show URLs/TLS state, explain policy denials, and verify public-to-private changes remove obsolete ingress. Prerequisites: OPS-005-T02; PLAN-001.
 - [ ] **DEV-009-T02 · Deferred** — Control exposure and outbound policy per component; prove private components cannot be reached through public ingress. Prerequisites: DEV-001-T02; DEV-009-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source partial: all projects get a public Ingress, with [Caddy](../../infrastructure/proxy/Caddyfile) edge forwarding to Traefik. Certificate authorization uses domain suffix and stored `applied` status, not observed health. Public/private transitions, declared egress, policy-specific errors and developer TLS-state reporting are absent. Local/live acceptance for DNS/ACME issuance/renewal, rejected names, outage behavior, forwarded headers and certificate-state recovery remains unverified; [ADR-009](../03-decisions/ADR-009-edge-and-cluster-ingress.md) lists exercises. T02 — deferred, source absent, local unverified.
@@ -313,7 +316,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [x] **DEV-010-T01 · 1C** — Bind managed database settings/secrets; demonstrate application write/read, denied cross-project database access and data preservation across redeployment. Prerequisites: PLAN-001; OPS-004-T01; OPS-001-T01.
-- [ ] **DEV-010-T02 · 2B** — Expose data-service availability and a tracked recovery request; demonstrate operator review, a documented controlled recovery procedure, and a developer-visible outcome without exposing foreign-project data. Prerequisites: DEV-010-T01; DEV-006-T01.
+- [ ] **DEV-010-T02 · 2C** — Expose data-service availability and a tracked recovery request; demonstrate operator review, a documented controlled recovery procedure, and a developer-visible outcome without exposing foreign-project data. Prerequisites: DEV-010-T01; DEV-006-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source partial: [API provisioning](../../platform/app/main.py) creates dedicated non-superuser logins/databases and bindings use `PGHOST/PGPORT/PGDATABASE/PGUSER/PGPASSWORD`, not the draft configurable `DB_*` prefix. Each runtime login owns its database; runtime/migration/human role separation is absent. The provisioner uses PostgreSQL `postgres` and cluster-wide Kubernetes permissions. Database preservation and CONNECT restrictions exist in source, but application write/read and live isolation remain unverified; smoke uses `http-echo`, and isolation was inspected, not run. T02 — source absent and local unverified for developer availability/recovery requests. Resolve ADR-003 role separation when implementing the binding/recovery design.
 
@@ -335,6 +338,29 @@ Phase tasks:
 - [ ] **DEV-011-T02 · 2A** — Extend retirement previews and retryable cleanup to every long-running and scheduled component; verify actual removals match confirmed scope, run resources are included, and data deletion remains separately authorized. Prerequisites: DEV-001-T03; DEV-011-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source absent for application deletion, preview/confirmation, resumable cleanup and retained-resource inventory. Lab teardown is not a scoped application lifecycle. Local acceptance unverified; shell syntax in EV-03 does not test deletion safety. T02 — deferred, source absent, local unverified.
+
+
+### DEV-012 — Deploy applications from CI with revocable credentials
+
+As a developer, I want a dedicated machine credential for my CI pipeline,
+so that it can deploy an application without storing my personal token or receiving project-administration privileges.
+
+Acceptance criteria:
+
+- A project administrator can create a named, expiring credential scoped to one project/environment and optionally one application; its secret is returned exactly once.
+- CI exchanges the credential through the configured OIDC provider for a short-lived token, deploys a revision non-interactively, and observes the operation result.
+- The credential can be rotated with bounded overlap and revoked without changing a person's access or another pipeline's credential.
+- Revocation or expiry denies the next Platform API request, including a request made with a previously issued but still-unexpired access token.
+- Cross-project access, credential/grant administration, secret-value reads, retirement, data deletion, and operator endpoints are denied.
+- Credential creation, use, rotation, denial, expiry, and revocation are attributable in audit without exposing client secrets, bearer tokens, or authorization headers.
+
+Phase tasks:
+
+- [ ] **DEV-012-T01 · 2B** — Finalize the provider-neutral deployment-credential API, OIDC administration adapter, machine-principal/grant model, permission matrix, expiry/rotation policy, one-time-secret and redaction rules, and failure/reconciliation states. Prerequisites: Phase 2A gate; ADR-004; ADR-018.
+- [ ] **DEV-012-T02 · 2B** — Implement authorized create/list/rotate/revoke lifecycle, Keycloak confidential-client integration, short-lived client-credentials authentication, immediate platform-grant denial, idempotent provider cleanup, and audit/backup coverage. Prerequisites: DEV-012-T01; OPS-001-T01; OPS-004-T01.
+- [ ] **DEV-012-T03 · 2B** — Run a portable CI deployment example and prove one-time disclosure, deploy/observe success, permission denials, rotation, expiry, immediate revocation with an unexpired token, provider-failure recovery, and complete redaction. Prerequisites: DEV-012-T02; DEV-006-T02.
+
+**Task evidence (October 4, 2026):** Source absent; local and operational acceptance unverified. The current API validates human and service OIDC tokens and rechecks platform grants, but it has no deployment-credential resource, machine-principal lifecycle, client-credentials provisioning adapter, one-time secret response, expiry/rotation workflow, or CI deployment example. [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md) and [Phase 2B](phase-2b-ci-deployment-credentials.md) document the requirement boundary and planned acceptance; they are not implementation evidence.
 
 
 ## Operator stories
@@ -407,7 +433,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [x] **OPS-003-T01 · 1C** — Measure host, shared-service, workload and storage consumption; record system reserve and representative load baseline without promising unmeasured capacity. Prerequisites: PLAN-001.
-- [ ] **OPS-003-T02 · 2B** — Deliver host/usage/request comparisons and project storage/usage breakdown including shared services; test stale/missing metrics, capacity alerts and unschedulable workload visibility. Prerequisites: OPS-003-T01.
+- [ ] **OPS-003-T02 · 2C** — Deliver host/usage/request comparisons and project storage/usage breakdown including shared services; test stale/missing metrics, capacity alerts and unschedulable workload visibility. Prerequisites: OPS-003-T01.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source partial: node-exporter, kube-state-metrics, Compose memory limits, fixed workload quotas and some retention settings exist. Representative load/reserve measurements, project/shared-service usage breakdown, storage/capacity comparisons, CPU/memory alerts and dashboards are missing. EV-01/04 verify selected config only; task measurement/alert acceptance remains unverified.
 
@@ -451,8 +477,8 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-005-T01 · 2B** — Configure per-project quotas, resource defaults and allowed network/security policy; show impact on existing workloads and subsequent deployments. Prerequisites: PLAN-002; OPS-004-T01; OPS-003-T01.
-- [ ] **OPS-005-T02 · 2B** — Reject security/quota violations with specific reasons; admit against aggregate host allocations after system/shared-service reserve and test policy enforcement. Prerequisites: OPS-005-T01; OPS-003-T02.
+- [ ] **OPS-005-T01 · 2C** — Configure per-project quotas, resource defaults and allowed network/security policy; show impact on existing workloads and subsequent deployments. Prerequisites: PLAN-002; OPS-004-T01; OPS-003-T01.
+- [ ] **OPS-005-T02 · 2C** — Reject security/quota violations with specific reasons; admit against aggregate host allocations after system/shared-service reserve and test policy enforcement. Prerequisites: OPS-005-T01; OPS-003-T02.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source partial: fixed quotas/LimitRange, restricted Pod Security, non-root/read-only workloads, dropped capabilities, no mounted API token and NetworkPolicies exist in [manifests](../../platform/app/manifests.py). Configurable policy, impact previews and aggregate host admission are absent. EV-01 checks selected hardening/quota settings only. All Compose/k3d services share the `developer-platform` network; pods use a fixed PostgreSQL IP because Compose DNS is not Kubernetes DNS. PostgreSQL TLS and target edge/platform/persistence segmentation are unimplemented; policy convergence can briefly allow new-pod egress. Define/test the required boundaries as part of policy work without claiming hostile-tenant isolation. Local/live network acceptance unverified; the isolation script was not run.
 
@@ -652,7 +678,7 @@ Acceptance criteria:
 Phase tasks:
 
 - [x] **OPS-007-T01 · 1A** — Configure real Alertmanager/watchdog routing and response ownership; verify actual outage/recovery receipt, cluster/host expiry, and public canary. Independent watchdog cron/hosting detection and notification-delivery-failure injection are excluded under [ADR-011](../03-decisions/ADR-011-watchdog-monitoring-boundary.md); both are accepted lab limitations. Keep platform, pipeline and backup identities/timestamps isolated. Prerequisites: Installation inventory and notification recipients.
-- [ ] **OPS-007-T02 · 2B** — Exercise control-plane, ingress, database, monitoring and application failure checks; identify affected projects where known and verify external detection with host/local monitoring unavailable. Prerequisites: OPS-007-T01; DEV-006-T01.
+- [ ] **OPS-007-T02 · 2C** — Exercise control-plane, ingress, database, monitoring and application failure checks; identify affected projects where known and verify external detection with host/local monitoring unavailable. Prerequisites: OPS-007-T01; DEV-006-T01.
 
 #### Current monitoring progress
 
@@ -723,8 +749,8 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **OPS-008-T01 · 2B** — Preview project workloads/routes/credentials/databases/backups; record explicit project-specific retention/deletion decisions and confirmation invalidated by scope changes. Prerequisites: DEV-011-T01; OPS-004-T01; OPS-006-T02.
-- [ ] **OPS-008-T02 · 2B** — Revoke project access/credentials and remove selected resources; inject partial failures, retry without affecting other projects, and audit all retained/deleted resources and outcomes. Prerequisites: OPS-008-T01; OPS-001-T01.
+- [ ] **OPS-008-T01 · 2C** — Preview project workloads/routes/credentials/databases/backups; record explicit project-specific retention/deletion decisions and confirmation invalidated by scope changes. Prerequisites: DEV-011-T01; OPS-004-T01; OPS-006-T02.
+- [ ] **OPS-008-T02 · 2C** — Revoke project access/credentials and remove selected resources; inject partial failures, retry without affecting other projects, and audit all retained/deleted resources and outcomes. Prerequisites: OPS-008-T01; OPS-001-T01.
 
 **Task evidence (B-2026-09-26):** T01/T02 — source absent for scoped project retirement, inventory/confirmation, credential revocation and audited retryable cleanup. Whole-lab teardown cannot satisfy these workflows. Local acceptance unverified; prerequisites include retained data inventory, individual access and tested recovery.
 
@@ -741,27 +767,27 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Update (October 3, 2026):** live acceptance, worker-interruption (EV-13), readiness failure (EV-14, EV-15), authorized restart (EV-16) and installation record (EV-17) evidence now exist; the throwaway `badimage` project was removed (namespace deleted, then retired with data retained) and the API/CLI demo is documented in the runbook. Unsupported capabilities (scaling, object storage, messaging, cache, multiple components, resources, environment) are rejected with 422 and no catalog/provider side effect by the strict `Project` model, covered by a unit test. Installation record now includes image references (EV-17). Repeat-POST reuse and no-spurious-rollout were confirmed live (EV-18); only a `progressing` snapshot during a restart roll remains unobserved. Tests use doubles; no live PostgreSQL migration/API, Kubernetes execution or operational acceptance was run. PLAN-001 remains open.
 
-- [x] **PLAN-002 · 2B** — Complete ApplicationSpec/API fit-gap and schema reuse assessment, versioned OpenAPI contract, environment capabilities/profiles, explicit CPU/memory request/limit semantics and migration rules; reject unsupported requests before side effects and keep backend fields out of the public contract. Prerequisites: Phase 1 gate.
+- [x] **PLAN-002 · 2C** — Complete ApplicationSpec/API fit-gap and schema reuse assessment, versioned OpenAPI contract, environment capabilities/profiles, explicit CPU/memory request/limit semantics and migration rules; reject unsupported requests before side effects and keep backend fields out of the public contract. Prerequisites: Phase 1 gate.
 
   **Task evidence (B-2026-09-26):** Source partial; local EV-01 validates names/manifests, not the draft contract. API output exposes `namespace` and implementation calls Kubernetes directly. Schema versioning, capabilities, configurable bindings/resource budgets and fit-gap evidence are absent. Tag-to-digest resolution is absent despite the ApplicationSpec target; include it when stabilizing deployment identity.
 
   **Progress (October 3, 2026):** Tag-to-digest resolution is implemented in the API at acceptance (anonymous, allow-listed registries; unknown tag/unsupported registry 422, outage 503, no side effects; `resolved_image` stored in the revision and used for deployment and readiness), with unit tests. Live-verified in EV-19. The field-level [fit-gap](../02-architecture/application-spec-fit-gap.md) is written. Resource requests/limits are decided and implemented in the flat body (explicit requests and limits, validated, stored per revision, applied to the container; unit tests only, no live evidence yet); The versioned `Application` envelope is accepted next to the flat body (unit tests only) and the OpenAPI contract is committed; the public API does not expose `namespace`, `GET /v1/capabilities` publishes the default-environment capabilities and PUT rejections carry stable codes (unit tests only; no live evidence). Live evidence for the capability endpoint and stable codes is EV-22. Decision: the flat body stays supported with no sunset date and the envelope is the preferred format. PLAN-002 is closed; the Phase 1 gate prerequisite was not separately verified.
 
-- [x] **PLAN-003 · 2B** — Harden worker interruption, concurrent writes, revision retention and drift recovery; prove no duplicated resources/lost revisions and redacted traceable provider failures. Prerequisites: PLAN-002; DEV-007-T02.
+- [x] **PLAN-003 · 2C** — Harden worker interruption, concurrent writes, revision retention and drift recovery; prove no duplicated resources/lost revisions and redacted traceable provider failures. Prerequisites: PLAN-002; DEV-007-T02.
 
   **Progress (October 3, 2026):** Decision: concurrent writes use an optional `If-Match: <revision>` header on PUT; a stale value returns 409 `revision_conflict` with the current revision and no side effects, and omitting it keeps last-writer-wins (unit tests; live check in EV-23). Drift decision: report only, never auto-revert; `GET /projects/{name}/drift` reports image, replica and resource differences and audits `project.drift.detected` (unit tests; live replica drift in EV-24; a background scan audits drift transitions; live in EV-25). Provider failures now record a redacted trace (`step`, `error_type`, numeric `http_status`; never exception text) in the operation result, audit detail and log (unit tests only; live check pending). Revision retention: each new revision prunes all but the newest `REVISION_RETENTION` (default 25), skipping revisions with queued/running operations and the last successful restart (unit tests; live check pending). Idempotency keys are dropped from scope (If-Match and spec deduplication cover it) and persisted health transitions are deferred to observability. Retention and rollback are live-verified in EV-26. Closed with two accepted gaps: the failure trace is unit-tested only (it will surface on the next real deploy failure), and revision 2 stayed beyond the window in EV-26 with the restart-pinning explanation unconfirmed (bounded to one extra revision); DEV-007-T02 is partly built (rollback) with its open parts noted there.
 
   **Task evidence (B-2026-09-26):** Source partial; local workflow acceptance unverified. A global advisory lock serializes cooperating API requests but supplies no expected-revision conflict check. Updates overwrite the only spec; stale clients can replace intent. Persistent idempotency keys, revision history, per-step recovery and drift reconciliation are absent.
 
-- [ ] **PLAN-004 · 2B** — Add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: PLAN-002; PLAN-003; Phase 2A; Phase 2B retained-backlog packages.
+- [ ] **PLAN-004 · 2C** — Add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: PLAN-002; PLAN-003; Phase 2A; Phase 2B; Phase 2C retained-backlog packages.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. Docker hosts shared services but is not a direct application compute provider. No portable provider contract or reproducible provider comparison harness exists (F-07/UC-05).
 
-- [ ] **PLAN-005 · 2B** — Implement the ADR-006 transition as separately gated packages: versioned catalog/control-plane/worker contracts; Kotlin catalog metadata/grant migration; Quarkus control-plane contract and state parity; Python durable worker separation; single-writer cutovers; backup/restore and rollback. Prove cross-service authorization, audit correlation, interruption/idempotency, and stable-ID reconciliation before retiring the corresponding FastAPI path. Prerequisites: Phase 2A; PLAN-001; PLAN-002; code/effort analysis before contract stabilization.
+- [ ] **PLAN-005 · 2C** — Implement the ADR-006 transition as separately gated packages: versioned catalog/control-plane/worker contracts; Kotlin catalog metadata/human and machine-grant migration; Quarkus control-plane contract and state parity; Python durable worker separation; single-writer cutovers; backup/restore and rollback. Prove cross-service authorization, audit correlation, interruption/idempotency, and stable-ID reconciliation before retiring the corresponding FastAPI path. Prerequisites: Phase 2A; Phase 2B; PLAN-001; PLAN-002; code/effort analysis before contract stabilization.
 
   **Task evidence (B-2026-09-26):** At this baseline the decision was open and local implementation-language parity/migration acceptance was unverified. The existing Python vertical slice remains the implementation baseline. ADR-006 accepted the target roles on October 1, 2026; that documentation decision supplies no implementation, migration, or acceptance evidence.
 
-- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned catalog and control-plane APIs for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail in the responsible service. Prerequisites: Phase 2B gate.
+- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned catalog and control-plane APIs for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail in the responsible service. Prerequisites: Phase 2C gate.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. REST/curl and interactive API docs are not a domain CLI or self-service portal; no UI/API compatibility journey exists.
 
@@ -769,11 +795,11 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. The sample project JSON/http-echo demonstrates provisioning only, not a combined UI/API template or application/database journey (ADR-007).
 
-- [ ] **PLAN-008 · 3** — Deliver separate authorized/audited human database identity and controlled tunnel; test foreign-project denial, credentials distinct from application credentials, and revocation of new/existing sessions per policy. Prerequisites: Phase 2B gate; accepted IAM design.
+- [ ] **PLAN-008 · 3** — Deliver separate authorized/audited human database identity and controlled tunnel; test foreign-project denial, credentials distinct from application credentials, and revocation of new/existing sessions per policy. Prerequisites: Phase 2C gate; accepted IAM design.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. Runtime logins own their database; no separate human identity, controlled tunnel, grant audit or session revocation workflow exists (F-09/UC-03).
 
-- [ ] **PLAN-009 · 3** — Automate hosted-application OIDC clients/redirect URIs against the accepted provider-neutral OIDC boundary; demonstrate platform/application role separation and no implicit platform-admin access. F-10 acceptance is required for Phase 3 completion. Prerequisites: Phase 2B gate; ADR-004 acceptance.
+- [ ] **PLAN-009 · 3** — Automate hosted-application OIDC clients/redirect URIs against the accepted provider-neutral OIDC boundary; demonstrate platform/application role separation and no implicit platform-admin access. F-10 acceptance is required for Phase 3 completion. Prerequisites: Phase 2C gate; ADR-004 acceptance.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No OIDC provider/client automation or platform/application role-separation flow exists. ADR-004 was proposed at this baseline.
 
@@ -879,13 +905,15 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | F-10 | PLAN-006/007/009 |
 | F-11 / UC-06 | PLAN-010/011/012 |
 | F-12 / UC-06 | PLAN-013/014 |
+| F-13 / UC-07 | DEV-001-T01/02/03, DEV-006-T02, DEV-011-T02 |
+| F-14 / UC-08 | DEV-012-T01/02/03 |
 | N-01 | PLAN-001/002/004 |
 | N-02 | DEV-007-T01/02, PLAN-003, DEV-011-T01, OPS-008-T02 |
-| N-03 | OPS-004-T01 and authorization checks on every later data surface |
-| N-04 | DEV-003-T01/02 and redaction checks on every later data surface |
+| N-03 | OPS-004-T01, DEV-012-T02/03, and authorization checks on every later data surface |
+| N-04 | DEV-003-T01/02, DEV-012-T01/02/03, and redaction checks on every later data surface |
 | N-05 | OPS-006-T01/02; reassess the documented recovery procedure whenever persisted state grows |
 | N-06 | OPS-007-T01/02 |
 | N-07 | OPS-003-T01/02, OPS-005-T01/02 |
-| N-08 | OPS-001-T01/02 and audit checks on every later mutation/access change |
+| N-08 | OPS-001-T01/02, DEV-012-T02/03, and audit checks on every later mutation/access change |
 
 The phase task index remains authoritative for scheduling, including deferred component-specific extensions. Requirement or story closure needs all applicable criteria, not just the foundation tasks listed here.

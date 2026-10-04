@@ -8,7 +8,7 @@ Execution tracking: [DEV-001-T01 through DEV-001-T03, DEV-006-T02, and DEV-011-T
 
 Deploy one application as a set of named, cooperating components. At least two components run as long-lived services and one component is started by a recurring schedule. The components share the project boundary, can use stable internal service names, and can be updated and observed independently.
 
-This gate is delivered on the existing Kubernetes provider first. The public contract remains provider-independent. Providers that cannot yet realize scheduled components must reject the capability before side effects; Docker parity remains part of Phase 2B provider acceptance.
+This gate is delivered on the existing Kubernetes provider first. The public contract remains provider-independent. Providers that cannot yet realize scheduled components must reject the capability before side effects; Docker parity remains part of Phase 2C provider acceptance.
 
 ## Initial contract
 
@@ -83,7 +83,7 @@ Deletion and rollback operate on the entire declared component set. Removal prev
 1. Finalize and publish the successor schema, compatibility rules, capability flag, status model, and single-component migration/rollback design. Measure the representative three-component profile against the lab reserve.
 2. Implement named long-running services, stable project-internal discovery, per-component reconciliation, status, logs, and failure attribution.
 3. Implement scheduled components with validation, non-overlap, run history, logs, and audit correlation.
-4. Run the acceptance scenario below on the existing Kubernetes environment and record evidence in DEV-001. Only after this gate passes does Phase 2B resume.
+4. Run the acceptance scenario below on the existing Kubernetes environment and record evidence in DEV-001. Only after this gate passes does Phase 2B begin.
 
 All new endpoints and persisted records reuse project authorization, audit, redaction, revision, backup, and recovery boundaries. The implementation must extend backup coverage before the gate closes.
 
@@ -108,4 +108,4 @@ Acceptance requires evidence that:
 - second-level schedules, non-UTC timezones, overlapping scheduled runs, and catch-up of every missed run;
 - automatic retries beyond the provider's explicitly documented initial policy;
 - autoscaling, multi-cluster placement, and high availability; and
-- Docker execution of scheduled components, which remains Phase 2B portability work.
+- Docker execution of scheduled components, which remains Phase 2C portability work.

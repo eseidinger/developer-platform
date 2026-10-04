@@ -18,7 +18,7 @@ Offer the catalog and control-plane lifecycle as understandable self-service. An
 - Make ownership, roles, and the distinction between application and platform permissions visible.
 - Build the self-service journey on the multi-service and scheduled-component contract accepted in Phase 2A; do not create a portal-only component model.
 
-Entry requires the Phase 1, Phase 2A, and Phase 2B backlog gates, including usable authorized diagnostics, recovery and retirement APIs. Portal completion cannot substitute for those API acceptance results.
+Entry requires the Phase 1, Phase 2A, Phase 2B, and Phase 2C backlog gates, including usable authorized diagnostics, recovery, retirement, and CI-credential APIs. Portal completion cannot substitute for those API acceptance results.
 
 ## Acceptance
 

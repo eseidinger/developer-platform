@@ -33,6 +33,7 @@ Phase 3 adds developer experience and access extensions; Phase 4 adds AI assista
 | F-11 | Generate AI diagnoses through read-only platform tools | Phase 4 | Incident diagnosis with evidence; deny access to another project's context |
 | F-12 | Execute AI changes through the Platform API using an approved plan | Phase 4 | No mutation without valid approval for the exact revision and target |
 | F-13 | Deploy one application as multiple cooperating services, including a component triggered by a cron schedule | Phase 2A (next) | UC-07: two long-running services communicate internally; one scheduled component runs without overlap; component updates, status, logs, and failures are independently attributable |
+| F-14 | Create scoped, expiring, rotatable, and revocable machine credentials for CI application deployments | Phase 2B | UC-08: a non-interactive pipeline deploys and observes one scoped application; revocation denies the next request; cross-project and privileged actions remain denied; the secret is returned once and never exposed by later platform surfaces |
 | N-01 | Keep the public Platform API technology-independent | All phases; portability verified in Phase 2 | Contract review and F-07 |
 | N-02 | Make provisioning idempotent and resumable after partial failures | Phase 1 (MVP) | Database creation succeeds, deployment fails, retry creates no duplicates |
 | N-03 | Enforce project/environment boundaries server-side | Phase 1 (MVP) | Negative tests for resources, logs, secrets, jobs, and database access |
@@ -44,7 +45,7 @@ Phase 3 adds developer experience and access extensions; Phase 4 adds AI assista
 
 ## Delivery acceptance
 
-The [delivery backlog](../04-development/delivery-backlog.md) retains detailed DEV/OPS acceptance criteria. The [development plan crosswalk](../04-development/development-plan.md#backlog-delivery-commitments) assigns them to phases, including security-event notifications and project retirement as explicit extensions of these broad requirements. F-13 is the next implementation increment; single-image evidence does not close its multi-service or scheduled-run criteria.
+The [delivery backlog](../04-development/delivery-backlog.md) retains detailed DEV/OPS acceptance criteria. The [development plan crosswalk](../04-development/development-plan.md#backlog-delivery-commitments) assigns them to phases, including security-event notifications and project retirement as explicit extensions of these broad requirements. F-13 is the next implementation increment; F-14 follows as Phase 2B. Single-image or interactive-user evidence does not close their multi-service, scheduled-run, or CI-credential criteria.
 
 ## Boundaries and open operational targets
 

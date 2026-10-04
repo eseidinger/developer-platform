@@ -35,6 +35,14 @@ Database read/write permissions are separate grants and do not follow automatica
 
 OIDC identities use stable issuer and subject identifiers, not only mutable display names. Validate token signatures, issuer, audience, and validity. Human CLI clients use Authorization Code with PKCE or Device Authorization; machine-to-machine flows use separate service identities and explicit grants. Frontends contain no client secrets. Keycloak is the supported lab reference deployment, while API authentication remains provider-neutral OIDC.
 
+## CI deployment credentials
+
+Phase 2B adds provider-neutral deployment-credential resources backed by separate OIDC machine identities. The supported Keycloak adapter creates confidential clients; CI exchanges the one-time client secret through the client-credentials flow for a short-lived `platform-api` token. The Platform API never accepts the long-lived client secret directly as a bearer key.
+
+Each credential is scoped to one project/environment and optionally one application. Its initial permission set can submit a desired revision and read the capabilities, operation, status, and redacted diagnostics needed to determine the outcome. It cannot administer grants or credentials, read secret values, retire resources, delete data, call operator endpoints, or access another project.
+
+Only project or platform administrators can manage these credentials. Secret material is returned once; later surfaces show non-secret identity, scope, expiry, rotation, status, and usage metadata. Revocation disables the platform grant before identity-provider cleanup, so the next API request is denied even if its OIDC token is still within its cryptographic lifetime. Provider cleanup is idempotent and a failure remains visible as `revocation_pending` while access stays denied. See [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md).
+
 ## Resources and secrets
 
 Workloads, CI, and interactive database users receive separate identities. Database roles separate runtime DML from schema migration/ownership. Network access, authentication, and object authorization are distinct checks.
@@ -55,4 +63,4 @@ Proposed tools include Trivy for scanning and Kyverno for policies; runtime dete
 
 AI receives only authorized, redacted data within the user's scope. Logs and documents are untrusted input and cannot change tool permissions. Write actions use an explicitly approved plan with a target and revision; approval does not replace authorization at execution time.
 
-Core decision: [ADR-004](../03-decisions/ADR-004-identity-and-access-management.md). Incidents: [Runbook](../05-operations/runbook.md).
+Core decisions: [ADR-004](../03-decisions/ADR-004-identity-and-access-management.md) and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). Incidents: [Runbook](../05-operations/runbook.md).

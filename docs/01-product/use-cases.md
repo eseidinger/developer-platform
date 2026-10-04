@@ -56,3 +56,15 @@ As a developer, I want to deploy one application containing multiple services an
 6. Update one component without restarting or redeploying unchanged components.
 
 Acceptance: an invalid schedule is rejected before side effects; a scheduled run never overlaps the next trigger under the initial concurrency policy; status and logs distinguish every service and scheduled run; a failed component does not hide the health of other components; and migration from the existing single-component shape preserves configuration, secrets, database data, revisions, and rollback. See [Phase 2A](../04-development/phase-2a-multi-service-scheduled-application.md).
+
+## UC-08 – Deploy an application from CI
+
+As a developer, I want a dedicated revocable machine credential for my CI pipeline so that it can deploy an application without storing my personal access token or receiving project-administration rights.
+
+1. A project administrator creates a named deployment credential scoped to one project/environment and optionally one application, with an expiry.
+2. The secret is shown once and stored in the CI system's protected secret store.
+3. The pipeline exchanges the credential through the configured OIDC provider for a short-lived Platform API token.
+4. It submits an application revision and follows the operation and observed deployment status to completion.
+5. The administrator rotates the credential, moves the pipeline to the replacement, and revokes the predecessor.
+
+Acceptance: the pipeline works without interactive login; audit records attribute the deployment to the machine credential; list/status/log/audit/backup surfaces do not disclose its secret or bearer tokens; cross-project, grant/credential administration, secret-value, retirement, data-deletion, and operator actions are denied; and revocation denies the next Platform API request even if an earlier OIDC token has not expired. See [Phase 2B](../04-development/phase-2b-ci-deployment-credentials.md).
