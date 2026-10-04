@@ -9,10 +9,7 @@ The available Ubuntu host has **16 vCPUs and 32 GB RAM**. The hybrid design runs
 | Area | Placement | Responsibility |
 |---|---|---|
 | Edge | Caddy in Docker outside k3d; implemented and selected | Public TLS, platform routing, application forwarding, and API-gated on-demand certificates |
-| Platform API | Docker; implemented | Synchronous admin provisioning and latest project spec/status; durable worker remains proposed |
-| Target application catalog | Docker placement proposed; not implemented | Kotlin/Spring Boot service for application metadata, ownership, environments, dependencies, and grants |
-| Target control plane | Docker placement proposed; not implemented | Quarkus service for deployment intent, policy, operations, runtime status, and events |
-| Target automation workers | Docker placement proposed; not implemented | Python execution of approved provider operations with scoped credentials |
+| Platform API | Docker; implemented and selected | Single Python/FastAPI application for metadata, grants, desired state, durable operations, policy, infrastructure execution, status, and audit |
 | Identity provider | Dedicated Keycloak service for the supported lab profile; generic OIDC API boundary; deployment acceptance open | Authentication and client identities; platform grants remain platform-owned |
 | PostgreSQL | Docker outside k3d, persistent volume | Platform metadata and separate project databases |
 | Workload compute | k3d with project namespaces; implemented | Applications, services, secrets, and Traefik ingress; environment model remains proposed |
@@ -46,13 +43,13 @@ A possible **planning baseline**, not a measurement or capacity guarantee:
 | Host, Docker, and base processes | 3 GiB |
 | PostgreSQL | 5 GiB |
 | Monitoring/logging | 4 GiB |
-| Catalog, control plane, workers, and identity provider | 3 GiB |
+| Platform API and identity provider | 3 GiB |
 | k3d system components | 3 GiB |
 | Application workloads | 9 GiB |
 | Reserve | 5 GiB |
 | Total | 32 GiB |
 
-The 3 GiB service allocation predates implementation of the three-service target and is only a placeholder. Measure idle, peak, and failure/retry behavior for each JVM service and Python worker before accepting it or reduce workload capacity/reserve explicitly. Measure actual usable memory on the host: “32 GB” and “32 GiB” are not equivalent. Also constrain and measure CPU, I/O, connections, and log growth.
+The 3 GiB platform-service allocation is only a planning placeholder. Measure idle, peak, and failure/retry behavior for the Python API and Keycloak before accepting it or reduce workload capacity/reserve explicitly. Measure actual usable memory on the host: “32 GB” and “32 GiB” are not equivalent. Also constrain and measure CPU, I/O, connections, and log growth.
 
 All local components share one host failure domain. The host sender does not directly inspect the Docker daemon or deliver a local notification; failed API/Prometheus checks stop its heartbeat. The external watchdog detects expiry, including during host loss. Broader host checks remain target work. The operator has reported receipt for heartbeat, selected Alertmanager and backup scenarios; see [current monitoring evidence](../04-development/delivery-backlog.md#current-monitoring-progress).
 

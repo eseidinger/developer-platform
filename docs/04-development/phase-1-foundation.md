@@ -37,7 +37,7 @@ OPS-001, OPS-002 and OPS-004 require all backlog criteria to pass. Reapply these
 
 ### 1C — Durable single-application lifecycle
 
-Implement the project/environment/application identity and supported single-image profile with stable IDs and minimally separated provider ports. Separate catalog metadata and permission facts from deployment revisions, operations, runtime state, and Python provider execution at logical module and data-access boundaries, even while the existing Python deployment remains the transitional implementation. Persist desired revisions and asynchronous jobs atomically before side effects using a versioned job envelope/result contract; return an operation ID, expose authorized progress, and resume after worker interruption. Phase 2 hardens this baseline, extracts the target services, and adds revision selection, concurrency guarantees and portability.
+Implement the project/environment/application identity and supported single-image profile with stable IDs. Separate metadata and permission facts from deployment revisions, operations, runtime state, and infrastructure execution at logical module and data-access boundaries inside the Python application. Persist desired revisions and asynchronous operations atomically before side effects using a versioned envelope/result contract; return an operation ID, expose authorized progress, and resume after worker interruption. Phase 2 hardens this baseline and adds multi-component execution, machine credentials, revision selection, concurrency guarantees, diagnostics, policy, recovery, and retirement without changing the selected deployment architecture.
 
 - Validate the supported single-image profile and reject unknown fields or unsupported capabilities before side effects; preserve technology-independent public identities and provider boundaries.
 - Deploy a sample application in a fresh environment and write/read PostgreSQL through it. Bind managed configuration/secrets, deny foreign-project database access, preserve data across updates and repeat identical requests without duplicate resources.
@@ -52,6 +52,6 @@ Single-image acceptance is only a slice of stories with per-component criteria. 
 
 ## Outside this phase
 
-A complete portal, broad data-service catalog, HA PostgreSQL, multi-cluster support, AI, and production cutover to the Kotlin catalog or Quarkus control plane. Phase 1 establishes migration-safe ownership seams without a big-bang rewrite.
+A complete portal, broad data-service catalog, HA PostgreSQL, multi-cluster support, AI, and optional extraction into Kotlin/Spring or Quarkus services. Phase 1 establishes clear internal ownership seams within the Python application without requiring a service split.
 
 Dependencies: [Deployment](../05-operations/deployment.md), [Monitoring](../05-operations/monitoring.md), [Backup and recovery](../05-operations/backup-recovery.md).

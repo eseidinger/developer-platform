@@ -13,7 +13,7 @@ Status: working analysis for PLAN-002 and DEV-001-T01, as of October 4, 2026. It
 | `runtime.image` | `image`, validated and resolved to a digest at acceptance (`resolved_image`) | implemented | Digest is stored in the revision. Private registries remain unsupported. |
 | `endpoints[].name/protocol/exposure` | One implicit public HTTP endpoint | reject | Accept exactly one `http` endpoint with `public` exposure; reject others. |
 | `endpoints[].port` | `port`, 1024–65535, default 8080 | implemented | Map to the endpoint port. |
-| `scaling` | Fixed single replica | reject | Accept `minInstances == maxInstances == 1`; reject autoscaling (see PLAN-004). |
+| `scaling` | Fixed single replica | reject | Accept `minInstances == maxInstances == 1`; reject autoscaling until the Phase 2C scaling and policy package supports it. |
 | `resources.cpu/memory` | Fixed `100m/128Mi` requests and `500m/256Mi` limits for every workload | implemented (flat form) | Decided: explicit `requests`/`limits` with `requests <= limits`, defaults equal to the previous fixed values. Optional `resources` in the flat body is validated, canonicalized, stored in the revision and applied to the container; maxima keep two surge pods within the namespace quota. The enveloped `spec.application.resources` form follows with the envelope. |
 | `health.readiness` | `probe_profile` (`status`, `hello-world`) with fixed paths | map | Public `path`/`port` replace the profile; keep `probe_profile` as a deprecated alias. Path validation required. |
 | `spec.resources[type=postgres]` | A database is always provisioned | map | Make the single `postgres` resource explicit with profile `shared-dev` and `deletionPolicy: retain`; reject other types and profiles. |

@@ -8,7 +8,7 @@ Execution tracking: [DEV-001-T01 through DEV-001-T03, DEV-006-T02, and DEV-011-T
 
 Deploy one application as a set of named, cooperating components. At least two components run as long-lived services and one component is started by a recurring schedule. The components share the project boundary, can use stable internal service names, and can be updated and observed independently.
 
-This gate is delivered on the existing Kubernetes provider first. The public contract remains provider-independent. Providers that cannot yet realize scheduled components must reject the capability before side effects; Docker parity remains part of Phase 2C provider acceptance.
+This gate is delivered on the selected Kubernetes provider. The public contract remains free of Kubernetes-specific client fields. Docker workload parity is not part of current acceptance and is available only as an optional Phase 5 expansion.
 
 ## Initial contract
 
@@ -23,7 +23,7 @@ Each component has a stable name and declares:
 
 The initial profile makes the application's existing project-managed configuration, secrets, and database binding available consistently to all components. Per-component configuration/secret assignment remains a separately tracked extension.
 
-Only long-running services receive stable internal DNS names. Scheduled components may call those names while a run is active. A scheduled component does not receive a public endpoint and must exit after each run; the platform scheduler starts it again at the next matching time. Invalid schedules, unsupported timezones, public exposure on a scheduled component, name collisions, and cyclic or missing references are rejected before provider changes.
+Only long-running services receive stable internal DNS names. Scheduled components may call those names while a run is active. A scheduled component does not receive a public endpoint and must exit after each run; the platform scheduler starts it again at the next matching time. Invalid schedules, unsupported timezones, public exposure on a scheduled component, name collisions, and cyclic or missing references are rejected before infrastructure changes.
 
 Illustrative target shape (the exact schema is finalized by DEV-001-T01):
 
@@ -68,7 +68,7 @@ spec:
         concurrencyPolicy: Forbid
 ```
 
-Provider object names and Kubernetes `Service`/`CronJob` fields are not part of the public contract.
+Kubernetes object names and `Service`/`CronJob` fields are not part of the public contract.
 
 ## Status and operations
 
@@ -76,14 +76,14 @@ Application status reports each long-running service's desired/ready replicas, a
 
 Changing one component creates an application revision but reconciles only the changed component and any application binding that actually changed. It must not restart unchanged services or cause an immediate run of an unchanged scheduled component. Schedule or image changes affect subsequent runs; an already active run is allowed to finish unless an explicitly authorized stop operation is added later.
 
-Deletion and rollback operate on the entire declared component set. Removal previews list all long-running and scheduled provider resources. Persistent data remains governed by its own retention decision and is not removed as a side effect.
+Deletion and rollback operate on the entire declared component set. Removal previews list all long-running and scheduled Kubernetes resources. Persistent data remains governed by its own retention decision and is not removed as a side effect.
 
 ## Ordered implementation work
 
 1. Finalize and publish the successor schema, compatibility rules, capability flag, status model, and single-component migration/rollback design. Measure the representative three-component profile against the lab reserve.
 2. Implement named long-running services, stable project-internal discovery, per-component reconciliation, status, logs, and failure attribution.
 3. Implement scheduled components with validation, non-overlap, run history, logs, and audit correlation.
-4. Run the acceptance scenario below on the existing Kubernetes environment and record evidence in DEV-001. Only after this gate passes does Phase 2B begin.
+4. Run the acceptance scenario below on the existing Kubernetes environment and record evidence in DEV-001. Phase 2B began under the documented owner exception, but this acceptance remains required before entering Phase 2C.
 
 All new endpoints and persisted records reuse project authorization, audit, redaction, revision, backup, and recovery boundaries. The implementation must extend backup coverage before the gate closes.
 
@@ -108,4 +108,4 @@ Acceptance requires evidence that:
 - second-level schedules, non-UTC timezones, overlapping scheduled runs, and catch-up of every missed run;
 - automatic retries beyond the provider's explicitly documented initial policy;
 - autoscaling, multi-cluster placement, and high availability; and
-- Docker execution of scheduled components, which remains Phase 2C portability work.
+- Docker execution of scheduled components, which is optional Phase 5 portability work.

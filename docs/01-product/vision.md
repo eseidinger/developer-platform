@@ -15,7 +15,7 @@ The core promise is: **I describe what my application needs; the platform provis
 | Software architect | Evaluate implementation options through reproducible labs |
 | Tech lead | Understand project ownership, dependencies, and standards |
 
-The platform also serves as a cohesive reference and portfolio project. Kotlin/Spring Boot for the application catalog, Java/Quarkus for the control plane, Python for automation and operations, plus the portal, Docker, Kubernetes, and later AI demonstrate concrete responsibilities and justified decisions. Technology variety is not an acceptance criterion, and the target split is accepted only through functional and migration evidence.
+The platform also serves as a cohesive reference and portfolio project. Its current architecture deliberately uses one Python/FastAPI application for the Platform API and the existing Kubernetes/k3d workload infrastructure. A Kotlin/Spring catalog, Java/Quarkus control plane, separately deployed Python workers, or a direct Docker workload adapter are optional Phase 5 studies, not current acceptance requirements. Technology variety is not a success criterion.
 
 ## Product boundaries
 
@@ -27,4 +27,4 @@ AI supports development, delivery, and operations. Its initial value is explaini
 
 ## Success
 
-Success is demonstrated through the [vertical slice](use-cases.md) and [verifiable requirements](requirements.md): deploy an application, preserve its data, detect failures, apply a change, and remove resources deliberately. A second compute provider must use the same contract. Measure time to the first healthy application and recovery time; binding targets remain open.
+Success is demonstrated through the [vertical slice](use-cases.md) and [verifiable requirements](requirements.md): deploy an application, preserve its data, detect failures, apply a change, and remove resources deliberately. The public contract remains free of Kubernetes-specific client fields. If optional Phase 5 adds a second compute provider, it must use that same contract. Measure time to the first healthy application and recovery time; binding targets remain open.

@@ -1,67 +1,52 @@
 # Architecture Overview
 
-Status: current lab summary plus target architecture. The technology-independent API and technology responsibility split are accepted directions; the richer contracts, provider ports, migrations, and worker implementation below remain drafts.
+Status: selected single-host hybrid topology with one Python/FastAPI Platform API. Project workloads run in Kubernetes/k3d; no additional compute adapter or deployable platform-service split is in the current scope.
 
-## Implemented lab
+## Implemented platform
 
-The [FastAPI service](../../platform/app/main.py) accepts authorized PUT requests for one image, HTTP endpoint and mandatory PostgreSQL database per project. Existing project names remain public slugs while internal project, default-environment and application IDs are persisted with numbered desired revisions. PUT atomically queues a versioned operation and returns `202 Accepted`; `GET /v1/operations/{id}` checks current project-view authorization. An in-process Python worker applies queued operations and recovers interrupted work after restart. Docker runs shared services; it is not an application compute provider.
+The [FastAPI service](../../platform/app/main.py) authenticates human and machine callers, owns projects and grants, accepts declarative application specifications, persists desired revisions and operations, provisions PostgreSQL bindings, applies Kubernetes resources, and exposes runtime status and diagnostics. Its in-process worker recovers queued or interrupted work after restart.
 
-A global PostgreSQL advisory lock serializes provisioning and retirement. The worker persists operation outcomes and reclaims interrupted work; operation state `succeeded` means resource application completed, not that the workload is ready. Authorized operation reads include a live Kubernetes readiness snapshot with replica counts, images and rollout reason. The separate discovery thread rebuilds monitoring targets but does not reconcile workloads or persist health transitions. See [the current API guide](../../platform/README.md) and [ADR-012](../03-decisions/ADR-012-admin-provisioning-baseline.md).
-
-## Target architecture
-
-The diagram and domain description below describe the intended evolution, not deployed components.
-
-## Three responsibility layers
-
-1. **Infrastructure foundation:** hosts, Docker/Kubernetes, PostgreSQL servers, networking, edge/TLS, monitoring, and backups. Managed through installation and infrastructure as code.
-2. **Platform services:** an application catalog owns application metadata and permission facts; a control plane owns deployment intent, operations, provider selection, and runtime status; automation workers execute approved infrastructure steps.
-3. **Developer experience:** API, CLI, and later a portal and AI assistant. They use the catalog and control-plane contracts without bypassing their ownership or authorization boundaries.
+Docker runs the platform API, Keycloak, PostgreSQL, edge, monitoring, and k3d containers. Docker is host infrastructure, not an application workload provider. Kubernetes/k3d is the only supported application compute environment.
 
 ```mermaid
 flowchart TB
-    Human["Developer / Operator"] --> Clients["CLI / Portal"]
-    Human --> AI["Operations / AI Assistant<br/>Python"]
-    Clients --> Catalog["Application Catalog<br/>Kotlin + Spring Boot"]
-    Clients --> API["Platform API / Control Plane<br/>Java + Quarkus"]
-    AI --> API
-    AI --> Catalog
-    API --> AI
-    API --> Catalog
-    Catalog --> CatalogState[("Applications / Ownership / Permissions")]
-    API --> ControlState[("Desired State / Operations / Runtime Audit")]
-    ControlState --> Worker["Automation / Reconciler<br/>Python"]
-    Worker --> Compute["ComputeProvider"]
-    Worker --> DB["DatabaseProvider"]
-    Worker --> Secret["SecretProvider"]
-    Worker --> Net["NetworkProvider"]
-    Worker --> Obs["ObservabilityProvider"]
-    Compute --> Docker["Docker"]
-    Compute --> K8s["Kubernetes / k3d"]
-    DB --> PG["External PostgreSQL Server"]
-    Secret --> Bind["Runtime Bindings"]
-    Net --> Route["Proxy / Ingress"]
-    Obs --> Telemetry["Prometheus / Loki / Future Traces"]
+    Human[Developer / Operator] --> Clients[CLI / Portal]
+    CI[CI / Test automation] --> API[Platform API<br/>Python + FastAPI]
+    Clients --> API
+    API --> Identity[Keycloak / OIDC]
+    API --> PlatformState[(Platform PostgreSQL)]
+    API --> ProjectDB[(Project databases)]
+    API --> K8s[Kubernetes / k3d]
+    K8s --> Workloads[Application services and scheduled jobs]
+    API --> Obs[Prometheus / Loki / Grafana / Alertmanager]
+    Edge[Caddy / Traefik] --> API
+    Edge --> Workloads
 ```
 
-The diagram is the target service topology, not the implemented lab. The current FastAPI process still combines catalog storage, request coordination, and direct provisioning. [ADR-006](../03-decisions/ADR-006-python-quarkus-evolution.md) selects the target roles but requires contract, parity, state-migration, and rollback gates before traffic moves.
+## Responsibility layers
 
-## Domain boundaries
+1. **Infrastructure foundation:** the host, Docker, Kubernetes/k3d, PostgreSQL, networking, edge/TLS, monitoring, backups, Keycloak, and the external watchdog.
+2. **Platform application:** one Python/FastAPI deployment owns metadata, authorization, deployment intent, durable operations, policy, infrastructure execution, runtime observation, diagnostics, and audit.
+3. **Developer experience:** API, CLI, CI, test automation, and later the portal and AI assistance use the same authorized Platform API.
 
-A Project owns Environments. The catalog is authoritative for Projects, Environments, Applications, ownership, repositories, dependencies, Grants, and intended resource relationships. The control plane refers to their stable IDs and is authoritative for ApplicationSpec revisions, Deployments, Operations, provider assignments, observed runtime state, and platform events. Workload, Resource, and Endpoint are addressable runtime targets.
+The Python code keeps catalog, authorization, lifecycle, operation, integration, and observation responsibilities modular. Those are internal boundaries, not separately deployed services or permission to duplicate authoritative state.
 
-A catalog dependency expresses a logical relationship between applications or intended resources; it causes no infrastructure side effect. An ApplicationSpec requests the environment-specific resource and binding realization. The control plane validates that request against catalog relationships and platform policy before provisioning.
+## Domain model
 
-The catalog supplies permission facts; each service still authenticates the caller and enforces authorization for its own operations. The control plane must reject a deployment when the referenced catalog identity is absent, inactive, or not allowed. Services exchange versioned APIs or events and never share tables. Catalog summaries of deployment state are projections of control-plane events, not a second source of truth.
+A Project owns its application specification, default environment, grants, revisions, operations, credentials, and resource inventory. An application can contain long-running service components and scheduled components. Stable platform IDs remain independent of Kubernetes namespace and resource names.
 
-Providers can be combined independently: Kubernetes compute can use the same external PostgreSQL instance and observability stack as Docker compute. The API does not use namespaces or Compose project names as public identities.
+The platform stores desired state separately from observed runtime state. An accepted request records intent and an operation; it does not claim that the workload is healthy. Runtime status reports component readiness, scheduled-run state, and actionable failure reasons.
 
-The implemented Application consists of one OCI image, HTTP endpoint, configuration, and optional PostgreSQL binding. The next planned increment adds named cooperating services and a scheduled component through a versioned contract and lossless migration; see [Phase 2A](../04-development/phase-2a-multi-service-scheduled-application.md). Database data is independent of the workload lifecycle.
+The public API uses platform concepts rather than Kubernetes kinds or Compose fields. Environment capabilities describe what the selected Kubernetes installation supports, and unsupported requests fail before side effects. This contract discipline does not require a second provider.
 
-## Desired state, observed state, and limits
+## Infrastructure and lifecycle boundaries
 
-The control-plane API stores intent; Python workers reconcile infrastructure toward it and return structured step results. A worker executes an approved plan but neither changes application ownership nor decides platform policy. An accepted request is not yet a successful deployment. Status includes the observed revision, conditions, and failure reasons.
+PostgreSQL data is independent of workload lifecycle. Removing or replacing Kubernetes resources does not implicitly remove project databases. Retirement and permanent deletion require explicit scoped decisions and auditable operations.
 
-Portability covers the contract, not automatically identical availability, network isolation, or rollout guarantees. Environments report verified capabilities. Migrating persistent data remains a planned operational process.
+The Platform API directly integrates with Kubernetes, PostgreSQL, monitoring discovery, routing configuration, and Keycloak administration needed for machine credentials. Backend failures are redacted for callers and correlated through durable operation and audit identifiers.
 
-Details: [Technology roles](technology-roles.md), [Software architecture](software-architecture.md), [Infrastructure](infrastructure.md), [ApplicationSpec](application-spec.md), [Decisions](../03-decisions/README.md).
+## Optional expansion
+
+A direct Docker application adapter and Kotlin/Spring catalog, Java/Quarkus control plane, or separately deployed Python workers are outside Phases 2 through 4. They may be considered independently in [optional Phase 5](../04-development/phase-5-optional-architecture-expansion.md) only after a concrete need is recorded and migration, parity, recovery, and rollback gates are defined.
+
+Details: [Technology roles](technology-roles.md), [Software architecture](software-architecture.md), [Infrastructure](infrastructure.md), [ApplicationSpec](application-spec.md), and [decisions](../03-decisions/README.md).

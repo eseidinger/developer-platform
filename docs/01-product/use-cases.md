@@ -36,7 +36,7 @@ Acceptance: databases are retained by default; permanently deleting data require
 
 ## UC-05 – Compare technical alternatives
 
-As an architect, I want to run the same workload on two compute providers or against two data stores. Input data, versions, configuration, measurement duration, and evaluation method are fixed. Evaluate latency, throughput, resource consumption, and operational effort. A lab result supports an ADR; it does not automatically enable a new default service.
+As an architect, I may run the same workload on two compute providers or against two data stores when an explicit experiment is approved. Input data, versions, configuration, measurement duration, and evaluation method are fixed. Evaluate latency, throughput, resource consumption, and operational effort. A lab result supports an ADR; it does not automatically enable a new default service. A second compute provider belongs to optional Phase 5 and is not a current platform acceptance criterion.
 
 ## UC-06 – Support development and incident analysis with AI
 

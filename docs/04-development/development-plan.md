@@ -20,10 +20,11 @@ As of October 4, 2026. Future phases are proposals without confirmed dates.
 | October 4, 2026 | Multi-service application with a cron-triggered component prioritized | F-13 and UC-07 added; versioned contract, migration, internal discovery, scheduled-run status, and Kubernetes acceptance are the next Phase 2A increment |
 | October 4, 2026 | Revocable CI deployment credentials prioritized after multi-service support | F-14, UC-08, and ADR-018 added; scoped OIDC machine credentials and immediate platform revocation form Phase 2B; former Phase 2B work moves to 2C |
 | October 4, 2026 | Empty-project and machine-driven platform acceptance added to Phase 2B | F-15 and UC-09 add human-bootstrapped test-runner credentials, temporary role personas, and first deployment by CI after empty-project creation |
+| October 4, 2026 | Current runtime architecture retained | Phase 2C remains on the existing Kubernetes infrastructure and single Python/FastAPI application; a Docker compute adapter and polyglot service split move to optional Phase 5 |
 
 ## Implementation status
 
-The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A source implementation exists but its live acceptance is deferred by owner direction. Phase 2B implementation proceeds next; this sequencing exception does not mark Phase 2A accepted. Phase 2C and all later gates remain open. Consult task notes and the verification register for revisions, environments and limits.
+The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A source implementation exists but its live acceptance is deferred by owner direction. Phase 2B source implementation also exists and its deployed acceptance remains open; this sequencing exception does not mark Phase 2A accepted. Phase 2C and all later gates remain open. The current delivery architecture remains the existing Kubernetes provider and one Python/FastAPI API application. Consult task notes and the verification register for revisions, environments and limits.
 
 ## Work sequence and gates
 
@@ -32,41 +33,47 @@ flowchart LR
     Baseline["Inspect Existing Prototype"] --> P1["1 Foundation and Vertical Slice"]
     P1 --> P2A["2A Multi-service and Scheduled Component"]
     P2A -. "live acceptance deferred" .-> P2B["2B CI Deployment Credentials"]
-    P2B --> P2C["2C Contract and Second Provider"]
+    P2B --> P2C["2C Platform Capabilities"]
     P2C --> P3["3 Developer Experience"]
     P3 --> P4["4 AI Operations / Development"]
+    P4 -. "optional" .-> P5["5 Architecture Expansion"]
     P1 --> Evidence["Measurements and Operational Evidence"]
     P2A --> Evidence
     P2B --> Evidence
     P2C --> Evidence
     P3 --> Evidence
     P4 --> Evidence
+    P5 --> Evidence
 ```
 
 | Phase | Entry condition | Outcome / dependency |
 |---|---|---|
-| [1](phase-1-foundation.md) | Access to actual code and target host | 1A operational protection, 1B accountable access/security alerts, 1C durable lifecycle and minimal API/CLI, with target ownership seams in the Python baseline |
+| [1](phase-1-foundation.md) | Access to actual code and target host | 1A operational protection, 1B accountable access/security alerts, 1C durable lifecycle and minimal API/CLI, with internal ownership seams in the Python application |
 | [2A](phase-2a-multi-service-scheduled-application.md) | Accepted Phase 1 vertical slice | Versioned multi-service contract; internal discovery; independently observable long-running services and cron-triggered component on Kubernetes; lossless single-component migration |
 | [2B](phase-2b-ci-deployment-credentials.md) | IAM boundary; Phase 2A live gate explicitly deferred by owner | Empty-project bootstrap; scoped deployment credentials; human-created test runner and temporary role personas; machine-driven deploy/observe and authorization suite; immediate platform denial and redacted audit evidence |
-| [2C](phase-2-platform-api.md) | Accepted Phase 2A and 2B vertical slices | Stable catalog/control-plane/worker contracts, gated service migration, retained packages, and direct Docker parity, including scheduled and machine-identity handling |
-| [3](phase-3-developer-experience.md) | Reliable lifecycle, authorization, and migrated public contracts from Phase 2C | Portal, templates, human database access, application OIDC across catalog and control-plane APIs |
-| [4](phase-4-ai-operations.md) | Access-controlled data and deployment history | Python-based evidence assistance and controlled actions through the control plane |
+| [2C](phase-2c-platform-capabilities.md) | Accepted Phase 2A and 2B vertical slices | Diagnostics, policy, scaling, connectivity, recovery, and retirement on the current Kubernetes provider and single Python API |
+| [3](phase-3-developer-experience.md) | Reliable lifecycle, authorization, and stable public contracts from Phase 2C | Portal, templates, human database access, and application OIDC through the Python Platform API |
+| [4](phase-4-ai-operations.md) | Access-controlled data and deployment history | Python-based evidence assistance and controlled actions through the Platform API |
+| [5](phase-5-optional-architecture-expansion.md) | Optional owner decision after Phase 4; demonstrated need for another compute provider or service boundary | Optional Docker compute adapter and/or polyglot service extraction, each gated by parity, migration, rollback, and operational evidence |
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their acceptance minimum by that phase’s exit; later extensions do not defer it.
 
 Basic access enforcement, audit, secrets, and observability start in Phase 1. Phase 3 extends these capabilities rather than removing them from the MVP.
 
-## Technology transition
+## Current architecture and optional expansion
 
-[ADR-006](../03-decisions/ADR-006-python-quarkus-evolution.md) fixes the target responsibilities but does not prove an implementation. The current FastAPI service remains the operational baseline until each replacement is demonstrably safe. The transition follows these gates:
+The selected delivery architecture through Phase 4 is one Python/FastAPI API application using the existing Kubernetes/k3d workload infrastructure. Logical responsibility boundaries remain useful inside that application, but they do not imply separately deployed catalog, control-plane, or worker services. No additional compute adapter is required for current acceptance.
+
+[ADR-001](../03-decisions/ADR-001-platform-api-abstraction.md), [ADR-002](../03-decisions/ADR-002-docker-vs-kubernetes.md), and [ADR-006](../03-decisions/ADR-006-python-quarkus-evolution.md) retain the former expansion design as an optional Phase 5 direction. If the owner activates that phase, it follows these gates:
 
 | Gate | Phase | Required result |
 |---|---|---|
-| Logical seams | 1C | Stable catalog IDs and permission facts are separated from deployment revisions, operations, provider execution, and observed state, even if one Python deployment still implements them. Persisted jobs use a versioned envelope/result model. |
-| Catalog extraction | 2C | Kotlin/Spring Boot owns migrated application metadata, human grants, and CI machine-principal grants through a versioned API. Reconciliation proves record counts/IDs and authorization behavior; backup/restore and rollback are tested before it becomes the writer. |
-| Control-plane migration | 2C | Quarkus accepts the technology-independent contract and owns desired revisions, policy, operations, runtime state, and events. Contract tests and shadow/parity comparison cover success, denial, conflict, failure, and recovery before traffic moves. |
-| Worker separation | 2C | Python workers execute only bounded, idempotent jobs with scoped credentials. Interruption, duplicate delivery, stale authorization, timeouts, and result redaction pass acceptance. |
-| Provider portability | 2C | Kubernetes and Docker adapters pass the same provider contract and end-to-end lifecycle evidence after the service split. |
+| Logical seams | Existing baseline | Stable IDs, grants, deployment revisions, operations, provider execution, and observed state remain logically separated within the Python codebase. Persisted jobs use a versioned envelope/result model. |
+| Need and scope decision | Optional Phase 5 entry | Record the concrete limitation that justifies another provider or deployable service and choose only the required expansion package. |
+| Catalog extraction | Optional Phase 5 | If selected, Kotlin/Spring Boot owns migrated application metadata and grants only after reconciliation, authorization, backup/restore, and rollback pass. |
+| Control-plane migration | Optional Phase 5 | If selected, Quarkus passes public-contract and behavior parity before traffic moves. |
+| Worker separation | Optional Phase 5 | If selected, separately deployed Python workers pass interruption, duplicate-delivery, stale-authorization, timeout, and redaction acceptance. |
+| Provider portability | Optional Phase 5 | If selected, Kubernetes and Docker adapters pass the same provider contract and end-to-end lifecycle evidence. |
 
 Use one authoritative writer per data type at every migration step. Prefer backfill, compare, cut over, and retain a bounded rollback path over permanent dual writes. Correlate actor, catalog version, desired revision, operation ID, job ID, and provider resource IDs across services. Extend monitoring and recovery coverage before retiring the corresponding FastAPI path.
 
@@ -74,13 +81,13 @@ Use one authoritative writer per data type at every migration step. Prefer backf
 
 The [delivery backlog](delivery-backlog.md) preserves all 20 permanent DEV/OPS IDs and their acceptance criteria. Its [phase task index](delivery-backlog.md#phase-task-index) assigns independently checkable tasks to one gate each, including provider, developer-experience and AI work. Stories may span gates; task completion and story completion are recorded separately. This plan supersedes the former six-milestone plan. No story is dropped or marked complete by this amendment.
 
-Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Phase 1 is complete under its recorded limits. Deliver **2A multi-service and scheduled component next**, then **2B CI deployment credentials**, before continuing the remaining Phase 2C backlog, service-migration gates, and second-provider acceptance. Phase 3 and Phase 4 depend on those demonstrated outcomes.
+Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Phase 1 is complete under its recorded limits. Deliver **2A multi-service and scheduled component next**, then **2B CI deployment credentials**, before continuing the remaining Phase 2C capability backlog. Phase 3 and Phase 4 depend on those demonstrated outcomes. Optional Phase 5 does not gate them.
 
 The table assigns delivery responsibility by role; named delivery owners, dates, and capacity remain unassigned. Alert response is assigned to the project owner under the lab response policy. Assign a named owner before starting each package. Every row is open. A single-image slice does not close criteria that require multiple components.
 
 | Story | Requirement mapping | Delivery gate and disposition | Accountable role |
 |---|---|---|---|
-| DEV-001 | F-02/F-07/F-13 | Phase 2A next: versioned named-component contract, stable internal discovery, independent updates/status, and a non-overlapping cron-triggered component | Product / API |
+| DEV-001 | F-02/F-13 | Phase 2A next: versioned named-component contract, stable internal discovery, independent updates/status, and a non-overlapping cron-triggered component | Product / API |
 | DEV-002 | F-02, N-02 | 1C configuration CRUD/activation for one component; per-component extension deferred | API |
 | DEV-003 | N-03/N-04 | 1C secret CRUD/rotation/adoption; per-component extension deferred | API / security |
 | DEV-004 | F-06, N-03 | Phase 2C diagnostics: authorized search/follow and terminated-instance retention; Phase 2A adds basic scheduled-run attribution | Observability |
@@ -98,12 +105,12 @@ The table assigns delivery responsibility by role; named delivery owners, dates,
 | OPS-004 | F-01, N-03/N-08 | 1B individual access, roles, revocation; recheck every new data surface | Security / API |
 | OPS-005 | F-08, N-03/N-07 | Phase 2C configurable quotas/policy, impact preview and aggregate admission | Infrastructure |
 | OPS-006 | N-05 | 1A scheduled encrypted off-host backups and measured isolated restoration; repeat as state grows | Operations |
-| OPS-007 | N-06, F-06 | 1A independent failure signals; Phase 2C full service coverage and project impact | Operations |
+| OPS-007 | N-06, F-06 | 1A independent failure signals; Phase 2C current-platform coverage and project impact | Operations |
 | OPS-008 | F-01/F-05, N-02/N-08 extension | Phase 2C project retirement after reliable deletion, retention inventory and access revocation | API / operations |
 
-Multi-service support is no longer deferred. [Phase 2A](phase-2a-multi-service-scheduled-application.md) is the next gate and must pass before [Phase 2B CI credentials](phase-2b-ci-deployment-credentials.md), which in turn gates the remaining Phase 2C work. The component change uses a successor schema and explicit migration; do not silently transform the existing singular application object or claim acceptance from single-image tests. CI acceptance must use a distinct machine identity rather than a developer token.
+Multi-service support is no longer deferred. [Phase 2A](phase-2a-multi-service-scheduled-application.md) is the next gate and must pass before [Phase 2B CI credentials](phase-2b-ci-deployment-credentials.md), which in turn gates the remaining Phase 2C work. The component change uses a successor schema and explicit migration; do not silently transform the existing singular application object or claim acceptance from single-image tests. CI acceptance must use a distinct machine identity rather than a developer token. All three Phase 2 increments stay on the existing Kubernetes infrastructure and in the single Python API application.
 
-Docker portability, human database access, hosted-application OIDC, and AI are additions to this backlog. Retain their phases, but review priority against open story criteria at each gate. No calendar or effort commitments are implied.
+Human database access, hosted-application OIDC, and AI remain later additions. Docker portability and the polyglot service split are optional Phase 5 packages and do not gate those additions. No calendar or effort commitments are implied.
 
 ## Lab validation constraint
 
@@ -117,8 +124,8 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 |---|---|---|
 | Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](delivery-backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
 | Multi-service scheduled application | Finalize the successor schema, migration/rollback and capacity result; implement and run UC-07 on Kubernetes | Phase 2A (next) |
-| CI deployment credentials | Finalize expiry/rotation policy and provider adapter; implement and run UC-08 with immediate platform revocation evidence | Phase 2B |
-| Polyglot service rollout | Specify catalog/control-plane/job/event contracts and migration/rollback packages; satisfy ADR-006 transition gates | Logical seams in Phase 1C; extraction and cutover in Phase 2C |
+| CI deployment credentials | Finalize expiry/rotation policy and OIDC credential integration; implement and run UC-08 with immediate platform revocation evidence | Phase 2B |
+| Optional architecture expansion | Keep the single Python API and Kubernetes provider unless a concrete need justifies activating adapter or service-extraction work | Optional Phase 5 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
 | Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |
 | RPO/RTO, retention, capacity | Backup policy is selected (24-hour RPO, four-hour RTO, 14/8/6 retention); [ADR-017](../03-decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits full-horizon retention evidence from Phase 1A, so measure recovery, retention, and capacity against targets | Before production-like acceptance |

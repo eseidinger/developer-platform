@@ -1,51 +1,35 @@
-# Developer Platform: Technology Roles and Service Boundaries
+# Developer Platform: Technology Roles
 
-Status: integrated into the target [architecture overview](overview.md), [software architecture](software-architecture.md), [ADR-006](../03-decisions/ADR-006-python-quarkus-evolution.md), and [development plan](../04-development/development-plan.md) on October 1, 2026. Those documents are authoritative for boundaries, sequencing, and acceptance; this page retains the originating summary as an architecture reference.
+Status: the selected implementation through Phase 4 is one Python/FastAPI Platform API application. The former Kotlin/Spring, Java/Quarkus, and separately deployed Python-worker split is an optional Phase 5 expansion.
 
-This document describes the intended division of responsibilities in the Developer Platform. The platform uses each language and framework where its strengths fit the workload: **Kotlin + Spring Boot** for application data and domain rules, **Java + Quarkus** for the platform runtime and control plane, and **Python** for infrastructure automation and operations. These are architectural roles; individual services can be introduced as the platform grows.
-
-## Architecture at a glance
+## Current architecture
 
 ```mermaid
 flowchart LR
-    UI[Web UI] -->|Application data| Catalog[Application Catalog<br/>Kotlin + Spring Boot]
-    UI -->|Deployment and resource requests| Control[Platform API / Control Plane<br/>Java + Quarkus]
-    Control -->|Read application metadata| Catalog
-    Control -->|Provisioning jobs| Automation[Automation / Provisioning<br/>Python]
-    Automation -->|Execute operations| Infra[Docker, Kubernetes,<br/>databases and other infrastructure]
-    Infra -->|Results and telemetry| Automation
-    Automation -->|Job results| Control
-    Control -->|Deployment status and events| UI
-    Control -->|Events and diagnostics| Ops[Operations / AI assistance<br/>Python]
+    Clients[CLI / Portal / CI] --> API[Platform API<br/>Python + FastAPI]
+    API --> State[(Platform PostgreSQL)]
+    API --> Identity[Keycloak / OIDC]
+    API --> K8s[Kubernetes / k3d workloads]
+    API --> ProjectDB[(Project PostgreSQL databases)]
+    API --> Obs[Monitoring and logging]
 ```
 
-## Kotlin + Spring Boot: application and domain management
+Python owns the complete platform application: public APIs, application metadata, grants, deployment credentials, desired revisions, durable operations, policy, Kubernetes execution, PostgreSQL provisioning, observation, diagnostics, and audit. Work remains separated into modules with explicit responsibilities, but all modules share one deployment and application lifecycle.
 
-The **Application Catalog** owns the durable business description of an application: its identity, owners, repositories, environments, dependencies, permissions, and intended resource relationships. It exposes APIs for creating and managing those records and enforces domain rules such as valid ownership and application configuration. Spring Boot and Kotlin fit this data-oriented service, where expressive domain models, persistence, validation, and the Spring ecosystem are useful.
+The single-application choice avoids inter-service authentication, distributed transactions, cross-service availability dependencies, state migration, and additional operational overhead. API and module boundaries must still remain clear enough to support testing and safe evolution.
 
-The catalog is the source of truth for **what an application is and who may manage it**. It does not deploy workloads, provision infrastructure, or act as the source of truth for live runtime state. A deployment summary shown in the catalog may be derived from control-plane events, but the control plane remains authoritative for deployment execution and status.
+## Supporting technologies
 
-## Java + Quarkus: platform runtime and control plane
+Kubernetes/k3d is the only application workload environment. PostgreSQL stores platform state and project databases. Keycloak supplies OIDC identities while the platform remains authoritative for grants. Caddy, Traefik, Prometheus, Loki, Grafana, and Alertmanager provide routing and observability around the Python application and workloads.
 
-The **Platform API** accepts declarative deployment and resource requests, validates them against application metadata and platform rules, and coordinates their execution. It owns deployment lifecycle state, runtime abstractions for Docker and Kubernetes, configuration and secret references, resource management, and platform events. Quarkus is suited to this infrastructure-facing service and keeps the Java-based runtime distinct from the business domain service.
+Docker hosts these platform components but is not a second application compute provider.
 
-The control plane decides **what operation should happen**, tracks its progress, and reports the outcome. It delegates concrete infrastructure steps to automation workers rather than embedding every provider-specific script in the API. Infrastructure-specific results return to the control plane, which records the operation status and publishes events for consumers.
+## Optional evolution
 
-## Python: automation, provisioning, and operations
+If an explicit need justifies independently deploying a responsibility, [optional Phase 5](../04-development/phase-5-optional-architecture-expansion.md) retains a candidate allocation:
 
-Python workers execute the integration-heavy work requested by the control plane: Docker or Kubernetes operations, database provisioning, secret generation, monitoring setup, backups, audits, and infrastructure checks. Python is also the home for operations tools such as log analysis, deployment diagnostics, incident analysis, and a future AI-assisted operations agent.
+- Kotlin/Spring Boot for an extracted application catalog;
+- Java/Quarkus for an extracted control plane;
+- Python for separately deployed infrastructure workers.
 
-Python owns **how an approved operation is carried out** against external systems. It does not own application records or decide platform policy. AI-assisted analysis can suggest or explain actions; any state-changing action still goes through the control plane's normal authorization and execution path.
-
-## Interaction and ownership rules
-
-1. A user creates or updates an application through the catalog. The catalog stores its domain metadata and validates the change.
-2. A deployment or resource request reaches the control plane with an application identifier and desired specification. The control plane consults the catalog for relevant metadata and permissions.
-3. The control plane records the operation, dispatches a provisioning job to Python, and tracks its lifecycle.
-4. Python performs the external operation and returns a structured result. The control plane updates runtime status and emits events. The UI or other consumers can use those events to show progress.
-
-Service contracts should exchange application identifiers, desired specifications, job identifiers, results, and events rather than sharing database tables. Each service owns its data and exposes the facts other services need through an API or event contract. Long-running operations should have explicit status and failure information so retries and diagnostics remain understandable.
-
-## Why a polyglot architecture?
-
-This split follows the work each component performs. Kotlin + Spring Boot supports domain modeling and data management; Java + Quarkus provides a focused platform control plane; Python provides a broad ecosystem for infrastructure integrations and operational analysis. Clear ownership makes the technology choice explainable while allowing each part to evolve independently. The extra service boundaries are justified only when they preserve these responsibilities and remain backed by clear contracts.
+That allocation is not a target that current work should prepare by adding network boundaries prematurely. Each extraction must independently justify its cost and pass migration, behavior-parity, authorization, audit, recovery, and rollback gates.

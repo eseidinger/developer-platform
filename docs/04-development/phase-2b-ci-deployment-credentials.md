@@ -1,6 +1,6 @@
 # Phase 2B – CI Deployment Credentials
 
-Status: **in implementation by owner direction; Phase 2A live acceptance is deferred, not accepted.** Covers [F-14 and F-15](../01-product/requirements.md), [UC-08 and UC-09](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). The executable breakdown is preserved in the [automation implementation plan](phase-2b-automation-implementation-plan.md).
+Status: **source implementation complete through DEV-012-T02; deployed acceptance remains open. Phase 2A live acceptance is deferred, not accepted.** Covers [F-14 and F-15](../01-product/requirements.md), [UC-08 and UC-09](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). The executable breakdown is preserved in the [automation implementation plan](phase-2b-automation-implementation-plan.md).
 
 Execution tracking: [DEV-012-T01 through DEV-012-T03](delivery-backlog.md#phase-task-index).
 

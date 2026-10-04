@@ -1,6 +1,6 @@
 # ADR-001 – Technology-Independent Platform API
 
-Created: September 25, 2026. Status: **Accepted principle**; detailed design proposed.
+Created: September 25, 2026. Status: **Accepted public-contract principle**; second-provider implementation is optional Phase 5.
 
 ## Context
 
@@ -12,7 +12,7 @@ Public contracts use Applications, Environments, Resources, Endpoints, and Grant
 
 Each environment declares its verified capabilities. Unsupported mandatory features cause rejection before provisioning. Internal backend resources remain referenced through stable platform IDs.
 
-Ports and adapters, persistent reconciliation, and the specific v1alpha1 contract are the proposed implementation of this accepted requirement.
+The public contract must remain independent of Kubernetes resource shapes. Multiple runtime adapters are not required by the current scope. Provider ports and a second compute implementation remain an optional Phase 5 technique for validating portability if a concrete need emerges.
 
 ## Alternatives
 
@@ -27,6 +27,6 @@ The platform owns its state models, error classes, and workflows. This increases
 
 ## Validation
 
-Run the same web/PostgreSQL use case on Kubernetes and directly on Docker. The schema and client remain unchanged; only the environment and capability offering differ. Explicitly test partial failures and unsupported autoscaling.
+For the current scope, review the contract for Kubernetes-specific client fields and test capability rejection before side effects. If optional Phase 5 adds Docker compute, run the same web/PostgreSQL use case on Kubernetes and directly on Docker; keep the schema and client unchanged and test partial failures and unsupported capabilities.
 
-Implementation: [Software architecture](../02-architecture/software-architecture.md), [ApplicationSpec](../02-architecture/application-spec.md), [Phase 2](../04-development/phase-2-platform-api.md).
+Implementation: [Software architecture](../02-architecture/software-architecture.md), [ApplicationSpec](../02-architecture/application-spec.md), [Phase 2C](../04-development/phase-2c-platform-capabilities.md), [optional Phase 5](../04-development/phase-5-optional-architecture-expansion.md).

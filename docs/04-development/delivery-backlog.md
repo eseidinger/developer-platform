@@ -28,9 +28,9 @@ Each task belongs to exactly one phase or sub-gate; story IDs remain the overall
 
 Top-level task checkboxes remain open where full acceptance is outstanding. Checked progress criteria below record narrower verified outcomes; they do not close the parent task or phase. Task evidence below distinguishes partial or absent source implementation, verified local checks, and operational acceptance. Close a task only after its listed outcome is verified and record date, revision, environment, results and limitations beside it. Link shared checks by evidence ID. Update implementation findings here when code changes; other documents link here rather than maintain a separate status assessment. Close a story only when every original acceptance criterion passes. A Phase 3 design decision does not close deferred implementation tasks.
 
-Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Phase 2A is the prioritized multi-service/scheduled-component increment; Phase 2B adds CI deployment credentials; the former Phase 2B work is now Phase 2C. Deferred tasks have no scheduled phase. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
+Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Phase 2A is the prioritized multi-service/scheduled-component increment; Phase 2B adds CI deployment credentials; the remaining current-platform work is Phase 2C. Optional Phase 5 is unscheduled and does not gate Phases 2 through 4. Deferred tasks have no scheduled phase. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
 
-**Gate status, October 4, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is complete under its recorded owner-directed alert-delivery exception. Phase 1C is complete as of October 3, 2026: all ten tasks are checked with live evidence (EV-30 to EV-37), and the unit-tested-only items and the not-yet-run access/audit drill are recorded owner-accepted limits in the Phase 1C audit below. Phase 2A is the next gate.
+**Gate status, October 4, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is complete under its recorded owner-directed alert-delivery exception. Phase 1C is complete as of October 3, 2026: all ten tasks are checked with live evidence (EV-30 to EV-37), and the unit-tested-only items and the not-yet-run access/audit drill are recorded owner-accepted limits in the Phase 1C audit below. Phase 2A source implementation exists but live acceptance is deferred. Phase 2B source implementation is complete through DEV-012-T02; DEV-012-T03 deployed acceptance remains open. Phase 2C has not started as a gate.
 
 Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Reassess the documented recovery procedure when recovery scope changes; [ADR-016](../03-decisions/ADR-016-phase-1a-recovery-scope.md) excludes isolated recovery exercises from the current Phase 1A gate. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
@@ -84,7 +84,7 @@ This index lists execution tasks, not story completion promises. Task details an
 | 1C | DEV-002-T01, DEV-003-T01, DEV-003-T02, DEV-004-T01, DEV-005-T01, DEV-006-T01, DEV-007-T01, DEV-010-T01, DEV-011-T01, OPS-003-T01, PLAN-001 |
 | 2A | DEV-001-T01, DEV-001-T02, DEV-001-T03, DEV-006-T02, DEV-011-T02 |
 | 2B | DEV-012-T01, DEV-012-T02, DEV-012-T03 |
-| 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003, PLAN-004, PLAN-005 |
+| 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003 |
 | 3 | PLAN-006, PLAN-007, PLAN-008, PLAN-009 |
 | 4.1 | PLAN-010 |
 | 4.2 | PLAN-011 |
@@ -92,6 +92,7 @@ This index lists execution tasks, not story completion promises. Task details an
 | 4.4 | PLAN-013 |
 | 4.5 | PLAN-014 |
 | 4 (after 4.5) | PLAN-015 |
+| Optional 5 | PLAN-004, PLAN-005 |
 | Deferred | DEV-002-T02, DEV-003-T03, DEV-008-T02, DEV-009-T02 |
 
 ### Phase 1C story-task audit (October 3, 2026)
@@ -779,15 +780,15 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26):** Source partial; local workflow acceptance unverified. A global advisory lock serializes cooperating API requests but supplies no expected-revision conflict check. Updates overwrite the only spec; stale clients can replace intent. Persistent idempotency keys, revision history, per-step recovery and drift reconciliation are absent.
 
-- [ ] **PLAN-004 · 2C** — Add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: PLAN-002; PLAN-003; Phase 2A; Phase 2B; Phase 2C retained-backlog packages.
+- [ ] **PLAN-004 · Optional 5** — If a recorded need activates the package, add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: completed current-platform lifecycle; explicit owner scope decision.
 
-  **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. Docker hosts shared services but is not a direct application compute provider. No portable provider contract or reproducible provider comparison harness exists (F-07/UC-05).
+  **Task evidence (B-2026-09-26; moved October 4, 2026):** Source absent; local acceptance unverified. Docker hosts shared services but is not a direct application compute provider. No portable provider contract or reproducible provider comparison harness exists (F-07/UC-05). This is expected while the package remains optional and inactive.
 
-- [ ] **PLAN-005 · 2C** — Implement the ADR-006 transition as separately gated packages: versioned catalog/control-plane/worker contracts; Kotlin catalog metadata/human and machine-grant migration; Quarkus control-plane contract and state parity; Python durable worker separation; single-writer cutovers; backup/restore and rollback. Prove cross-service authorization, audit correlation, interruption/idempotency, and stable-ID reconciliation before retiring the corresponding FastAPI path. Prerequisites: Phase 2A; Phase 2B; PLAN-001; PLAN-002; code/effort analysis before contract stabilization.
+- [ ] **PLAN-005 · Optional 5** — If a recorded need activates the package, extract only the justified deployable responsibilities using versioned contracts, state reconciliation, single-writer cutovers, backup/restore, parity, and rollback. The candidate split remains Kotlin catalog, Quarkus control plane, and Python workers. Prove cross-service authorization, audit correlation, interruption/idempotency, and stable-ID reconciliation before retiring any FastAPI path. Prerequisites: completed current-platform lifecycle; explicit owner scope decision; code/effort analysis before contract stabilization.
 
-  **Task evidence (B-2026-09-26):** At this baseline the decision was open and local implementation-language parity/migration acceptance was unverified. The existing Python vertical slice remains the implementation baseline. ADR-006 accepted the target roles on October 1, 2026; that documentation decision supplies no implementation, migration, or acceptance evidence.
+  **Task evidence (B-2026-09-26; moved October 4, 2026):** At this baseline the decision was open and local implementation-language parity/migration acceptance was unverified. The Python application is now the selected architecture through Phase 4. ADR-006 retains the former target roles only as an optional Phase 5 candidate; that documentation decision supplies no implementation, migration, or acceptance evidence.
 
-- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned catalog and control-plane APIs for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail in the responsible service. Prerequisites: Phase 2C gate.
+- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned Python Platform API for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail server-side. Prerequisites: Phase 2C gate.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. REST/curl and interactive API docs are not a domain CLI or self-service portal; no UI/API compatibility journey exists.
 
@@ -899,8 +900,8 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | F-04 | PLAN-001/003, DEV-006-T01, DEV-007-T01/02 |
 | F-05 / UC-02 / UC-04 | PLAN-001, DEV-007-T02, DEV-011-T01, OPS-008-T01/02 |
 | F-06 / UC-02 | DEV-004-T01/02, DEV-005-T01/02, DEV-006-T01, DEV-007-T02 |
-| F-07 / UC-05 | PLAN-002/004; additional data-store labs remain unscheduled |
-| F-08 | PLAN-001/002/004, OPS-005-T01/02 |
+| F-07 / UC-05 (optional Phase 5) | PLAN-002/004; additional data-store labs remain unscheduled |
+| F-08 | PLAN-001/002, OPS-005-T01/02; PLAN-004 only if optional provider work is activated |
 | F-09 / UC-03 | PLAN-008 |
 | F-10 | PLAN-006/007/009 |
 | F-11 / UC-06 | PLAN-010/011/012 |

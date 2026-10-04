@@ -6,12 +6,12 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 
 | ADR | Topic | Status |
 |---|---|---|
-| [001](ADR-001-platform-api-abstraction.md) | Technology-independent API and provider abstraction | Accepted principle; implementation details proposed |
-| [002](ADR-002-docker-vs-kubernetes.md) | Docker, hybrid, or Kubernetes | Accepted hybrid starting topology; expansion sequence proposed |
+| [001](ADR-001-platform-api-abstraction.md) | Technology-independent API and provider abstraction | Accepted public-contract principle; second provider optional in Phase 5 |
+| [002](ADR-002-docker-vs-kubernetes.md) | Docker, hybrid, or Kubernetes | Accepted hybrid topology; no additional workload adapter in current scope |
 | [003](ADR-003-postgresql-provisioning.md) | PostgreSQL provisioning and human access | Proposed; database/Secret provisioning inspected in source |
 | [004](ADR-004-identity-and-access-management.md) | Generic OIDC with Keycloak reference deployment and platform-owned authorization | Accepted October 2, 2026; source implementation, deployment acceptance pending |
 | [005](ADR-005-observability-watchdog.md) | Monitoring and independent watchdog | Proposed; implementation scope established |
-| [006](ADR-006-python-quarkus-evolution.md) | Kotlin catalog, Quarkus control plane, and Python automation roles | Accepted target direction October 1, 2026; implementation pending |
+| [006](ADR-006-python-quarkus-evolution.md) | Python application and optional polyglot evolution | Current single Python/FastAPI application selected October 4, 2026; polyglot split optional Phase 5 |
 | [007](ADR-007-ui-api-deployment.md) | Combined or separate UI/API deployment | Proposed |
 | [008](ADR-008-ai-assisted-operations.md) | AI for development and operations | Accepted product focus; execution design proposed |
 | [009](ADR-009-edge-and-cluster-ingress.md) | Caddy edge and Traefik cluster ingress | Accepted for hybrid starting profile; operational acceptance open |

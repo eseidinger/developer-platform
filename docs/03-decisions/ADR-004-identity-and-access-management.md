@@ -10,7 +10,7 @@ The platform, applications, CI, and database access need identities. Sharing a l
 
 Use standards-based OIDC as the platform identity boundary. Platform APIs depend on a generic OIDC contract; Keycloak is the supported reference deployment for the existing lab. The reference deployment uses one shared realm, with separate clients for each application or technical purpose. This selects Keycloak for the supported profile without coupling public API contracts or authorization data to Keycloak-specific APIs.
 
-OIDC proves principal identity. Platform-owned data remains authoritative for authorization: the platform stores project/environment memberships and role bindings instead of encoding them as identity-provider realm roles. During Phase 1B the existing platform service owns these facts in its PostgreSQL state. Phase 2 migrates them to the Application Catalog through a reconciled, single-writer cutover that preserves principal and scope associations.
+OIDC proves principal identity. Platform-owned data remains authoritative for authorization: the platform stores project/environment memberships and role bindings instead of encoding them as identity-provider realm roles. The single Python/FastAPI platform service owns these facts in its PostgreSQL state through the current delivery phases. Any optional Phase 5 catalog extraction requires a reconciled, single-writer cutover that preserves principal and scope associations.
 
 Identify a principal by the stable OIDC issuer and subject pair. Usernames, email addresses and display names are attributes, not authorization keys. Each API validates token signature, issuer, audience and validity before consulting the authoritative platform grant on every request. Removing a grant must therefore deny the next request; project permission is not retained merely because an access token remains valid.
 
@@ -39,7 +39,7 @@ Requiring Keycloak-specific APIs in platform contracts would make replacing the 
 
 The API must check every access and background job within the correct scope. Specs can request permissions but cannot authorize themselves. Authorization state, identity-provider configuration and required recovery secrets join backup and recovery scope. Audit records correlate the issuer/subject principal, scope, action and result without storing bearer tokens or unnecessary identity claims.
 
-The Python baseline needs an OIDC adapter and platform-owned grant repository before expanded self-service. Phase 1C must reapply this boundary to each new endpoint and data surface. Phase 2 must preserve authorization behavior and audit correlation while grant ownership moves to the Application Catalog. Automatic hosted-application client provisioning requires controlled redirect URIs, secret rotation and cleanup in Phase 3.
+The Python baseline needs an OIDC adapter and platform-owned grant repository before expanded self-service. Each phase must reapply this boundary to every new endpoint and data surface. Phase 2 keeps grant ownership in the Python application and preserves authorization behavior and audit correlation. Automatic hosted-application client provisioning requires controlled redirect URIs, secret rotation and cleanup in Phase 3.
 
 ## Validation
 

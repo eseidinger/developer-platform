@@ -1,6 +1,6 @@
 # Provisioning Sequence
 
-Status: current queued-operation API and in-process worker followed by the future service contract. [Software architecture](../software-architecture.md).
+Status: current queued-operation API and in-process worker. The second diagram records an optional Phase 5 service-extraction concept, not the selected delivery architecture. [Software architecture](../software-architecture.md).
 
 ## Current asynchronous acceptance and execution
 
@@ -31,7 +31,7 @@ sequenceDiagram
 
 The worker reclaims a `running` operation when the prior process releases its session lock, retrying idempotent steps from the start. The monitoring-only thread also republishes discovery but does not reconcile workloads. Retirement separately acknowledges an already absent namespace, rejects active operations, and retains SQL/catalog data. See [ADR-012](../../03-decisions/ADR-012-admin-provisioning-baseline.md) and [ADR-014](../../03-decisions/ADR-014-catalog-availability-monitoring.md).
 
-## Target asynchronous contract
+## Optional Phase 5 extracted-service contract
 
 ```mermaid
 sequenceDiagram

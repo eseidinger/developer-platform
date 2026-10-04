@@ -1,6 +1,6 @@
 # ADR-002 – Hybrid Starting Topology
 
-Created: September 25, 2026. Status: **Hybrid accepted**; provider expansion sequence proposed.
+Created: September 25, 2026. Status: **Hybrid accepted**; no additional workload adapter in the current scope.
 
 ## Context
 
@@ -10,7 +10,7 @@ An initial design used three Kubernetes VMs plus PostgreSQL and monitoring VMs. 
 
 Starting profile: platform services, PostgreSQL, and central observability run in Docker; project workloads run in Kubernetes inside Docker, with k3d proposed. PostgreSQL remains outside the workload cluster. An external watchdog complements local monitoring.
 
-k3d is an installation profile of the Kubernetes adapter. A direct Docker compute adapter is added as a second path to validate ADR-001.
+k3d is the selected workload-compute implementation. The platform services and PostgreSQL continue to run in Docker, but Docker is not an additional application workload adapter. A direct Docker compute adapter is an optional Phase 5 expansion only.
 
 ## Implementation note — September 27, 2026
 
@@ -24,7 +24,7 @@ k3d is an installation profile of the Kubernetes adapter. A direct Docker comput
 | Hybrid | Real Kubernetes API with simple shared-service installation | Additional routing/network complexity; one host |
 | Multiple VMs | Separate failure domains and scaling | Cost and higher operational effort |
 
-Docker-first remains a proposed implementation alternative. It has not replaced the accepted hybrid topology. Existing hybrid/Kubernetes work should therefore be inspected and consolidated before considering a change in direction.
+Docker-first remains an optional implementation alternative. It has not replaced the accepted hybrid topology and is not part of Phases 2 through 4. Existing hybrid/Kubernetes work remains the supported path unless the owner explicitly activates the Phase 5 provider package.
 
 ## Consequences
 

@@ -8,7 +8,7 @@ Developing Angular and the backend separately does not require separate deployme
 
 ## Proposed decision
 
-The first application profile contains one image. It can serve static UI files and the API together, for example Angular plus Quarkus. Release and rollback treat this as one artifact.
+The first application profile contains one image. It can serve static UI files and the Python/FastAPI API together. Release and rollback treat this as one artifact.
 
 A later multi-component profile adds separate UI/API images and routing under the same origin: `/` to the UI and `/api/` to the API. This choice concerns hosted applications; it does not prescribe the Platform Control Plane implementation.
 
