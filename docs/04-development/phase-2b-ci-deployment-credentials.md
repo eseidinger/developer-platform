@@ -1,6 +1,6 @@
 # Phase 2B – CI Deployment Credentials
 
-Status: **source implementation is complete through DEV-012-T02 and the basic deployed suite passed on October 4, 2026. Expiry and identity-provider-outage drills are automated but owner-accepted as deferred for the current lab. Phase 2A is accepted under its recorded deferred checks.** Covers [F-14 and F-15](../01-product/requirements.md), [UC-08 and UC-09](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). The executable breakdown is preserved in the [automation implementation plan](phase-2b-automation-implementation-plan.md).
+Status: **accepted on October 4, 2026.** The basic deployed suite passed; expiry, controlled identity-provider-outage, and deployed backup-coverage checks are owner-accepted deferrals for the current lab. This is a sequencing decision, not evidence that those drills ran. Phase 2A is accepted under its recorded deferred checks. Covers [F-14 and F-15](../01-product/requirements.md), [UC-08 and UC-09](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). The executable breakdown is preserved in the [automation implementation plan](phase-2b-automation-implementation-plan.md).
 
 Execution tracking: [DEV-012-T01 through DEV-012-T03](delivery-backlog.md#phase-task-index).
 
