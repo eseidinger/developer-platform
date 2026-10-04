@@ -97,5 +97,19 @@ class WorkloadContract(unittest.TestCase):
         self.assertEqual(pod["restartPolicy"], "Never")
         self.assertEqual(pod["containers"][0]["env"], [{"name": "MODE", "value": "batch"}])
 
+    def test_updating_one_component_leaves_other_service_pod_template_unchanged(self):
+        shared = [{"name": "api", "type": "service", "resolved_image": "registry/api@sha256:one",
+                   "ports": [{"name": "http", "port": 8080}]},
+                  {"name": "web", "type": "service", "resolved_image": "registry/web@sha256:one",
+                   "ports": [{"name": "http", "port": 8081}]}]
+        before = component_resources("shop", shared, "172.30.80.10", "secret")
+        changed = [{**component, **({"resolved_image": "registry/api@sha256:two"} if component["name"] == "api" else {})}
+                   for component in shared]
+        after = component_resources("shop", changed, "172.30.80.10", "secret")
+        template = lambda docs, component: next(d for d in docs if d["kind"] == "Deployment" and
+                                                 d["metadata"]["name"] == component)["spec"]["template"]
+        self.assertEqual(template(before, "web"), template(after, "web"))
+        self.assertNotEqual(template(before, "api"), template(after, "api"))
+
 if __name__ == "__main__":
     unittest.main()
