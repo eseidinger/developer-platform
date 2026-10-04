@@ -42,6 +42,22 @@ The protected input supplies `platform_api_url`, `platform_human_admin_token`, a
 
 Only a human platform administrator can create, list, rotate, or revoke a root test runner. The runner can create disposable projects and temporary role personas, but it cannot mint another runner.
 
+To deliberately remove a runner, use a separate protected file containing
+`platform_api_url` and `platform_human_admin_token`. The runner JSON and its
+credential ID are not needed. The playbook resolves exactly one active runner by
+name and refuses an absent or ambiguous match. The explicit confirmation prevents
+that name from being revoked accidentally:
+
+```bash
+ansible-playbook ansible/revoke-platform-test-runner.yml \
+  -e @/path/to/protected-human-admin-vars.yml \
+  -e platform_confirm_test_runner_revocation=platform-acceptance-suite
+```
+
+Set `platform_test_runner_name` and the same confirmation value to revoke a
+different named runner. The command is irreversible: a replacement runner must
+be bootstrapped with a human token and receives a new one-time secret.
+
 ## 4. Run basic platform tests without a human token
 
 Run the suite with the protected bootstrap output as its variable file:
@@ -54,6 +70,34 @@ ansible-playbook ansible/test-platform.yml \
 The suite creates two unique empty projects, creates short-lived viewer, developer, and project-administrator service-account personas, verifies role and cross-project boundaries, creates a project deployment credential, and performs the project's first application deployment with it. It also exercises configuration, bounded credential rotation, immediate old-token denial, revocation, and best-effort cleanup from an Ansible `always` block. All client-secret and bearer-token tasks use `no_log: true`; the final report contains only the test-run ID and deployed revision.
 
 These personas test Platform API authorization through the same immutable OIDC subject and platform-owned grant path as human principals. They do not test an interactive browser login or a user's password flow.
+
+## 4A. Run the automated multi-service and scheduled-component acceptance suite
+
+After the basic suite, run the Phase 2A suite from a controller with the normal
+platform inventory. It uses the protected runner configuration, creates a unique
+disposable project and administrator persona, and delegates only read-only
+Kubernetes object checks to the platform host:
+
+```bash
+ansible-playbook -i ansible/inventory.yml \
+  ansible/test-platform-components.yml \
+  -e @/path/to/protected-test-runner.json
+```
+
+The suite waits for a real minute-based CronJob run and may take several minutes.
+It verifies legacy-to-component revision history, two ready internal services,
+scheduled access to both stable service names, `Forbid` non-overlap observed on
+each poll, invalid-cron rejection, an API-only update that leaves the peer
+Deployment generation unchanged, and a component-aware retirement preview. It
+always attempts to retire the disposable project and revoke its temporary persona.
+It assumes the inventory connects to the platform host as `root` and therefore
+does not invoke `sudo`. If the inventory instead uses an unprivileged SSH user,
+set `platform_component_drill_become=true` and provide that host's normal Ansible
+become credentials through an encrypted inventory or vars file.
+
+This does not replace the separate backup/recovery procedures. Triggering and
+inspecting encrypted backup storage requires distinct protected credentials and
+is kept in the [backup and recovery](backup-recovery.md) track.
 
 ## 5. Create a real empty project for later CI deployment
 

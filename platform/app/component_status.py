@@ -69,7 +69,7 @@ def _scheduled_status(runtime: Any, project: str, component: dict, log, now: dat
     try:
         jobs = runtime.resources.get(api_version="batch/v1", kind="Job").get(
             namespace="project-" + project,
-            label_selector="batch.kubernetes.io/cronjob-name=" + component["name"])
+            label_selector="platform.example/component=" + component["name"])
         for job in _field(jobs, "items", []) or []:
             job_status = _field(job, "status", {}) or {}
             for condition in _field(job_status, "conditions", []) or []:

@@ -89,10 +89,12 @@ class WorkloadContract(unittest.TestCase):
         service = next(d for d in docs if d["kind"] == "Service")
         self.assertEqual(service["metadata"]["name"], "api")
         self.assertEqual(service["spec"]["selector"]["platform.example/component"], "api")
-        cronjob = next(d for d in docs if d["kind"] == "CronJob")["spec"]
+        cronjob_document = next(d for d in docs if d["kind"] == "CronJob")
+        cronjob = cronjob_document["spec"]
         self.assertEqual(cronjob["schedule"], "*/15 * * * *")
         self.assertEqual(cronjob["timeZone"], "UTC")
         self.assertEqual(cronjob["concurrencyPolicy"], "Forbid")
+        self.assertEqual(cronjob["jobTemplate"]["metadata"]["labels"]["platform.example/component"], "worker")
         pod = cronjob["jobTemplate"]["spec"]["template"]["spec"]
         self.assertEqual(pod["restartPolicy"], "Never")
         self.assertEqual(pod["containers"][0]["env"], [{"name": "MODE", "value": "batch"}])

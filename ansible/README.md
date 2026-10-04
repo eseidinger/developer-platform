@@ -99,6 +99,22 @@ personas, performs the first deployment with a project CI credential, and cleans
 up without retaining the human token. `test-platform-ci-credential.yml` is the
 narrower compatibility check for an already prepared project.
 
+`test-platform-components.yml` is the Phase 2A acceptance suite. Run it with the
+normal platform inventory and the protected test-runner output; it creates and
+retires its own disposable project, so it needs no human token. It checks legacy
+migration, two stable internal Services, a scheduled internal connectivity probe,
+non-overlap, invalid-cron rejection, an isolated component update, revision
+history, and component retirement scope. It deliberately does not trigger or
+inspect backup storage: backup evidence remains a separate operational track.
+
+`revoke-platform-test-runner.yml` removes exactly one active named runner. Supply
+`platform_api_url` and a fresh human platform-administrator token; the runner JSON
+and credential ID are not needed. It defaults to `platform-acceptance-suite`; set
+`platform_test_runner_name` for another runner and set
+`platform_confirm_test_runner_revocation` to that same name. The playbook refuses
+no or ambiguous active matches, revokes Platform API access before provider cleanup,
+and polls until cleanup is complete.
+
 `verify-platform-test-runner-expiry.yml` is a two-stage, scheduled-safe expiry
 drill for a dedicated one-day test runner: run it once with
 `platform_expiry_drill_phase=active`, then schedule the same protected credential

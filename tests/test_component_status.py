@@ -63,6 +63,7 @@ class ComponentStatusTests(unittest.TestCase):
         self.assertEqual(result["state"], "failed")
         self.assertEqual(result["failure"], {"reason": "BackoffLimitExceeded"})
         self.assertNotIn("should-not-leak", str(result))
+        jobs.get.assert_called_once_with(namespace="project-shop", label_selector="platform.example/component=worker")
 
 
 if __name__ == "__main__":

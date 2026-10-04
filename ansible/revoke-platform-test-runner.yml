@@ -1,0 +1,71 @@
+---
+- name: Revoke an active platform test-runner credential
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    platform_test_runner_name: platform-acceptance-suite
+    platform_test_runner_revocation_retries: 12
+    platform_test_runner_revocation_delay_seconds: 5
+  tasks:
+    - name: Require a runner name, human authority, and explicit confirmation
+      ansible.builtin.assert:
+        that:
+          - platform_api_url is defined
+          - platform_human_admin_token is defined
+          - platform_test_runner_name | length > 0
+          - platform_confirm_test_runner_revocation is defined
+          - platform_confirm_test_runner_revocation == platform_test_runner_name
+        fail_msg: >-
+          Supply a fresh human platform-admin token, the runner name, and
+          platform_confirm_test_runner_revocation equal to that exact runner name.
+      no_log: true
+
+    - name: List runner metadata to resolve the active named runner
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/platform/test-runner-credentials"
+        headers:
+          Authorization: "Bearer {{ platform_human_admin_token }}"
+        status_code: 200
+      register: listed_test_runners
+      no_log: true
+
+    - name: Select the one active runner with the requested name
+      ansible.builtin.set_fact:
+        matching_test_runners: >-
+          {{ listed_test_runners.json.credentials
+             | selectattr('name', 'equalto', platform_test_runner_name)
+             | selectattr('status', 'equalto', 'active') | list }}
+      no_log: true
+
+    - name: Require exactly one active named runner
+      ansible.builtin.assert:
+        that: matching_test_runners | length == 1
+        fail_msg: >-
+          Expected exactly one active test runner named {{ platform_test_runner_name }};
+          no runner or an ambiguous selection was found.
+      no_log: true
+
+    - name: Resolve the selected credential ID internally
+      ansible.builtin.set_fact:
+        resolved_test_runner_credential_id: "{{ matching_test_runners[0].credential_id }}"
+      no_log: true
+
+    - name: Revoke the resolved runner and retry provider cleanup until complete
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/platform/test-runner-credentials/{{ resolved_test_runner_credential_id }}"
+        method: DELETE
+        headers:
+          Authorization: "Bearer {{ platform_human_admin_token }}"
+        status_code: [200, 202]
+      register: test_runner_revocation
+      until: test_runner_revocation.json.status == 'revoked'
+      retries: "{{ platform_test_runner_revocation_retries | int }}"
+      delay: "{{ platform_test_runner_revocation_delay_seconds | int }}"
+      no_log: true
+
+    - name: Report non-secret revocation evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: test runner {{ platform_test_runner_name }} is revoked; its platform grant is
+          denied and provider cleanup completed.

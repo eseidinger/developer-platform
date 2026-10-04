@@ -210,6 +210,6 @@ def component_resources(name, components, database_ip, password, configuration=N
                 "schedule": component["schedule"], "timeZone": component.get("time_zone", "UTC"),
                 "concurrencyPolicy": component.get("concurrency_policy", "Forbid"),
                 "successfulJobsHistoryLimit": 3, "failedJobsHistoryLimit": 3,
-                "jobTemplate": {"spec": {"backoffLimit": 1, "template": {"metadata": {"labels": component_labels},
+                "jobTemplate": {"metadata": {"labels": component_labels}, "spec": {"backoffLimit": 1, "template": {"metadata": {"labels": component_labels},
                     "spec": pod_spec(component, "Never")}}}}))
     return manifests

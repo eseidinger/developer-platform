@@ -1,7 +1,6 @@
 ---
 - name: Prove revocation fails closed during a controlled identity-provider outage
   hosts: localhost
-  connection: local
   gather_facts: false
   vars:
     platform_identity_outage_acknowledgement: ''

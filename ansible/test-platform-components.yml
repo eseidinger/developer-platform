@@ -1,0 +1,579 @@
+---
+- name: Accept the multi-service and scheduled-component platform contract
+  hosts: localhost
+  gather_facts: true
+  vars:
+    platform_component_service_image: hashicorp/http-echo:1.0.0
+    platform_component_job_image: busybox:1.36
+    platform_component_drill_host: platform
+    platform_component_kubectl: /opt/developer-platform/.runtime/bin/kubectl
+    platform_component_kubeconfig: /opt/developer-platform/.runtime/admin.kubeconfig
+    platform_component_drill_become: false
+  tasks:
+    - name: Require protected runner configuration and a platform inventory host
+      ansible.builtin.assert:
+        that:
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_component_drill_host in groups['all']
+        fail_msg: >-
+          Supply the protected test-runner configuration and run with the normal platform
+          inventory so read-only Kubernetes checks can be delegated to the platform host.
+      no_log: true
+
+    - name: Establish a unique disposable component project
+      ansible.builtin.set_fact:
+        component_run_id: "{{ platform_component_test_run_id | default('components-' + ansible_facts['date_time']['epoch']) }}"
+        component_project: "{{ platform_component_test_project | default('components-' + ansible_facts['date_time']['epoch']) }}"
+
+    - name: Inspect the configured kubectl executable on the delegated platform host
+      ansible.builtin.stat:
+        path: "{{ platform_component_kubectl }}"
+      delegate_to: "{{ platform_component_drill_host }}"
+      register: platform_component_kubectl_stat
+      changed_when: false
+
+    - name: Require an executable kubectl binary on the delegated platform host
+      ansible.builtin.assert:
+        that:
+          - platform_component_kubectl_stat.stat.exists
+          - platform_component_kubectl_stat.stat.isreg
+          - platform_component_kubectl_stat.stat.executable
+        fail_msg: >-
+          The configured kubectl executable {{ platform_component_kubectl }} is not an executable
+          regular file on delegated host {{ platform_component_drill_host }}.
+
+    - name: Verify the delegated platform host can execute kubectl
+      ansible.builtin.command:
+        argv: ["{{ platform_component_kubectl }}", version, --client]
+      delegate_to: "{{ platform_component_drill_host }}"
+      register: platform_component_kubectl_version
+      changed_when: false
+
+    - name: Exchange the reusable runner secret for a short-lived token
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: component_runner_token
+      no_log: true
+
+    - name: Exercise the component contract with a disposable project
+      block:
+        - name: Create the empty disposable project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+            body_format: json
+            body:
+              name: "{{ component_project }}"
+            status_code: 201
+          no_log: true
+
+        - name: Create a short-lived project administrator persona
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/platform/test-identities"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+            body_format: json
+            body:
+              name: "component-admin-{{ component_run_id }}"
+              role: project-admin
+              project: "{{ component_project }}"
+              test_run_id: "{{ component_run_id }}"
+              expires_in_hours: 2
+            status_code: 201
+          register: component_admin_credential
+          no_log: true
+
+        - name: Exchange the project administrator credential
+          ansible.builtin.uri:
+            url: "{{ component_admin_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ component_admin_credential.json.client_id }}"
+              client_secret: "{{ component_admin_credential.json.client_secret }}"
+            status_code: 200
+          register: component_admin_token
+          no_log: true
+
+        - name: Deploy the legacy single-service revision to establish migration history
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            body_format: json
+            body:
+              name: "{{ component_project }}"
+              image: "{{ platform_component_service_image }}"
+              port: 5678
+              probe_profile: hello-world
+            status_code: 202
+          register: legacy_deployment
+          no_log: true
+
+        - name: Wait for the legacy revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ legacy_deployment.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            status_code: 200
+          register: legacy_operation
+          until:
+            - legacy_operation.json.state == 'succeeded'
+            - legacy_operation.json.readiness.state == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Reject an invalid scheduled-component specification before side effects
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata:
+                name: "{{ component_project }}"
+              spec:
+                components:
+                  - name: invalid-schedule
+                    type: scheduled
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_job_image }}"
+                    schedule: every-minute
+            status_code: 422
+          no_log: true
+
+        - name: Migrate to two services and a non-overlapping scheduled component
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata:
+                name: "{{ component_project }}"
+              spec:
+                components:
+                  - name: api
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_service_image }}"
+                      args: ['-listen=:5678', '-text=component-api']
+                    ports:
+                      - name: http
+                        protocol: http
+                        port: 5678
+                  - name: peer
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_service_image }}"
+                      args: ['-listen=:5678', '-text=component-peer']
+                    ports:
+                      - name: http
+                        protocol: http
+                        port: 5678
+                  - name: probe
+                    type: scheduled
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_job_image }}"
+                      command: ['/bin/sh', '-ec']
+                      args: ['wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75']
+                    schedule: '* * * * *'
+                    timeZone: UTC
+                    concurrencyPolicy: Forbid
+            status_code: 202
+          register: component_deployment
+          no_log: true
+
+        - name: Require the component deployment operation to complete successfully
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ component_deployment.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            status_code: 200
+          register: component_deployment_operation
+          until: component_deployment_operation.json.state not in ['queued', 'running']
+          retries: 60
+          delay: 5
+          failed_when: component_deployment_operation.json.state != 'succeeded'
+          no_log: true
+
+        - name: Wait for both long-running components to become ready
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/components"
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            status_code: 200
+          register: component_status
+          until: >-
+            (component_status.json.components | selectattr('type', 'equalto', 'service') |
+             map(attribute='status.state') | list) == ['ready', 'ready']
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Require stable internal Services on Kubernetes
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - service
+              - -n
+              - "project-{{ component_project }}"
+              - -o
+              - jsonpath={.items[*].metadata.name}
+          delegate_to: "{{ platform_component_drill_host }}"
+          become: "{{ platform_component_drill_become | bool }}"
+          register: component_resources
+          changed_when: false
+
+        - name: Assert both internal Service names exist
+          ansible.builtin.assert:
+            that:
+              - "'api' in component_resources.stdout.split()"
+              - "'peer' in component_resources.stdout.split()"
+
+        - name: Wait for the scheduled CronJob to appear on Kubernetes
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - cronjob
+              - probe
+              - -n
+              - "project-{{ component_project }}"
+          delegate_to: "{{ platform_component_drill_host }}"
+          register: scheduled_component_resource
+          until: scheduled_component_resource.rc == 0
+          retries: 12
+          delay: 5
+          changed_when: false
+          failed_when: false
+
+        - name: Require the expected scheduled CronJob
+          ansible.builtin.assert:
+            that: scheduled_component_resource.rc == 0
+            fail_msg: >-
+              CronJob probe was not found in project-{{ component_project }} after the component
+              deployment succeeded.
+
+        - name: Wait for a successful scheduled internal connectivity probe without overlap
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/components"
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            status_code: 200
+          register: scheduled_status
+          until: >-
+            (scheduled_status.json.components | selectattr('name', 'equalto', 'probe') |
+             first).last_result == 'succeeded'
+          failed_when: >-
+            (scheduled_status.json.components | selectattr('name', 'equalto', 'probe') |
+             first).active_runs | int > 1
+          retries: 48
+          delay: 5
+          no_log: true
+
+        - name: Report non-secret scheduled component status
+          ansible.builtin.debug:
+            msg: >-
+              Scheduled probe status: {{ scheduled_status.json.components |
+              selectattr('name', 'equalto', 'probe') | first }}
+
+        - name: Read raw scheduled Job status before asserting success
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - jobs
+              - -n
+              - "project-{{ component_project }}"
+              - -l
+              - platform.example/component=probe
+              - -o
+              - "jsonpath={range .items[*]}{.metadata.name}{' succeeded='}{.status.succeeded}{' failed='}{.status.failed}{' active='}{.status.active}{' conditions='}{range .status.conditions[*]}{.type}{','}{end}{'\\n'}{end}"
+          delegate_to: "{{ platform_component_drill_host }}"
+          register: scheduled_job_status
+          changed_when: false
+          failed_when: false
+
+        - name: Read raw scheduled pod status before asserting success
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - pods
+              - -n
+              - "project-{{ component_project }}"
+              - -l
+              - platform.example/component=probe
+              - -o
+              - "jsonpath={range .items[*]}{.metadata.name}{' phase='}{.status.phase}{' reason='}{.status.reason}{'\\n'}{end}"
+          delegate_to: "{{ platform_component_drill_host }}"
+          register: scheduled_pod_status
+          changed_when: false
+          failed_when: false
+
+        - name: Report non-secret scheduled Job and pod evidence
+          ansible.builtin.debug:
+            msg: >-
+              Scheduled Job status: {{ scheduled_job_status.stdout | default('') }};
+              scheduled pod status: {{ scheduled_pod_status.stdout | default('') }}
+
+        - name: Require the scheduled internal connectivity probe to succeed
+          ansible.builtin.assert:
+            that: >-
+              (scheduled_status.json.components | selectattr('name', 'equalto', 'probe') |
+               first).last_result == 'succeeded'
+            fail_msg: >-
+              The scheduled probe did not succeed. Its non-secret status was reported above;
+              inspect its retained Kubernetes Job and pod logs before rerunning.
+
+        - name: Refresh the project administrator token before log inspection
+          ansible.builtin.uri:
+            url: "{{ component_admin_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ component_admin_credential.json.client_id }}"
+              client_secret: "{{ component_admin_credential.json.client_secret }}"
+            status_code: 200
+          register: component_admin_token_refresh
+          no_log: true
+
+        - name: Use the refreshed project administrator token
+          ansible.builtin.set_fact:
+            component_admin_access_token: "{{ component_admin_token_refresh.json.access_token }}"
+          no_log: true
+
+        - name: Verify scheduled logs show calls through both stable service names
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/logs?component=probe&tail=100"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: scheduled_logs
+          until: >-
+            'component-api' in (scheduled_logs.json.get('lines', []) | map(attribute='message') | join('\n')) and
+            'component-peer' in (scheduled_logs.json.get('lines', []) | map(attribute='message') | join('\n'))
+          retries: 12
+          delay: 5
+          no_log: true
+
+        - name: Capture the unchanged peer Deployment generation before an API-only update
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - deployment
+              - peer
+              - -n
+              - "project-{{ component_project }}"
+              - -o
+              - jsonpath={.metadata.generation}
+          delegate_to: "{{ platform_component_drill_host }}"
+          become: "{{ platform_component_drill_become | bool }}"
+          register: peer_before
+          changed_when: false
+
+        - name: Update only the API component
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata:
+                name: "{{ component_project }}"
+              spec:
+                components:
+                  - name: api
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_service_image }}"
+                      args: ['-listen=:5678', '-text=component-api-v2']
+                    ports: [{name: http, protocol: http, port: 5678}]
+                  - name: peer
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_service_image }}"
+                      args: ['-listen=:5678', '-text=component-peer']
+                    ports: [{name: http, protocol: http, port: 5678}]
+                  - name: probe
+                    type: scheduled
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_job_image }}"
+                      command: ['/bin/sh', '-ec']
+                      args: ['wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75']
+                    schedule: '* * * * *'
+                    timeZone: UTC
+                    concurrencyPolicy: Forbid
+            status_code: 202
+          register: api_only_update
+          no_log: true
+
+        - name: Wait for the API-only update
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ api_only_update.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: api_update_operation
+          until: api_update_operation.json.state == 'succeeded'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Capture the peer Deployment generation after the API-only update
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - deployment
+              - peer
+              - -n
+              - "project-{{ component_project }}"
+              - -o
+              - jsonpath={.metadata.generation}
+          delegate_to: "{{ platform_component_drill_host }}"
+          become: "{{ platform_component_drill_become | bool }}"
+          register: peer_after
+          changed_when: false
+
+        - name: Require the unchanged peer Deployment not to roll
+          ansible.builtin.assert:
+            that: peer_before.stdout == peer_after.stdout
+            fail_msg: The unchanged peer Deployment generation changed during the API-only update.
+
+        - name: Verify migration preserved the legacy revision and component revision history
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/revisions"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: component_revisions
+          failed_when: >-
+            component_revisions.json.revisions | length < 3 or
+            (component_revisions.json.revisions | selectattr('components', 'defined') | list | length) < 3
+          no_log: true
+
+        - name: Read the component retirement scope
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/retirement-preview"
+            headers:
+              Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+            status_code: 200
+          register: component_retirement
+          no_log: true
+
+        - name: Require retirement to include services and the scheduled resource while retaining data
+          ansible.builtin.assert:
+            that:
+              - component_retirement.json.removes | selectattr('kind', 'equalto', 'Deployment') | list | length == 2
+              - component_retirement.json.removes | selectattr('kind', 'equalto', 'CronJob') | list | length == 1
+              - component_retirement.json.retains | length > 0
+          no_log: true
+
+        - name: Report non-secret Phase 2A acceptance evidence
+          ansible.builtin.debug:
+            msg: >-
+              PASS: {{ component_run_id }} migrated a legacy project to two internal services and
+              one scheduled probe, observed non-overlap, isolated an API update, and verified retirement scope.
+      always:
+        - name: Refresh the runner token before disposable-project cleanup
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: component_cleanup_runner_token
+          failed_when: false
+          no_log: true
+
+        - name: Retire the disposable component project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/retirement-preview"
+            headers:
+              Authorization: "Bearer {{ component_cleanup_runner_token.json.access_token }}"
+            status_code: [200, 404]
+          register: component_cleanup_preview
+          failed_when: false
+          no_log: true
+
+        - name: Confirm disposable component project retirement
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/retire"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+            body_format: json
+            body:
+              confirm_name: "{{ component_project }}"
+              scope_token: "{{ component_cleanup_preview.json.scope_token }}"
+            status_code: [200, 202, 404, 409]
+          register: component_cleanup
+          until: component_cleanup.status != 202
+          retries: 20
+          delay: 2
+          failed_when: false
+          when: component_cleanup_preview.status | default(0) | int == 200
+          no_log: true
+
+        - name: Revoke the disposable component administrator persona
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/platform/test-identities/{{ component_admin_credential.json.credential_id }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ component_cleanup_runner_token.json.access_token }}"
+            status_code: [200, 202, 404]
+          failed_when: false
+          when: component_admin_credential is defined
+          no_log: true
