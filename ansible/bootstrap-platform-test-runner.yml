@@ -1,0 +1,55 @@
+---
+- name: Bootstrap the reusable platform test-runner credential
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    platform_test_runner_name: platform-acceptance-suite
+    platform_test_runner_expires_in_days: 7
+  tasks:
+    - name: Require human bootstrap inputs and a protected output path
+      ansible.builtin.assert:
+        that:
+          - platform_api_url is defined
+          - platform_human_admin_token is defined
+          - platform_test_runner_output is defined
+          - platform_test_runner_output | length > 0
+        fail_msg: >-
+          Supply platform_api_url, platform_human_admin_token, and an explicit protected
+          platform_test_runner_output path.
+      no_log: true
+
+    - name: Create an expiring test-runner identity
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/platform/test-runner-credentials"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ platform_human_admin_token }}"
+        body_format: json
+        body:
+          name: "{{ platform_test_runner_name }}"
+          expires_in_days: "{{ platform_test_runner_expires_in_days }}"
+        status_code: 201
+      register: test_runner
+      no_log: true
+
+    - name: Write the one-time credential to its protected destination
+      ansible.builtin.copy:
+        dest: "{{ platform_test_runner_output }}"
+        mode: "0600"
+        content: >-
+          {{ {'platform_api_url': platform_api_url,
+              'platform_oidc_token_url': test_runner.json.token_endpoint,
+              'platform_test_runner_client_id': test_runner.json.client_id,
+              'platform_test_runner_client_secret': test_runner.json.client_secret,
+              'platform_test_runner_credential_id': test_runner.json.credential_id,
+              'platform_test_runner_expires_at': test_runner.json.expires_at} | to_nice_json }}
+      no_log: true
+
+    - name: Report the safe bootstrap result
+      ansible.builtin.debug:
+        msg: >-
+          Test runner {{ test_runner.json.credential_id }} expires at
+          {{ test_runner.json.expires_at }}; its protected configuration was written to
+          {{ platform_test_runner_output }}.
+

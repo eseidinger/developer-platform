@@ -78,7 +78,7 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
                        "stale_revision", "rejected", False, log)
         return
     if not actor_issuer or not actor_subject or not is_allowed(
-            conn, Principal(actor_issuer, actor_subject), "change", project):
+            conn, Principal(actor_issuer, actor_subject), "deploy", project):
         _finish_failed(conn, operation_id, actor, project, revision,
                        "authorization_revoked", "denied", True, log)
         return

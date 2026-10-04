@@ -19,10 +19,11 @@ As of October 4, 2026. Future phases are proposals without confirmed dates.
 | October 2, 2026 | Generic OIDC boundary accepted with Keycloak as the supported lab reference | Platform-owned project grants and Phase 1B roles selected, implemented, and accepted under the recorded owner-directed alert-delivery exception |
 | October 4, 2026 | Multi-service application with a cron-triggered component prioritized | F-13 and UC-07 added; versioned contract, migration, internal discovery, scheduled-run status, and Kubernetes acceptance are the next Phase 2A increment |
 | October 4, 2026 | Revocable CI deployment credentials prioritized after multi-service support | F-14, UC-08, and ADR-018 added; scoped OIDC machine credentials and immediate platform revocation form Phase 2B; former Phase 2B work moves to 2C |
+| October 4, 2026 | Empty-project and machine-driven platform acceptance added to Phase 2B | F-15 and UC-09 add human-bootstrapped test-runner credentials, temporary role personas, and first deployment by CI after empty-project creation |
 
 ## Implementation status
 
-The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A is the next gate; Phase 2B, Phase 2C, and all later gates remain open. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment. Phase 1A criterion-level evidence is recorded under [backup and recovery](delivery-backlog.md#current-backup-and-recovery-progress) and [monitoring](delivery-backlog.md#current-monitoring-progress).
+The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A source implementation exists but its live acceptance is deferred by owner direction. Phase 2B implementation proceeds next; this sequencing exception does not mark Phase 2A accepted. Phase 2C and all later gates remain open. Consult task notes and the verification register for revisions, environments and limits.
 
 ## Work sequence and gates
 
@@ -30,7 +31,7 @@ The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source o
 flowchart LR
     Baseline["Inspect Existing Prototype"] --> P1["1 Foundation and Vertical Slice"]
     P1 --> P2A["2A Multi-service and Scheduled Component"]
-    P2A --> P2B["2B CI Deployment Credentials"]
+    P2A -. "live acceptance deferred" .-> P2B["2B CI Deployment Credentials"]
     P2B --> P2C["2C Contract and Second Provider"]
     P2C --> P3["3 Developer Experience"]
     P3 --> P4["4 AI Operations / Development"]
@@ -46,7 +47,7 @@ flowchart LR
 |---|---|---|
 | [1](phase-1-foundation.md) | Access to actual code and target host | 1A operational protection, 1B accountable access/security alerts, 1C durable lifecycle and minimal API/CLI, with target ownership seams in the Python baseline |
 | [2A](phase-2a-multi-service-scheduled-application.md) | Accepted Phase 1 vertical slice | Versioned multi-service contract; internal discovery; independently observable long-running services and cron-triggered component on Kubernetes; lossless single-component migration |
-| [2B](phase-2b-ci-deployment-credentials.md) | Accepted Phase 2A vertical slice and IAM boundary | Scoped, expiring, rotatable, revocable OIDC machine credential; CI deploy/observe flow; immediate platform denial and redacted audit evidence |
+| [2B](phase-2b-ci-deployment-credentials.md) | IAM boundary; Phase 2A live gate explicitly deferred by owner | Empty-project bootstrap; scoped deployment credentials; human-created test runner and temporary role personas; machine-driven deploy/observe and authorization suite; immediate platform denial and redacted audit evidence |
 | [2C](phase-2-platform-api.md) | Accepted Phase 2A and 2B vertical slices | Stable catalog/control-plane/worker contracts, gated service migration, retained packages, and direct Docker parity, including scheduled and machine-identity handling |
 | [3](phase-3-developer-experience.md) | Reliable lifecycle, authorization, and migrated public contracts from Phase 2C | Portal, templates, human database access, application OIDC across catalog and control-plane APIs |
 | [4](phase-4-ai-operations.md) | Access-controlled data and deployment history | Python-based evidence assistance and controlled actions through the control plane |
@@ -90,7 +91,7 @@ The table assigns delivery responsibility by role; named delivery owners, dates,
 | DEV-009 | F-02/F-08, N-03 | Phase 2C public/private transitions, TLS and outbound policy; advanced per-component policy deferred | Networking |
 | DEV-010 | F-03, N-03/N-05 | 1C binding/preservation; Phase 2C availability and tracked operator recovery requests | API / operations |
 | DEV-011 | F-05/F-13, N-02/N-08 | 1C confirmed application removal with retained data; Phase 2A all-component retirement preview/cleanup | API |
-| DEV-012 | F-14, N-03/N-04/N-08 | Phase 2B: scoped, expiring, rotatable and immediately revocable OIDC machine credentials for CI deployment | API / security |
+| DEV-012 | F-14/F-15, N-03/N-04/N-08 | Phase 2B: empty-project bootstrap plus scoped deployment and test-automation OIDC identities with expiry, rotation, immediate revocation, and machine-driven acceptance | API / security |
 | OPS-001 | N-08 | 1B durable audit, inspection, restricted filtering/export and retention | Security |
 | OPS-002 | N-06/N-08 extension | 1B configurable security alerts with evidence and tested delivery | Security / operations |
 | OPS-003 | N-07, F-06 | Phase 2C host/shared-service/project capacity views and alerts; representative Phase 2A capacity measurement and 1C baseline | Operations |

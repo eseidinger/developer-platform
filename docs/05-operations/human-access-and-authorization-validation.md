@@ -1,4 +1,4 @@
-# Phase 1B access-validation runbook
+# Human access and authorization validation
 
 Use this controlled lab procedure to gather evidence for individual OIDC access,
 platform-owned project grants, immediate grant revocation, and durable audit

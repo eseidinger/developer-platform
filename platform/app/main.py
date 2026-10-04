@@ -9,7 +9,7 @@ import io
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional, Union
 from contextlib import asynccontextmanager
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import psycopg
 from psycopg import sql
@@ -44,8 +44,13 @@ from .logs import observe_logs
 from .component_status import observe_components
 from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
                       remove_secret, revert_secret, roll_pods, validate_secret_name, validate_secret_value, write_secret)
-from .retirement import removal_scope
+from .retirement import removal_scope, scope_token as retirement_scope_token
 from .security_alerts import security_alert_loop
+from .deployment_credentials import access_scope, cleanup_loop as credential_cleanup_loop
+from .deployment_credentials import initialize as initialize_deployment_credentials, record_use
+from .deployment_credentials import public_record as public_credential_record
+from .keycloak_credentials import ProviderError as CredentialProviderError
+from .keycloak_credentials import create_client as create_credential_client, delete_client as delete_credential_client
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -67,11 +72,13 @@ async def lifespan(app):
     with connect() as conn:
         conn.execute("REVOKE ALL ON DATABASE platform FROM PUBLIC")
         conn.execute("""CREATE TABLE IF NOT EXISTS projects (
-            name TEXT PRIMARY KEY, spec JSONB NOT NULL, status TEXT NOT NULL,
+            name TEXT PRIMARY KEY, spec JSONB, status TEXT NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+        conn.execute("ALTER TABLE projects ALTER COLUMN spec DROP NOT NULL")
         initialize_catalog(conn)
         initialize_audit(conn)
         initialize_authorization(conn)
+        initialize_deployment_credentials(conn)
         bootstrap = bootstrap_platform_admin(conn, verifier.issuer)
     if bootstrap:
         required_audit(Actor("bootstrap", bootstrap.audit_id), "membership.bootstrap", "platform-grant",
@@ -99,6 +106,11 @@ async def lifespan(app):
         daemon=True,
     )
     drift_worker.start()
+    credential_cleanup_worker = threading.Thread(
+        target=credential_cleanup_loop,
+        args=(stop, connect, delete_credential_client, best_effort_audit, log), daemon=True,
+    )
+    credential_cleanup_worker.start()
     try:
         yield
     finally:
@@ -107,6 +119,7 @@ async def lifespan(app):
         security_worker.join(timeout=6)
         operation_worker.join(timeout=6)
         drift_worker.join(timeout=6)
+        credential_cleanup_worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 
@@ -162,6 +175,13 @@ def current_principal(request: Request, credentials: HTTPAuthorizationCredential
         raise HTTPException(401, "Invalid OIDC access token")
     with connect() as conn:
         upsert_principal(conn, principal)
+        machine = access_scope(conn, principal)
+        if machine is not None and not machine.active:
+            best_effort_audit(actor_for(principal), "authentication", "automation-credential",
+                              str(machine.credential_id), "denied", {"project": machine.project},
+                              {"reason": "revoked_or_expired", "kind": machine.kind})
+            raise HTTPException(403, "Automation credential is revoked or expired")
+        record_use(conn, principal)
     request.state.audit_actor = actor_for(principal)
     return principal
 
@@ -186,6 +206,30 @@ def require_platform_admin(principal: Principal) -> None:
     required_audit(actor, "authorization", "platform", None, "denied", {"scope": "platform"},
                    {"permission": "platform-admin"})
     raise HTTPException(403, "Platform administrator permission is required")
+
+
+def require_human_platform_admin(principal: Principal) -> None:
+    """Require a platform administrator that is not backed by an automation credential."""
+    require_platform_admin(principal)
+    with connect() as conn:
+        machine = access_scope(conn, principal)
+    if machine is None:
+        return
+    required_audit(actor_for(principal), "authorization", "platform", None, "denied",
+                   {"scope": "platform"}, {"permission": "human-platform-admin"})
+    raise HTTPException(403, "A human platform administrator is required")
+
+
+def require_test_identity_manager(principal: Principal) -> None:
+    """Permit a human platform administrator or the dedicated test-runner profile."""
+    require_platform_admin(principal)
+    with connect() as conn:
+        machine = access_scope(conn, principal)
+    if machine is None or machine.kind == "test-runner":
+        return
+    required_audit(actor_for(principal), "authorization", "platform", None, "denied",
+                   {"scope": "platform"}, {"permission": "test-identity-manager"})
+    raise HTTPException(403, "Only a human platform administrator or test runner may manage test identities")
 
 
 @app.exception_handler(RequestValidationError)
@@ -243,6 +287,53 @@ class Project(BaseModel):
     def check_name(cls, value):
         return validate_name(value)
 
+
+class DeploymentCredentialCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+    expires_in_days: int = Field(default=30, ge=1, le=90)
+
+
+class DeploymentCredentialRotate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    expires_in_days: int = Field(default=30, ge=1, le=90)
+    overlap_hours: int = Field(default=1, ge=0, le=24)
+
+
+class EmptyProjectCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def check_name(cls, value):
+        return validate_name(value)
+
+
+class TestRunnerCredentialCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+    expires_in_days: int = Field(default=7, ge=1, le=30)
+
+
+class TestIdentityCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    name: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+    role: Literal["viewer", "developer", "project-admin", "platform-admin"]
+    project: str | None = None
+    test_run_id: str = Field(min_length=1, max_length=64, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9._-]*$")
+    expires_in_hours: int = Field(default=2, ge=1, le=24)
+
+    @model_validator(mode="after")
+    def role_scope(self):
+        if self.role == "platform-admin" and self.project is not None:
+            raise ValueError("platform-admin must use platform scope")
+        if self.role != "platform-admin" and self.project is None:
+            raise ValueError("project roles require a project")
+        if self.project is not None:
+            self.project = validate_name(self.project)
+        return self
+
 def password_for(name):
     return hmac.new(os.environ["DATABASE_KEY"].encode(), name.encode(), hashlib.sha256).hexdigest()
 
@@ -294,10 +385,418 @@ def projects(principal: Principal = Depends(current_principal)):
     return [{"name": name, "spec": spec, "status": status} for name, spec, status in rows]
 
 
+@app.post("/projects")
+def create_empty_project(body: EmptyProjectCreate, principal: Principal = Depends(current_principal)):
+    """Create an authorization and credential scope before its first deployment."""
+    require_platform_admin(principal)
+    actor = actor_for(principal)
+    with connect() as conn:
+        row = conn.execute("""INSERT INTO projects(name, spec, status) VALUES (%s, NULL, 'empty')
+            ON CONFLICT(name) DO NOTHING RETURNING name, status, updated_at""", (body.name,)).fetchone()
+    if row is None:
+        required_audit(actor, "project.create", "project", body.name, "rejected",
+                       {"project": body.name}, {"reason": "name_in_use"})
+        return JSONResponse(status_code=409, content={
+            "detail": "Project name is already in use", "code": "name_in_use"})
+    required_audit(actor, "project.create", "project", body.name, "succeeded",
+                   {"project": body.name}, {"status": "empty"})
+    return JSONResponse(status_code=201, content=jsonable_encoder({
+        "name": row[0], "status": row[1], "spec": None, "created_at": row[2]}))
+
+
 @app.get("/v1/capabilities")
 def capabilities(principal: Principal = Depends(current_principal)):
     """Declare what a deployment spec may request in each environment."""
     return {**CAPABILITIES, "imageRegistries": sorted(allowed_registries())}
+
+
+@app.post("/projects/{name}/deployment-credentials")
+def create_deployment_credential(name: str, body: DeploymentCredentialCreate,
+                                 principal: Principal = Depends(current_principal)):
+    """Create a project-scoped OIDC client and return its secret exactly once."""
+    require_permission(principal, "grant", name)
+    actor = actor_for(principal)
+    provider = None
+    try:
+        with connect() as conn:
+            if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+                raise HTTPException(404, "Unknown project")
+        provider = create_credential_client(f"{name}: {body.name}")
+        machine = Principal(verifier.issuer, provider["subject"], "CI " + body.name)
+        with connect() as conn, conn.transaction():
+            grant_role(conn, machine, "project", name, "developer")
+            row = conn.execute("""INSERT INTO deployment_credentials(
+                    name, project, issuer, subject, provider_client_id, provider_resource_id,
+                    status, created_by_issuer, created_by_subject, expires_at)
+                VALUES (%s,%s,%s,%s,%s,%s,'active',%s,%s,now()+make_interval(days => %s))
+                RETURNING credential_id, name, kind, project, environment, status, created_at,
+                          expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id""",
+                (body.name, name, machine.issuer, machine.subject, provider["client_id"],
+                 provider["provider_resource_id"], principal.issuer, principal.subject,
+                 body.expires_in_days)).fetchone()
+        result = {**public_credential_record(row), "token_endpoint": verifier.issuer + "/protocol/openid-connect/token",
+                  "client_id": provider["client_id"], "client_secret": provider["client_secret"]}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if provider:
+            try:
+                delete_credential_client(provider["provider_resource_id"])
+            except Exception:
+                pass
+        required_audit(actor, "deployment-credential.create", "project", name, "failed",
+                       {"project": name}, {"error_type": type(exc).__name__})
+        raise HTTPException(503, "Credential creation failed without returning a usable secret")
+    required_audit(actor, "deployment-credential.create", "deployment-credential", result["credential_id"],
+                   "succeeded", {"project": name}, {"name": body.name, "expires_at": result["expires_at"]})
+    return JSONResponse(status_code=201, content=jsonable_encoder(result))
+
+
+@app.get("/projects/{name}/deployment-credentials")
+def list_deployment_credentials(name: str, principal: Principal = Depends(current_principal)):
+    require_permission(principal, "grant", name)
+    with connect() as conn:
+        rows = conn.execute("""SELECT credential_id, name, kind, project, environment, status, created_at,
+                expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id
+            FROM deployment_credentials WHERE kind='deployment' AND project=%s
+            ORDER BY created_at, credential_id""", (name,)).fetchall()
+    required_audit(actor_for(principal), "deployment-credential.list", "project", name, "succeeded",
+                   {"project": name}, {"count": len(rows)})
+    return {"project": name, "credentials": [public_credential_record(row) for row in rows]}
+
+
+@app.post("/projects/{name}/deployment-credentials/{credential_id}/rotate")
+def rotate_deployment_credential(name: str, credential_id: UUID, body: DeploymentCredentialRotate,
+                                 principal: Principal = Depends(current_principal)):
+    """Create a linked replacement and bound how long the predecessor remains usable."""
+    require_permission(principal, "grant", name)
+    actor = actor_for(principal)
+    with connect() as conn:
+        predecessor = conn.execute("""SELECT name, status, expires_at>now()
+            FROM deployment_credentials WHERE kind='deployment' AND project=%s AND credential_id=%s""",
+                                   (name, credential_id)).fetchone()
+    if predecessor is None:
+        raise HTTPException(404, "Unknown deployment credential")
+    if predecessor[1] != "active" or not predecessor[2]:
+        raise HTTPException(409, "Only an active deployment credential can be rotated")
+
+    suffix = "-r-" + uuid4().hex[:8]
+    replacement_name = predecessor[0][:(64 - len(suffix))] + suffix
+    provider = None
+    try:
+        provider = create_credential_client(f"{name}: {replacement_name}")
+        machine = Principal(verifier.issuer, provider["subject"], "CI " + replacement_name)
+        with connect() as conn, conn.transaction():
+            locked = conn.execute("""SELECT status, expires_at>now()
+                FROM deployment_credentials WHERE kind='deployment' AND project=%s AND credential_id=%s FOR UPDATE""",
+                                  (name, credential_id)).fetchone()
+            if locked is None or locked[0] != "active" or not locked[1]:
+                raise RuntimeError("Deployment credential became inactive during rotation")
+            grant_role(conn, machine, "project", name, "developer")
+            row = conn.execute("""INSERT INTO deployment_credentials(
+                    name, project, issuer, subject, provider_client_id, provider_resource_id,
+                    status, created_by_issuer, created_by_subject, expires_at, rotated_from)
+                VALUES (%s,%s,%s,%s,%s,%s,'active',%s,%s,now()+make_interval(days => %s),%s)
+                RETURNING credential_id, name, kind, project, environment, status, created_at,
+                          expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id""",
+                (replacement_name, name, machine.issuer, machine.subject, provider["client_id"],
+                 provider["provider_resource_id"], principal.issuer, principal.subject,
+                 body.expires_in_days, credential_id)).fetchone()
+            old_expiry = conn.execute("""UPDATE deployment_credentials
+                    SET expires_at=LEAST(expires_at, now()+make_interval(hours => %s))
+                WHERE credential_id=%s RETURNING expires_at""",
+                                      (body.overlap_hours, credential_id)).fetchone()[0]
+        result = {**public_credential_record(row),
+                  "token_endpoint": verifier.issuer + "/protocol/openid-connect/token",
+                  "client_id": provider["client_id"], "client_secret": provider["client_secret"],
+                  "predecessor_id": str(credential_id), "predecessor_expires_at": old_expiry.isoformat()}
+    except Exception as exc:
+        if provider:
+            try:
+                delete_credential_client(provider["provider_resource_id"])
+            except Exception:
+                pass
+        required_audit(actor, "deployment-credential.rotate", "deployment-credential", str(credential_id),
+                       "failed", {"project": name}, {"error_type": type(exc).__name__})
+        raise HTTPException(503, "Credential rotation failed without returning a usable secret")
+    required_audit(actor, "deployment-credential.rotate", "deployment-credential", result["credential_id"],
+                   "succeeded", {"project": name},
+                   {"rotated_from": str(credential_id), "overlap_hours": body.overlap_hours,
+                    "expires_at": result["expires_at"]})
+    return JSONResponse(status_code=201, content=jsonable_encoder(result))
+
+
+@app.delete("/projects/{name}/deployment-credentials/{credential_id}")
+def revoke_deployment_credential(name: str, credential_id: UUID,
+                                principal: Principal = Depends(current_principal)):
+    """Deny platform access first, then remove the identity-provider client."""
+    require_permission(principal, "grant", name)
+    actor = actor_for(principal)
+    with connect() as conn, conn.transaction():
+        row = conn.execute("""SELECT provider_resource_id, issuer, subject, status
+            FROM deployment_credentials WHERE kind='deployment' AND project=%s AND credential_id=%s FOR UPDATE""",
+                           (name, credential_id)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Unknown deployment credential")
+        if row[3] == "revoked":
+            return {"credential_id": str(credential_id), "status": "revoked"}
+        revoke_role(conn, row[1], row[2], "project", name)
+        conn.execute("""UPDATE deployment_credentials SET status='revocation_pending'
+            WHERE credential_id=%s""", (credential_id,))
+    try:
+        delete_credential_client(row[0])
+    except CredentialProviderError:
+        required_audit(actor, "deployment-credential.revoke", "deployment-credential", str(credential_id),
+                       "failed", {"project": name}, {"state": "revocation_pending"})
+        return JSONResponse(status_code=202, content={"credential_id": str(credential_id),
+                                                      "status": "revocation_pending"})
+    with connect() as conn:
+        conn.execute("""UPDATE deployment_credentials SET status='revoked', revoked_at=now()
+            WHERE credential_id=%s""", (credential_id,))
+    required_audit(actor, "deployment-credential.revoke", "deployment-credential", str(credential_id),
+                   "succeeded", {"project": name}, {"status": "revoked"})
+    return {"credential_id": str(credential_id), "status": "revoked"}
+
+
+@app.post("/platform/test-runner-credentials")
+def create_test_runner_credential(body: TestRunnerCredentialCreate,
+                                  principal: Principal = Depends(current_principal)):
+    """Create the reusable suite identity; automation identities cannot invoke this endpoint."""
+    require_human_platform_admin(principal)
+    actor = actor_for(principal)
+    provider = None
+    try:
+        provider = create_credential_client("Platform test runner: " + body.name)
+        machine = Principal(verifier.issuer, provider["subject"], "Test runner " + body.name)
+        with connect() as conn, conn.transaction():
+            grant_role(conn, machine, "platform", None, "platform-admin")
+            row = conn.execute("""INSERT INTO deployment_credentials(
+                    name, kind, project, issuer, subject, provider_client_id, provider_resource_id,
+                    status, created_by_issuer, created_by_subject, expires_at)
+                VALUES (%s,'test-runner',NULL,%s,%s,%s,%s,'active',%s,%s,
+                        now()+make_interval(days => %s))
+                RETURNING credential_id, name, kind, project, environment, status, created_at,
+                          expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id""",
+                (body.name, machine.issuer, machine.subject, provider["client_id"],
+                 provider["provider_resource_id"], principal.issuer, principal.subject,
+                 body.expires_in_days)).fetchone()
+        result = {**public_credential_record(row),
+                  "token_endpoint": verifier.issuer + "/protocol/openid-connect/token",
+                  "client_id": provider["client_id"], "client_secret": provider["client_secret"]}
+    except Exception as exc:
+        if provider:
+            try:
+                delete_credential_client(provider["provider_resource_id"])
+            except Exception:
+                pass
+        required_audit(actor, "test-runner-credential.create", "platform", None, "failed",
+                       {"scope": "platform"}, {"error_type": type(exc).__name__})
+        raise HTTPException(503, "Test-runner creation failed without returning a usable secret")
+    required_audit(actor, "test-runner-credential.create", "automation-credential",
+                   result["credential_id"], "succeeded", {"scope": "platform"},
+                   {"name": body.name, "expires_at": result["expires_at"]})
+    return JSONResponse(status_code=201, content=jsonable_encoder(result))
+
+
+@app.get("/platform/test-runner-credentials")
+def list_test_runner_credentials(principal: Principal = Depends(current_principal)):
+    require_human_platform_admin(principal)
+    with connect() as conn:
+        rows = conn.execute("""SELECT credential_id, name, kind, project, environment, status, created_at,
+                expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id
+            FROM deployment_credentials WHERE kind='test-runner'
+            ORDER BY created_at, credential_id""").fetchall()
+    required_audit(actor_for(principal), "test-runner-credential.list", "platform", None, "succeeded",
+                   {"scope": "platform"}, {"count": len(rows)})
+    return {"credentials": [public_credential_record(row) for row in rows]}
+
+
+@app.post("/platform/test-runner-credentials/{credential_id}/rotate")
+def rotate_test_runner_credential(credential_id: UUID, body: DeploymentCredentialRotate,
+                                  principal: Principal = Depends(current_principal)):
+    require_human_platform_admin(principal)
+    actor = actor_for(principal)
+    with connect() as conn:
+        predecessor = conn.execute("""SELECT name, status, expires_at>now()
+            FROM deployment_credentials WHERE kind='test-runner' AND credential_id=%s""",
+                                   (credential_id,)).fetchone()
+    if predecessor is None:
+        raise HTTPException(404, "Unknown test-runner credential")
+    if predecessor[1] != "active" or not predecessor[2]:
+        raise HTTPException(409, "Only an active test-runner credential can be rotated")
+    suffix = "-r-" + uuid4().hex[:8]
+    replacement_name = predecessor[0][:(64 - len(suffix))] + suffix
+    provider = None
+    try:
+        provider = create_credential_client("Platform test runner: " + replacement_name)
+        machine = Principal(verifier.issuer, provider["subject"], "Test runner " + replacement_name)
+        with connect() as conn, conn.transaction():
+            locked = conn.execute("""SELECT status, expires_at>now() FROM deployment_credentials
+                WHERE kind='test-runner' AND credential_id=%s FOR UPDATE""", (credential_id,)).fetchone()
+            if locked is None or locked[0] != "active" or not locked[1]:
+                raise RuntimeError("Test-runner credential became inactive during rotation")
+            grant_role(conn, machine, "platform", None, "platform-admin")
+            row = conn.execute("""INSERT INTO deployment_credentials(
+                    name, kind, project, issuer, subject, provider_client_id, provider_resource_id,
+                    status, created_by_issuer, created_by_subject, expires_at, rotated_from)
+                VALUES (%s,'test-runner',NULL,%s,%s,%s,%s,'active',%s,%s,
+                        now()+make_interval(days => %s),%s)
+                RETURNING credential_id, name, kind, project, environment, status, created_at,
+                          expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id""",
+                (replacement_name, machine.issuer, machine.subject, provider["client_id"],
+                 provider["provider_resource_id"], principal.issuer, principal.subject,
+                 body.expires_in_days, credential_id)).fetchone()
+            old_expiry = conn.execute("""UPDATE deployment_credentials
+                    SET expires_at=LEAST(expires_at, now()+make_interval(hours => %s))
+                WHERE credential_id=%s RETURNING expires_at""",
+                                      (body.overlap_hours, credential_id)).fetchone()[0]
+        result = {**public_credential_record(row),
+                  "token_endpoint": verifier.issuer + "/protocol/openid-connect/token",
+                  "client_id": provider["client_id"], "client_secret": provider["client_secret"],
+                  "predecessor_id": str(credential_id), "predecessor_expires_at": old_expiry.isoformat()}
+    except Exception as exc:
+        if provider:
+            try:
+                delete_credential_client(provider["provider_resource_id"])
+            except Exception:
+                pass
+        required_audit(actor, "test-runner-credential.rotate", "automation-credential",
+                       str(credential_id), "failed", {"scope": "platform"},
+                       {"error_type": type(exc).__name__})
+        raise HTTPException(503, "Test-runner rotation failed without returning a usable secret")
+    required_audit(actor, "test-runner-credential.rotate", "automation-credential",
+                   result["credential_id"], "succeeded", {"scope": "platform"},
+                   {"rotated_from": str(credential_id), "overlap_hours": body.overlap_hours})
+    return JSONResponse(status_code=201, content=jsonable_encoder(result))
+
+
+@app.delete("/platform/test-runner-credentials/{credential_id}")
+def revoke_test_runner_credential(credential_id: UUID,
+                                  principal: Principal = Depends(current_principal)):
+    require_human_platform_admin(principal)
+    actor = actor_for(principal)
+    with connect() as conn, conn.transaction():
+        row = conn.execute("""SELECT provider_resource_id, issuer, subject, status
+            FROM deployment_credentials WHERE kind='test-runner' AND credential_id=%s FOR UPDATE""",
+                           (credential_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Unknown test-runner credential")
+        if row[3] == "revoked":
+            return {"credential_id": str(credential_id), "status": "revoked"}
+        revoke_role(conn, row[1], row[2], "platform", None)
+        conn.execute("UPDATE deployment_credentials SET status='revocation_pending' WHERE credential_id=%s",
+                     (credential_id,))
+    try:
+        delete_credential_client(row[0])
+    except CredentialProviderError:
+        required_audit(actor, "test-runner-credential.revoke", "automation-credential",
+                       str(credential_id), "failed", {"scope": "platform"},
+                       {"state": "revocation_pending"})
+        return JSONResponse(status_code=202, content={"credential_id": str(credential_id),
+                                                      "status": "revocation_pending"})
+    with connect() as conn:
+        conn.execute("""UPDATE deployment_credentials SET status='revoked', revoked_at=now()
+            WHERE credential_id=%s""", (credential_id,))
+    required_audit(actor, "test-runner-credential.revoke", "automation-credential",
+                   str(credential_id), "succeeded", {"scope": "platform"}, {"status": "revoked"})
+    return {"credential_id": str(credential_id), "status": "revoked"}
+
+
+@app.post("/platform/test-identities")
+def create_test_identity(body: TestIdentityCreate,
+                         principal: Principal = Depends(current_principal)):
+    """Create a short-lived service-account persona tied to one test run."""
+    require_test_identity_manager(principal)
+    actor = actor_for(principal)
+    if body.project is not None:
+        with connect() as conn:
+            if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (body.project,)).fetchone():
+                raise HTTPException(404, "Unknown project")
+    provider = None
+    try:
+        provider = create_credential_client(f"Test persona {body.test_run_id}: {body.name}")
+        machine = Principal(verifier.issuer, provider["subject"], "Test persona " + body.name)
+        with connect() as conn, conn.transaction():
+            if body.role == "platform-admin":
+                grant_role(conn, machine, "platform", None, body.role)
+            else:
+                grant_role(conn, machine, "project", body.project, body.role)
+            row = conn.execute("""INSERT INTO deployment_credentials(
+                    name, kind, project, issuer, subject, provider_client_id, provider_resource_id,
+                    status, created_by_issuer, created_by_subject, expires_at, test_run_id)
+                VALUES (%s,'test-persona',%s,%s,%s,%s,%s,'active',%s,%s,
+                        now()+make_interval(hours => %s),%s)
+                RETURNING credential_id, name, kind, project, environment, status, created_at,
+                          expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id""",
+                (body.name, body.project, machine.issuer, machine.subject, provider["client_id"],
+                 provider["provider_resource_id"], principal.issuer, principal.subject,
+                 body.expires_in_hours, body.test_run_id)).fetchone()
+        result = {**public_credential_record(row), "role": body.role,
+                  "token_endpoint": verifier.issuer + "/protocol/openid-connect/token",
+                  "client_id": provider["client_id"], "client_secret": provider["client_secret"]}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        if provider:
+            try:
+                delete_credential_client(provider["provider_resource_id"])
+            except Exception:
+                pass
+        required_audit(actor, "test-identity.create", "test-run", body.test_run_id, "failed",
+                       {"project": body.project}, {"error_type": type(exc).__name__})
+        raise HTTPException(503, "Test identity creation failed without returning a usable secret")
+    required_audit(actor, "test-identity.create", "automation-credential", result["credential_id"],
+                   "succeeded", {"project": body.project},
+                   {"role": body.role, "test_run_id": body.test_run_id, "expires_at": result["expires_at"]})
+    return JSONResponse(status_code=201, content=jsonable_encoder(result))
+
+
+@app.get("/platform/test-identities")
+def list_test_identities(test_run_id: str | None = Query(None, max_length=64),
+                         principal: Principal = Depends(current_principal)):
+    require_test_identity_manager(principal)
+    with connect() as conn:
+        rows = conn.execute("""SELECT credential_id, name, kind, project, environment, status, created_at,
+                expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id,
+                (SELECT role FROM platform_grants g
+                 WHERE g.issuer=deployment_credentials.issuer
+                   AND g.subject=deployment_credentials.subject LIMIT 1)
+            FROM deployment_credentials WHERE kind='test-persona' AND (%s IS NULL OR test_run_id=%s)
+            ORDER BY created_at, credential_id""", (test_run_id, test_run_id)).fetchall()
+    required_audit(actor_for(principal), "test-identity.list", "test-run", test_run_id, "succeeded",
+                   {"scope": "platform"}, {"count": len(rows)})
+    return {"credentials": [{**public_credential_record(row[:12]), "role": row[12]} for row in rows]}
+
+
+@app.delete("/platform/test-identities/{credential_id}")
+def revoke_test_identity(credential_id: UUID, principal: Principal = Depends(current_principal)):
+    require_test_identity_manager(principal)
+    actor = actor_for(principal)
+    with connect() as conn, conn.transaction():
+        row = conn.execute("""SELECT provider_resource_id, issuer, subject, status, test_run_id, project
+            FROM deployment_credentials WHERE kind='test-persona' AND credential_id=%s FOR UPDATE""",
+                           (credential_id,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Unknown test identity")
+        if row[3] == "revoked":
+            return {"credential_id": str(credential_id), "status": "revoked"}
+        conn.execute("DELETE FROM platform_grants WHERE issuer=%s AND subject=%s", (row[1], row[2]))
+        conn.execute("UPDATE deployment_credentials SET status='revocation_pending' WHERE credential_id=%s",
+                     (credential_id,))
+    try:
+        delete_credential_client(row[0])
+    except CredentialProviderError:
+        required_audit(actor, "test-identity.revoke", "automation-credential", str(credential_id),
+                       "failed", {"project": row[5]},
+                       {"state": "revocation_pending", "test_run_id": row[4]})
+        return JSONResponse(status_code=202, content={"credential_id": str(credential_id),
+                                                      "status": "revocation_pending"})
+    with connect() as conn:
+        conn.execute("""UPDATE deployment_credentials SET status='revoked', revoked_at=now()
+            WHERE credential_id=%s""", (credential_id,))
+    required_audit(actor, "test-identity.revoke", "automation-credential", str(credential_id),
+                   "succeeded", {"project": row[5]}, {"test_run_id": row[4]})
+    return {"credential_id": str(credential_id), "status": "revoked"}
 
 
 def _operator_audit(principal: Principal, action: str, target_id: str | None, detail: dict):
@@ -484,7 +983,7 @@ def provision(name: str, body: Union[ApplicationEnvelopeV1Alpha2, ApplicationEnv
     else:
         project = body
     actor = actor_for(principal)
-    require_permission(principal, "change", name)
+    require_permission(principal, "deploy", name)
     try:
         expected = expected_revision(if_match)
     except HTTPException:
@@ -548,17 +1047,13 @@ def drift(name: str, principal: Principal = Depends(current_principal)):
     """Compare the live Deployment with the desired revision; report only, never repair."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
-    with connect() as conn:
-        current = conn.execute("""SELECT max(r.revision), (array_agg(r.spec ORDER BY r.revision DESC))[1]
-            FROM projects p
-            JOIN project_environments e ON e.project_id=p.project_id
-            JOIN project_applications a ON a.environment_id=e.environment_id
-            JOIN application_revisions r ON r.application_id=a.application_id
-            WHERE p.name=%s""", (name,)).fetchone()
-    if current is None or current[0] is None:
+    current = current_spec(name)
+    if current is None:
         required_audit(actor, "project.drift.inspect", "project", name, "rejected", {"project": name},
                        {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if current[0] is None:
+        raise HTTPException(409, "Project has not been deployed")
     result = observe_drift(runtime, name, current[1], log)
     detail = {"revision": current[0], "state": result["state"],
               "fields": [d["field"] for d in result["differences"]]}
@@ -573,10 +1068,12 @@ def component_status(name: str, principal: Principal = Depends(current_principal
     require_permission(principal, "view", name)
     actor = actor_for(principal)
     current = current_spec(name)
-    if current is None or current[0] is None:
+    if current is None:
         required_audit(actor, "project.components.read", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if current[0] is None:
+        raise HTTPException(409, "Project has not been deployed")
     components = current[1].get("components")
     if components is None:
         raise HTTPException(409, "Component status requires a v1alpha2 application revision")
@@ -595,9 +1092,9 @@ def current_spec(name: str):
     with connect() as conn:
         return conn.execute("""SELECT max(r.revision), (array_agg(r.spec ORDER BY r.revision DESC))[1], p.status
             FROM projects p
-            JOIN project_environments e ON e.project_id=p.project_id
-            JOIN project_applications a ON a.environment_id=e.environment_id
-            JOIN application_revisions r ON r.application_id=a.application_id
+            LEFT JOIN project_environments e ON e.project_id=p.project_id
+            LEFT JOIN project_applications a ON a.environment_id=e.environment_id
+            LEFT JOIN application_revisions r ON r.application_id=a.application_id
             WHERE p.name=%s GROUP BY p.status""", (name,)).fetchone()
 
 
@@ -607,10 +1104,12 @@ def get_configuration(name: str, principal: Principal = Depends(current_principa
     require_permission(principal, "view", name)
     actor = actor_for(principal)
     current = current_spec(name)
-    if current is None or current[0] is None:
+    if current is None:
         required_audit(actor, "project.configuration.read", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if current[0] is None:
+        raise HTTPException(409, "Project has not been deployed")
     values = current[1].get("configuration") or {}
     activation = observe_activation(runtime, name, values)
     required_audit(actor, "project.configuration.read", "project", name, "succeeded",
@@ -641,10 +1140,12 @@ def put_configuration(name: str, body: ConfigurationBody,
                        {"project": name}, {"reason": "invalid_configuration", "names": sorted(map(str, body.values))})
         return JSONResponse(status_code=422, content={"detail": str(exc), "code": "invalid_configuration"})
     current = current_spec(name)
-    if current is None or current[0] is None:
+    if current is None:
         required_audit(actor, "project.configuration.update", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if current[0] is None:
+        raise HTTPException(409, "Project has not been deployed")
     try:
         stored = read_secret(runtime, name)
     except SecretsUnavailable:
@@ -690,9 +1191,11 @@ def secrets_project(name: str, principal: Principal, permission: str, action: st
     require_permission(principal, permission, name)
     actor = actor_for(principal)
     current = current_spec(name)
-    if current is None or current[0] is None:
+    if current is None:
         required_audit(actor, action, "project", name, "rejected", {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if current[0] is None:
+        raise HTTPException(409, "Project has not been deployed")
     if current[2] == "retired":
         required_audit(actor, action, "project", name, "rejected", {"project": name}, {"reason": "retired"})
         raise HTTPException(409, "Project is retired")
@@ -846,16 +1349,21 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
     require_permission(principal, "view", name)
     actor = actor_for(principal)
     with connect() as conn:
+        project = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
         rows = conn.execute("""SELECT r.revision, r.created_at, r.spec
             FROM projects p
             JOIN project_environments e ON e.project_id=p.project_id
             JOIN project_applications a ON a.environment_id=e.environment_id
             JOIN application_revisions r ON r.application_id=a.application_id
             WHERE p.name=%s ORDER BY r.revision DESC""", (name,)).fetchall()
-    if not rows:
+    if project is None:
         required_audit(actor, "project.revisions.list", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if not rows:
+        required_audit(actor, "project.revisions.list", "project", name, "succeeded",
+                       {"project": name}, {"count": 0})
+        return {"project": name, "current_revision": None, "revisions": []}
     required_audit(actor, "project.revisions.list", "project", name, "succeeded",
                    {"project": name}, {"count": len(rows)})
     return {"project": name, "current_revision": rows[0][0], "revisions": [
@@ -873,11 +1381,13 @@ def resource_usage(name: str, principal: Principal = Depends(current_principal))
     require_permission(principal, "view", name)
     actor = actor_for(principal)
     with connect() as conn:
-        known = conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone()
+        known = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
     if not known:
         required_audit(actor, "project.usage.inspect", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if known[0] == "empty":
+        raise HTTPException(409, "Project has not been deployed")
     usage = observe_usage(runtime, name, log)
     required_audit(actor, "project.usage.inspect", "project", name, "succeeded",
                    {"project": name}, {"state": usage["state"]})
@@ -893,11 +1403,13 @@ def project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
     require_permission(principal, "view", name)
     actor = actor_for(principal)
     with connect() as conn:
-        known = conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone()
+        known = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
     if not known:
         required_audit(actor, "project.logs.read", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
         raise HTTPException(404, "Unknown project")
+    if known[0] == "empty":
+        raise HTTPException(409, "Project has not been deployed")
     if component is not None:
         current = current_spec(name)
         available = {item["name"] for item in ((current[1] or {}).get("components") if current else [])}
@@ -920,6 +1432,11 @@ def rollback(name: str, body: Rollback, principal: Principal = Depends(current_p
     """Re-apply a retained revision as a new revision; databases are never rolled back."""
     actor = actor_for(principal)
     require_permission(principal, "change", name)
+    current = current_spec(name)
+    if current is None:
+        raise HTTPException(404, "Unknown project")
+    if current[0] is None:
+        raise HTTPException(409, "Project has not been deployed")
     try:
         expected = expected_revision(if_match)
     except HTTPException:
@@ -966,6 +1483,11 @@ def restart(name: str, principal: Principal = Depends(current_principal)):
     """Queue a rolling restart of the current desired revision without changing the spec."""
     actor = actor_for(principal)
     require_permission(principal, "change", name)
+    current_specification = current_spec(name)
+    if current_specification is None:
+        raise HTTPException(404, "Unknown project")
+    if current_specification[0] is None:
+        raise HTTPException(409, "Project has not been deployed")
     try:
         validate_name(name)
     except ValueError:
@@ -1093,7 +1615,12 @@ def current_retirement_scope(conn, name):
         JOIN application_revisions r ON r.application_id=a.application_id
         WHERE p.name=%s""", (name,)).fetchone()
     if row is None or row[0] is None:
-        return None
+        project = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
+        if project is None:
+            return None
+        return {"project": name, "revision": 0, "removes": [], "route": None,
+                "retains": {"database": None, "role": None, "catalog_and_revisions": True},
+                "scope_token": retirement_scope_token(name, 0)}
     return removal_scope(name, row[0], row[1], os.environ["APPS_DOMAIN"])
 
 

@@ -68,3 +68,16 @@ As a developer, I want a dedicated revocable machine credential for my CI pipeli
 5. The administrator rotates the credential, moves the pipeline to the replacement, and revokes the predecessor.
 
 Acceptance: the pipeline works without interactive login; audit records attribute the deployment to the machine credential; list/status/log/audit/backup surfaces do not disclose its secret or bearer tokens; cross-project, grant/credential administration, secret-value, retirement, data-deletion, and operator actions are denied; and revocation denies the next Platform API request even if an earlier OIDC token has not expired. See [Phase 2B](../04-development/phase-2b-ci-deployment-credentials.md).
+
+## UC-09 – Run platform acceptance without a reusable human token
+
+As a platform administrator, I want to bootstrap one revocable test-runner identity so that repeatable acceptance tests can create disposable projects and role personas, assign grants, exercise platform behavior, and clean up without storing my interactive access token.
+
+1. A human platform administrator creates an expiring test-runner client and places its one-time returned secret in protected suite configuration.
+2. A test run exchanges that reusable client secret for a short-lived bearer token and creates a uniquely named empty project before any application deployment.
+3. The runner creates short-lived service-account personas for viewer, developer, project-administrator, deployment, and selected disposable platform-administrator checks.
+4. Each persona obtains its own token and the suite exercises its allowed and denied actions, including cross-project denial.
+5. A project deployment credential performs the first deployment, is rotated with bounded overlap, and is revoked while its access token is still otherwise valid.
+6. The suite revokes temporary identities and retires its disposable projects even when a test fails.
+
+Acceptance: only a human platform administrator can create or revoke the root test-runner credential; a test runner cannot mint another root runner; persona secrets and bearer tokens never appear in reports, logs, inventories, or audit details; expiry and revocation are checked against platform state on every request; and operational backup, watchdog, heartbeat, and Alertmanager drills remain separate. See the [Phase 2B automation plan](../04-development/phase-2b-automation-implementation-plan.md).

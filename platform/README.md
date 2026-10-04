@@ -15,7 +15,7 @@ After `bash scripts/up.sh` completes, these local endpoints are available:
 
 | Endpoint | Purpose |
 | --- | --- |
-| `http://localhost:8000/` | Keycloak login and Phase 1B access-validation portal |
+| `http://localhost:8000/` | Keycloak login and human access-validation portal |
 | `http://localhost:8000/docs` | Interactive API documentation |
 | `http://localhost:8000/openapi.json` | OpenAPI schema |
 | `http://localhost:8000/healthz` | API process health |
@@ -42,7 +42,7 @@ to PostgreSQL and will not recreate it on later starts. Remove the bootstrap set
 after recording the controlled setup evidence.
 
 For the full local bootstrap, Device Authorization with PKCE, scoped-role, and
-revocation evidence procedure, see the [Phase 1B access-validation runbook](../docs/05-operations/phase-1b-access-validation.md).
+revocation evidence procedure, see the [human access and authorization validation runbook](../docs/05-operations/human-access-and-authorization-validation.md).
 
 ## Access-validation portal
 

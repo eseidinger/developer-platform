@@ -48,10 +48,16 @@ class Catalog:
     def execute(self, query, params=()):
         self.events.append(query)
         if query.startswith("INSERT INTO projects"):
-            name, spec = params
-            self.rows[name] = (spec.obj, "provisioning")
-            project_id = self.project_ids.setdefault(name, "project-id-" + name)
-            self.result = [(project_id,)]
+            if "NULL, 'empty'" in query:
+                name = params[0]
+                self.rows[name] = (None, "empty")
+                self.project_ids.setdefault(name, "project-id-" + name)
+                self.result = [(name, "empty", datetime(2026, 10, 4, tzinfo=timezone.utc))]
+            else:
+                name, spec = params
+                self.rows[name] = (spec.obj, "provisioning")
+                project_id = self.project_ids.setdefault(name, "project-id-" + name)
+                self.result = [(project_id,)]
         elif query.startswith("UPDATE projects SET status="):
             status = query.split("status='")[1].split("'")[0]
             self.rows[params[0]] = (self.rows[params[0]][0], status)
@@ -124,7 +130,8 @@ class Catalog:
         elif query.startswith("SELECT max(r.revision), (array_agg"):
             revisions = self.revisions.get("application-" + params[0], [])
             status = self.rows[params[0]][1] if params[0] in self.rows else None
-            self.result = [(revisions[-1][0], revisions[-1][1], status) if revisions else (None, None, None)]
+            self.result = ([(revisions[-1][0], revisions[-1][1], status)] if revisions else
+                           ([(None, None, status)] if params[0] in self.rows else []))
         elif query.startswith("SELECT max(r.revision)"):
             revisions = self.revisions.get("application-" + params[0], [])
             self.result = [(revisions[-1][0] if revisions else None,)]
@@ -135,6 +142,8 @@ class Catalog:
             self.result = [(row[1],)] if row else []
         elif query.startswith("SELECT 1 FROM projects"):
             self.result = [(1,)] if params[0] in self.rows else []
+        elif "FROM deployment_credentials WHERE issuer=" in query:
+            self.result = []
         return self
 
     def fetchall(self):
@@ -741,6 +750,24 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(stored["image"], "example:v1")
         self.assertEqual(stored["resolved_image"], "example@" + self.digest)
         self.assertEqual(self.catalog.operations[response.json()["operation_id"]]["envelope"]["spec"], stored)
+
+    def test_empty_project_accepts_grants_before_its_first_ci_deployment(self):
+        with patch.object(main, "require_platform_admin"):
+            created = self.client.post("/projects", json={"name": "smoke"}, headers=self.headers)
+        self.assertEqual(created.status_code, 201)
+        self.assertEqual(created.json()["status"], "empty")
+        self.assertIsNone(created.json()["spec"])
+        granted = self.client.put("/projects/smoke/grants", headers=self.headers, json={
+            "issuer": "https://issuer.example", "subject": "project-admin", "role": "project-admin"})
+        self.assertEqual(granted.status_code, 200)
+        revisions = self.client.get("/projects/smoke/revisions", headers=self.headers)
+        self.assertEqual(revisions.json(), {"project": "smoke", "current_revision": None, "revisions": []})
+        self.assertEqual(self.client.get("/projects/smoke/logs", headers=self.headers).status_code, 409)
+
+        deployed = self.deploy()
+        self.assertEqual(deployed.status_code, 202)
+        self.assertEqual(deployed.json()["revision"], 1)
+        self.assertEqual(self.catalog.rows["smoke"][1], "provisioning")
 
     def test_unchanged_tag_digest_reuses_revision_and_moved_tag_creates_one(self):
         first = self.deploy().json()["revision"]

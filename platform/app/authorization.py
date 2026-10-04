@@ -12,6 +12,7 @@ ROLE_ORDER = {"viewer": 1, "developer": 2, "project-admin": 3, "platform-admin":
 PERMISSIONS = {
     "view": {"viewer", "developer", "project-admin", "platform-admin"},
     "change": {"developer", "project-admin", "platform-admin"},
+    "deploy": {"developer", "project-admin", "platform-admin"},
     "retire": {"project-admin", "platform-admin"},
     "grant": {"project-admin", "platform-admin"},
 }
@@ -72,6 +73,14 @@ def _roles(conn, principal: Principal, project: str | None = None) -> set[str]:
 
 
 def is_allowed(conn, principal: Principal, permission: str, project: str | None = None) -> bool:
+    from .deployment_credentials import access_scope
+    machine = access_scope(conn, principal)
+    if machine is not None:
+        if not machine.active:
+            return False
+        if machine.kind == "deployment" and (
+                project != machine.project or permission not in {"view", "deploy"}):
+            return False
     return bool(_roles(conn, principal, project) & PERMISSIONS[permission])
 
 
@@ -80,6 +89,10 @@ def is_platform_admin(conn, principal: Principal) -> bool:
 
 
 def projects_for_principal(conn, principal: Principal):
+    from .deployment_credentials import access_scope
+    machine = access_scope(conn, principal)
+    if machine is not None and not machine.active:
+        return []
     if is_platform_admin(conn, principal):
         return conn.execute("SELECT name, spec, status FROM projects ORDER BY name").fetchall()
     return conn.execute("""SELECT p.name, p.spec, p.status FROM projects p

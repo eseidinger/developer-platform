@@ -1,6 +1,6 @@
 # Phase 2A – Multi-service Application with a Scheduled Component
 
-Status: planned and prioritized as the next implementation increment on October 4, 2026. Covers [F-13](../01-product/requirements.md) and [UC-07](../01-product/use-cases.md).
+Status: **deferred on October 4, 2026 after source implementation; live Kubernetes acceptance remains open.** Phase 2B proceeds by owner direction. This deferral does not count the Phase 2A gate as accepted. Covers [F-13](../01-product/requirements.md) and [UC-07](../01-product/use-cases.md).
 
 Execution tracking: [DEV-001-T01 through DEV-001-T03, DEV-006-T02, and DEV-011-T02](delivery-backlog.md#phase-task-index).
 

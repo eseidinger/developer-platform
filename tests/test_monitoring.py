@@ -14,6 +14,7 @@ class DiscoveryTests(unittest.TestCase):
     def test_active_and_failed_targets_retained_retired_removed(self):
         rows = [(name, {}, status) for name, status in
                 [("ready", "applied"), ("broken", "failed"), ("new", "provisioning"), ("old", "retired")]]
+        rows.append(("empty", None, "empty"))
         groups = target_groups(rows, "apps.example.com")
         self.assertEqual([g["labels"]["application"] for g in groups], ["broken", "new", "ready"])
         self.assertEqual(groups[0]["targets"], ["https://broken.apps.example.com/"])

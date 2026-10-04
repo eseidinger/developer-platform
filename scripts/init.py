@@ -7,7 +7,7 @@ root = Path(__file__).resolve().parents[1]
 target = root / ".env"
 content = (root / ".env.example").read_text()
 secret_keys = ("POSTGRES_PASSWORD", "DATABASE_KEY", "PLATFORM_AUDIT_PASSWORD", "PLATFORM_AUDIT_READER_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD",
-               "KEYCLOAK_DB_PASSWORD", "GRAFANA_PASSWORD")
+               "KEYCLOAK_DB_PASSWORD", "KEYCLOAK_PROVISIONER_SECRET", "GRAFANA_PASSWORD")
 for key in secret_keys:
     content = content.replace(key + "=\n", key + "=" + secrets.token_hex(32) + "\n")
 try:

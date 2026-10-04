@@ -18,7 +18,7 @@ def target_groups(rows, domain):
     local = domain == "apps.localhost"
     groups = []
     for name, spec, status in sorted(rows):
-        if status == "retired":
+        if status in {"empty", "retired"} or spec is None:
             continue
         validate_name(name)
         profile = spec.get("probe_profile", "status")

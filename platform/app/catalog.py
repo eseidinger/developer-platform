@@ -102,6 +102,7 @@ def initialize(conn) -> None:
             FROM project_applications a
             JOIN project_environments e ON e.environment_id=a.environment_id
             JOIN projects p ON p.project_id=e.project_id AND p.name=a.name
+            WHERE p.spec IS NOT NULL
             ON CONFLICT(application_id, revision) DO NOTHING""")
 
 

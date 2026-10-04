@@ -91,6 +91,139 @@
         "title": "ApplicationEnvelope",
         "type": "object"
       },
+      "ApplicationEnvelopeV1Alpha2": {
+        "additionalProperties": false,
+        "properties": {
+          "apiVersion": {
+            "const": "platform.example/v1alpha2",
+            "title": "Apiversion",
+            "type": "string"
+          },
+          "kind": {
+            "const": "Application",
+            "title": "Kind",
+            "type": "string"
+          },
+          "metadata": {
+            "$ref": "#/components/schemas/Metadata"
+          },
+          "spec": {
+            "$ref": "#/components/schemas/ComponentSpec"
+          }
+        },
+        "required": [
+          "apiVersion",
+          "kind",
+          "metadata",
+          "spec"
+        ],
+        "title": "ApplicationEnvelopeV1Alpha2",
+        "type": "object"
+      },
+      "ComponentRuntime": {
+        "additionalProperties": false,
+        "properties": {
+          "args": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 50,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Args"
+          },
+          "command": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Command"
+          },
+          "image": {
+            "maxLength": 512,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$",
+            "title": "Image",
+            "type": "string"
+          },
+          "type": {
+            "const": "container",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "image"
+        ],
+        "title": "ComponentRuntime",
+        "type": "object"
+      },
+      "ComponentSpec": {
+        "additionalProperties": false,
+        "properties": {
+          "components": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/ServiceComponent"
+                },
+                {
+                  "$ref": "#/components/schemas/ScheduledComponent"
+                }
+              ]
+            },
+            "maxItems": 5,
+            "minItems": 1,
+            "title": "Components",
+            "type": "array"
+          },
+          "configuration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Configuration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "resources": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ExternalResource"
+                },
+                "maxItems": 1,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resources"
+          }
+        },
+        "required": [
+          "components"
+        ],
+        "title": "ComponentSpec",
+        "type": "object"
+      },
       "Configuration": {
         "additionalProperties": false,
         "properties": {
@@ -119,6 +252,65 @@
           "values"
         ],
         "title": "ConfigurationBody",
+        "type": "object"
+      },
+      "DeploymentCredentialCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_days": {
+            "default": 30,
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "DeploymentCredentialCreate",
+        "type": "object"
+      },
+      "DeploymentCredentialRotate": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_days": {
+            "default": 30,
+            "maximum": 90.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "overlap_hours": {
+            "default": 1,
+            "maximum": 24.0,
+            "minimum": 0.0,
+            "title": "Overlap Hours",
+            "type": "integer"
+          }
+        },
+        "title": "DeploymentCredentialRotate",
+        "type": "object"
+      },
+      "EmptyProjectCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "EmptyProjectCreate",
         "type": "object"
       },
       "Endpoint": {
@@ -232,6 +424,34 @@
         "title": "Health",
         "type": "object"
       },
+      "InternalPort": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "pattern": "^[a-z][a-z0-9-]{0,14}$",
+            "title": "Name",
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535.0,
+            "minimum": 1024.0,
+            "title": "Port",
+            "type": "integer"
+          },
+          "protocol": {
+            "const": "http",
+            "title": "Protocol",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "protocol",
+          "port"
+        ],
+        "title": "InternalPort",
+        "type": "object"
+      },
       "Metadata": {
         "additionalProperties": false,
         "properties": {
@@ -312,6 +532,21 @@
       "Project": {
         "additionalProperties": false,
         "properties": {
+          "components": {
+            "anyOf": [
+              {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Components"
+          },
           "configuration": {
             "anyOf": [
               {
@@ -325,11 +560,18 @@
             "title": "Configuration"
           },
           "image": {
-            "maxLength": 512,
-            "minLength": 1,
-            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$",
-            "title": "Image",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image"
           },
           "name": {
             "title": "Name",
@@ -365,8 +607,7 @@
           }
         },
         "required": [
-          "name",
-          "image"
+          "name"
         ],
         "title": "Project",
         "type": "object"
@@ -514,6 +755,127 @@
         "title": "Scaling",
         "type": "object"
       },
+      "ScheduledComponent": {
+        "additionalProperties": false,
+        "properties": {
+          "concurrencyPolicy": {
+            "const": "Forbid",
+            "default": "Forbid",
+            "title": "Concurrencypolicy",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "resources": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resources"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/ComponentRuntime"
+          },
+          "schedule": {
+            "title": "Schedule",
+            "type": "string"
+          },
+          "timeZone": {
+            "const": "UTC",
+            "default": "UTC",
+            "title": "Timezone",
+            "type": "string"
+          },
+          "type": {
+            "const": "scheduled",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "runtime",
+          "type",
+          "schedule"
+        ],
+        "title": "ScheduledComponent",
+        "type": "object"
+      },
+      "ServiceComponent": {
+        "additionalProperties": false,
+        "properties": {
+          "health": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Health"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "ports": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/InternalPort"
+                },
+                "maxItems": 10,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ports"
+          },
+          "replicas": {
+            "default": 1,
+            "maximum": 5.0,
+            "minimum": 1.0,
+            "title": "Replicas",
+            "type": "integer"
+          },
+          "resources": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resources"
+          },
+          "runtime": {
+            "$ref": "#/components/schemas/ComponentRuntime"
+          },
+          "type": {
+            "const": "service",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "runtime",
+          "type"
+        ],
+        "title": "ServiceComponent",
+        "type": "object"
+      },
       "Spec": {
         "additionalProperties": false,
         "properties": {
@@ -550,6 +912,84 @@
           "application"
         ],
         "title": "Spec",
+        "type": "object"
+      },
+      "TestIdentityCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_hours": {
+            "default": 2,
+            "maximum": 24.0,
+            "minimum": 1.0,
+            "title": "Expires In Hours",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+            "title": "Name",
+            "type": "string"
+          },
+          "project": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Project"
+          },
+          "role": {
+            "enum": [
+              "viewer",
+              "developer",
+              "project-admin",
+              "platform-admin"
+            ],
+            "title": "Role",
+            "type": "string"
+          },
+          "test_run_id": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+            "title": "Test Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "test_run_id"
+        ],
+        "title": "TestIdentityCreate",
+        "type": "object"
+      },
+      "TestRunnerCredentialCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "expires_in_days": {
+            "default": 7,
+            "maximum": 30.0,
+            "minimum": 1.0,
+            "title": "Expires In Days",
+            "type": "integer"
+          },
+          "name": {
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[a-zA-Z0-9][a-zA-Z0-9._-]*$",
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "title": "TestRunnerCredentialCreate",
         "type": "object"
       },
       "ValidationError": {
@@ -868,6 +1308,296 @@
         "summary": "Put Platform Grant"
       }
     },
+    "/platform/test-identities": {
+      "get": {
+        "operationId": "list_test_identities_platform_test_identities_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "test_run_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Test Run Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Test Identities"
+      },
+      "post": {
+        "description": "Create a short-lived service-account persona tied to one test run.",
+        "operationId": "create_test_identity_platform_test_identities_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestIdentityCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Test Identity"
+      }
+    },
+    "/platform/test-identities/{credential_id}": {
+      "delete": {
+        "operationId": "revoke_test_identity_platform_test_identities__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Test Identity"
+      }
+    },
+    "/platform/test-runner-credentials": {
+      "get": {
+        "operationId": "list_test_runner_credentials_platform_test_runner_credentials_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Test Runner Credentials"
+      },
+      "post": {
+        "description": "Create the reusable suite identity; automation identities cannot invoke this endpoint.",
+        "operationId": "create_test_runner_credential_platform_test_runner_credentials_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TestRunnerCredentialCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Test Runner Credential"
+      }
+    },
+    "/platform/test-runner-credentials/{credential_id}": {
+      "delete": {
+        "operationId": "revoke_test_runner_credential_platform_test_runner_credentials__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Test Runner Credential"
+      }
+    },
+    "/platform/test-runner-credentials/{credential_id}/rotate": {
+      "post": {
+        "operationId": "rotate_test_runner_credential_platform_test_runner_credentials__credential_id__rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentCredentialRotate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rotate Test Runner Credential"
+      }
+    },
     "/projects": {
       "get": {
         "operationId": "projects_projects_get",
@@ -887,6 +1617,46 @@
           }
         ],
         "summary": "Projects"
+      },
+      "post": {
+        "description": "Create an authorization and credential scope before its first deployment.",
+        "operationId": "create_empty_project_projects_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EmptyProjectCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Empty Project"
       }
     },
     "/projects/{name}": {
@@ -926,6 +1696,9 @@
               "schema": {
                 "anyOf": [
                   {
+                    "$ref": "#/components/schemas/ApplicationEnvelopeV1Alpha2"
+                  },
+                  {
                     "$ref": "#/components/schemas/ApplicationEnvelope"
                   },
                   {
@@ -964,6 +1737,49 @@
           }
         ],
         "summary": "Provision"
+      }
+    },
+    "/projects/{name}/components": {
+      "get": {
+        "description": "Live, per-component status for a v1alpha2 application revision.",
+        "operationId": "component_status_projects__name__components_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Component Status"
       }
     },
     "/projects/{name}/configuration": {
@@ -1074,6 +1890,215 @@
           }
         ],
         "summary": "Put Configuration"
+      }
+    },
+    "/projects/{name}/deployment-credentials": {
+      "get": {
+        "operationId": "list_deployment_credentials_projects__name__deployment_credentials_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Deployment Credentials"
+      },
+      "post": {
+        "description": "Create a project-scoped OIDC client and return its secret exactly once.",
+        "operationId": "create_deployment_credential_projects__name__deployment_credentials_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentCredentialCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Deployment Credential"
+      }
+    },
+    "/projects/{name}/deployment-credentials/{credential_id}": {
+      "delete": {
+        "description": "Deny platform access first, then remove the identity-provider client.",
+        "operationId": "revoke_deployment_credential_projects__name__deployment_credentials__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Deployment Credential"
+      }
+    },
+    "/projects/{name}/deployment-credentials/{credential_id}/rotate": {
+      "post": {
+        "description": "Create a linked replacement and bound how long the predecessor remains usable.",
+        "operationId": "rotate_deployment_credential_projects__name__deployment_credentials__credential_id__rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentCredentialRotate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rotate Deployment Credential"
       }
     },
     "/projects/{name}/drift": {
@@ -1263,6 +2288,23 @@
                 }
               ],
               "title": "Since Seconds"
+            }
+          },
+          {
+            "in": "query",
+            "name": "component",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Component"
             }
           }
         ],

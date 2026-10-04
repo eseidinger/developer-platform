@@ -72,8 +72,27 @@ services:
           -s "webOrigins=[\"https://$$PLATFORM_DOMAIN\",\"http://localhost\",\"http://localhost:8000\",\"http://127.0.0.1:8000\",\"https://platform.localhost\"]" \
           -s 'attributes={"pkce.code.challenge.method":"S256"}' \
           -s 'protocolMappers=[{"name":"platform-api audience","protocol":"openid-connect","protocolMapper":"oidc-audience-mapper","consentRequired":false,"config":{"included.client.audience":"platform-api","id.token.claim":"false","access.token.claim":"true"}}]'
+        provisioner_id="$$(/opt/keycloak/bin/kcadm.sh get clients -r platform -q clientId=platform-credential-provisioner --fields id \
+          | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')"
+        if [ -z "$$provisioner_id" ]; then
+          /opt/keycloak/bin/kcadm.sh create clients -r platform \
+            -s clientId=platform-credential-provisioner -s name='Platform Credential Provisioner' \
+            -s enabled=true -s protocol=openid-connect -s publicClient=false \
+            -s serviceAccountsEnabled=true -s standardFlowEnabled=false -s directAccessGrantsEnabled=false \
+            -s "secret=$$KEYCLOAK_PROVISIONER_SECRET"
+          provisioner_id="$$(/opt/keycloak/bin/kcadm.sh get clients -r platform -q clientId=platform-credential-provisioner --fields id \
+            | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')"
+        else
+          /opt/keycloak/bin/kcadm.sh update "clients/$$provisioner_id" -r platform \
+            -s enabled=true -s serviceAccountsEnabled=true -s "secret=$$KEYCLOAK_PROVISIONER_SECRET"
+        fi
+        service_user_id="$$(/opt/keycloak/bin/kcadm.sh get "clients/$$provisioner_id/service-account-user" -r platform --fields id \
+          | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')"
+        /opt/keycloak/bin/kcadm.sh add-roles -r platform --uid "$$service_user_id" \
+          --cclientid realm-management --rolename manage-clients
     environment:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run scripts/init.py}
+      KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
     networks: [platform]
     depends_on:

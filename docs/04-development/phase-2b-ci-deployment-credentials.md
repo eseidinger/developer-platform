@@ -1,6 +1,6 @@
 # Phase 2B – CI Deployment Credentials
 
-Status: planned after [Phase 2A](phase-2a-multi-service-scheduled-application.md). Covers [F-14](../01-product/requirements.md), [UC-08](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md).
+Status: **in implementation by owner direction; Phase 2A live acceptance is deferred, not accepted.** Covers [F-14 and F-15](../01-product/requirements.md), [UC-08 and UC-09](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). The executable breakdown is preserved in the [automation implementation plan](phase-2b-automation-implementation-plan.md).
 
 Execution tracking: [DEV-012-T01 through DEV-012-T03](delivery-backlog.md#phase-task-index).
 
@@ -16,7 +16,7 @@ The public resource is a `deployment credential`, not a provider-specific client
 - project and environment scope, with an optional application restriction;
 - the fixed initial `deploy` action set;
 - active, expired, `revocation_pending`, or revoked status;
-- creator, creation time, expiry, rotation relationship, last-used time, and safe fingerprint; and
+- creation time, expiry, rotation relationship, and last-used time; and
 - the immutable OIDC issuer/subject identity associated with the platform grant, kept out of ordinary developer responses where it is not needed.
 
 Creation returns secret material exactly once. The initial Keycloak-backed profile returns an OIDC client ID and client secret suitable only for the client-credentials flow. Later reads never return the secret. The platform does not accept that client secret directly as an API bearer key; CI exchanges it for a short-lived access token with audience `platform-api`.
@@ -24,6 +24,8 @@ Creation returns secret material exactly once. The initial Keycloak-backed profi
 The `deploy` action set allows the scoped machine identity to read the target application and capabilities, submit or update its desired revision, and read the resulting operation, deployment status, and redacted diagnostics needed to decide whether the deployment succeeded. It excludes credential/grant administration, secret-value reads, project or application retirement, data deletion, operator APIs, and all other projects.
 
 Only a project administrator within the scope or a platform administrator may create, rotate, list, or revoke deployment credentials. The platform checks the machine identity's grant on every API request. Revocation or expiry disables that grant first, so access is denied immediately even when an already issued OIDC access token has not expired.
+
+The separate `test-runner` credential is a platform-scoped acceptance identity created, listed, rotated, and revoked only by a human platform administrator. It may create empty disposable projects and temporary service-account personas carrying ordinary platform grants, but it cannot mint another test runner. An empty project has no desired revision; it can receive grants and deployment credentials before CI performs its first `PUT /projects/{name}` deployment.
 
 ## Lifecycle and failure behavior
 

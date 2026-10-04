@@ -1,0 +1,469 @@
+---
+- name: Test the platform with short-lived automation personas
+  hosts: localhost
+  connection: local
+  gather_facts: true
+  vars:
+    platform_test_image: hashicorp/http-echo:1.0.0
+  tasks:
+    - name: Require protected test-runner configuration
+      ansible.builtin.assert:
+        that:
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+        fail_msg: Supply the protected output produced by bootstrap-platform-test-runner.yml.
+      no_log: true
+
+    - name: Establish unique disposable resource names
+      ansible.builtin.set_fact:
+        test_run_id: "{{ platform_test_run_id | default('run-' + ansible_date_time.epoch) }}"
+        test_project: "{{ platform_test_project | default('test-' + ansible_date_time.epoch) }}"
+        forbidden_project: "{{ platform_forbidden_project | default('test-denied-' + ansible_date_time.epoch) }}"
+
+    - name: Exchange the reusable runner secret for a short-lived token
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: runner_token_response
+      no_log: true
+
+    - name: Exercise the platform using disposable identities and projects
+      block:
+        - name: Create empty project scopes before any application deployment
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+            body_format: json
+            body:
+              name: "{{ item }}"
+            status_code: 201
+          loop:
+            - "{{ test_project }}"
+            - "{{ forbidden_project }}"
+          no_log: true
+
+        - name: Create short-lived standard-role test personas
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/platform/test-identities"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+            body_format: json
+            body:
+              name: "{{ persona.role }}-{{ test_run_id }}"
+              role: "{{ persona.role }}"
+              project: "{{ test_project }}"
+              test_run_id: "{{ test_run_id }}"
+              expires_in_hours: 2
+            status_code: 201
+          loop:
+            - {role: viewer}
+            - {role: developer}
+            - {role: project-admin}
+          loop_control:
+            loop_var: persona
+          register: persona_credentials
+          no_log: true
+
+        - name: Exchange persona credentials for independent access tokens
+          ansible.builtin.uri:
+            url: "{{ credential.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ credential.client_id }}"
+              client_secret: "{{ credential.client_secret }}"
+            status_code: 200
+          loop: "{{ persona_credentials.results | map(attribute='json') | list }}"
+          loop_control:
+            loop_var: credential
+            label: "{{ credential.role }}"
+          register: persona_tokens
+          no_log: true
+
+        - name: Select role-specific short-lived tokens
+          ansible.builtin.set_fact:
+            viewer_token: >-
+              {{ (persona_tokens.results | selectattr('credential.role', 'equalto', 'viewer') | first).json.access_token }}
+            developer_token: >-
+              {{ (persona_tokens.results | selectattr('credential.role', 'equalto', 'developer') | first).json.access_token }}
+            project_admin_token: >-
+              {{ (persona_tokens.results | selectattr('credential.role', 'equalto', 'project-admin') | first).json.access_token }}
+          no_log: true
+
+        - name: Verify viewer can list only its granted project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            headers:
+              Authorization: "Bearer {{ viewer_token }}"
+            status_code: 200
+          register: viewer_projects
+          failed_when: >-
+            viewer_projects.status != 200 or
+            (viewer_projects.json | map(attribute='name') | list) != [test_project]
+          no_log: true
+
+        - name: Verify viewer cannot perform the first deployment
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ viewer_token }}"
+            body_format: json
+            body:
+              name: "{{ test_project }}"
+              image: "{{ platform_test_image }}"
+              port: 5678
+              probe_profile: hello-world
+            status_code: 403
+          no_log: true
+
+        - name: Create a project-scoped deployment credential as project administrator
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ project_admin_token }}"
+            body_format: json
+            body:
+              name: "deployment-{{ test_run_id }}"
+              expires_in_days: 1
+            status_code: 201
+          register: deployment_credential
+          no_log: true
+
+        - name: Exchange deployment credentials for a short-lived token
+          ansible.builtin.uri:
+            url: "{{ deployment_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ deployment_credential.json.client_id }}"
+              client_secret: "{{ deployment_credential.json.client_secret }}"
+            status_code: 200
+          register: deployment_token_response
+          no_log: true
+
+        - name: Perform the project's first deployment through CI credentials
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ deployment_token_response.json.access_token }}"
+            body_format: json
+            body:
+              name: "{{ test_project }}"
+              image: "{{ platform_test_image }}"
+              port: 5678
+              probe_profile: hello-world
+            status_code: 202
+          register: first_deployment
+          no_log: true
+
+        - name: Wait for the CI deployment operation and rollout
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ first_deployment.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ deployment_token_response.json.access_token }}"
+            status_code: 200
+          register: deployment_operation
+          until:
+            - deployment_operation.json.state == 'succeeded'
+            - deployment_operation.json.readiness.state == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Verify deployment identity cannot access another project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ forbidden_project }}/logs"
+            headers:
+              Authorization: "Bearer {{ deployment_token_response.json.access_token }}"
+            status_code: 403
+          no_log: true
+
+        - name: Verify deployment identity cannot administer credentials
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials"
+            headers:
+              Authorization: "Bearer {{ deployment_token_response.json.access_token }}"
+            status_code: 403
+          no_log: true
+
+        - name: Verify developer can create a configuration revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/configuration"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ developer_token }}"
+            body_format: json
+            body:
+              values:
+                ACCEPTANCE_RUN: "{{ test_run_id }}"
+            status_code: 202
+          register: configuration_change
+          no_log: true
+
+        - name: Wait for the configuration revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ configuration_change.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ developer_token }}"
+            status_code: 200
+          register: configuration_operation
+          until:
+            - configuration_operation.json.state == 'succeeded'
+            - configuration_operation.json.readiness.state == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Verify viewer can observe configuration but cannot change it
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/configuration"
+            method: "{{ item.method }}"
+            headers:
+              Authorization: "Bearer {{ viewer_token }}"
+            body_format: json
+            body: "{{ item.body | default(omit) }}"
+            status_code: "{{ item.status }}"
+          loop:
+            - {method: GET, status: 200}
+            - {method: PUT, status: 403, body: {values: {FORBIDDEN: value}}}
+          no_log: true
+
+        - name: Verify viewer cannot assign project grants
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/grants"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ viewer_token }}"
+            body_format: json
+            body:
+              issuer: https://invalid.example
+              subject: must-not-be-granted
+              role: viewer
+            status_code: 403
+          no_log: true
+
+        - name: Restart the application as a developer persona
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/restart"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ developer_token }}"
+            status_code: 202
+          register: restart_operation_request
+          no_log: true
+
+        - name: Wait for the restart operation
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ restart_operation_request.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ developer_token }}"
+            status_code: 200
+          register: restart_operation
+          until:
+            - restart_operation.json.state == 'succeeded'
+            - restart_operation.json.readiness.state == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Roll back to the first revision as a developer persona
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/rollback"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ developer_token }}"
+            body_format: json
+            body:
+              revision: 1
+            status_code: 202
+          register: rollback_operation_request
+          no_log: true
+
+        - name: Wait for the rollback operation
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ rollback_operation_request.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ developer_token }}"
+            status_code: 200
+          register: rollback_operation
+          until:
+            - rollback_operation.json.state == 'succeeded'
+            - rollback_operation.json.readiness.state == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Verify viewer diagnostics after deployment
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/{{ item }}"
+            headers:
+              Authorization: "Bearer {{ viewer_token }}"
+            status_code: 200
+          loop:
+            - revisions
+            - logs
+            - drift
+            - resource-usage
+          no_log: true
+
+        - name: Verify runner can inspect resulting grants through the operator API
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/operator/projects/{{ test_project }}/permissions"
+            headers:
+              Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+            status_code: 200
+          register: inspected_grants
+          failed_when: inspected_grants.status != 200 or inspected_grants.json.grants | length < 4
+          no_log: true
+
+        - name: Rotate the deployment credential with bounded overlap
+          ansible.builtin.uri:
+            url: >-
+              {{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials/{{ deployment_credential.json.credential_id }}/rotate
+            method: POST
+            headers:
+              Authorization: "Bearer {{ project_admin_token }}"
+            body_format: json
+            body:
+              expires_in_days: 1
+              overlap_hours: 1
+            status_code: 201
+          register: rotated_credential
+          no_log: true
+
+        - name: Exchange the replacement credential
+          ansible.builtin.uri:
+            url: "{{ rotated_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ rotated_credential.json.client_id }}"
+              client_secret: "{{ rotated_credential.json.client_secret }}"
+            status_code: 200
+          register: replacement_token_response
+          no_log: true
+
+        - name: Verify predecessor remains usable during overlap
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            headers:
+              Authorization: "Bearer {{ deployment_token_response.json.access_token }}"
+            status_code: 200
+          no_log: true
+
+        - name: Verify replacement is usable during overlap
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            headers:
+              Authorization: "Bearer {{ replacement_token_response.json.access_token }}"
+            status_code: 200
+          no_log: true
+
+        - name: Revoke the predecessor credential
+          ansible.builtin.uri:
+            url: >-
+              {{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials/{{ deployment_credential.json.credential_id }}
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ project_admin_token }}"
+            status_code: [200, 202]
+          register: predecessor_revocation
+          no_log: true
+
+        - name: Require completed predecessor provider cleanup
+          ansible.builtin.assert:
+            that: predecessor_revocation.json.status == 'revoked'
+            fail_msg: Predecessor access is denied, but provider cleanup must be retried.
+
+        - name: Verify the predecessor's issued token is immediately denied
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            headers:
+              Authorization: "Bearer {{ deployment_token_response.json.access_token }}"
+            status_code: 403
+          no_log: true
+
+        - name: Report non-secret platform acceptance evidence
+          ansible.builtin.debug:
+            msg: >-
+              PASS: {{ test_run_id }} created an empty project, exercised viewer/developer/admin
+              personas, deployed revision {{ first_deployment.json.revision }} with CI credentials,
+              and proved bounded rotation plus immediate revocation.
+
+      always:
+        - name: Revoke disposable deployment credentials
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials/{{ item }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ project_admin_token | default(runner_token_response.json.access_token) }}"
+            status_code: [200, 202, 404]
+          loop: >-
+            {{ ([deployment_credential.json.credential_id]
+                if deployment_credential is defined and deployment_credential.json is defined else [])
+               + ([rotated_credential.json.credential_id]
+                  if rotated_credential is defined and rotated_credential.json is defined else []) }}
+          failed_when: false
+          no_log: true
+
+        - name: Read disposable project retirement scopes
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ item }}/retirement-preview"
+            headers:
+              Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+            status_code: [200, 404]
+          loop:
+            - "{{ test_project }}"
+            - "{{ forbidden_project }}"
+          register: retirement_previews
+          failed_when: false
+          no_log: true
+
+        - name: Retire disposable projects and their workload resources
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ item.item }}/retire"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+            body_format: json
+            body:
+              confirm_name: "{{ item.item }}"
+              scope_token: "{{ item.json.scope_token }}"
+            status_code: [200, 202, 404, 409]
+          loop: >-
+            {{ retirement_previews.results | default([])
+               | selectattr('status', 'equalto', 200) | list }}
+          register: retirement_results
+          until: retirement_results.status != 202
+          retries: 20
+          delay: 2
+          failed_when: false
+          no_log: true
+
+        - name: Revoke temporary test personas
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/platform/test-identities/{{ item.json.credential_id }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+            status_code: [200, 202, 404]
+          loop: "{{ persona_credentials.results | default([]) }}"
+          failed_when: false
+          no_log: true

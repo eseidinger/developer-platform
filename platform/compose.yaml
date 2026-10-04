@@ -11,6 +11,9 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-https://${IDENTITY_DOMAIN:-identity.localhost}/realms/platform}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-platform-api}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/platform/protocol/openid-connect/certs}
+      KEYCLOAK_INTERNAL_URL: http://keycloak:8080
+      KEYCLOAK_PROVISIONER_CLIENT_ID: platform-credential-provisioner
+      KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}
       PLATFORM_BOOTSTRAP_SUBJECT: ${PLATFORM_BOOTSTRAP_SUBJECT:-}
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}

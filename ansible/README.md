@@ -84,6 +84,19 @@ configuration, and bootstrap are skipped. It is not a deployment validation on a
 fresh host. After deployment, the optional `scripts/smoke.py` test creates and
 retains a project; it is not run automatically.
 
+For a fresh-install sequence covering basic users, revocable CI credentials, and
+platform tests, use [Fresh deployment and basic platform tests](../docs/05-operations/fresh-deployment-and-platform-tests.md).
+Backup, watchdog/heartbeat, and Alertmanager setup and drills remain separate
+operational tracks with their own inventories and protected credentials.
+
+The one-time `bootstrap-platform-test-runner.yml` playbook uses a human
+platform-administrator token and writes the returned client credential to an
+explicit mode-`0600` path. The repeatable `test-platform.yml` playbook consumes
+that protected file, creates empty disposable projects and short-lived role
+personas, performs the first deployment with a project CI credential, and cleans
+up without retaining the human token. `test-platform-ci-credential.yml` is the
+narrower compatibility check for an already prepared project.
+
 Installation references: [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 and [kubectl on Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/).
 

@@ -247,14 +247,18 @@ CAPABILITIES = {
 def error_code(body, errors):
     """Stable machine-readable code for a rejected PUT body."""
     envelope = isinstance(body, dict) and ("apiVersion" in body or "kind" in body)
+    if envelope and (body.get("apiVersion") not in {API_VERSION, COMPONENT_API_VERSION}
+                     or body.get("kind") != "Application"):
+        return "invalid_spec"
     for error in errors:
         # Union validation tags each error's location with the branch it came from.
         loc = tuple(str(part) for part in error.get("loc", ()))
-        branch = loc[1] if len(loc) > 1 else ""
+        branch = next((part for part in loc
+                       if "ApplicationEnvelope" in part or "Project" in part), "")
         if envelope and "ApplicationEnvelope" in branch:
             if loc[-1] not in ("apiVersion", "kind") and error.get("type") in ("extra_forbidden", "literal_error"):
                 return "unsupported_capability"
-        elif not envelope and branch == "Project" and error.get("type") == "extra_forbidden":
+        elif not envelope and "Project" in branch and error.get("type") == "extra_forbidden":
             return "unsupported_capability"
     return "invalid_spec"
 

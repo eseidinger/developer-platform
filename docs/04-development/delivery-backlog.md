@@ -356,11 +356,11 @@ Acceptance criteria:
 
 Phase tasks:
 
-- [ ] **DEV-012-T01 · 2B** — Finalize the provider-neutral deployment-credential API, OIDC administration adapter, machine-principal/grant model, permission matrix, expiry/rotation policy, one-time-secret and redaction rules, and failure/reconciliation states. Prerequisites: Phase 2A gate; ADR-004; ADR-018.
-- [ ] **DEV-012-T02 · 2B** — Implement authorized create/list/rotate/revoke lifecycle, Keycloak confidential-client integration, short-lived client-credentials authentication, immediate platform-grant denial, idempotent provider cleanup, and audit/backup coverage. Prerequisites: DEV-012-T01; OPS-001-T01; OPS-004-T01.
-- [ ] **DEV-012-T03 · 2B** — Run a portable CI deployment example and prove one-time disclosure, deploy/observe success, permission denials, rotation, expiry, immediate revocation with an unexpired token, provider-failure recovery, and complete redaction. Prerequisites: DEV-012-T02; DEV-006-T02.
+- [x] **DEV-012-T01 · 2B** — Finalize the provider-neutral deployment/test-automation credential API, empty-project lifecycle, OIDC administration adapter, machine-principal/grant model, permission matrix, expiry/rotation policy, one-time-secret and redaction rules, and failure states. Prerequisites: Phase 2A gate explicitly deferred by owner; ADR-004; ADR-018.
+- [x] **DEV-012-T02 · 2B** — Implement empty-project creation; authorized deployment/test-runner/test-persona lifecycle; Keycloak confidential-client integration; short-lived client-credentials authentication; immediate platform-grant denial; provider cleanup retry state; and audit coverage. Prerequisites: DEV-012-T01; OPS-001-T01; OPS-004-T01.
+- [ ] **DEV-012-T03 · 2B** — Run the portable machine-driven platform suite and prove empty-project first deployment, one-time disclosure, role and cross-project permissions, deploy/observe success, rotation, expiry, immediate revocation with an unexpired token, provider-failure recovery, cleanup, and complete redaction. Prerequisites: DEV-012-T02; DEV-006-T02.
 
-**Task evidence (October 4, 2026):** Source absent; local and operational acceptance unverified. The current API validates human and service OIDC tokens and rechecks platform grants, but it has no deployment-credential resource, machine-principal lifecycle, client-credentials provisioning adapter, one-time secret response, expiry/rotation workflow, or CI deployment example. [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md) and [Phase 2B](phase-2b-ci-deployment-credentials.md) document the requirement boundary and planned acceptance; they are not implementation evidence.
+**Task evidence (October 4, 2026):** Source now includes empty-project creation; deployment, test-runner, and test-persona credential profiles; Keycloak confidential-client provisioning; one-time secret responses; per-request expiry/revocation checks; bounded rotation; fail-closed provider cleanup with automatic retry; and bootstrap plus repeatable Ansible playbooks. All 169 local Python tests pass; OpenAPI, Compose, Python compilation, diff checks, and the three playbook syntax checks pass. Live Keycloak/Kubernetes acceptance, explicit deployed expiry evidence, provider-failure injection, and deployed backup coverage remain open, so DEV-012-T03 and the Phase 2B gate remain incomplete.
 
 
 ## Operator stories
@@ -906,7 +906,7 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | F-11 / UC-06 | PLAN-010/011/012 |
 | F-12 / UC-06 | PLAN-013/014 |
 | F-13 / UC-07 | DEV-001-T01/02/03, DEV-006-T02, DEV-011-T02 |
-| F-14 / UC-08 | DEV-012-T01/02/03 |
+| F-14 / UC-08; F-15 / UC-09 | DEV-012-T01/02/03 |
 | N-01 | PLAN-001/002/004 |
 | N-02 | DEV-007-T01/02, PLAN-003, DEV-011-T01, OPS-008-T02 |
 | N-03 | OPS-004-T01, DEV-012-T02/03, and authorization checks on every later data surface |

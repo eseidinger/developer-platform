@@ -53,7 +53,7 @@ Operation state `succeeded` means Kubernetes resources were applied. Its live `r
 
 ## Minimal API deployment demo
 
-Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [Phase 1B access validation](phase-1b-access-validation.md)). `scripts/smoke.py` performs the same flow end to end and is the acceptance check:
+Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [human access and authorization validation](human-access-and-authorization-validation.md)). `scripts/smoke.py` performs the same flow end to end and is the acceptance check:
 
 ```bash
 OP=$(curl -fsS -X PUT http://127.0.0.1:8000/projects/demo \
