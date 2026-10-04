@@ -4,6 +4,7 @@ __pycache__/
 *.pyc
 .venv/
 ansible/inventory.yml
+ansible/human-bootstrap-vars.yml
 operations/watchdog/src/config.local.php
 operations/watchdog/ansible/inventory.watchdog.yml
 operations/heartbeat/ansible/inventory.heartbeat.yml

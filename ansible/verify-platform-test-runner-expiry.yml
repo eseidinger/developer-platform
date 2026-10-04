@@ -1,0 +1,64 @@
+---
+- name: Verify a dedicated test-runner credential before or after expiry
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  tasks:
+    - name: Require a protected dedicated expiry-drill credential
+      ansible.builtin.assert:
+        that:
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_test_runner_credential_id is defined
+          - platform_test_runner_expires_at is defined
+          - platform_expiry_drill_phase is defined
+          - platform_expiry_drill_phase in ['active', 'expired']
+        fail_msg: >-
+          Supply the protected dedicated runner configuration and set
+          platform_expiry_drill_phase to active or expired explicitly.
+      no_log: true
+
+    - name: Exchange the dedicated runner while it is active
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: active_runner_token
+      when: platform_expiry_drill_phase == 'active'
+      no_log: true
+
+    - name: Verify the active dedicated runner can use the Platform API
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects"
+        headers:
+          Authorization: "Bearer {{ active_runner_token.json.access_token }}"
+        status_code: 200
+      when: platform_expiry_drill_phase == 'active'
+      no_log: true
+
+    - name: Verify the expired dedicated runner cannot obtain a token
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: [400, 401]
+      when: platform_expiry_drill_phase == 'expired'
+      no_log: true
+
+    - name: Report non-secret expiry-drill evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: dedicated test runner {{ platform_test_runner_credential_id }} was
+          {{ platform_expiry_drill_phase }}-checked against its expiry at
+          {{ platform_test_runner_expires_at }}.

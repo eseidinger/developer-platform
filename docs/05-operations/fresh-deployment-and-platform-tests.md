@@ -31,7 +31,7 @@ Grant project roles through the Platform API, then run the [human access and aut
 
 ## 3. Bootstrap the automation test runner once
 
-Use a current human platform-administrator token once to create the privileged, expiring test-runner client. Choose an output path outside the repository on encrypted or otherwise protected storage:
+Use a current human platform-administrator token once to create the privileged, expiring test-runner client. Choose an output path outside the repository on encrypted or otherwise protected storage **on the controller running Ansible**, not on the platform host. Create its parent directory first with restrictive permissions; the playbook refuses a missing, unwritable, or existing output path before creating the one-time credential:
 
 ```bash
 ansible-playbook ansible/bootstrap-platform-test-runner.yml \
@@ -83,7 +83,70 @@ Content-Type: application/json
 
 The focused legacy `test-platform-ci-credential.yml` remains available when an operator specifically wants to test an already prepared project's credential path with a protected project-administrator token. The normal fresh-deployment acceptance path is `test-platform.yml` and does not retain a human token.
 
-## 6. Additional manual checks
+## 6. Optional credential lifecycle drills (accepted as deferred)
+
+The routine suite has already exercised creation, scoped access, rotation, and
+immediate revocation. The following two higher-cost drills are automated but are
+**accepted as deferred for the current lab**. They are not required for routine
+CI or for the basic platform test sequence. Record a new owner decision before
+making either a release gate.
+
+### Scheduled expiry verification
+
+Create a separate, one-day test runner; do not reuse the normal acceptance runner.
+Use a new protected output path and run its active check immediately:
+
+```bash
+ansible-playbook ansible/bootstrap-platform-test-runner.yml \
+  -e @/path/to/protected-human-bootstrap-vars.yml \
+  -e platform_test_runner_name=platform-expiry-drill \
+  -e platform_test_runner_expires_in_days=1 \
+  -e platform_test_runner_output=/path/to/protected-expiry-drill.json
+
+ansible-playbook ansible/verify-platform-test-runner-expiry.yml \
+  -e @/path/to/protected-expiry-drill.json \
+  -e platform_expiry_drill_phase=active
+```
+
+Schedule the same verifier after the `platform_test_runner_expires_at` timestamp
+written to that protected file, with a small delay for clock skew:
+
+```bash
+ansible-playbook ansible/verify-platform-test-runner-expiry.yml \
+  -e @/path/to/protected-expiry-drill.json \
+  -e platform_expiry_drill_phase=expired
+```
+
+The second invocation passes only when the client-credentials exchange returns
+`400` or `401`. Its report includes only the credential ID and expiry timestamp.
+
+### Controlled identity-provider outage verification
+
+This drill stops Keycloak on the deployed host. Run it only in an approved
+maintenance window, from a controller that can SSH to the `platform` host in the
+normal inventory. Provide a disposable existing project and its protected human
+project-administrator token outside the repository:
+
+```bash
+ansible-playbook -i ansible/inventory.yml \
+  ansible/test-platform-identity-provider-outage.yml \
+  -e platform_api_url=https://platform.example.com \
+  -e platform_test_project=disposable-outage-drill \
+  -e platform_identity_drill_host=platform \
+  -e @/path/to/protected-project-admin-vars.yml \
+  -e platform_allow_identity_outage_drill=true \
+  -e platform_identity_outage_acknowledgement=I_ACCEPT_IDENTITY_OUTAGE
+```
+
+The playbook creates a disposable credential, proves it works, stops Keycloak,
+requires `revocation_pending` and immediate denial of the issued token, then
+restores Keycloak in an `always` block and requires final `revoked` cleanup. It
+does not print client secrets or bearer tokens. If a failed controller connection
+prevents Ansible from reaching the `always` block, restore the service manually
+on the host with `sudo docker compose up -d --wait keycloak` from
+`/opt/developer-platform`.
+
+## 7. Additional manual checks
 
 Run, in order:
 

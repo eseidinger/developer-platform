@@ -1,6 +1,6 @@
 # Phase 2B – CI Deployment Credentials
 
-Status: **source implementation complete through DEV-012-T02; deployed acceptance remains open. Phase 2A live acceptance is deferred, not accepted.** Covers [F-14 and F-15](../01-product/requirements.md), [UC-08 and UC-09](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). The executable breakdown is preserved in the [automation implementation plan](phase-2b-automation-implementation-plan.md).
+Status: **source implementation is complete through DEV-012-T02 and the basic deployed suite passed on October 4, 2026. Expiry and identity-provider-outage drills are automated but owner-accepted as deferred for the current lab. Phase 2A live acceptance remains deferred, not accepted.** Covers [F-14 and F-15](../01-product/requirements.md), [UC-08 and UC-09](../01-product/use-cases.md), and [ADR-018](../03-decisions/ADR-018-revocable-ci-deployment-credentials.md). The executable breakdown is preserved in the [automation implementation plan](phase-2b-automation-implementation-plan.md).
 
 Execution tracking: [DEV-012-T01 through DEV-012-T03](delivery-backlog.md#phase-task-index).
 
@@ -55,6 +55,15 @@ Using a disposable project and repository pipeline:
 6. explicit revocation denies the next request made with a still-unexpired access token;
 7. expiry denies access without operator cleanup; and
 8. identity-provider failure during create/revoke produces a visible, retryable, fail-closed state with no orphan that retains Platform API access.
+
+For the current lab, items 7 and 8 are accepted as deferred rather than treated
+as routine release checks: expiry requires a real one-day wait, and item 8 causes
+a deliberate identity-service outage. The automated procedures are
+[`verify-platform-test-runner-expiry.yml`](../../ansible/verify-platform-test-runner-expiry.yml)
+and
+[`test-platform-identity-provider-outage.yml`](../../ansible/test-platform-identity-provider-outage.yml).
+They remain available for a later maintenance-window validation, but this
+acceptance exception must not be interpreted as evidence that either drill ran.
 
 ## Out of scope for this gate
 

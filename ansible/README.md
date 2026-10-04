@@ -91,11 +91,24 @@ operational tracks with their own inventories and protected credentials.
 
 The one-time `bootstrap-platform-test-runner.yml` playbook uses a human
 platform-administrator token and writes the returned client credential to an
-explicit mode-`0600` path. The repeatable `test-platform.yml` playbook consumes
+explicit mode-`0600` path on the controller. Create the protected parent directory
+there first; the playbook checks that it is writable and that the output file does
+not already exist before creating the one-time credential. The repeatable `test-platform.yml` playbook consumes
 that protected file, creates empty disposable projects and short-lived role
 personas, performs the first deployment with a project CI credential, and cleans
 up without retaining the human token. `test-platform-ci-credential.yml` is the
 narrower compatibility check for an already prepared project.
+
+`verify-platform-test-runner-expiry.yml` is a two-stage, scheduled-safe expiry
+drill for a dedicated one-day test runner: run it once with
+`platform_expiry_drill_phase=active`, then schedule the same protected credential
+file after its recorded expiry with `platform_expiry_drill_phase=expired`.
+`test-platform-identity-provider-outage.yml` is an operator-only Keycloak outage
+drill. It requires an inventory, a protected project-administrator token, an
+explicit acknowledgement, and `platform_allow_identity_outage_drill=true`; its
+`always` block restores Keycloak. The two drills are intentionally deferred and
+accepted for the current lab, so do not add either to routine CI without a new
+owner decision.
 
 Installation references: [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 and [kubectl on Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/).

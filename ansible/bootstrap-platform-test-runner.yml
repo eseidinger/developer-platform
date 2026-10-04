@@ -19,6 +19,37 @@
           platform_test_runner_output path.
       no_log: true
 
+    - name: Inspect the controller output directory before creating an identity
+      ansible.builtin.stat:
+        path: "{{ platform_test_runner_output | dirname }}"
+      register: platform_test_runner_output_directory
+      no_log: true
+
+    - name: Require a writable protected controller output directory
+      ansible.builtin.assert:
+        that:
+          - platform_test_runner_output_directory.stat.exists
+          - platform_test_runner_output_directory.stat.isdir
+          - platform_test_runner_output_directory.stat.writeable
+        fail_msg: >-
+          Create a writable protected directory on the controller before bootstrapping.
+          platform_test_runner_output is written locally, not on the platform host.
+      no_log: true
+
+    - name: Refuse to overwrite an existing one-time credential output
+      ansible.builtin.stat:
+        path: "{{ platform_test_runner_output }}"
+      register: platform_test_runner_output_file
+      no_log: true
+
+    - name: Require an unused controller output path
+      ansible.builtin.assert:
+        that: not platform_test_runner_output_file.stat.exists
+        fail_msg: >-
+          Refusing to overwrite an existing test-runner credential output. Choose a new
+          protected path or revoke and remove the old credential deliberately.
+      no_log: true
+
     - name: Create an expiring test-runner identity
       ansible.builtin.uri:
         url: "{{ platform_api_url }}/platform/test-runner-credentials"
@@ -52,4 +83,3 @@
           Test runner {{ test_runner.json.credential_id }} expires at
           {{ test_runner.json.expires_at }}; its protected configuration was written to
           {{ platform_test_runner_output }}.
-

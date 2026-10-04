@@ -18,9 +18,9 @@
 
     - name: Establish unique disposable resource names
       ansible.builtin.set_fact:
-        test_run_id: "{{ platform_test_run_id | default('run-' + ansible_date_time.epoch) }}"
-        test_project: "{{ platform_test_project | default('test-' + ansible_date_time.epoch) }}"
-        forbidden_project: "{{ platform_forbidden_project | default('test-denied-' + ansible_date_time.epoch) }}"
+        test_run_id: "{{ platform_test_run_id | default('run-' + ansible_facts['date_time']['epoch']) }}"
+        test_project: "{{ platform_test_project | default('test-' + ansible_facts['date_time']['epoch']) }}"
+        forbidden_project: "{{ platform_forbidden_project | default('test-denied-' + ansible_facts['date_time']['epoch']) }}"
 
     - name: Exchange the reusable runner secret for a short-lived token
       ansible.builtin.uri:

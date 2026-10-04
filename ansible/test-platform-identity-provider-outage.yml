@@ -1,0 +1,125 @@
+---
+- name: Prove revocation fails closed during a controlled identity-provider outage
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    platform_identity_outage_acknowledgement: ''
+    platform_identity_drill_install_dir: /opt/developer-platform
+    platform_identity_outage_credential_name: identity-outage-drill
+  tasks:
+    - name: Require explicit approval and protected outage-drill inputs
+      ansible.builtin.assert:
+        that:
+          - platform_allow_identity_outage_drill | default(false) | bool
+          - platform_identity_outage_acknowledgement == 'I_ACCEPT_IDENTITY_OUTAGE'
+          - platform_api_url is defined
+          - platform_project_admin_token is defined
+          - platform_test_project is defined
+          - platform_identity_drill_host is defined
+          - platform_identity_drill_host in groups['all']
+          - platform_identity_drill_install_dir | length > 1
+        fail_msg: >-
+          This drill stops Keycloak. Supply a reachable inventory host, protected project
+          administrator token and project, plus platform_allow_identity_outage_drill=true
+          and platform_identity_outage_acknowledgement=I_ACCEPT_IDENTITY_OUTAGE.
+      no_log: true
+
+    - name: Run the controlled outage and restoration sequence
+      block:
+        - name: Create a disposable deployment credential
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/deployment-credentials"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ platform_project_admin_token }}"
+            body_format: json
+            body:
+              name: "{{ platform_identity_outage_credential_name }}"
+              expires_in_days: 1
+            status_code: 201
+          register: outage_credential
+          no_log: true
+
+        - name: Exchange the disposable credential before the outage
+          ansible.builtin.uri:
+            url: "{{ outage_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ outage_credential.json.client_id }}"
+              client_secret: "{{ outage_credential.json.client_secret }}"
+            status_code: 200
+          register: outage_token
+          no_log: true
+
+        - name: Verify the disposable credential has Platform API access before the outage
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            headers:
+              Authorization: "Bearer {{ outage_token.json.access_token }}"
+            status_code: 200
+          no_log: true
+
+        - name: Stop Keycloak for the approved outage drill
+          ansible.builtin.command:
+            argv: [docker, compose, stop, keycloak]
+            chdir: "{{ platform_identity_drill_install_dir }}"
+          delegate_to: "{{ platform_identity_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Revoke the credential while provider cleanup is unavailable
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/deployment-credentials/{{ outage_credential.json.credential_id }}"
+            method: DELETE
+            headers:
+              Authorization: "Bearer {{ platform_project_admin_token }}"
+            status_code: 202
+          register: pending_revocation
+          no_log: true
+
+        - name: Require the visible pending provider-cleanup state
+          ansible.builtin.assert:
+            that: pending_revocation.json.status == 'revocation_pending'
+            fail_msg: Expected revocation_pending while Keycloak is stopped.
+          no_log: true
+
+        - name: Prove the already-issued credential token is immediately denied
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            headers:
+              Authorization: "Bearer {{ outage_token.json.access_token }}"
+            status_code: 403
+          no_log: true
+      always:
+        - name: Restore Keycloak even if the outage drill fails
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', keycloak]
+            chdir: "{{ platform_identity_drill_install_dir }}"
+          delegate_to: "{{ platform_identity_drill_host }}"
+          become: true
+          changed_when: true
+
+    - name: Retry provider cleanup after Keycloak recovery
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/deployment-credentials/{{ outage_credential.json.credential_id }}"
+        method: DELETE
+        headers:
+          Authorization: "Bearer {{ platform_project_admin_token }}"
+        status_code: 200
+      register: completed_revocation
+      no_log: true
+
+    - name: Require completed provider cleanup after recovery
+      ansible.builtin.assert:
+        that: completed_revocation.json.status == 'revoked'
+        fail_msg: Provider cleanup did not complete after Keycloak recovery.
+      no_log: true
+
+    - name: Report non-secret outage-drill evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: credential {{ outage_credential.json.credential_id }} was denied while
+          Keycloak was unavailable and provider cleanup completed after recovery.
