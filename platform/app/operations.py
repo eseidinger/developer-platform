@@ -110,22 +110,22 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         if spec.get("components") is not None:
             manifests = component_resources(project, spec["components"], os.environ["POSTGRES_IP"], password,
                                             spec.get("configuration"))
-            previous = conn.execute("""SELECT spec FROM application_revisions
-                WHERE application_id=%s AND revision<%s ORDER BY revision DESC LIMIT 1""",
-                                    (application_id, revision)).fetchone()
-            if remove and previous and previous[0].get("components") is not None:
-                old_manifests = component_resources(project, previous[0]["components"], os.environ["POSTGRES_IP"],
-                                                    password, previous[0].get("configuration"))
-                desired_ids = {(m["apiVersion"], m["kind"], m["metadata"]["name"]) for m in manifests}
-                for manifest in old_manifests:
-                    identity = (manifest["apiVersion"], manifest["kind"], manifest["metadata"]["name"])
-                    if manifest["kind"] in {"Deployment", "Service", "CronJob"} and identity not in desired_ids:
-                        step = f"delete:{manifest['kind']}"
-                        remove(manifest)
         else:
             manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
                                   os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
                                   spec.get("resources"), spec.get("configuration"))
+        previous = conn.execute("""SELECT spec FROM application_revisions
+            WHERE application_id=%s AND revision<%s ORDER BY revision DESC LIMIT 1""",
+                                (application_id, revision)).fetchone()
+        if remove and previous and previous[0].get("components") is not None:
+            old_manifests = component_resources(project, previous[0]["components"], os.environ["POSTGRES_IP"],
+                                                password, previous[0].get("configuration"))
+            desired_ids = {(m["apiVersion"], m["kind"], m["metadata"]["name"]) for m in manifests}
+            for manifest in old_manifests:
+                identity = (manifest["apiVersion"], manifest["kind"], manifest["metadata"]["name"])
+                if manifest["kind"] in {"Deployment", "Service", "CronJob"} and identity not in desired_ids:
+                    step = f"delete:{manifest['kind']}"
+                    remove(manifest)
         if operation_kind == "restart":
             # The marker is this operation's ID, so a reclaimed retry cannot restart twice.
             marker = str(operation_id)

@@ -177,6 +177,26 @@ class OperationWorkerTests(OperationWorkerFixture):
         self.assertEqual([call.args[0]["kind"] for call in self.apply.call_args_list], ["Secret", "Deployment"])
         self.assertEqual(self.conn.state, "succeeded")
 
+    def test_rollback_to_legacy_removes_component_workloads_before_legacy_apply(self):
+        self.conn.previous_spec = {"name": "smoke", "components": [
+            {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
+             "ports": [{"name": "http", "port": 8080}]},
+            {"name": "worker", "type": "scheduled", "resolved_image": "example/worker@sha256:" + "b" * 64,
+             "schedule": "*/15 * * * *"}]}
+        old = [{"apiVersion": "v1", **self.secret()},
+               {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "api"}},
+               {"apiVersion": "v1", "kind": "Service", "metadata": {"name": "api"}},
+               {"apiVersion": "batch/v1", "kind": "CronJob", "metadata": {"name": "worker"}}]
+        self.resources.return_value = [{"apiVersion": "v1", **self.secret()},
+                                       {"apiVersion": "apps/v1", **self.deployment()}]
+        with patch("app.operations.component_resources", return_value=old):
+            self.assertTrue(self.run_one())
+
+        self.assertEqual([call.args[0]["kind"] for call in self.remove.call_args_list],
+                         ["Deployment", "Service", "CronJob"])
+        self.resources.assert_called_once()
+        self.assertEqual(self.conn.state, "succeeded")
+
     def test_deploys_the_resolved_digest_reference_and_falls_back_for_legacy_specs(self):
         digest_image = "example@sha256:" + "a" * 64
         for resolved, expected in ((digest_image, digest_image), (None, "example:v1")):
