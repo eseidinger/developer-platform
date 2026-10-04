@@ -1,6 +1,6 @@
 # Phase 2B Automation Credential Implementation Plan
 
-Status: **source implementation complete; deployed acceptance remains open**. This plan extends the Phase 2B deployment-credential work with an explicitly privileged test-runner identity and empty-project bootstrap. Phase 2A live acceptance remains deferred.
+Status: **source implementation complete; deployed acceptance remains open**. This plan extends the Phase 2B deployment-credential work with an explicitly privileged test-runner identity and empty-project bootstrap. Phase 2A is accepted under its recorded deferred checks.
 
 ## Objective
 

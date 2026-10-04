@@ -139,6 +139,61 @@
           delay: 5
           no_log: true
 
+        - name: Add configuration before migrating the legacy revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/configuration"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            body_format: json
+            body:
+              values:
+                COMPONENT_ACCEPTANCE_RUN: "{{ component_run_id }}"
+            status_code: 202
+          register: legacy_configuration
+          no_log: true
+
+        - name: Wait for configuration activation before migration
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ legacy_configuration.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            status_code: 200
+          register: legacy_configuration_operation
+          until:
+            - legacy_configuration_operation.json.state == 'succeeded'
+            - legacy_configuration_operation.json.readiness.state == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Add a write-only secret before migrating the legacy revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/secrets/COMPONENT_ACCEPTANCE_SECRET"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            body_format: json
+            body:
+              value: "{{ component_run_id }}-secret"
+            status_code: 202
+          register: legacy_secret
+          no_log: true
+
+        - name: Require the migrated secret to remain write-only
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/secrets"
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            status_code: 200
+          register: legacy_secret_listing
+          until: >-
+            legacy_secret_listing.json.secrets | selectattr('name', 'equalto',
+            'COMPONENT_ACCEPTANCE_SECRET') | list | length == 1
+          retries: 24
+          delay: 5
+          no_log: true
+
         - name: Reject an invalid scheduled-component specification before side effects
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ component_project }}"
@@ -203,6 +258,16 @@
                       image: "{{ platform_component_job_image }}"
                       command: ['/bin/sh', '-ec']
                       args: ['wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75']
+                    schedule: '* * * * *'
+                    timeZone: UTC
+                    concurrencyPolicy: Forbid
+                  - name: failing-probe
+                    type: scheduled
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_job_image }}"
+                      command: ['/bin/sh', '-ec']
+                      args: ['echo scheduled-failure >&2; exit 1']
                     schedule: '* * * * *'
                     timeZone: UTC
                     concurrencyPolicy: Forbid
@@ -285,6 +350,32 @@
             fail_msg: >-
               CronJob probe was not found in project-{{ component_project }} after the component
               deployment succeeded.
+
+        - name: Wait for the deliberately failing scheduled component to report a safe failure
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/components"
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            status_code: 200
+          register: failing_scheduled_status
+          until: >-
+            (failing_scheduled_status.json.components | selectattr('name', 'equalto', 'failing-probe') |
+             first).last_result == 'failed'
+          retries: 48
+          delay: 5
+          no_log: true
+
+        - name: Require the failed scheduled component to expose only a safe reason
+          ansible.builtin.assert:
+            that:
+              - >-
+                (failing_scheduled_status.json.components | selectattr('name', 'equalto', 'failing-probe') |
+                 first).failure.reason is defined
+              - >-
+                'scheduled-failure' not in
+                ((failing_scheduled_status.json.components | selectattr('name', 'equalto', 'failing-probe') |
+                  first).failure | to_json)
+          no_log: true
 
         - name: Wait for a successful scheduled internal connectivity probe without overlap
           ansible.builtin.uri:
@@ -450,6 +541,16 @@
                     schedule: '* * * * *'
                     timeZone: UTC
                     concurrencyPolicy: Forbid
+                  - name: failing-probe
+                    type: scheduled
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_job_image }}"
+                      command: ['/bin/sh', '-ec']
+                      args: ['echo scheduled-failure >&2; exit 1']
+                    schedule: '* * * * *'
+                    timeZone: UTC
+                    concurrencyPolicy: Forbid
             status_code: 202
           register: api_only_update
           no_log: true
@@ -489,6 +590,113 @@
             that: peer_before.stdout == peer_after.stdout
             fail_msg: The unchanged peer Deployment generation changed during the API-only update.
 
+        - name: Capture both Service Deployment generations before a scheduled-only update
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - deployment
+              - api
+              - peer
+              - -n
+              - "project-{{ component_project }}"
+              - -o
+              - "jsonpath={range .items[*]}{.metadata.name}{'='}{.metadata.generation}{'\\n'}{end}"
+          delegate_to: "{{ platform_component_drill_host }}"
+          become: "{{ platform_component_drill_become | bool }}"
+          register: services_before_scheduled_update
+          changed_when: false
+
+        - name: Update only the failing scheduled component
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata:
+                name: "{{ component_project }}"
+              spec:
+                components:
+                  - name: api
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_service_image }}"
+                      args: ['-listen=:5678', '-text=component-api-v2']
+                    ports: [{name: http, protocol: http, port: 5678}]
+                  - name: peer
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_service_image }}"
+                      args: ['-listen=:5678', '-text=component-peer']
+                    ports: [{name: http, protocol: http, port: 5678}]
+                  - name: probe
+                    type: scheduled
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_job_image }}"
+                      command: ['/bin/sh', '-ec']
+                      args: ['wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75']
+                    schedule: '* * * * *'
+                    timeZone: UTC
+                    concurrencyPolicy: Forbid
+                  - name: failing-probe
+                    type: scheduled
+                    runtime:
+                      type: container
+                      image: "{{ platform_component_job_image }}"
+                      command: ['/bin/sh', '-ec']
+                      args: ['echo scheduled-failure >&2; exit 1']
+                    schedule: '*/2 * * * *'
+                    timeZone: UTC
+                    concurrencyPolicy: Forbid
+            status_code: 202
+          register: scheduled_only_update
+          no_log: true
+
+        - name: Wait for the scheduled-only update
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ scheduled_only_update.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: scheduled_only_update_operation
+          until: scheduled_only_update_operation.json.state == 'succeeded'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Capture both Service Deployment generations after the scheduled-only update
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - deployment
+              - api
+              - peer
+              - -n
+              - "project-{{ component_project }}"
+              - -o
+              - "jsonpath={range .items[*]}{.metadata.name}{'='}{.metadata.generation}{'\\n'}{end}"
+          delegate_to: "{{ platform_component_drill_host }}"
+          become: "{{ platform_component_drill_become | bool }}"
+          register: services_after_scheduled_update
+          changed_when: false
+
+        - name: Require a scheduled-only update not to roll either Service
+          ansible.builtin.assert:
+            that: services_before_scheduled_update.stdout == services_after_scheduled_update.stdout
+            fail_msg: A scheduled-only update changed a long-running Service Deployment.
+
         - name: Verify migration preserved the legacy revision and component revision history
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ component_project }}/revisions"
@@ -500,6 +708,85 @@
             component_revisions.json.revisions | length < 3 or
             (component_revisions.json.revisions | selectattr('components', 'defined') | list | length) < 3
           no_log: true
+
+        - name: Verify configuration survived component migration and independent updates
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/configuration"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: migrated_configuration
+          no_log: true
+
+        - name: Require the migrated configuration value
+          ansible.builtin.assert:
+            that: migrated_configuration.json['values']['COMPONENT_ACCEPTANCE_RUN'] == component_run_id
+          no_log: true
+
+        - name: Verify the migrated secret remains present but write-only
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/secrets"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: migrated_secret_listing
+          no_log: true
+
+        - name: Require the migrated secret name without exposing its value
+          ansible.builtin.assert:
+            that:
+              - >-
+                migrated_secret_listing.json.secrets | selectattr('name', 'equalto',
+                'COMPONENT_ACCEPTANCE_SECRET') | list | length == 1
+              - (component_run_id ~ '-secret') not in (migrated_secret_listing.json | to_json)
+          no_log: true
+
+        - name: Roll back to the first component revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/rollback"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            body_format: json
+            body:
+              revision: "{{ component_deployment.json.revision }}"
+            status_code: 202
+          register: component_rollback
+          no_log: true
+
+        - name: Wait for rollback to the first component revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ component_rollback.json.status_url }}"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: component_rollback_operation
+          until: component_rollback_operation.json.state == 'succeeded'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Require rollback to restore the original API component command
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - deployment
+              - api
+              - -n
+              - "project-{{ component_project }}"
+              - -o
+              - "jsonpath={.spec.template.spec.containers[0].args[*]}"
+          delegate_to: "{{ platform_component_drill_host }}"
+          become: "{{ platform_component_drill_become | bool }}"
+          register: rollback_api_args
+          changed_when: false
+
+        - name: Assert rollback restored the initial component revision
+          ansible.builtin.assert:
+            that: "'-text=component-api' in rollback_api_args.stdout"
 
         - name: Read the component retirement scope
           ansible.builtin.uri:
@@ -514,7 +801,7 @@
           ansible.builtin.assert:
             that:
               - component_retirement.json.removes | selectattr('kind', 'equalto', 'Deployment') | list | length == 2
-              - component_retirement.json.removes | selectattr('kind', 'equalto', 'CronJob') | list | length == 1
+              - component_retirement.json.removes | selectattr('kind', 'equalto', 'CronJob') | list | length == 2
               - component_retirement.json.retains | length > 0
           no_log: true
 
@@ -522,7 +809,9 @@
           ansible.builtin.debug:
             msg: >-
               PASS: {{ component_run_id }} migrated a legacy project to two internal services and
-              one scheduled probe, observed non-overlap, isolated an API update, and verified retirement scope.
+              two scheduled probes (one successful and one safely failed), observed non-overlap,
+              preserved configuration and write-only secrets through migration, isolated component updates,
+              restored the first component revision, and verified retirement scope.
       always:
         - name: Refresh the runner token before disposable-project cleanup
           ansible.builtin.uri:

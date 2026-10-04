@@ -1017,6 +1017,13 @@ def provision(name: str, body: Union[ApplicationEnvelopeV1Alpha2, ApplicationEnv
         spec["components"] = resolved_components
     else:
         spec["resolved_image"] = resolved_image
+    # Configuration is managed by its dedicated, revisioned endpoint. A deployment
+    # envelope that omits it must not erase those separately managed values while
+    # migrating a legacy application or updating one component.
+    if "configuration" not in spec:
+        current = current_spec(name)
+        if current and current[1] and current[1].get("configuration"):
+            spec["configuration"] = current[1]["configuration"]
     try:
         with connect() as conn:
             operation_id, operation_state, revision = queue_deploy(

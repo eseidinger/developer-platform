@@ -655,6 +655,24 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.client.get(path, headers=self.headers).status_code, 403)
         self.assertEqual(self.client.put(path, json={"values": {}}, headers=self.headers).status_code, 403)
 
+    def test_component_deployment_preserves_separately_managed_configuration(self):
+        self.assertEqual(self.deploy().status_code, 202)
+        configured = self.client.put("/projects/smoke/configuration", json={"values": {"MODE": "fast"}},
+                                     headers=self.headers)
+        self.assertEqual(configured.status_code, 202)
+        component_body = {
+            "apiVersion": "platform.example/v1alpha2", "kind": "Application",
+            "metadata": {"name": "smoke"},
+            "spec": {"components": [{
+                "name": "api", "type": "service",
+                "runtime": {"type": "container", "image": "example:v2"},
+                "ports": [{"name": "http", "protocol": "http", "port": 8080}],
+            }]},
+        }
+        migrated = self.client.put("/projects/smoke", json=component_body, headers=self.headers)
+        self.assertEqual(migrated.status_code, 202)
+        self.assertEqual(self.catalog.revisions["application-smoke"][-1][1]["configuration"], {"MODE": "fast"})
+
     def test_secrets_are_write_only_audited_by_name_and_roll_the_pods(self):
         from test_secrets import cluster
         fake = cluster()

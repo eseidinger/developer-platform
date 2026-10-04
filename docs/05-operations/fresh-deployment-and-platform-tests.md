@@ -200,7 +200,7 @@ Run, in order:
 4. The automation suite: empty-project creation, persona token acquisition, first CI deployment, scoped reads, denied privileged/cross-project actions, rotation, old-token denial, revocation, and cleanup.
 5. Project logs, status, revision, rollback, restart, and retirement-preview checks appropriate to the deployed feature set.
 
-Use disposable test project names and record the deployed revision and installation record. Do not claim multi-service Phase 2A acceptance while its live checks are deferred.
+Use disposable test project names and record the deployed revision and installation record. Phase 2A acceptance is recorded as EV-38 with owner-accepted deferrals for database-row preservation, backup inventory, and representative capacity measurement.
 
 ## Separate operational tracks
 
