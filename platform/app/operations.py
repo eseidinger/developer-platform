@@ -10,6 +10,7 @@ from psycopg.types.json import Jsonb
 from .audit import Actor, record_event
 from .authorization import is_allowed
 from .identity import Principal
+from .manifests import component_resources
 
 
 LIFECYCLE_LOCK_ID = 731904
@@ -51,7 +52,7 @@ def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int
 
 def _execute_locked(conn, operation_id, password_for: Callable, provision_database: Callable,
                     apply: Callable, resources: Callable, publish_catalog: Callable,
-                    log: logging.Logger) -> None:
+                    log: logging.Logger, remove: Callable | None = None) -> None:
     row = conn.execute("""SELECT o.operation_id, o.application_id, o.revision, o.operation_kind,
             o.state, o.envelope_version, o.envelope, o.actor_issuer, o.actor_subject,
             p.project_id, p.name, p.status
@@ -106,9 +107,25 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         password = password_for(project)
         step = "manifests"
         spec = desired[1]
-        manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
-                              os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
-                              spec.get("resources"), spec.get("configuration"))
+        if spec.get("components") is not None:
+            manifests = component_resources(project, spec["components"], os.environ["POSTGRES_IP"], password,
+                                            spec.get("configuration"))
+            previous = conn.execute("""SELECT spec FROM application_revisions
+                WHERE application_id=%s AND revision<%s ORDER BY revision DESC LIMIT 1""",
+                                    (application_id, revision)).fetchone()
+            if remove and previous and previous[0].get("components") is not None:
+                old_manifests = component_resources(project, previous[0]["components"], os.environ["POSTGRES_IP"],
+                                                    password, previous[0].get("configuration"))
+                desired_ids = {(m["apiVersion"], m["kind"], m["metadata"]["name"]) for m in manifests}
+                for manifest in old_manifests:
+                    identity = (manifest["apiVersion"], manifest["kind"], manifest["metadata"]["name"])
+                    if manifest["kind"] in {"Deployment", "Service", "CronJob"} and identity not in desired_ids:
+                        step = f"delete:{manifest['kind']}"
+                        remove(manifest)
+        else:
+            manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
+                                  os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
+                                  spec.get("resources"), spec.get("configuration"))
         if operation_kind == "restart":
             # The marker is this operation's ID, so a reclaimed retry cannot restart twice.
             marker = str(operation_id)
@@ -161,7 +178,7 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
 
 def process_one(connect: Callable, password_for: Callable, provision_database: Callable,
                 apply: Callable, resources: Callable, publish_catalog: Callable,
-                log: logging.Logger) -> bool:
+                log: logging.Logger, remove: Callable | None = None) -> bool:
     with connect() as conn:
         candidates = conn.execute("""SELECT operation_id FROM application_operations
             WHERE state IN ('queued', 'running') ORDER BY created_at LIMIT 100""").fetchall()
@@ -174,7 +191,7 @@ def process_one(connect: Callable, password_for: Callable, provision_database: C
                 conn.execute("SELECT pg_advisory_lock(%s)", (LIFECYCLE_LOCK_ID,))
                 lifecycle_locked = True
                 _execute_locked(conn, operation_id, password_for, provision_database,
-                                apply, resources, publish_catalog, log)
+                                apply, resources, publish_catalog, log, remove)
                 return True
             finally:
                 if lifecycle_locked:
@@ -186,11 +203,11 @@ def process_one(connect: Callable, password_for: Callable, provision_database: C
 
 def operation_loop(stop: threading.Event, connect: Callable, password_for: Callable,
                    provision_database: Callable, apply: Callable, resources: Callable,
-                   publish_catalog: Callable, log: logging.Logger) -> None:
+                   publish_catalog: Callable, log: logging.Logger, remove: Callable | None = None) -> None:
     while not stop.is_set():
         try:
             processed = process_one(connect, password_for, provision_database,
-                                    apply, resources, publish_catalog, log)
+                                    apply, resources, publish_catalog, log, remove)
         except Exception as exc:
             log.error("Operation worker iteration failed error_type=%s", type(exc).__name__)
             processed = False

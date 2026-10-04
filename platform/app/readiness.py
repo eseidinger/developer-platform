@@ -64,8 +64,8 @@ def _active_images(pods: list[Any]) -> tuple[list[str], list[str]]:
     return sorted(images), sorted(image_ids)
 
 
-def observe_deployment(runtime: Any, project: str, desired_image: str,
-                       log) -> dict[str, Any]:
+def observe_deployment(runtime: Any, project: str, desired_image: str, log,
+                       deployment_name: str | None = None) -> dict[str, Any]:
     namespace = "project-" + project
     if runtime is None:
         log.error("Deployment readiness observer unavailable project=%s", project)
@@ -74,7 +74,7 @@ def observe_deployment(runtime: Any, project: str, desired_image: str,
     try:
         deployment = runtime.resources.get(
             api_version="apps/v1", kind="Deployment"
-        ).get(name=project, namespace=namespace)
+        ).get(name=deployment_name or project, namespace=namespace)
     except ApiException as exc:
         if exc.status == 404:
             return _snapshot("not_found", desired_image, reason="DeploymentNotFound")
@@ -104,7 +104,8 @@ def observe_deployment(runtime: Any, project: str, desired_image: str,
     try:
         response = runtime.resources.get(api_version="v1", kind="Pod").get(
             namespace=namespace,
-            label_selector="app.kubernetes.io/name=" + project,
+            label_selector=("app.kubernetes.io/name=" + project if deployment_name is None
+                            else "platform.example/component=" + deployment_name),
         )
         pods = _field(response, "items", []) or []
     except Exception as exc:

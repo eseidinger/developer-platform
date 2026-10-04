@@ -23,7 +23,7 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
 from kubernetes.client.exceptions import ApiException
-from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationInfo, field_validator, model_validator
 
 from .audit import Actor, initialize as initialize_audit, read_events, record_event, redact
 from .authorization import (bootstrap_platform_admin, grant as grant_role, initialize as initialize_authorization,
@@ -32,9 +32,9 @@ from .authorization import (bootstrap_platform_admin, grant as grant_role, initi
 from .catalog import ensure_default_application, initialize as initialize_catalog
 from .images import ImageResolutionError, allowed_registries, resolve_image
 from .identity import AuthenticationError, Principal, configured_verifier
-from .spec import CAPABILITIES, ApplicationEnvelope, error_code, to_flat
+from .spec import CAPABILITIES, ApplicationEnvelope, ApplicationEnvelopeV1Alpha2, error_code, to_flat
 from .config import normalize_configuration, observe_activation
-from .manifests import normalize_resources, resources, validate_name
+from .manifests import component_resources, normalize_resources, resources, validate_name
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
 from .drift import drift_loop, observe_drift
@@ -87,7 +87,7 @@ async def lifespan(app):
     security_worker.start()
     operation_worker = threading.Thread(
         target=operation_loop,
-        args=(stop, connect, password_for, provision_database, apply, resources, publish_catalog, log),
+        args=(stop, connect, password_for, provision_database, apply, resources, publish_catalog, log, remove),
         daemon=True,
     )
     operation_worker.start()
@@ -207,11 +207,25 @@ class Project(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str
-    image: str = Field(min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$")
+    image: Optional[str] = Field(default=None, min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$")
     port: int = Field(default=8080, ge=1024, le=65535)
     probe_profile: Literal["status", "hello-world"] = "status"
     resources: Optional[dict] = None
     configuration: Optional[dict] = None
+    components: Optional[list[dict]] = None
+
+    @field_validator("components")
+    @classmethod
+    def components_require_versioned_envelope(cls, value, info: ValidationInfo):
+        if value is not None and not (info.context or {}).get("versioned_envelope"):
+            raise ValueError("components require a versioned Application envelope")
+        return value
+
+    @model_validator(mode="after")
+    def one_workload_shape(self):
+        if (self.image is None) == (self.components is None):
+            raise ValueError("provide either image or components")
+        return self
 
     @field_validator("resources")
     @classmethod
@@ -248,6 +262,15 @@ def apply(manifest):
     if resource.namespaced:
         args["namespace"] = manifest["metadata"]["namespace"]
     resource.patch(**args)
+
+
+def remove(manifest):
+    """Delete one managed Kubernetes object during component reconciliation."""
+    resource = runtime.resources.get(api_version=manifest["apiVersion"], kind=manifest["kind"])
+    args = {"name": manifest["metadata"]["name"]}
+    if resource.namespaced:
+        args["namespace"] = manifest["metadata"]["namespace"]
+    resource.delete(**args)
 
 @app.get("/healthz")
 def health():
@@ -443,7 +466,7 @@ def queue_deploy(conn, principal: Principal, name: str, spec: Optional[dict],
 
 
 @app.put("/projects/{name}")
-def provision(name: str, body: Union[ApplicationEnvelope, Project],
+def provision(name: str, body: Union[ApplicationEnvelopeV1Alpha2, ApplicationEnvelope, Project],
               principal: Principal = Depends(current_principal),
               if_match: Optional[str] = Header(None)):
     """Accept the flat project body or a versioned `Application` envelope.
@@ -451,9 +474,10 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
     An optional `If-Match: <revision>` header makes the update conditional on the
     current desired revision; a stale value returns 409 with the current revision.
     """
-    if isinstance(body, ApplicationEnvelope):
+    if isinstance(body, (ApplicationEnvelope, ApplicationEnvelopeV1Alpha2)):
         try:
-            project = Project.model_validate(to_flat(body.model_dump(exclude_none=True)))
+            project = Project.model_validate(to_flat(body.model_dump(exclude_none=True)),
+                                            context={"versioned_envelope": True})
         except ValidationError as exc:
             raise RequestValidationError(exc.errors(include_context=False))
     else:
@@ -472,7 +496,12 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
         raise HTTPException(400, "Path and project name must match")
     # Resolve before taking locks or writing so registry failures have no side effects.
     try:
-        resolved_image = resolve_image(project.image)
+        if project.components is not None:
+            resolved_components = []
+            for component in project.components:
+                resolved_components.append({**component, "resolved_image": resolve_image(component["image"])})
+        else:
+            resolved_image = resolve_image(project.image)
     except ImageResolutionError as exc:
         status_code = 503 if exc.reason == "unavailable" else 422
         required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
@@ -483,7 +512,11 @@ def provision(name: str, body: Union[ApplicationEnvelope, Project],
             "unavailable": "Image registry is unavailable; retry the same PUT",
         }
         raise HTTPException(status_code, messages[exc.reason])
-    spec = {**project.model_dump(exclude_none=True), "resolved_image": resolved_image}
+    spec = project.model_dump(exclude_none=True)
+    if project.components is not None:
+        spec["components"] = resolved_components
+    else:
+        spec["resolved_image"] = resolved_image
     try:
         with connect() as conn:
             operation_id, operation_state, revision = queue_deploy(
@@ -807,8 +840,9 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
                    {"project": name}, {"count": len(rows)})
     return {"project": name, "current_revision": rows[0][0], "revisions": [
         {"revision": r[0], "created_at": r[1].isoformat(), "current": r[0] == rows[0][0],
-         "image": r[2].get("resolved_image", r[2]["image"]), "port": r[2]["port"],
-         "resources": r[2].get("resources")}
+         "image": r[2].get("resolved_image", r[2].get("image")), "port": r[2].get("port"),
+         "components": [{"name": c["name"], "type": c["type"], "image": c.get("resolved_image", c["image"])}
+                        for c in r[2].get("components", [])], "resources": r[2].get("resources")}
         for r in rows]}
 
 
@@ -988,7 +1022,13 @@ def operation_status(operation_id: UUID, principal: Principal = Depends(current_
     require_permission(principal, "view", row[6])
     required_audit(actor_for(principal), "operation.inspect", "operation", str(operation_id),
                    "succeeded", {"project": row[6]}, {"state": row[2], "revision": row[1]})
-    readiness = observe_deployment(runtime, row[6], row[7].get("resolved_image", row[7]["image"]), log)
+    components = row[7].get("components")
+    if components:
+        services = [component for component in components if component["type"] == "service"]
+        readiness = {"state": "not_applicable"} if not services else observe_deployment(
+            runtime, row[6], services[0].get("resolved_image", services[0]["image"]), log, services[0]["name"])
+    else:
+        readiness = observe_deployment(runtime, row[6], row[7].get("resolved_image", row[7]["image"]), log)
     return {
         "operation_id": str(row[0]),
         "revision": row[1],

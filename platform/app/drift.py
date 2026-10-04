@@ -21,6 +21,10 @@ def _canonical(kind: str, value: Any):
 
 
 def observe_drift(runtime: Any, project: str, spec: dict, log) -> dict[str, Any]:
+    # Component-level drift comparisons are introduced with component status.  Do
+    # not treat the legacy project-named Deployment as an expected v1alpha2 object.
+    if spec.get("components") is not None:
+        return {"state": "not_applicable", "differences": []}
     if runtime is None:
         return {"state": "unknown", "differences": []}
     try:

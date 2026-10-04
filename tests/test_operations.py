@@ -37,6 +37,7 @@ class OperationConnection:
         self.operation_result = None
         self.error_code = None
         self.last_restart = None
+        self.previous_spec = None
 
     def __enter__(self):
         return self
@@ -66,6 +67,8 @@ class OperationConnection:
             self.result = [(self.last_restart,)] if self.last_restart else []
         elif query.startswith("SELECT revision, spec FROM application_revisions"):
             self.result = [(self.current_revision, self.spec)]
+        elif query.startswith("SELECT spec FROM application_revisions"):
+            self.result = [(self.previous_spec,)] if self.previous_spec is not None else []
         elif query.startswith("UPDATE projects SET status='failed'"):
             self.project_status = "failed"
         elif query.startswith("UPDATE projects SET status='applied'"):
@@ -93,6 +96,7 @@ class OperationWorkerFixture(unittest.TestCase):
         self.connect = Mock(return_value=self.conn)
         self.provision_database = Mock()
         self.apply = Mock()
+        self.remove = Mock()
         self.resources = Mock(return_value=[self.secret(), self.deployment()])
         self.publish_catalog = Mock()
         self.log = Mock()
@@ -126,11 +130,53 @@ class OperationWorkerFixture(unittest.TestCase):
     def run_one(self):
         return process_one(
             self.connect, lambda name: "derived-password", self.provision_database,
-            self.apply, self.resources, self.publish_catalog, self.log,
+            self.apply, self.resources, self.publish_catalog, self.log, self.remove,
         )
 
 
 class OperationWorkerTests(OperationWorkerFixture):
+    def test_component_revision_uses_component_manifests_and_applies_each_workload(self):
+        self.conn.spec = {
+            "name": "smoke", "components": [
+                {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
+                 "ports": [{"name": "http", "port": 8080}]},
+                {"name": "worker", "type": "scheduled", "resolved_image": "example/worker@sha256:" + "b" * 64,
+                 "schedule": "*/15 * * * *", "time_zone": "UTC", "concurrency_policy": "Forbid"},
+            ],
+        }
+        self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
+        generated = [self.secret(), self.deployment(), {"kind": "CronJob", "metadata": {"name": "worker"}}]
+        with patch("app.operations.component_resources", return_value=generated) as build:
+            self.assertTrue(self.run_one())
+
+        build.assert_called_once_with("smoke", self.conn.spec["components"], "172.30.80.10",
+                                      "derived-password", None)
+        self.resources.assert_not_called()
+        self.assertEqual([call.args[0]["kind"] for call in self.apply.call_args_list],
+                         ["Secret", "Deployment", "CronJob"])
+        self.assertEqual(self.conn.state, "succeeded")
+
+    def test_component_reconciliation_removes_only_obsolete_workloads(self):
+        self.conn.spec = {"name": "smoke", "components": [
+            {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
+             "ports": [{"name": "http", "port": 8080}]}]}
+        self.conn.previous_spec = {"name": "smoke", "components": [
+            {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
+             "ports": [{"name": "http", "port": 8080}]},
+            {"name": "worker", "type": "scheduled", "resolved_image": "example/worker@sha256:" + "b" * 64,
+             "schedule": "*/15 * * * *"}]}
+        self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
+        desired = [{"apiVersion": "v1", **self.secret()}, {"apiVersion": "apps/v1", **self.deployment()}]
+        obsolete = [{"apiVersion": "v1", **self.secret()}, {"apiVersion": "apps/v1", **self.deployment()},
+                    {"apiVersion": "batch/v1", "kind": "CronJob",
+                     "metadata": {"name": "worker", "namespace": "project-smoke"}}]
+        with patch("app.operations.component_resources", side_effect=[desired, obsolete]):
+            self.assertTrue(self.run_one())
+
+        self.remove.assert_called_once_with(obsolete[-1])
+        self.assertEqual([call.args[0]["kind"] for call in self.apply.call_args_list], ["Secret", "Deployment"])
+        self.assertEqual(self.conn.state, "succeeded")
+
     def test_deploys_the_resolved_digest_reference_and_falls_back_for_legacy_specs(self):
         digest_image = "example@sha256:" + "a" * 64
         for resolved, expected in ((digest_image, digest_image), (None, "example:v1")):

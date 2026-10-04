@@ -2,7 +2,7 @@ import sys
 import unittest
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
-from app.manifests import normalize_resources, resources, validate_name
+from app.manifests import component_resources, normalize_resources, resources, validate_name
 
 class WorkloadContract(unittest.TestCase):
     def test_rejects_namespace_and_identifier_injection(self):
@@ -75,6 +75,27 @@ class WorkloadContract(unittest.TestCase):
         for value in bad:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 normalize_resources(value)
+
+    def test_component_resources_create_internal_services_and_a_non_overlapping_cronjob(self):
+        docs = component_resources("shop", [
+            {"name": "api", "type": "service", "resolved_image": "registry/api@sha256:one", "replicas": 2,
+             "ports": [{"name": "http", "port": 8080}]},
+            {"name": "worker", "type": "scheduled", "resolved_image": "registry/worker@sha256:two",
+             "schedule": "*/15 * * * *", "time_zone": "UTC", "concurrency_policy": "Forbid"},
+        ], "172.30.80.10", "secret", {"MODE": "batch"})
+        self.assertEqual([d["kind"] for d in docs].count("Deployment"), 1)
+        self.assertEqual([d["kind"] for d in docs].count("Service"), 1)
+        self.assertFalse(any(d["kind"] == "Ingress" for d in docs))
+        service = next(d for d in docs if d["kind"] == "Service")
+        self.assertEqual(service["metadata"]["name"], "api")
+        self.assertEqual(service["spec"]["selector"]["platform.example/component"], "api")
+        cronjob = next(d for d in docs if d["kind"] == "CronJob")["spec"]
+        self.assertEqual(cronjob["schedule"], "*/15 * * * *")
+        self.assertEqual(cronjob["timeZone"], "UTC")
+        self.assertEqual(cronjob["concurrencyPolicy"], "Forbid")
+        pod = cronjob["jobTemplate"]["spec"]["template"]["spec"]
+        self.assertEqual(pod["restartPolicy"], "Never")
+        self.assertEqual(pod["containers"][0]["env"], [{"name": "MODE", "value": "batch"}])
 
 if __name__ == "__main__":
     unittest.main()

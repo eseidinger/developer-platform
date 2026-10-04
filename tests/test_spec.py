@@ -70,6 +70,27 @@ class EnvelopeContract(unittest.TestCase):
             with self.subTest(label), self.assertRaises(ValueError):
                 spec.to_flat(body)
 
+    def test_v1alpha2_maps_service_and_scheduled_components(self):
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application",
+                "metadata": {"name": "shop"}, "spec": {"components": [
+                    {"name": "api", "type": "service", "runtime": {"type": "container", "image": "registry/api:v1"},
+                     "ports": [{"name": "http", "protocol": "http", "port": 8080}], "replicas": 2},
+                    {"name": "worker", "type": "scheduled", "runtime": {"type": "container", "image": "registry/worker:v1",
+                        "command": ["python", "-m", "jobs"]}, "schedule": "*/15 * * * *"}]}}
+        self.assertEqual(spec.to_flat(body), {"name": "shop", "components": [
+            {"name": "api", "type": "service", "image": "registry/api:v1", "replicas": 2,
+             "ports": [{"name": "http", "protocol": "http", "port": 8080}]},
+            {"name": "worker", "type": "scheduled", "image": "registry/worker:v1",
+             "command": ["python", "-m", "jobs"], "schedule": "*/15 * * * *", "time_zone": "UTC",
+             "concurrency_policy": "Forbid"}]})
+
+    def test_v1alpha2_rejects_invalid_schedule(self):
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"},
+                "spec": {"components": [{"name": "job", "type": "scheduled",
+                    "runtime": {"type": "container", "image": "registry/job:v1"}, "schedule": "every minute"}]}}
+        with self.assertRaises(ValueError):
+            spec.to_flat(body)
+
 
 if __name__ == "__main__":
     unittest.main()
