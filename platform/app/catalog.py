@@ -8,6 +8,20 @@ from psycopg.types.json import Jsonb
 
 DEFAULT_ENVIRONMENT = "default"
 DEFAULT_REVISION_RETENTION = 25
+LEGACY_COMPONENT_NAME = "app"
+
+
+def component_view(spec: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return a component view without rewriting an immutable historical revision."""
+    if spec.get("components") is not None:
+        return spec["components"]
+    image = spec.get("resolved_image", spec.get("image"))
+    if image is None:
+        return []
+    service = {"name": LEGACY_COMPONENT_NAME, "type": "service", "image": image, "legacy": True}
+    if spec.get("port") is not None:
+        service["ports"] = [{"name": "http", "port": spec["port"]}]
+    return [service]
 
 
 def initialize(conn) -> None:

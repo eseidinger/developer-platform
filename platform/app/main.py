@@ -29,7 +29,7 @@ from .audit import Actor, initialize as initialize_audit, read_events, record_ev
 from .authorization import (bootstrap_platform_admin, grant as grant_role, initialize as initialize_authorization,
                             grants_for_project, is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
                             upsert_principal)
-from .catalog import ensure_default_application, initialize as initialize_catalog
+from .catalog import component_view, ensure_default_application, initialize as initialize_catalog
 from .images import ImageResolutionError, allowed_registries, resolve_image
 from .identity import AuthenticationError, Principal, configured_verifier
 from .spec import CAPABILITIES, ApplicationEnvelope, ApplicationEnvelopeV1Alpha2, error_code, to_flat
@@ -861,8 +861,9 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
     return {"project": name, "current_revision": rows[0][0], "revisions": [
         {"revision": r[0], "created_at": r[1].isoformat(), "current": r[0] == rows[0][0],
          "image": r[2].get("resolved_image", r[2].get("image")), "port": r[2].get("port"),
-         "components": [{"name": c["name"], "type": c["type"], "image": c.get("resolved_image", c["image"])}
-                        for c in r[2].get("components", [])], "resources": r[2].get("resources")}
+         "components": [{"name": c["name"], "type": c["type"], "image": c.get("resolved_image", c["image"]),
+                         **({"legacy": True} if c.get("legacy") else {})} for c in component_view(r[2])],
+         "resources": r[2].get("resources")}
         for r in rows]}
 
 

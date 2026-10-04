@@ -20,16 +20,48 @@ def _canonical(kind: str, value: Any):
         return str(value)
 
 
-def observe_drift(runtime: Any, project: str, spec: dict, log) -> dict[str, Any]:
-    # Component-level drift comparisons are introduced with component status.  Do
-    # not treat the legacy project-named Deployment as an expected v1alpha2 object.
-    if spec.get("components") is not None:
-        return {"state": "not_applicable", "differences": []}
+def observe_drift(runtime: Any, project: str, spec: dict, log, deployment_name: str | None = None) -> dict[str, Any]:
     if runtime is None:
         return {"state": "unknown", "differences": []}
+    if spec.get("components") is not None:
+        differences = []
+        unknown = False
+        for component in spec["components"]:
+            if component["type"] == "service":
+                result = observe_drift(runtime, project, {
+                    "image": component["image"], "resolved_image": component.get("resolved_image", component["image"]),
+                    "resources": component.get("resources"), "configuration": spec.get("configuration"),
+                    "replicas": component.get("replicas", 1)}, log, component["name"])
+                if result["state"] == "unknown":
+                    unknown = True
+                for difference in result["differences"]:
+                    differences.append({**difference, "component": component["name"]})
+            else:
+                try:
+                    cronjob = runtime.resources.get(api_version="batch/v1", kind="CronJob").get(
+                        name=component["name"], namespace="project-" + project)
+                    cron_spec = _field(cronjob, "spec", {}) or {}
+                    for field, desired in (("schedule", component["schedule"]),
+                                           ("timeZone", component.get("time_zone", "UTC")),
+                                           ("concurrencyPolicy", component.get("concurrency_policy", "Forbid"))):
+                        observed = _field(cron_spec, field)
+                        if desired != observed:
+                            differences.append({"component": component["name"], "field": field,
+                                                "desired": desired, "observed": observed})
+                except ApiException as exc:
+                    if exc.status == 404:
+                        differences.append({"component": component["name"], "field": "CronJob",
+                                            "desired": "present", "observed": "missing"})
+                    else:
+                        unknown = True
+                except Exception:
+                    unknown = True
+        if unknown and not differences:
+            return {"state": "unknown", "differences": []}
+        return {"state": "drifted" if differences else "in_sync", "differences": differences}
     try:
         deployment = runtime.resources.get(api_version="apps/v1", kind="Deployment").get(
-            name=project, namespace="project-" + project)
+            name=deployment_name or project, namespace="project-" + project)
     except ApiException as exc:
         if exc.status == 404:
             return {"state": "not_found", "differences": []}
@@ -51,7 +83,7 @@ def observe_drift(runtime: Any, project: str, spec: dict, log) -> dict[str, Any]
             differences.append({"field": name, "desired": desired, "observed": observed})
 
     compare("image", spec.get("resolved_image", spec["image"]), _field(container, "image"))
-    compare("replicas", 1, 1 if replicas is None else replicas)
+    compare("replicas", spec.get("replicas", 1), 1 if replicas is None else replicas)
     desired_resources = normalize_resources(spec.get("resources") or {})
     for section, values in desired_resources.items():
         seen = _field(observed_resources, section, {}) or {}

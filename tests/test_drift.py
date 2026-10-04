@@ -57,6 +57,25 @@ class DriftTests(unittest.TestCase):
         self.assertEqual(failed["state"], "unknown")
         self.assertEqual(observe_drift(None, "smoke", SPEC, self.log)["state"], "unknown")
 
+    def test_component_revision_reports_service_and_scheduled_drift(self):
+        deployment_resource, cronjob_resource = Mock(), Mock()
+        deployment_resource.get.return_value = deployment(replicas=2)
+        cronjob_resource.get.return_value = {"spec": {"schedule": "0 * * * *", "timeZone": "UTC",
+                                                         "concurrencyPolicy": "Forbid"}}
+        runtime = Mock()
+        runtime.resources.get.side_effect = lambda **kwargs: (
+            deployment_resource if kwargs["kind"] == "Deployment" else cronjob_resource)
+        spec = {"components": [
+            {"name": "api", "type": "service", "image": "example:v1", "resolved_image": SPEC["resolved_image"],
+             "replicas": 1, "resources": SPEC["resources"]},
+            {"name": "worker", "type": "scheduled", "image": "example:job", "schedule": "*/15 * * * *",
+             "time_zone": "UTC", "concurrency_policy": "Forbid"},
+        ]}
+        result = observe_drift(runtime, "smoke", spec, self.log)
+        self.assertEqual(result["state"], "drifted")
+        self.assertEqual({(d["component"], d["field"]) for d in result["differences"]},
+                         {("api", "replicas"), ("worker", "schedule")})
+
 
 class ScanTests(unittest.TestCase):
     log = logging.getLogger("test")

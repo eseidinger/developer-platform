@@ -4,7 +4,7 @@ from contextlib import nullcontext
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
-from app.catalog import initialize
+from app.catalog import component_view, initialize
 
 
 class RecordingConnection:
@@ -21,6 +21,13 @@ class RecordingConnection:
 
 
 class CatalogMigrationTests(unittest.TestCase):
+    def test_legacy_revision_has_a_lossless_named_service_view(self):
+        legacy = {"name": "shop", "image": "example:v1", "resolved_image": "example@sha256:one", "port": 8080}
+        view = component_view(legacy)
+        self.assertEqual(view, [{"name": "app", "type": "service", "image": "example@sha256:one",
+                                 "legacy": True, "ports": [{"name": "http", "port": 8080}]}])
+        self.assertNotIn("components", legacy)
+
     def test_migration_adds_stable_identity_and_versioned_lifecycle_tables_atomically(self):
         conn = RecordingConnection()
         initialize(conn)
