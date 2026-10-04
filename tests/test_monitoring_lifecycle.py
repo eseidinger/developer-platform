@@ -850,3 +850,23 @@ class LifecycleTests(unittest.TestCase):
             response = self.client.get("/operator/audit/events", headers=self.headers, params={
                 "start": "2026-10-01T00:00:00Z", "end": "2026-11-02T00:00:01Z"})
             self.assertEqual(response.status_code, 400)
+
+
+class CrossVersionQueueTests(unittest.TestCase):
+    def test_rollback_from_components_requeues_the_retained_legacy_spec(self):
+        catalog = Catalog()
+        principal = Principal("https://issuer.example", "person-1", "person")
+        legacy = {"name": "smoke", "image": "example:v1", "resolved_image": "example@sha256:legacy", "port": 8080}
+        components = {"name": "smoke", "components": [
+            {"name": "api", "type": "service", "image": "example/api:v1",
+             "resolved_image": "example/api@sha256:one", "ports": [{"name": "http", "port": 8080}]},
+            {"name": "worker", "type": "scheduled", "image": "example/worker:v1",
+             "resolved_image": "example/worker@sha256:two", "schedule": "*/15 * * * *"},
+        ]}
+        first = main.queue_deploy(catalog, principal, "smoke", legacy, None)
+        second = main.queue_deploy(catalog, principal, "smoke", components, None)
+        rollback = main.queue_deploy(catalog, principal, "smoke", None, second[2], target=first[2])
+
+        self.assertEqual((first[2], second[2], rollback[2]), (1, 2, 3))
+        self.assertEqual(catalog.revisions["application-smoke"][2][1], legacy)
+        self.assertEqual(catalog.rows["smoke"][0], legacy)
