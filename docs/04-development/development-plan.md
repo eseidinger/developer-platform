@@ -1,6 +1,6 @@
 # Development Plan and Architectural Evolution
 
-As of October 2, 2026. Future phases are proposals without confirmed dates.
+As of October 4, 2026. Future phases are proposals without confirmed dates.
 
 ## Architectural evolution
 
@@ -17,21 +17,24 @@ As of October 2, 2026. Future phases are proposals without confirmed dates.
 | September 25, 2026 | Structured documentation established | Separate architecture, decisions, and planning |
 | October 1, 2026 | Kotlin/Spring catalog, Quarkus control plane, and Python automation roles selected | Target ownership boundaries accepted; staged implementation and migration remain open |
 | October 2, 2026 | Generic OIDC boundary accepted with Keycloak as the supported lab reference | Platform-owned project grants and Phase 1B roles selected, implemented, and accepted under the recorded owner-directed alert-delivery exception |
+| October 4, 2026 | Multi-service application with a cron-triggered component prioritized | F-13 and UC-07 added; versioned contract, migration, internal discovery, scheduled-run status, and Kubernetes acceptance are the next Phase 2A increment |
 
 ## Implementation status
 
-The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C and all later gates remain open. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment. Phase 1A criterion-level evidence is recorded under [backup and recovery](delivery-backlog.md#current-backup-and-recovery-progress) and [monitoring](delivery-backlog.md#current-monitoring-progress).
+The [delivery backlog](delivery-backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A is the next gate; Phase 2B and all later gates remain open. Consult task notes and the verification register for revisions, environments and limits. This plan owns sequencing, not a separate implementation assessment. Phase 1A criterion-level evidence is recorded under [backup and recovery](delivery-backlog.md#current-backup-and-recovery-progress) and [monitoring](delivery-backlog.md#current-monitoring-progress).
 
 ## Work sequence and gates
 
 ```mermaid
 flowchart LR
     Baseline["Inspect Existing Prototype"] --> P1["1 Foundation and Vertical Slice"]
-    P1 --> P2["2 Contract and Second Provider"]
-    P2 --> P3["3 Developer Experience"]
+    P1 --> P2A["2A Multi-service and Scheduled Component"]
+    P2A --> P2B["2B Contract and Second Provider"]
+    P2B --> P3["3 Developer Experience"]
     P3 --> P4["4 AI Operations / Development"]
     P1 --> Evidence["Measurements and Operational Evidence"]
-    P2 --> Evidence
+    P2A --> Evidence
+    P2B --> Evidence
     P3 --> Evidence
     P4 --> Evidence
 ```
@@ -39,8 +42,9 @@ flowchart LR
 | Phase | Entry condition | Outcome / dependency |
 |---|---|---|
 | [1](phase-1-foundation.md) | Access to actual code and target host | 1A operational protection, 1B accountable access/security alerts, 1C durable lifecycle and minimal API/CLI, with target ownership seams in the Python baseline |
-| [2](phase-2-platform-api.md) | Reproducible vertical slice | Stable catalog/control-plane/worker contracts, gated service migration, retained packages, and direct Docker parity |
-| [3](phase-3-developer-experience.md) | Reliable lifecycle, authorization, and migrated public contracts | Portal, templates, human database access, application OIDC across catalog and control-plane APIs |
+| [2A](phase-2a-multi-service-scheduled-application.md) | Accepted Phase 1 vertical slice | Versioned multi-service contract; internal discovery; independently observable long-running services and cron-triggered component on Kubernetes; lossless single-component migration |
+| [2B](phase-2-platform-api.md) | Accepted Phase 2A vertical slice | Stable catalog/control-plane/worker contracts, gated service migration, retained packages, and direct Docker parity, including scheduled-capability handling |
+| [3](phase-3-developer-experience.md) | Reliable lifecycle, authorization, and migrated public contracts from Phase 2B | Portal, templates, human database access, application OIDC across catalog and control-plane APIs |
 | [4](phase-4-ai-operations.md) | Access-controlled data and deployment history | Python-based evidence assistance and controlled actions through the control plane |
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their acceptance minimum by that phase’s exit; later extensions do not defer it.
@@ -54,10 +58,10 @@ Basic access enforcement, audit, secrets, and observability start in Phase 1. Ph
 | Gate | Phase | Required result |
 |---|---|---|
 | Logical seams | 1C | Stable catalog IDs and permission facts are separated from deployment revisions, operations, provider execution, and observed state, even if one Python deployment still implements them. Persisted jobs use a versioned envelope/result model. |
-| Catalog extraction | 2 | Kotlin/Spring Boot owns migrated application metadata and grants through a versioned API. Reconciliation proves record counts/IDs and authorization behavior; backup/restore and rollback are tested before it becomes the writer. |
-| Control-plane migration | 2 | Quarkus accepts the technology-independent contract and owns desired revisions, policy, operations, runtime state, and events. Contract tests and shadow/parity comparison cover success, denial, conflict, failure, and recovery before traffic moves. |
-| Worker separation | 2 | Python workers execute only bounded, idempotent jobs with scoped credentials. Interruption, duplicate delivery, stale authorization, timeouts, and result redaction pass acceptance. |
-| Provider portability | 2 | Kubernetes and Docker adapters pass the same provider contract and end-to-end lifecycle evidence after the service split. |
+| Catalog extraction | 2B | Kotlin/Spring Boot owns migrated application metadata and grants through a versioned API. Reconciliation proves record counts/IDs and authorization behavior; backup/restore and rollback are tested before it becomes the writer. |
+| Control-plane migration | 2B | Quarkus accepts the technology-independent contract and owns desired revisions, policy, operations, runtime state, and events. Contract tests and shadow/parity comparison cover success, denial, conflict, failure, and recovery before traffic moves. |
+| Worker separation | 2B | Python workers execute only bounded, idempotent jobs with scoped credentials. Interruption, duplicate delivery, stale authorization, timeouts, and result redaction pass acceptance. |
+| Provider portability | 2B | Kubernetes and Docker adapters pass the same provider contract and end-to-end lifecycle evidence after the service split. |
 
 Use one authoritative writer per data type at every migration step. Prefer backfill, compare, cut over, and retain a bounded rollback path over permanent dual writes. Correlate actor, catalog version, desired revision, operation ID, job ID, and provider resource IDs across services. Extend monitoring and recovery coverage before retiring the corresponding FastAPI path.
 
@@ -65,33 +69,33 @@ Use one authoritative writer per data type at every migration step. Prefer backf
 
 The [delivery backlog](delivery-backlog.md) preserves all 19 permanent DEV/OPS IDs and their acceptance criteria. Its [phase task index](delivery-backlog.md#phase-task-index) assigns independently checkable tasks to one gate each, including provider, developer-experience and AI work. Stories may span gates; task completion and story completion are recorded separately. This plan supersedes the former six-milestone plan. No story is dropped or marked complete by this amendment.
 
-Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Design and local implementation may overlap, but do not release expanded self-service before 1A and 1B pass. Phase 2 completes the retained single-image backlog and safe project retirement, then passes the service-migration gates before second-provider acceptance. Phase 3 and Phase 4 depend on those demonstrated outcomes.
+Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Phase 1 is complete under its recorded limits. Deliver **2A multi-service and scheduled component next**, before continuing the remaining Phase 2B backlog, service-migration gates, and second-provider acceptance. Phase 3 and Phase 4 depend on those demonstrated outcomes.
 
 The table assigns delivery responsibility by role; named delivery owners, dates, and capacity remain unassigned. Alert response is assigned to the project owner under the lab response policy. Assign a named owner before starting each package. Every row is open. A single-image slice does not close criteria that require multiple components.
 
 | Story | Requirement mapping | Delivery gate and disposition | Accountable role |
 |---|---|---|---|
-| DEV-001 | F-02/F-07 extension | Deferred multi-component contract and implementation; Phase 3 design review, then explicit scheduling decision | Product / API |
+| DEV-001 | F-02/F-07/F-13 | Phase 2A next: versioned named-component contract, stable internal discovery, independent updates/status, and a non-overlapping cron-triggered component | Product / API |
 | DEV-002 | F-02, N-02 | 1C configuration CRUD/activation for one component; per-component extension deferred | API |
 | DEV-003 | N-03/N-04 | 1C secret CRUD/rotation/adoption; per-component extension deferred | API / security |
-| DEV-004 | F-06, N-03 | Phase 2 diagnostics: authorized search/follow, terminated-instance retention; basic logs in 1C | Observability |
-| DEV-005 | F-06, N-07 | Phase 2 diagnostics: inventory and usage/request/limit/quota comparisons | Observability |
-| DEV-006 | F-04/F-06 | 1C observed rollout/health for one component; multi-component reporting deferred | API |
-| DEV-007 | F-04/F-05, N-02 | 1C durable retry; Phase 2 retained-revision recovery and dependency checks | API |
-| DEV-008 | F-02/F-08, N-07 | Phase 2 scaling/quota/scheduling acceptance; per-component extension deferred | API / infrastructure |
-| DEV-009 | F-02/F-08, N-03 | Phase 2 public/private transitions, TLS and outbound policy; per-component extension deferred | Networking |
-| DEV-010 | F-03, N-03/N-05 | 1C binding/preservation; Phase 2 availability and tracked operator recovery requests | API / operations |
-| DEV-011 | F-05, N-02/N-08 | 1C confirmed application removal with retained data; multi-component preview extension deferred | API |
+| DEV-004 | F-06, N-03 | Phase 2B diagnostics: authorized search/follow and terminated-instance retention; Phase 2A adds basic scheduled-run attribution | Observability |
+| DEV-005 | F-06, N-07 | Phase 2B diagnostics: inventory and usage/request/limit/quota comparisons | Observability |
+| DEV-006 | F-04/F-06/F-13 | 1C observed rollout/health for one component; Phase 2A per-component and scheduled-run reporting | API |
+| DEV-007 | F-04/F-05, N-02 | 1C durable retry; Phase 2B retained-revision recovery and dependency checks | API |
+| DEV-008 | F-02/F-08, N-07 | Phase 2B scaling/quota/scheduling acceptance; advanced per-component allocation deferred | API / infrastructure |
+| DEV-009 | F-02/F-08, N-03 | Phase 2B public/private transitions, TLS and outbound policy; advanced per-component policy deferred | Networking |
+| DEV-010 | F-03, N-03/N-05 | 1C binding/preservation; Phase 2B availability and tracked operator recovery requests | API / operations |
+| DEV-011 | F-05/F-13, N-02/N-08 | 1C confirmed application removal with retained data; Phase 2A all-component retirement preview/cleanup | API |
 | OPS-001 | N-08 | 1B durable audit, inspection, restricted filtering/export and retention | Security |
 | OPS-002 | N-06/N-08 extension | 1B configurable security alerts with evidence and tested delivery | Security / operations |
-| OPS-003 | N-07, F-06 | Phase 2 host/shared-service/project capacity views and alerts; baseline measurement in 1C | Operations |
+| OPS-003 | N-07, F-06 | Phase 2B host/shared-service/project capacity views and alerts; representative Phase 2A capacity measurement and 1C baseline | Operations |
 | OPS-004 | F-01, N-03/N-08 | 1B individual access, roles, revocation; recheck every new data surface | Security / API |
-| OPS-005 | F-08, N-03/N-07 | Phase 2 configurable quotas/policy, impact preview and aggregate admission | Infrastructure |
+| OPS-005 | F-08, N-03/N-07 | Phase 2B configurable quotas/policy, impact preview and aggregate admission | Infrastructure |
 | OPS-006 | N-05 | 1A scheduled encrypted off-host backups and measured isolated restoration; repeat as state grows | Operations |
-| OPS-007 | N-06, F-06 | 1A independent failure signals; Phase 2 full service coverage and project impact | Operations |
-| OPS-008 | F-01/F-05, N-02/N-08 extension | Phase 2 project retirement after reliable deletion, retention inventory and access revocation | API / operations |
+| OPS-007 | N-06, F-06 | 1A independent failure signals; Phase 2B full service coverage and project impact | Operations |
+| OPS-008 | F-01/F-05, N-02/N-08 extension | Phase 2B project retirement after reliable deletion, retention inventory and access revocation | API / operations |
 
-Multi-component support remains deferred from the single-image MVP and Phase 2 portability contract. At Phase 3 entry, review a concrete multi-component use case, capacity evidence, independent-update semantics, and a versioned migration design; the project owner then schedules implementation or records continued deferral with a next review trigger. Do not silently transform the existing schema or close affected stories based on single-image tests.
+Multi-service support is no longer deferred. [Phase 2A](phase-2a-multi-service-scheduled-application.md) is the next gate and must pass before the remaining Phase 2B work. It uses a successor schema and explicit migration; do not silently transform the existing singular application object or claim acceptance from single-image tests.
 
 Docker portability, human database access, hosted-application OIDC, and AI are additions to this backlog. Retain their phases, but review priority against open story criteria at each gate. No calendar or effort commitments are implied.
 
@@ -106,7 +110,8 @@ Docker portability, human database access, hosted-application OIDC, and AI are a
 | Topic | Next step | Gate |
 |---|---|---|
 | Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](delivery-backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
-| Polyglot service rollout | Specify catalog/control-plane/job/event contracts and migration/rollback packages; satisfy ADR-006 transition gates | Logical seams in Phase 1C; extraction and cutover in Phase 2 |
+| Multi-service scheduled application | Finalize the successor schema, migration/rollback and capacity result; implement and run UC-07 on Kubernetes | Phase 2A (next) |
+| Polyglot service rollout | Specify catalog/control-plane/job/event contracts and migration/rollback packages; satisfy ADR-006 transition gates | Logical seams in Phase 1C; extraction and cutover in Phase 2B |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
 | Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |
 | RPO/RTO, retention, capacity | Backup policy is selected (24-hour RPO, four-hour RTO, 14/8/6 retention); [ADR-017](../03-decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits full-horizon retention evidence from Phase 1A, so measure recovery, retention, and capacity against targets | Before production-like acceptance |

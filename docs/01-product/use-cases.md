@@ -43,3 +43,16 @@ As an architect, I want to run the same workload on two compute providers or aga
 As a developer, I want to understand why an application has become slower since its last deployment. The assistant correlates the deployment diff, logs, metrics, and dependencies, identifies observations, and formulates a testable hypothesis.
 
 A proposed change includes a concrete diff. Only after approval and renewed authorization does the Platform API execute it. The same boundaries apply to a later development assistant using documentation, ADRs, and API contracts as context. See [Phase 4](../04-development/phase-4-ai-operations.md).
+
+## UC-07 – Deploy cooperating services with a scheduled component
+
+As a developer, I want to deploy one application containing multiple services and a scheduled component so that the services can work together internally and recurring work runs without an external scheduler.
+
+1. Declare at least two named long-running services and one named scheduled component in one application revision.
+2. Give each component its own image, command, and resource settings; apply the application's existing managed configuration, secrets, and database binding consistently.
+3. Declare internal ports for the long-running services and a cron schedule for the scheduled component.
+4. Submit the application and track component-specific deployment and run status.
+5. Verify that services communicate through stable internal names and that the scheduled component runs at the declared time, reaches the required internal service, and exits.
+6. Update one component without restarting or redeploying unchanged components.
+
+Acceptance: an invalid schedule is rejected before side effects; a scheduled run never overlaps the next trigger under the initial concurrency policy; status and logs distinguish every service and scheduled run; a failed component does not hide the health of other components; and migration from the existing single-component shape preserves configuration, secrets, database data, revisions, and rollback. See [Phase 2A](../04-development/phase-2a-multi-service-scheduled-application.md).

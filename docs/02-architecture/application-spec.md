@@ -14,7 +14,7 @@ The database defines a versioned application-operation envelope/result table. PU
 
 A spec describes the desired runtime state of a catalog application in a catalog project/environment: workload, required resources, bindings, and configuration. The control plane produces observed status separately. Application ownership, membership, and grants are catalog operations, not fields that a deployment spec can mutate. Docker networks, Kubernetes namespaces, and PostgreSQL server addresses are outside this contract.
 
-The first profile supports one OCI image, one HTTP endpoint, and optional PostgreSQL. Object storage, messaging, cache, autoscaling, and multiple components are later capabilities. Unknown fields and unsupported capabilities must not be silently ignored.
+The implemented first profile supports one OCI image, one HTTP endpoint, and optional PostgreSQL. [F-13](../01-product/requirements.md) makes multiple cooperating components, including a scheduled component, the next contract increment. Object storage, messaging, cache, and autoscaling remain later capabilities. Unknown fields and unsupported capabilities must not be silently ignored.
 
 ## Example
 
@@ -103,10 +103,16 @@ The example produces `DB_HOST`, `DB_PORT`, `DB_DATABASE`, `DB_USERNAME`, and `DB
 
 Decision (PLAN-002): `resources` uses explicit `requests` and `limits` for CPU and memory, with `requests <= limits` and defaults equal to the earlier fixed values; the example's single `cpu`/`memory` budget is superseded. The flat API accepts them today (see the project specification in the platform README); the enveloped form follows with the versioned envelope. Do not interpret one budget as two independent values. The first profile remains one image and one HTTP endpoint, with a fixed replica count; multiple replicas do not imply multiple components.
 
+### Next contract increment: named and scheduled components
+
+Phase 2A introduces a successor schema with `spec.components`; it does not reinterpret the singular `spec.application` object in `v1alpha1`. A component has a stable name, a `service` or `scheduled` type, and its own runtime and resources. Services may expose named internal ports and receive stable internal discovery names. Scheduled components declare a five-field cron expression, initially in UTC with non-overlapping execution, and receive no public endpoint. The initial profile applies the existing application-level configuration, secrets, and resource bindings consistently to all components; per-component assignment remains a separate extension.
+
+The capability profile must distinguish long-running components, internal discovery, and scheduled components. Until a provider supports them, it rejects the request before persisting a revision or changing provider state. Migration maps an existing application to one named service while preserving revision history and rollback. The detailed initial semantics and acceptance scenario are in [Phase 2A](../04-development/phase-2a-multi-service-scheduled-application.md).
+
 ## Status and evolution
 
 Status includes at least `desiredRevision`, `observedRevision`, `phase`, `conditions`, `operationId`, and authorized endpoint information. Conditions carry timestamps, reasons, and redacted messages. Secret values and administrative provider credentials are excluded.
 
-Breaking changes require a new schema version and migration path. Multi-component support needs a separate contract design; the existing `application` object must not silently become a list. The catalog's principals/grants model is a separate versioned contract, not a second syntax inside ApplicationSpec.
+Breaking changes require a new schema version and migration path. Phase 2A supplies the separate multi-component contract design; the existing `application` object must not silently become a list. The catalog's principals/grants model is a separate versioned contract, not a second syntax inside ApplicationSpec.
 
 Core decision: [ADR-001](../03-decisions/ADR-001-platform-api-abstraction.md). Permissions: [Security](security.md). UI/API options: [ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).

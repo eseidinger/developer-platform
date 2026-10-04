@@ -16,9 +16,9 @@ Offer the catalog and control-plane lifecycle as understandable self-service. An
 - Extend the accepted ADR-004 boundary by automating OIDC clients and controlled redirect URIs for hosted applications while preserving the separation between platform and application permissions. F-10 remains a Phase 3 requirement; deferring it requires an explicit scope amendment.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
 - Make ownership, roles, and the distinction between application and platform permissions visible.
-- At phase entry, review the deferred multi-component backlog against a concrete use case and measured capacity. Design independent updates, per-component results/configuration/secrets and a versioned migration path before scheduling implementation. Record the scheduling decision or continued deferral and next review trigger in the development plan; avoid hidden schema changes.
+- Build the self-service journey on the multi-service and scheduled-component contract accepted in Phase 2A; do not create a portal-only component model.
 
-Entry requires the Phase 1 and Phase 2 backlog gates, including usable authorized diagnostics, recovery and retirement APIs. Portal completion cannot substitute for those API acceptance results.
+Entry requires the Phase 1, Phase 2A, and Phase 2B backlog gates, including usable authorized diagnostics, recovery and retirement APIs. Portal completion cannot substitute for those API acceptance results.
 
 ## Acceptance
 

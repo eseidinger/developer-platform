@@ -56,7 +56,7 @@ The catalog supplies permission facts; each service still authenticates the call
 
 Providers can be combined independently: Kubernetes compute can use the same external PostgreSQL instance and observability stack as Docker compute. The API does not use namespaces or Compose project names as public identities.
 
-The initial Application consists of an OCI image, HTTP endpoint, configuration, and optional PostgreSQL binding. Multi-component applications are a later extension. Database data is independent of the workload lifecycle.
+The implemented Application consists of one OCI image, HTTP endpoint, configuration, and optional PostgreSQL binding. The next planned increment adds named cooperating services and a scheduled component through a versioned contract and lossless migration; see [Phase 2A](../04-development/phase-2a-multi-service-scheduled-application.md). Database data is independent of the workload lifecycle.
 
 ## Desired state, observed state, and limits
 

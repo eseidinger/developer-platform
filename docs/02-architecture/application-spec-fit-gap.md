@@ -1,6 +1,6 @@
 # ApplicationSpec fit-gap
 
-Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v1alpha1 draft](application-spec.md) with the implemented `PUT /projects/{name}` contract and states one decision per field. Dispositions: **implemented**, **map** (exists internally, needs public form), **reject** (must fail validation until supported), **new** (work required).
+Status: working analysis for PLAN-002 and DEV-001-T01, as of October 4, 2026. It compares the [v1alpha1 draft](application-spec.md) and planned Phase 2A successor with the implemented `PUT /projects/{name}` contract. Dispositions: **implemented**, **map** (exists internally, needs public form), **reject** (must fail validation until supported), **new** (work required).
 
 ## Fields
 
@@ -20,6 +20,10 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 | `configuration.values` | Not supported | reject | Reject until implemented; then non-secret strings with name collision checks. |
 | `configuration.secrets` | Not supported | reject | Reject; needs a secret store (not in the current scope). |
 | `bindings` | Fixed `PG*` variables | map | Accept only the default `PG` binding until configurable prefixes land; document the migration to `DB_*`. |
+| `components[]` | One implicit long-running component | new | Add only in a successor schema. Migrate the singular application to one named `service`; preserve old revisions and rollback. |
+| `components[].type` | No component type | new | Support `service` and `scheduled`; reject every other type before side effects. |
+| `components[].ports` | One implicit public HTTP port | new | Give services named internal ports and stable discovery; scheduled components cannot expose ports publicly. |
+| `components[].schedule` | No application scheduler | new | Accept a five-field cron expression, UTC, and `Forbid` concurrency for `scheduled` components only. Report run identity and outcome. |
 
 ## Cross-cutting items
 
@@ -30,6 +34,7 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 | Capability profiles | `GET /v1/capabilities` publishes the `default` environment profile; PUT rejections return `code` `unsupported_capability` or `invalid_spec` | Implemented; the profile is static code, not yet per-environment configuration. |
 | Revision identity | Spec equality with the resolved digest | Keep; extend the equality to resource fields. |
 | Idempotency and conflicts | Same-revision reuse only | PLAN-003 (expected revision, idempotency keys). |
+| Component capability profile | Not published | DEV-001-T01: advertise long-running components, internal discovery, and scheduled components independently; reject unsupported requests before side effects. |
 
 ## Open decisions
 
@@ -39,6 +44,8 @@ Status: working analysis for PLAN-002, as of October 3, 2026. It compares the [v
 
 ## Proposed order
 
-1. Decide the resources semantics, then add validation, persistence and tests.
-2. Add the envelope and OpenAPI, mapping the flat body.
-3. Remove the public `namespace` and add capability rejection with stable error codes.
+1. Retain the completed `v1alpha1` resource semantics, envelope/OpenAPI, and capability/error work as the migration baseline.
+2. Define the successor `components` schema and single-service compatibility mapping.
+3. Add service discovery and independently reconciled long-running component status.
+4. Add scheduled-component validation, execution, run status, and capability rejection.
+5. Prove migration/rollback before making the successor schema the preferred form.
