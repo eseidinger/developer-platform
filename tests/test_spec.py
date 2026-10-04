@@ -91,6 +91,15 @@ class EnvelopeContract(unittest.TestCase):
         with self.assertRaises(ValueError):
             spec.to_flat(body)
 
+    def test_v1alpha2_rejects_component_capacity_that_cannot_roll_out_in_quota(self):
+        services = [{"name": f"api-{index}", "type": "service",
+                     "runtime": {"type": "container", "image": f"registry/api:{index}"}, "replicas": 2}
+                    for index in range(5)]
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application",
+                "metadata": {"name": "shop"}, "spec": {"components": services}}
+        with self.assertRaisesRegex(ValueError, "pod quota"):
+            spec.to_flat(body)
+
 
 if __name__ == "__main__":
     unittest.main()

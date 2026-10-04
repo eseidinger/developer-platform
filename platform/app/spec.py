@@ -5,7 +5,7 @@ from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .config import normalize_configuration
-from .manifests import normalize_resources
+from .manifests import DEFAULT_RESOURCES, normalize_resources
 
 API_VERSION = "platform.example/v1alpha1"
 COMPONENT_API_VERSION = "platform.example/v1alpha2"
@@ -186,6 +186,30 @@ class ComponentSpec(_Strict):
         names = [component.name for component in self.components]
         if len(set(names)) != len(names):
             raise ValueError("component names must be unique")
+        # Namespace quota is 10 pods, 2 CPU/2Gi requests and 4 CPU/4Gi limits.
+        # One Deployment may temporarily run both old and new replicas while it rolls.
+        steady_pods = 0
+        totals = {section: {"cpu": 0, "memory": 0} for section in ("requests", "limits")}
+        rollout = {section: {"cpu": 0, "memory": 0} for section in ("requests", "limits")}
+        for component in self.components:
+            replicas = component.replicas if isinstance(component, ServiceComponent) else 1
+            steady_pods += replicas
+            requested = component.resources or DEFAULT_RESOURCES
+            for section in totals:
+                cpu = int(requested[section]["cpu"][:-1])
+                memory = int(requested[section]["memory"][:-2])
+                totals[section]["cpu"] += cpu * replicas
+                totals[section]["memory"] += memory * replicas
+                if isinstance(component, ServiceComponent):
+                    rollout[section]["cpu"] = max(rollout[section]["cpu"], cpu * replicas)
+                    rollout[section]["memory"] = max(rollout[section]["memory"], memory * replicas)
+        quota = {"requests": {"cpu": 2000, "memory": 2048}, "limits": {"cpu": 4000, "memory": 4096}}
+        if steady_pods + (max((c.replicas for c in self.components if isinstance(c, ServiceComponent)), default=0)) > 10:
+            raise ValueError("components exceed the namespace pod quota during rollout")
+        for section in totals:
+            for resource in totals[section]:
+                if totals[section][resource] + rollout[section][resource] > quota[section][resource]:
+                    raise ValueError("components exceed the namespace resource quota during rollout")
         return self
 
 
