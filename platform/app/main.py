@@ -1771,6 +1771,22 @@ def retirement_access_inventory(conn, name):
             "credentials_by_status": {state: count for state, count in credentials}}
 
 
+@app.get("/operator/projects/{name}/retirement")
+def inspect_retirement(name: str, principal: Principal = Depends(current_principal)):
+    """Inspect retained retirement inventory and fail-closed credential cleanup progress."""
+    require_platform_admin(principal)
+    with connect() as conn:
+        row = conn.execute("""SELECT p.status, r.retired_at, r.inventory FROM projects p
+            LEFT JOIN project_retirements r ON r.project_id=p.project_id WHERE p.name=%s""", (name,)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Unknown project")
+        access = retirement_access_inventory(conn, name)
+    required_audit(actor_for(principal), "project.retirement.inspect", "project", name, "succeeded",
+                   {"scope": "platform"}, {"status": row[0]})
+    return {"project": name, "status": row[0], "retired_at": row[1].isoformat() if row[1] else None,
+            "retained": row[2], "credential_cleanup": access["credentials_by_status"]}
+
+
 def namespace_exists(name):
     try:
         runtime.resources.get(api_version="v1", kind="Namespace").get(name="project-" + name)

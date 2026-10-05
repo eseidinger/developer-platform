@@ -1327,6 +1327,49 @@
         "summary": "Inspect Project Permissions"
       }
     },
+    "/operator/projects/{name}/retirement": {
+      "get": {
+        "description": "Inspect retained retirement inventory and fail-closed credential cleanup progress.",
+        "operationId": "inspect_retirement_operator_projects__name__retirement_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Inspect Retirement"
+      }
+    },
     "/operator/projects/{name}/security-configuration": {
       "get": {
         "description": "Return the safe, managed workload and network policy contract for a project.",
