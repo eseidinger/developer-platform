@@ -31,8 +31,13 @@
     - name: Establish the retirement target
       ansible.builtin.set_fact:
         retirement_project: >-
-          {{ platform_retire_project | default('retirement-drill-' +
+          {{ platform_retire_project | default('retire-drill-' +
           lookup('pipe', 'date +%s') + '-' + (99999 | random | string)) }}
+
+    - name: Require a valid generated retirement target name
+      ansible.builtin.assert:
+        that: retirement_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+        fail_msg: Generated retirement project name is not a valid platform project name.
 
     - name: Require an exact confirmation for an existing project
       ansible.builtin.assert:
