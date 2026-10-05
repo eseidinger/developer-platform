@@ -3,9 +3,12 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import Mock
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.inventory import observe_inventory
+from app import main
+from app.identity import Principal
 
 
 def item(name, spec=None, status=None):
@@ -35,6 +38,19 @@ class InventoryTests(unittest.TestCase):
         runtime.resources.get.side_effect = RuntimeError("private detail")
         result = observe_inventory(runtime, "smoke", logging.getLogger("test"))
         self.assertEqual(result, {"state": "unavailable", "reason": "KubernetesApiUnavailable"})
+
+    def test_resource_endpoint_combines_inventory_with_labelled_usage(self):
+        conn = Mock()
+        conn.execute.return_value.fetchone.return_value = ("applied",)
+        inventory = {"state": "ok", "reason": None}
+        usage = {"state": "missing", "reason": "NoMetricsForProject", "pods": [], "totals": None}
+        principal = Principal("https://issuer.example", "person", "Person")
+        with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
+             patch.object(main, "connect", return_value=__import__("contextlib").nullcontext(conn)), \
+             patch.object(main, "observe_inventory", return_value=inventory), \
+             patch.object(main, "observe_usage", return_value=usage):
+            result = main.resource_inventory("smoke", principal)
+        self.assertEqual(result, {"project": "smoke", **inventory, "usage": usage})
 
 
 if __name__ == "__main__":

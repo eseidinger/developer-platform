@@ -1414,8 +1414,9 @@ def resource_inventory(name: str, principal: Principal = Depends(current_princip
     if known[0] == "empty":
         raise HTTPException(409, "Project has not been deployed")
     inventory = observe_inventory(runtime, name, log)
+    inventory["usage"] = observe_usage(runtime, name, log)
     required_audit(actor, "project.resources.inspect", "project", name, "succeeded",
-                   {"project": name}, {"state": inventory["state"]})
+                   {"project": name}, {"state": inventory["state"], "usage_state": inventory["usage"]["state"]})
     return {"project": name, **inventory}
 
 
