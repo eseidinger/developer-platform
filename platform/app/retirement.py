@@ -21,12 +21,15 @@ def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
         manifests = resources(name, spec.get("resolved_image", spec["image"]), spec.get("port", 8080),
                               domain, DOCUMENTATION_ADDRESS, "unused", spec.get("resources"), spec.get("configuration"))
     database = "project_" + name.replace("-", "_")
+    routes = [rule["host"] for manifest in manifests if manifest["kind"] == "Ingress"
+              for rule in manifest["spec"].get("rules", [])]
     return {
         "project": name,
         "revision": revision,
         "removes": [{"kind": m["kind"], "name": m["metadata"]["name"]} for m in manifests]
                    + [{"kind": "Secret", "name": SECRET_NAME}, {"kind": "Secret", "name": PREVIOUS_SECRET_NAME}],
-        "route": name + "." + domain,
+        "route": routes[0] if len(routes) == 1 else None,
+        "routes": routes,
         "retains": {"database": database, "role": database, "catalog_and_revisions": True},
         "scope_token": scope_token(name, revision),
     }

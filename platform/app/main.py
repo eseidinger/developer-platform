@@ -1758,7 +1758,7 @@ def current_retirement_scope(conn, name):
         project = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
         if project is None:
             return None
-        return {"project": name, "revision": 0, "removes": [], "route": None,
+        return {"project": name, "revision": 0, "removes": [], "route": None, "routes": [],
                 "retains": {"database": None, "role": None, "catalog_and_revisions": True},
                 "scope_token": retirement_scope_token(name, 0)}
     return removal_scope(name, row[0], row[1], os.environ["APPS_DOMAIN"])
