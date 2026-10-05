@@ -89,7 +89,17 @@ the retained application spec only: it neither reverses PostgreSQL contents/migr
 values, because secret values are deliberately excluded from revisions. Restore those dependencies through their
 separate controlled procedures before declaring a rollback recovery complete.
 
-For a protected retirement acceptance, `ansible/retire-platform-project.yml` can create and verify a disposable credential probe when invoked with `-e platform_retire_verify_credential_revocation=true`. After retirement it proves the issued token is denied; confirm provider cleanup reaches `revoked` separately. Do not enable this check for a shared CI credential or a non-disposable project. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active.
+For a protected retirement acceptance, `ansible/retire-platform-project.yml` can create and verify a disposable credential probe when invoked with `-e platform_retire_verify_credential_revocation=true`. After retirement it proves the issued token is denied and polls the platform-administrator retirement view until provider cleanup reaches `revoked`. Do not enable this check for a shared CI credential or a non-disposable project. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active; the drill fails after its bounded wait rather than treating that condition as acceptance.
+
+Run it only for a purpose-created project, with an exact repeated confirmation:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/retire-platform-project.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_retire_project=retirement-drill-1234567890 \
+  -e platform_confirm_retire_project=retirement-drill-1234567890 \
+  -e platform_retire_verify_credential_revocation=true
+```
 
 Before retirement, record the project database/role, the latest **verified** backup snapshot identifier and its
 independent restore evidence, and the chosen decision (`retain` or separately approved deletion). The Platform API

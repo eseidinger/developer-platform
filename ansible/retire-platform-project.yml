@@ -3,8 +3,10 @@
   hosts: localhost
   gather_facts: false
   vars:
-    platform_retire_project_retries: 20
-    platform_retire_project_delay_seconds: 2
+    platform_retire_project_retries: 60
+    platform_retire_project_delay_seconds: 5
+    platform_retire_credential_cleanup_retries: 72
+    platform_retire_credential_cleanup_delay_seconds: 5
     platform_retire_verify_credential_revocation: false
   tasks:
     - name: Require protected runner configuration and an exact project confirmation
@@ -20,6 +22,19 @@
         fail_msg: >-
           Supply the protected runner configuration, platform_retire_project, and a matching
           platform_confirm_retire_project.
+      no_log: true
+
+    - name: Exchange the runner credential for a fresh retirement token
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: retirement_runner_token
       no_log: true
 
     - name: Create a disposable credential-revocation probe when explicitly requested
@@ -49,19 +64,6 @@
           client_secret: "{{ retirement_probe.json.client_secret }}"
         status_code: 200
       register: retirement_probe_token
-      no_log: true
-
-    - name: Exchange the runner credential for a fresh cleanup token
-      ansible.builtin.uri:
-        url: "{{ platform_oidc_token_url }}"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          grant_type: client_credentials
-          client_id: "{{ platform_test_runner_client_id }}"
-          client_secret: "{{ platform_test_runner_client_secret }}"
-        status_code: 200
-      register: retirement_runner_token
       no_log: true
 
     - name: Read the exact project retirement scope
@@ -115,6 +117,22 @@
         headers:
           Authorization: "Bearer {{ retirement_probe_token.json.access_token }}"
         status_code: 403
+      no_log: true
+
+    - name: Wait for retired-project credential provider cleanup
+      when: platform_retire_verify_credential_revocation | bool
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/operator/projects/{{ platform_retire_project }}/retirement"
+        headers:
+          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+        status_code: 200
+      register: retirement_cleanup_status
+      until:
+        - retirement_cleanup_status.json.status == 'retired'
+        - (retirement_cleanup_status.json.credential_cleanup.revoked | default(0) | int) >= 1
+        - (retirement_cleanup_status.json.credential_cleanup.revocation_pending | default(0) | int) == 0
+      retries: "{{ platform_retire_credential_cleanup_retries | int }}"
+      delay: "{{ platform_retire_credential_cleanup_delay_seconds | int }}"
       no_log: true
 
     - name: Report non-secret retirement evidence
