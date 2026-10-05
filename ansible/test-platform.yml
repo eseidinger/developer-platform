@@ -338,6 +338,44 @@
             - resource-usage
           no_log: true
 
+        - name: Create a developer-visible managed database recovery request
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/data-services/recovery-requests"
+            method: POST
+            headers:
+              Authorization: "Bearer {{ developer_token }}"
+            body_format: json
+            body:
+              reason: unavailable
+            status_code: 201
+          register: recovery_request
+          no_log: true
+
+        - name: Require the platform administrator to acknowledge the recovery request
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/operator/data-service-recovery-requests/{{ recovery_request.json.request_id }}"
+            method: PATCH
+            headers:
+              Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+            body_format: json
+            body:
+              status: acknowledged
+            status_code: 200
+          no_log: true
+
+        - name: Verify developer-visible database recovery outcome contains no credentials
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ test_project }}/data-services"
+            headers:
+              Authorization: "Bearer {{ viewer_token }}"
+            status_code: 200
+          register: data_service_status
+          failed_when: >-
+            data_service_status.json.latest_recovery_request.status != 'acknowledged' or
+            data_service_status.json.services[0].state != 'available' or
+            data_service_status.json | to_json is search('password|PGPASSWORD')
+          no_log: true
+
         - name: Verify runner can inspect resulting grants through the operator API
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/operator/projects/{{ test_project }}/permissions"
