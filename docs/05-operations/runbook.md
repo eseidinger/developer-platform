@@ -160,6 +160,11 @@ After changing an allow-list, use a disposable workload and a non-production end
 connection succeeds and a neighbouring denied IP/port fails. Record the target CIDR, port, policy revision, and
 cleanup result. Do not add broad public CIDRs merely to make an application work.
 
+The protected egress acceptance drill is an exception for test execution: it temporarily replaces only
+`ALLOWED_EGRESS_CIDRS` and `ALLOWED_EGRESS_PORTS` and disables capacity admission, recreates only
+`platform-api`, then restores the exact pre-drill `.env` and API container in its `always` cleanup. It must still run only in an approved protected
+environment.
+
 ## Configure a project quota
 
 Set `PROJECT_QUOTAS_JSON` in the platform host's `.env` and restart the Platform API. It is a JSON object
@@ -254,18 +259,21 @@ ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.ym
   -e platform_rollback_drill_host=platform
 ```
 
-For egress, first configure the narrow target CIDR and TCP port in the platform API
-allow-list and provide a non-production listener reachable from workload pods. Then run:
+The egress drill supplies a temporary default target of
+[Cloudflare's public DNS-over-TLS listener](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-tls/),
+`1.1.1.1:853`. It applies only `1.1.1.1/32` and TCP port `853` during
+the test and restores the prior Platform API environment during cleanup:
 
 ```bash
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-egress-policy.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_allow_egress_drill=true \
-  -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL \
-  -e platform_egress_target_host=<listener-ip-or-name> \
-  -e platform_egress_target_cidr=<listener-cidr> \
-  -e platform_egress_target_port=<listener-port>
+  -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL
 ```
+
+If that public listener is unavailable from workload pods, override all three target
+values together with a reachable listener you control: `platform_egress_target_host`,
+`platform_egress_target_cidr`, and `platform_egress_target_port`.
 
 The playbook first proves an undeclared destination is rejected, then deploys a service
 whose readiness depends on reaching the approved listener. Do not use the managed
@@ -300,6 +308,11 @@ ansible-playbook -i ansible/inventory.yml ansible/test-platform-failure-signals.
   -e platform_allow_failure_signal_drill=true \
   -e platform_failure_drill_acknowledgement=I_ACCEPT_FAILURE_SIGNAL_DRILL
 ```
+
+The drill temporarily disables capacity admission so its disposable canary cannot be
+rejected by an unrelated capacity reservation. It restores the exact platform host
+`.env` and recreates `platform-api` during `always` cleanup, in addition to restoring
+the proxy and Prometheus.
 
 It creates and retires a public canary, verifies project-labelled application and ingress
 alerts, restores both boundaries, and proves Prometheus unavailability and recovery. Use the

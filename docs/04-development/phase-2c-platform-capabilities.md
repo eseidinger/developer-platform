@@ -1,6 +1,6 @@
 # Phase 2C – Platform Capabilities
 
-Status: planned after [Phase 2B](phase-2b-ci-deployment-credentials.md). Covers the remaining Phase 2 extensions of F-01 through F-06, F-08, F-13, F-14, and N-01 through N-08 in the [requirements](../01-product/requirements.md).
+Status: **accepted October 5, 2026**. Covers the remaining Phase 2 extensions of F-01 through F-06, F-08, F-13, F-14, and N-01 through N-08 in the [requirements](../01-product/requirements.md).
 
 Execution tracking: use the [phase task index and acceptance checkboxes](delivery-backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 
@@ -26,6 +26,13 @@ Include new revisions, operations, audit records, identities, secrets, and reten
 Through the single Python API and Kubernetes provider, an authorized human or machine identity can create, deploy, update, observe, recover, and retire applications with clear capability, policy, and failure behavior. Unsupported capabilities are rejected before side effects. Interrupted work and concurrent updates cause neither duplicate resources nor lost revisions.
 
 Each work package has criterion-level evidence for success, denial, failure injection, and retained-data behavior. Phase 2A multi-service/scheduled-component tests and Phase 2B machine-credential tests remain applicable and are rerun where Phase 2C changes their surfaces.
+
+Phase 2C acceptance is recorded in EV-39 through EV-44 in the
+[delivery backlog](delivery-backlog.md#verification-register). The owner accepted the
+remaining lab-specific boundaries (single-host k3d capacity calibration, best-effort
+Kubernetes log retention, and retained-data rather than destructive-data deletion) as
+documented limits of this phase; they are not production-capacity or hostile-tenant
+claims.
 
 Provider failures remain traceable and recoverable by observing existing resources. Public errors, logs, status, audit data, and inventories do not expose provider credentials, client secrets, or bearer tokens.
 

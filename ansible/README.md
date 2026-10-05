@@ -140,8 +140,15 @@ ansible-playbook -i ansible/inventory.yml ansible/test-platform-capacity-admissi
   -e platform_allow_capacity_drill=true \
   -e platform_capacity_drill_acknowledgement=I_ACCEPT_CAPACITY_DRILL
 
-# The target must be a reachable non-production TCP listener already allowed by
-# ALLOWED_EGRESS_CIDRS and ALLOWED_EGRESS_PORTS on the platform host.
+# Uses a temporary, exact 1.1.1.1/32:853 allow-list and restores the prior
+# Platform API environment during cleanup.
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-egress-policy.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_allow_egress_drill=true \
+  -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL
+
+# Optional: override all three defaults with a reachable listener you control.
+# This replacement is also temporary and is restored during cleanup.
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-egress-policy.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_allow_egress_drill=true \
@@ -175,14 +182,22 @@ recreates only `platform-api`, and restores the original `.env` and API containe
 Normal deployments manage the admission enablement and reserves through the three
 `platform_capacity_*` inventory variables above. The drill deliberately overrides
 them only for its duration and restores the exact pre-drill environment afterward.
-The egress example addresses are documentation ranges and will not work as targets.
-Supply an endpoint you control; never broaden the allow-list merely to pass the drill.
+The egress drill defaults to [Cloudflare's public DNS-over-TLS listener](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-tls/)
+at `1.1.1.1:853`. It replaces the two Platform API allow-list variables and temporarily
+disables capacity admission only for the drill, recreates only `platform-api`, and restores
+the exact original `.env` and API container in its `always` cleanup. Override all three target variables together when
+that endpoint is not reachable from workload pods. Never retain or broaden a normal
+production allow-list merely to pass the drill.
 
 The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally disrupt shared services and
 must not run in routine CI. The rollback drill is safe for a protected acceptance
 environment. Egress alters only a disposable workload but depends on operator policy
 and an external listener. Keep these drills in an explicitly approved protected pipeline
 rather than pull-request CI.
+
+The failure-signal drill also temporarily disables capacity admission so its disposable
+canary tests only application, ingress, and monitoring signals. It restores the exact
+host `.env` and recreates `platform-api` in its `always` cleanup.
 
 Installation references: [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 and [kubectl on Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/).

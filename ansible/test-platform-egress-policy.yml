@@ -3,9 +3,20 @@
   hosts: localhost
   gather_facts: false
   vars:
-    platform_egress_drill_image: busybox:1.36.1
+    # Pin the same BusyBox 1.36.1 image used by the protected acceptance
+    # environment, so this network-policy drill does not depend on a tag
+    # resolution request before it can exercise egress.
+    platform_egress_drill_image: busybox@sha256:73aaf090f3d85aa34ee199857f03fa3a95c8ede2ffd4cc2cdb5b94e566b11662
+    # Cloudflare's public DNS-over-TLS listener. These defaults are deliberately
+    # narrow and exist only during this disposable acceptance drill. Callers can
+    # override all three target values with a listener they control.
+    platform_egress_target_host: 1.1.1.1
+    platform_egress_target_cidr: 1.1.1.1/32
+    platform_egress_target_port: 853
     platform_egress_denied_cidr: 192.0.2.1/32
     platform_egress_denied_port: 9
+    platform_egress_drill_install_dir: /opt/developer-platform
+    platform_egress_drill_host: "{{ (groups.get('developer_platform', []) | first) | default('') }}"
   tasks:
     - name: Require protected runner configuration and explicit egress-drill inputs
       ansible.builtin.assert:
@@ -16,11 +27,10 @@
           - platform_oidc_token_url is defined
           - platform_test_runner_client_id is defined
           - platform_test_runner_client_secret is defined
-          - platform_egress_target_host is defined
+          - platform_egress_drill_host | length > 0
+          - platform_egress_drill_install_dir | length > 0
           - platform_egress_target_host is match('^[A-Za-z0-9][A-Za-z0-9.:-]*$')
-          - platform_egress_target_cidr is defined
           - platform_egress_target_cidr is match('^[0-9a-fA-F:.]+/[0-9]+$')
-          - platform_egress_target_port is defined
           - platform_egress_target_port | int >= 1
           - platform_egress_target_port | int <= 65535
           - platform_egress_denied_cidr is match('^[0-9a-fA-F:.]+/[0-9]+$')
@@ -28,9 +38,17 @@
           - platform_egress_denied_port | int <= 65535
           - platform_egress_denied_cidr != platform_egress_target_cidr or platform_egress_denied_port | int != platform_egress_target_port | int
         fail_msg: >-
-          Supply the protected runner configuration and a reachable non-production TCP target.
-          Its CIDR and port must already be present in ALLOWED_EGRESS_CIDRS and
-          ALLOWED_EGRESS_PORTS. Explicitly enable and acknowledge the drill.
+          Supply the protected runner configuration, normal platform inventory host,
+          and explicit acknowledgement. The playbook applies exactly the target CIDR
+          and TCP port temporarily, then restores the original environment.
+      no_log: true
+
+    - name: Read the exact platform environment before temporary egress enablement
+      ansible.builtin.slurp:
+        src: "{{ platform_egress_drill_install_dir }}/.env"
+      delegate_to: "{{ platform_egress_drill_host }}"
+      become: true
+      register: egress_original_environment
       no_log: true
 
     - name: Establish a unique disposable egress project
@@ -41,21 +59,46 @@
       ansible.builtin.assert:
         that: egress_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
 
-    - name: Exchange the runner credential
-      ansible.builtin.uri:
-        url: "{{ platform_oidc_token_url }}"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          grant_type: client_credentials
-          client_id: "{{ platform_test_runner_client_id }}"
-          client_secret: "{{ platform_test_runner_client_secret }}"
-        status_code: 200
-      register: egress_runner_token
-      no_log: true
-
     - name: Exercise egress policy with a disposable project
       block:
+        - name: Temporarily isolate egress validation from unrelated admission policy
+          ansible.builtin.lineinfile:
+            path: "{{ platform_egress_drill_install_dir }}/.env"
+            regexp: "^{{ item.key }}="
+            line: "{{ item.key }}={{ item.value }}"
+            create: false
+            owner: root
+            group: root
+            mode: '0600'
+          loop:
+            - {key: ALLOWED_EGRESS_CIDRS, value: "{{ platform_egress_target_cidr }}"}
+            - {key: ALLOWED_EGRESS_PORTS, value: "{{ platform_egress_target_port }}"}
+            - {key: CAPACITY_ADMISSION_ENABLED, value: 'false'}
+          delegate_to: "{{ platform_egress_drill_host }}"
+          become: true
+          no_log: true
+
+        - name: Recreate only the Platform API with temporary egress policy
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --force-recreate, --wait, --wait-timeout, '120', platform-api]
+            chdir: "{{ platform_egress_drill_install_dir }}"
+          delegate_to: "{{ platform_egress_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Exchange the runner credential after temporary API recreation
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: egress_runner_token
+          no_log: true
+
         - name: Create the disposable egress project
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects"
@@ -116,9 +159,19 @@
                     outbound:
                       - cidr: "{{ platform_egress_target_cidr }}"
                         port: "{{ platform_egress_target_port | int }}"
-            status_code: 202
+            status_code: [202, 422, 503]
+            return_content: true
           register: egress_deployment
+          failed_when: false
           no_log: true
+
+        - name: Require the approved egress deployment to be accepted
+          ansible.builtin.assert:
+            that: egress_deployment.status | int == 202
+            fail_msg: >-
+              The approved egress deployment was rejected before a workload was
+              created (HTTP {{ egress_deployment.status }}):
+              {{ egress_deployment.get('json', {}).get('detail', egress_deployment.get('json', {}).get('code', 'no safe API reason supplied')) }}
 
         - name: Wait for the approved-connectivity workload
           ansible.builtin.uri:
@@ -133,6 +186,27 @@
           delay: 5
           no_log: true
       always:
+        - name: Restore the exact original platform environment
+          ansible.builtin.copy:
+            content: "{{ egress_original_environment.content | b64decode }}"
+            dest: "{{ platform_egress_drill_install_dir }}/.env"
+            owner: root
+            group: root
+            mode: '0600'
+          delegate_to: "{{ platform_egress_drill_host }}"
+          become: true
+          when: egress_original_environment is defined
+          no_log: true
+
+        - name: Recreate only the Platform API with its original egress policy
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --force-recreate, --wait, --wait-timeout, '120', platform-api]
+            chdir: "{{ platform_egress_drill_install_dir }}"
+          delegate_to: "{{ platform_egress_drill_host }}"
+          become: true
+          changed_when: true
+          when: egress_original_environment is defined
+
         - name: Refresh the runner token before egress-project cleanup
           ansible.builtin.uri:
             url: "{{ platform_oidc_token_url }}"
@@ -187,4 +261,5 @@
         msg: >-
           PASS: {{ egress_project }} rejected an unapproved destination and became ready only
           after connecting to {{ platform_egress_target_host }}:{{ platform_egress_target_port }}
-          through the approved {{ platform_egress_target_cidr }} policy.
+          through a temporary approved {{ platform_egress_target_cidr }} policy; the
+          original Platform API environment was restored during cleanup.

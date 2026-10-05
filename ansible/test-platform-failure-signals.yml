@@ -35,21 +35,50 @@
       ansible.builtin.assert:
         that: failure_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
 
-    - name: Exchange the runner credential
-      ansible.builtin.uri:
-        url: "{{ platform_oidc_token_url }}"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          grant_type: client_credentials
-          client_id: "{{ platform_test_runner_client_id }}"
-          client_secret: "{{ platform_test_runner_client_secret }}"
-        status_code: 200
-      register: failure_runner_token
+    - name: Read the exact platform environment before temporary failure-drill policy changes
+      ansible.builtin.slurp:
+        src: "{{ platform_failure_drill_install_dir }}/.env"
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      register: failure_original_environment
       no_log: true
 
     - name: Exercise failure signals with a disposable public workload
       block:
+        - name: Temporarily isolate failure signals from unrelated admission policy
+          ansible.builtin.lineinfile:
+            path: "{{ platform_failure_drill_install_dir }}/.env"
+            regexp: '^CAPACITY_ADMISSION_ENABLED='
+            line: 'CAPACITY_ADMISSION_ENABLED=false'
+            create: false
+            owner: root
+            group: root
+            mode: '0600'
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          no_log: true
+
+        - name: Recreate only the Platform API with temporary failure-drill policy
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --force-recreate, --wait, --wait-timeout, '120', platform-api]
+            chdir: "{{ platform_failure_drill_install_dir }}"
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Exchange the runner credential after temporary API recreation
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: failure_runner_token
+          no_log: true
+
         - name: Create the disposable failure-signal project
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects"
@@ -71,9 +100,19 @@
               image: "{{ platform_failure_drill_image }}"
               port: 5678
               probe_profile: hello-world
-            status_code: 202
+            status_code: [202, 422, 503]
+            return_content: true
           register: failure_deployment
+          failed_when: false
           no_log: true
+
+        - name: Require the disposable public canary to be accepted
+          ansible.builtin.assert:
+            that: failure_deployment.status | int == 202
+            fail_msg: >-
+              The disposable public canary was rejected before a workload was created
+              (HTTP {{ failure_deployment.status }}):
+              {{ failure_deployment.get('json', {}).get('detail', failure_deployment.get('json', {}).get('code', 'no safe API reason supplied')) }}
 
         - name: Wait for the disposable public canary
           ansible.builtin.uri:
@@ -275,6 +314,27 @@
           delay: 2
           changed_when: false
       always:
+        - name: Restore the exact original platform environment
+          ansible.builtin.copy:
+            content: "{{ failure_original_environment.content | b64decode }}"
+            dest: "{{ platform_failure_drill_install_dir }}/.env"
+            owner: root
+            group: root
+            mode: '0600'
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          when: failure_original_environment is defined
+          no_log: true
+
+        - name: Recreate only the Platform API with its original failure-drill policy
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --force-recreate, --wait, --wait-timeout, '120', platform-api]
+            chdir: "{{ platform_failure_drill_install_dir }}"
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: true
+          when: failure_original_environment is defined
+
         - name: Ensure the shared edge proxy is running after the drill
           ansible.builtin.command:
             argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', proxy]
