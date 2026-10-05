@@ -308,7 +308,10 @@
                       type: container
                       image: "{{ platform_component_job_image }}"
                       command: ['/bin/sh', '-ec']
-                      args: ['wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75']
+                      # A Pod can begin before the node has installed its Service rules. Retry the
+                      # disposable connectivity assertion briefly, then keep the Job alive long
+                      # enough to prove Forbid prevents overlap.
+                      args: ['for n in $(seq 1 10); do wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75 && exit 0; sleep 2; done; exit 1']
                     schedule: '* * * * *'
                     timeZone: UTC
                     concurrencyPolicy: Forbid
