@@ -23,7 +23,7 @@ class InventoryTests(unittest.TestCase):
             "Deployment": [item("web", {"replicas": 2, "template": {"spec": {"containers": [
                 {"name": "web", "resources": {"requests": {"cpu": "100m"}, "limits": {"cpu": "500m"}}}]}}}, {"ready_replicas": 1})],
             "Pod": [item("web-1", status={"phase": "Running"})], "Service": [item("web")],
-            "Ingress": [item("web")], "ResourceQuota": [item("project", status={"hard": {
+            "Ingress": [item("web", {"rules": [{"host": "smoke.apps.test"}]})], "ResourceQuota": [item("project", status={"hard": {
                 "requests.cpu": "250m", "limits.cpu": "900m"}})],
             "LimitRange": [item("defaults")]}
         resources.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
@@ -38,6 +38,8 @@ class InventoryTests(unittest.TestCase):
             "requests.cpu": {"declared": 200, "hard": 250, "remaining": 50, "state": "within"},
             "limits.cpu": {"declared": 1000, "hard": 900, "remaining": 0, "state": "exceeded"}}}])
         self.assertEqual(result["data_services"], [{"type": "postgresql", "name": "managed", "scope": "project"}])
+        self.assertEqual(result["public_endpoints"], [{"route": "web", "url": "https://smoke.apps.test",
+                                                         "tls": {"state": "unknown", "reason": "EdgeCertificateNotObserved"}}])
 
     def test_provider_failure_is_not_reported_as_empty_inventory(self):
         runtime = Mock()

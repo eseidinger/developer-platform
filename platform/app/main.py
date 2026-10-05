@@ -35,12 +35,15 @@ from .identity import AuthenticationError, Principal, configured_verifier
 from .spec import CAPABILITIES, ApplicationEnvelope, ApplicationEnvelopeV1Alpha2, error_code, to_flat
 from .config import normalize_configuration, observe_activation
 from .manifests import component_resources, normalize_resources, resources, validate_name
+from .project_policy import validate_component_capacity
 from .monitoring import discovery_loop, publish_catalog
 from .operations import operation_loop
 from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
 from .inventory import observe_inventory, observe_cluster_capacity
+from .capacity_admission import assess as assess_capacity
+from .rollback import dependency_report
 from .logs import observe_logs
 from .component_status import observe_components
 from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
@@ -275,6 +278,8 @@ class Project(BaseModel):
     def one_workload_shape(self):
         if (self.image is None) == (self.components is None):
             raise ValueError("provide either image or components")
+        components = self.components if self.components is not None else [{"type": "service", "resources": self.resources}]
+        validate_component_capacity(self.name, components)
         return self
 
     @field_validator("resources")
@@ -1039,6 +1044,13 @@ def provision(name: str, body: Union[ApplicationEnvelopeV1Alpha2, ApplicationEnv
         current = current_spec(name)
         if current and current[1] and current[1].get("configuration"):
             spec["configuration"] = current[1]["configuration"]
+    capacity = assess_capacity(runtime, spec, log)
+    if capacity["state"] == "unavailable":
+        raise HTTPException(503, "Capacity admission is unavailable; retry without assuming free capacity")
+    if capacity["state"] == "rejected":
+        required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
+                       {"reason": "insufficient_reserved_capacity"})
+        raise HTTPException(422, "Requested rollout exceeds remaining reserved cluster capacity")
     try:
         with connect() as conn:
             operation_id, operation_state, revision = queue_deploy(
@@ -1391,6 +1403,7 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
     return {"project": name, "current_revision": rows[0][0], "revisions": [
         {"revision": r[0], "created_at": r[1].isoformat(), "current": r[0] == rows[0][0],
          "image": r[2].get("resolved_image", r[2].get("image")), "port": r[2].get("port"),
+         "dependencies": dependency_report(r[2]),
          "components": [{"name": c["name"], "type": c["type"], "image": c.get("resolved_image", c["image"]),
                          **({"legacy": True} if c.get("legacy") else {})} for c in component_view(r[2])],
          "resources": r[2].get("resources")}

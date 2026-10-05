@@ -121,5 +121,12 @@ class WorkloadContract(unittest.TestCase):
         policy = next(d for d in docs if d["kind"] == "NetworkPolicy")
         self.assertEqual(policy["spec"]["ingress"][1]["ports"][0]["port"], 8080)
 
+    def test_approved_component_egress_is_scoped_to_its_pods(self):
+        docs = component_resources("shop", [{"name": "api", "type": "service", "resolved_image": "x@sha256:a",
+            "outbound": [{"cidr": "203.0.113.10/32", "port": 443}]}], "172.30.80.10", "secret")
+        policy = next(d for d in docs if d["metadata"]["name"] == "api-egress")
+        self.assertEqual(policy["spec"]["podSelector"]["matchLabels"]["platform.example/component"], "api")
+        self.assertEqual(policy["spec"]["egress"][0]["to"][0]["ipBlock"]["cidr"], "203.0.113.10/32")
+
 if __name__ == "__main__":
     unittest.main()

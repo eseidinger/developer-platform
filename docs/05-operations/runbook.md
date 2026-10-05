@@ -79,12 +79,23 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/project
 | Set or rotate a secret | `PUT $P/secrets/NAME` body `{"value": "..."}` | `GET $P/secrets` shows `version` and `state: rotating` once the pods are `active` |
 | Finish a rotation | `POST $P/secrets/NAME/confirm` after the application works with the new value | 200, previous value revoked |
 | Undo a rotation | `POST $P/secrets/NAME/revert` while `rotating` | New version, pods restart |
-| Roll back a release | `POST $P/rollback` body `{"revision": N}` | New operation `succeeded` |
+| Roll back a release | `GET $P/revisions`, inspect `dependencies`, then `POST $P/rollback` body `{"revision": N}` | New operation `succeeded` |
 | Retire | `GET $P/retirement-preview`, then `POST $P/retire` with the `scope_token` and `confirm_name` | Repeat the POST until `200 retired`; project grants are removed and deployment credentials enter provider cleanup; database, role and catalog are retained |
 
 Failure responses: 401 no or expired token; 403 missing grant; 404 unknown project or secret; 400 retire confirmation does not match the project name; 409 `revision_conflict`, `scope_changed`, `name_in_use`, `not_adopted`, `no_previous_version` or a retired project; 422 `invalid_spec`, `unsupported_capability`, `invalid_configuration` or `invalid_secret`; 503 dependency unavailable, retry the same request. Secret values are never returned, logged or audited. Secrets are in the backup bundle (ADR-015); previous values are not.
 
+Revision `dependencies` reports `database: retained` and `application_secrets: current_only`. A rollback reapplies
+the retained application spec only: it neither reverses PostgreSQL contents/migrations nor restores historic secret
+values, because secret values are deliberately excluded from revisions. Restore those dependencies through their
+separate controlled procedures before declaring a rollback recovery complete.
+
 For a protected retirement acceptance, `ansible/retire-platform-project.yml` can create and verify a disposable credential probe when invoked with `-e platform_retire_verify_credential_revocation=true`. After retirement it proves the issued token is denied; confirm provider cleanup reaches `revoked` separately. Do not enable this check for a shared CI credential or a non-disposable project. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active.
+
+Before retirement, record the project database/role, the latest **verified** backup snapshot identifier and its
+independent restore evidence, and the chosen decision (`retain` or separately approved deletion). The Platform API
+does not infer project-level backup coverage from a retained database: the backup bundle is platform-wide and no
+project-addressable snapshot index exists. If that evidence is unavailable, retain the data and record the decision
+as `backup coverage unverified`; do not perform a destructive database action as part of retirement.
 
 ## Verify component public exposure
 
@@ -95,6 +106,39 @@ after DNS and certificate readiness, make one HTTPS request to that hostname; th
 private revision and confirm the ingress is removed and no application response remains. This
 is a manual edge/TLS check because local unit tests and cluster object checks do not prove
 public DNS, certificate issuance, or proxy forwarding. Follow ADR-009 before testing a public domain.
+The authorized `GET /projects/<project>/resources` response lists each declared HTTPS URL in
+`public_endpoints`. Its `tls.state: unknown` deliberately means the platform has not observed
+the edge certificate; do not treat it as a readiness signal.
+
+## Approve component outbound connectivity
+
+Outbound traffic is deny-by-default. Set `ALLOWED_EGRESS_CIDRS` (comma-separated CIDRs) and
+`ALLOWED_EGRESS_PORTS` (comma-separated TCP ports) in the platform host's `.env`, then restart the Platform API.
+Both values must be syntactically valid; an invalid value fails closed. A service component may
+request only a CIDR wholly contained in that allow-list and a listed port; the platform rejects all other requests
+before deployment and emits a component-scoped NetworkPolicy for approved traffic. Do not use domain names here:
+Kubernetes NetworkPolicy enforces IP ranges, not stable DNS identities.
+
+After changing an allow-list, use a disposable workload and a non-production endpoint to prove one approved
+connection succeeds and a neighbouring denied IP/port fails. Record the target CIDR, port, policy revision, and
+cleanup result. Do not add broad public CIDRs merely to make an application work.
+
+## Configure a project quota
+
+Set `PROJECT_QUOTAS_JSON` in the platform host's `.env` and restart the Platform API. It is a JSON object
+whose optional `default` entry applies to every project and whose project-name entries override that default.
+Only `pods`, `requests.cpu`, `requests.memory`, `limits.cpu`, and `limits.memory` may be changed; service and
+storage restrictions remain managed hardening controls. For example:
+
+```dotenv
+PROJECT_QUOTAS_JSON={"default":{"pods":"6","requests.cpu":"1200m","requests.memory":"1536Mi","limits.cpu":"2400m","limits.memory":"3Gi"},"batch":{"pods":"3"}}
+```
+
+The API validates a component rollout, including its rolling-update surge, against the same effective quota
+that it writes to the namespace. Invalid policy JSON or unsupported values fails closed; fix the operator
+configuration rather than retrying a developer request. Inspect the effective safe policy through
+`GET /operator/projects/<project>/security-configuration` as a platform administrator. Before raising a quota,
+perform the protected capacity exercise below; this local policy does not reserve physical host capacity.
 
 ## Inspect platform capacity
 
@@ -123,6 +167,15 @@ then verify the workload receives an `Unschedulable` diagnostic before its
 requested resources exceed the agreed reserve. Confirm alert delivery for the
 chosen threshold at the same time. Do not run that exercise against production
 data without an approved load plan and rollback conditions.
+
+After that measurement, an operator may enable conservative request admission with
+`CAPACITY_ADMISSION_ENABLED=true`, `CAPACITY_RESERVE_CPU_MILLICORES`, and
+`CAPACITY_RESERVE_MEMORY_MIB` in `.env`. The API then lists Kubernetes Nodes and active Pods,
+subtracts the explicit reserve and current pod requests from allocatable capacity, and rejects a rollout whose
+requested resources do not fit. It fails closed with `503` if Kubernetes capacity cannot be read. Keep it disabled
+until the reserve is measured; it is a request-based admission guard, not a live-usage or storage guarantee. On a
+protected lab, verify one intentionally oversized disposable rollout is rejected with `422`, then confirm a
+within-reserve rollout proceeds and remove the disposable workload.
 
 ## Restart an application
 

@@ -66,6 +66,23 @@ def _quota_comparisons(quotas: list[Any], declared: dict) -> list[dict]:
     return comparisons
 
 
+def _public_endpoints(ingresses: list[Any]) -> list[dict]:
+    """Report declared public URLs without claiming that edge TLS was observed.
+
+    Kubernetes Ingress describes a requested route.  In this platform the external
+    proxy owns DNS and certificates, so its status cannot establish certificate
+    readiness or public reachability.
+    """
+    endpoints = []
+    for ingress in ingresses:
+        for rule in (_get(_get(ingress, "spec", {}), "rules", []) or []):
+            host = _get(rule, "host")
+            if host:
+                endpoints.append({"route": _name(ingress), "url": "https://" + host,
+                                  "tls": {"state": "unknown", "reason": "EdgeCertificateNotObserved"}})
+    return endpoints
+
+
 def observe_inventory(runtime: Any, project: str, log) -> dict:
     """Return safe Kubernetes topology; provider errors are explicit, never empty inventory."""
     if runtime is None:
@@ -92,6 +109,7 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
                           for item in pods],
             "services": [_name(item) for item in services],
             "routes": [_name(item) for item in ingresses],
+            "public_endpoints": _public_endpoints(ingresses),
             "quotas": [{"name": _name(item), "hard": _get(_get(item, "status", {}), "hard", {})} for item in quotas],
             "quota_comparisons": _quota_comparisons(quotas, declared),
             "limit_ranges": [_name(item) for item in limits],

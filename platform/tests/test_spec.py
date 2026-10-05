@@ -1,5 +1,6 @@
 import sys
 import unittest
+import os
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import spec
@@ -24,6 +25,14 @@ def envelope(**changes):
 
 
 class EnvelopeContract(unittest.TestCase):
+    def setUp(self):
+        self.environment = os.environ.copy()
+        self.addCleanup(self.restore_environment)
+
+    def restore_environment(self):
+        os.environ.clear()
+        os.environ.update(self.environment)
+
     def test_flat_body_passes_through_unchanged(self):
         flat = {"name": "smoke", "image": "example:v1"}
         self.assertEqual(spec.to_flat(flat), flat)
@@ -105,6 +114,32 @@ class EnvelopeContract(unittest.TestCase):
             {"name": "api", "type": "service", "runtime": {"type": "container", "image": "registry/api:v1"},
              "ports": [{"name": "http", "protocol": "http", "port": 8080}], "exposure": "public"}]}}
         self.assertEqual(spec.to_flat(body)["components"][0]["exposure"], "public")
+
+    def test_v1alpha2_allows_only_operator_approved_outbound_cidr_port(self):
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"}, "spec": {"components": [
+            {"name": "api", "type": "service", "runtime": {"type": "container", "image": "registry/api:v1"},
+             "outbound": [{"cidr": "203.0.113.10/32", "port": 443}]}]}}
+        os.environ["ALLOWED_EGRESS_CIDRS"], os.environ["ALLOWED_EGRESS_PORTS"] = "203.0.113.0/24", "443"
+        self.assertEqual(spec.to_flat(body)["components"][0]["outbound"], [{"cidr": "203.0.113.10/32", "port": 443}])
+
+    def test_v1alpha2_rejects_unapproved_or_malformed_operator_egress_policy(self):
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"}, "spec": {"components": [
+            {"name": "api", "type": "service", "runtime": {"type": "container", "image": "registry/api:v1"},
+             "outbound": [{"cidr": "203.0.113.10/32", "port": 443}]}]}}
+        os.environ["ALLOWED_EGRESS_CIDRS"], os.environ["ALLOWED_EGRESS_PORTS"] = "", ""
+        with self.assertRaisesRegex(ValueError, "not allowed by operator policy"):
+            spec.to_flat(body)
+        os.environ["ALLOWED_EGRESS_CIDRS"], os.environ["ALLOWED_EGRESS_PORTS"] = "not-a-cidr", "443"
+        with self.assertRaisesRegex(ValueError, "operator egress policy is invalid"):
+            spec.to_flat(body)
+
+    def test_operator_egress_denial_has_a_stable_error_code(self):
+        self.assertEqual(spec.error_code({}, [{"msg": "Value error, outbound destination is not allowed by operator policy"}]),
+                         "policy_denied")
+
+    def test_invalid_operator_quota_policy_has_a_stable_error_code(self):
+        self.assertEqual(spec.error_code({}, [{"msg": "Value error, operator project quota policy is invalid"}]),
+                         "policy_unavailable")
 
 
 if __name__ == "__main__":

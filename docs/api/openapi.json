@@ -527,6 +527,28 @@
         "title": "Metadata",
         "type": "object"
       },
+      "OutboundDestination": {
+        "additionalProperties": false,
+        "description": "One operator-approved TCP egress exception for a service component.",
+        "properties": {
+          "cidr": {
+            "title": "Cidr",
+            "type": "string"
+          },
+          "port": {
+            "maximum": 65535.0,
+            "minimum": 1.0,
+            "title": "Port",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "cidr",
+          "port"
+        ],
+        "title": "OutboundDestination",
+        "type": "object"
+      },
       "PlatformGrant": {
         "properties": {
           "display_name": {
@@ -871,6 +893,14 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "outbound": {
+            "items": {
+              "$ref": "#/components/schemas/OutboundDestination"
+            },
+            "maxItems": 5,
+            "title": "Outbound",
+            "type": "array"
           },
           "ports": {
             "anyOf": [

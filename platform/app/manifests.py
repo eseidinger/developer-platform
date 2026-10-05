@@ -3,6 +3,7 @@ import ipaddress
 import re
 
 from .config import env_list
+from .project_policy import quota_for
 
 def validate_name(value):
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,30}[a-z0-9]|[a-z]", value):
@@ -68,11 +69,7 @@ def resources(name, image, port, domain, database_ip, password, workload_resourc
                 "platform.example/managed": "true",
                 "pod-security.kubernetes.io/enforce": "restricted",
                 "pod-security.kubernetes.io/enforce-version": "v1.36"}}},
-        obj("v1", "ResourceQuota", "budget", spec={"hard": {
-            "requests.cpu": "2", "requests.memory": "2Gi", "limits.cpu": "4",
-            "limits.memory": "4Gi", "pods": "10", "services": "5",
-            "services.loadbalancers": "0", "services.nodeports": "0",
-            "persistentvolumeclaims": "0"}}),
+        obj("v1", "ResourceQuota", "budget", spec={"hard": quota_for(name)}),
         obj("v1", "LimitRange", "defaults", spec={"limits": [{
             "type": "Container", "default": {"cpu": "500m", "memory": "256Mi"},
             "defaultRequest": {"cpu": "100m", "memory": "128Mi"}}]}),
@@ -174,10 +171,7 @@ def component_resources(name, components, database_ip, password, configuration=N
         {"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": namespace, "labels": {
             "platform.example/managed": "true", "pod-security.kubernetes.io/enforce": "restricted",
             "pod-security.kubernetes.io/enforce-version": "v1.36"}}},
-        obj("v1", "ResourceQuota", "budget", spec={"hard": {
-            "requests.cpu": "2", "requests.memory": "2Gi", "limits.cpu": "4", "limits.memory": "4Gi",
-            "pods": "10", "services": "5", "services.loadbalancers": "0", "services.nodeports": "0",
-            "persistentvolumeclaims": "0"}}),
+        obj("v1", "ResourceQuota", "budget", spec={"hard": quota_for(name)}),
         obj("v1", "LimitRange", "defaults", spec={"limits": [{"type": "Container",
             "default": {"cpu": "500m", "memory": "256Mi"},
             "defaultRequest": {"cpu": "100m", "memory": "128Mi"}}]}),
@@ -214,6 +208,11 @@ def component_resources(name, components, database_ip, password, configuration=N
                     "ingressClassName": "traefik", "rules": [{"host": component["name"] + "-" + name + "." + domain,
                     "http": {"paths": [{"path": "/", "pathType": "Prefix", "backend": {
                         "service": {"name": component["name"], "port": {"number": ports[0]["port"]}}}}]}}]}))
+            if component.get("outbound"):
+                manifests.append(obj("networking.k8s.io/v1", "NetworkPolicy", component["name"] + "-egress", spec={
+                    "podSelector": {"matchLabels": component_labels}, "policyTypes": ["Egress"],
+                    "egress": [{"to": [{"ipBlock": {"cidr": item["cidr"]}}],
+                                "ports": [{"protocol": "TCP", "port": item["port"]}]} for item in component["outbound"]]}))
         else:
             manifests.append(obj("batch/v1", "CronJob", component["name"], spec={
                 "schedule": component["schedule"], "timeZone": component.get("time_zone", "UTC"),

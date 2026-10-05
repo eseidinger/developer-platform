@@ -5,7 +5,9 @@ from typing import List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from .config import normalize_configuration
-from .manifests import DEFAULT_RESOURCES, normalize_resources
+from .manifests import normalize_resources
+from .egress import validate as validate_egress
+from .project_policy import validate_component_capacity
 
 API_VERSION = "platform.example/v1alpha1"
 COMPONENT_API_VERSION = "platform.example/v1alpha2"
@@ -148,11 +150,25 @@ class _Component(_Strict):
         return None if value is None else normalize_resources(value)
 
 
+class OutboundDestination(_Strict):
+    """One operator-approved TCP egress exception for a service component."""
+    cidr: str
+    port: int = Field(ge=1, le=65535)
+
+
 class ServiceComponent(_Component):
     type: Literal["service"]
     ports: Optional[List[InternalPort]] = Field(default=None, max_length=10)
     replicas: int = Field(default=1, ge=1, le=5)
     exposure: Literal["private", "public"] = "private"
+    outbound: List[OutboundDestination] = Field(default_factory=list, max_length=5)
+
+    @field_validator("outbound")
+    @classmethod
+    def check_outbound(cls, value):
+        for item in value:
+            validate_egress(item.model_dump())
+        return value
     health: Optional[Health] = None
 
     @model_validator(mode="after")
@@ -192,30 +208,6 @@ class ComponentSpec(_Strict):
             raise ValueError("only one public service component is supported")
         if public and not public[0].ports:
             raise ValueError("a public service component requires an internal HTTP port")
-        # Namespace quota is 10 pods, 2 CPU/2Gi requests and 4 CPU/4Gi limits.
-        # One Deployment may temporarily run both old and new replicas while it rolls.
-        steady_pods = 0
-        totals = {section: {"cpu": 0, "memory": 0} for section in ("requests", "limits")}
-        rollout = {section: {"cpu": 0, "memory": 0} for section in ("requests", "limits")}
-        for component in self.components:
-            replicas = component.replicas if isinstance(component, ServiceComponent) else 1
-            steady_pods += replicas
-            requested = component.resources or DEFAULT_RESOURCES
-            for section in totals:
-                cpu = int(requested[section]["cpu"][:-1])
-                memory = int(requested[section]["memory"][:-2])
-                totals[section]["cpu"] += cpu * replicas
-                totals[section]["memory"] += memory * replicas
-                if isinstance(component, ServiceComponent):
-                    rollout[section]["cpu"] = max(rollout[section]["cpu"], cpu * replicas)
-                    rollout[section]["memory"] = max(rollout[section]["memory"], memory * replicas)
-        quota = {"requests": {"cpu": 2000, "memory": 2048}, "limits": {"cpu": 4000, "memory": 4096}}
-        if steady_pods + (max((c.replicas for c in self.components if isinstance(c, ServiceComponent)), default=0)) > 10:
-            raise ValueError("components exceed the namespace pod quota during rollout")
-        for section in totals:
-            for resource in totals[section]:
-                if totals[section][resource] + rollout[section][resource] > quota[section][resource]:
-                    raise ValueError("components exceed the namespace resource quota during rollout")
         return self
 
 
@@ -229,6 +221,7 @@ class ApplicationEnvelopeV1Alpha2(_Strict):
     def check_project(self):
         if self.metadata.project not in (None, self.metadata.name):
             raise ValueError("metadata.project must equal metadata.name")
+        validate_component_capacity(self.metadata.name, [component.model_dump() for component in self.spec.components])
         return self
 
 
@@ -244,7 +237,9 @@ CAPABILITIES = {
         "externalResources": [{"type": "postgres", "profiles": ["shared-dev"], "deletionPolicies": ["retain"], "maxCount": 1}],
         "configuration": {"values": True, "maxValues": 50, "maxValueLength": 1024, "secrets": True, "bindings": ["PG"]},
         "components": {"types": ["service", "scheduled"], "maxCount": 5,
-                       "service": {"internalHttpPorts": True, "maxReplicas": 5},
+                       "service": {"internalHttpPorts": True, "maxReplicas": 5,
+                                   "outbound": {"cidrAndTcpPort": True, "maxDestinations": 5,
+                                                "operatorAllowListRequired": True}},
                        "scheduled": {"cronFields": 5, "timeZone": ["UTC"], "concurrencyPolicy": ["Forbid"]}},
     }},
 }
@@ -252,6 +247,10 @@ CAPABILITIES = {
 
 def error_code(body, errors):
     """Stable machine-readable code for a rejected PUT body."""
+    if any("operator project quota policy is invalid" in str(error.get("msg", "")) for error in errors):
+        return "policy_unavailable"
+    if any("not allowed by operator policy" in str(error.get("msg", "")) for error in errors):
+        return "policy_denied"
     envelope = isinstance(body, dict) and ("apiVersion" in body or "kind" in body)
     if envelope and (body.get("apiVersion") not in {API_VERSION, COMPONENT_API_VERSION}
                      or body.get("kind") != "Application"):
@@ -292,6 +291,8 @@ def to_flat(body):
                 flat_component["replicas"] = component.replicas
                 if component.exposure == "public":
                     flat_component["exposure"] = "public"
+                if component.outbound:
+                    flat_component["outbound"] = [destination.model_dump() for destination in component.outbound]
                 if component.ports:
                     flat_component["ports"] = [port.model_dump() for port in component.ports]
                 if component.health:
