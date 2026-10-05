@@ -217,6 +217,28 @@
             status_code: 422
           no_log: true
 
+        - name: Reject a rollout that would exceed the namespace pod quota before side effects
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}"
+            method: PUT
+            headers:
+              Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata:
+                name: "{{ component_project }}"
+              spec:
+                components:
+                  - {name: api, type: service, replicas: 5, runtime: {type: container, image: "{{ platform_component_service_image }}"}}
+                  - {name: peer, type: service, replicas: 5, runtime: {type: container, image: "{{ platform_component_service_image }}"}}
+            status_code: 422
+            return_content: true
+          register: quota_rejection
+          failed_when: "quota_rejection.status != 422 or 'namespace pod quota' not in (quota_rejection.content | string)"
+          no_log: true
+
         - name: Migrate to two services and a non-overlapping scheduled component
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ component_project }}"
@@ -235,6 +257,9 @@
                     type: service
                     replicas: 2
                     exposure: public
+                    resources:
+                      requests: {cpu: 200m, memory: 256Mi}
+                      limits: {cpu: 500m, memory: 512Mi}
                     runtime:
                       type: container
                       image: "{{ platform_component_service_image }}"
@@ -535,6 +560,7 @@
             'api' in (component_inventory.json.deployments | map(attribute='name') | list) and
             'peer' in (component_inventory.json.services | list) and
             'api-public' in (component_inventory.json.routes | list) and
+            (component_inventory.json.deployments | selectattr('name', 'equalto', 'api') | first).containers[0].requests.cpu == '200m' and
             (component_inventory.json.data_services | selectattr('type', 'equalto', 'postgresql') | list | length) == 1 and
             (component_inventory.json.quota_comparisons | length) > 0
           retries: 12

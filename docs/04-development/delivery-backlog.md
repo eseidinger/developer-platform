@@ -281,6 +281,8 @@ Acceptance criteria:
 Phase tasks:
 
 - [ ] **DEV-008-T01 · 2C** — Change fixed replicas and CPU/memory requests/limits for one component; test explained quota rejection and host-capacity scheduling diagnostics. Prerequisites: PLAN-002; OPS-005-T02; DEV-006-T01.
+
+  **Progress (October 5, 2026):** Versioned component specifications support per-service replicas and CPU/memory requests/limits; the inventory reports their declared totals and quota comparison. Validation rejects a component rollout that exceeds the namespace pod/resource quota including rolling-update headroom before provider side effects. Unit tests cover quota validation; the protected component playbook verifies resource declaration and explained quota rejection. **Manual test need:** before offering a larger quota, run a protected oversize-request scheduling drill and confirm component-specific `Unschedulable` diagnostics without exhausting host reserve.
 - [ ] **DEV-008-T02 · Deferred** — Scale and allocate resources independently per component, retaining quota and scheduling failure attribution. Prerequisites: DEV-001-T02; DEV-008-T01.
 
 **Task evidence (B-2026-09-26):** T01 — source partial through fixed [manifest](../../platform/app/manifests.py) replica/resource settings and namespace quotas; configurable scaling/resource requests/limits and scheduling diagnostics are absent. EV-01 verifies selected fixed quota settings only, not scaling acceptance. T02 — deferred, source absent, local unverified.
