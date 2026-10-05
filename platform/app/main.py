@@ -76,6 +76,10 @@ async def lifespan(app):
             name TEXT PRIMARY KEY, spec JSONB, status TEXT NOT NULL,
             updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
         conn.execute("ALTER TABLE projects ALTER COLUMN spec DROP NOT NULL")
+        conn.execute("""CREATE TABLE IF NOT EXISTS data_service_recovery_requests (
+            request_id UUID PRIMARY KEY, project TEXT NOT NULL REFERENCES projects(name),
+            reason TEXT NOT NULL, status TEXT NOT NULL, requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+            requested_by TEXT NOT NULL, reviewed_at TIMESTAMPTZ, reviewed_by TEXT)""")
         initialize_catalog(conn)
         initialize_audit(conn)
         initialize_authorization(conn)
@@ -287,6 +291,16 @@ class Project(BaseModel):
     @classmethod
     def check_name(cls, value):
         return validate_name(value)
+
+
+class DataServiceRecoveryRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: Literal["unavailable", "access", "data_integrity", "other"]
+
+
+class DataServiceRecoveryReview(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    status: Literal["acknowledged", "resolved"]
 
 
 class DeploymentCredentialCreate(BaseModel):
@@ -1418,6 +1432,85 @@ def resource_inventory(name: str, principal: Principal = Depends(current_princip
     required_audit(actor, "project.resources.inspect", "project", name, "succeeded",
                    {"project": name}, {"state": inventory["state"], "usage_state": inventory["usage"]["state"]})
     return {"project": name, **inventory}
+
+
+def _recovery_record(row):
+    if row is None:
+        return None
+    return {"request_id": str(row[0]), "reason": row[1], "status": row[2], "requested_at": row[3].isoformat(),
+            "reviewed_at": row[4].isoformat() if row[4] else None}
+
+
+@app.get("/projects/{name}/data-services")
+def data_services(name: str, principal: Principal = Depends(current_principal)):
+    """Report managed-database availability and the latest recovery outcome."""
+    require_permission(principal, "view", name)
+    database = "project_" + name.replace("-", "_")
+    try:
+        with connect() as conn:
+            if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+                raise HTTPException(404, "Unknown project")
+            available = bool(conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (database,)).fetchone())
+            request = conn.execute("""SELECT request_id, reason, status, requested_at, reviewed_at
+                FROM data_service_recovery_requests WHERE project=%s ORDER BY requested_at DESC LIMIT 1""",
+                                   (name,)).fetchone()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        log.error("Data-service observation failed project=%s error_type=%s", name, type(exc).__name__)
+        available, request = None, None
+    state = "available" if available else "unavailable"
+    required_audit(actor_for(principal), "data-service.inspect", "project", name, "succeeded", {"project": name},
+                   {"state": state})
+    return {"project": name, "services": [{"type": "postgresql", "name": "managed", "state": state,
+                                              "reason": None if available else "DatabaseUnavailable"}],
+            "latest_recovery_request": _recovery_record(request)}
+
+
+@app.post("/projects/{name}/data-services/recovery-requests", status_code=201)
+def request_data_service_recovery(name: str, body: DataServiceRecoveryRequest,
+                                  principal: Principal = Depends(current_principal)):
+    """Create a bounded operator-reviewable recovery request without incident details or credentials."""
+    require_permission(principal, "change", name)
+    request_id = uuid4()
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+            raise HTTPException(404, "Unknown project")
+        row = conn.execute("""INSERT INTO data_service_recovery_requests
+            (request_id, project, reason, status, requested_by) VALUES (%s, %s, %s, 'requested', %s)
+            RETURNING request_id, reason, status, requested_at, reviewed_at""",
+                           (request_id, name, body.reason, actor_for(principal).identifier)).fetchone()
+    required_audit(actor_for(principal), "data-service.recovery.request", "project", name, "succeeded",
+                   {"project": name}, {"request_id": str(request_id), "reason": body.reason})
+    return {"project": name, **_recovery_record(row)}
+
+
+@app.get("/operator/data-service-recovery-requests")
+def list_data_service_recovery_requests(principal: Principal = Depends(current_principal)):
+    require_platform_admin(principal)
+    with connect() as conn:
+        rows = conn.execute("""SELECT request_id, project, reason, status, requested_at, reviewed_at
+            FROM data_service_recovery_requests ORDER BY requested_at DESC LIMIT 100""").fetchall()
+    required_audit(actor_for(principal), "data-service.recovery.list", "platform", "recovery-requests", "succeeded",
+                   {"scope": "platform"}, {"count": len(rows)})
+    return {"requests": [{"project": row[1], **_recovery_record((row[0], row[2], row[3], row[4], row[5]))}
+                         for row in rows]}
+
+
+@app.patch("/operator/data-service-recovery-requests/{request_id}")
+def review_data_service_recovery_request(request_id: UUID, body: DataServiceRecoveryReview,
+                                         principal: Principal = Depends(current_principal)):
+    require_platform_admin(principal)
+    with connect() as conn:
+        row = conn.execute("""UPDATE data_service_recovery_requests
+            SET status=%s, reviewed_at=now(), reviewed_by=%s WHERE request_id=%s
+            RETURNING project, request_id, reason, status, requested_at, reviewed_at""",
+                           (body.status, actor_for(principal).identifier, request_id)).fetchone()
+    if row is None:
+        raise HTTPException(404, "Unknown recovery request")
+    required_audit(actor_for(principal), "data-service.recovery.review", "project", row[0], "succeeded",
+                   {"project": row[0]}, {"request_id": str(request_id), "status": body.status})
+    return {"project": row[0], **_recovery_record(row[1:])}
 
 
 @app.get("/operator/capacity")

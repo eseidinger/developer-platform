@@ -152,6 +152,13 @@ Inspect host disk/memory, Docker logs, and node status before changing resources
 
 ## PostgreSQL unreachable or slow
 
+Developers can inspect the managed service at `GET /projects/{name}/data-services`
+and submit one of the bounded recovery reasons to `POST .../data-services/recovery-requests`.
+Platform administrators review requests through `GET /operator/data-service-recovery-requests`
+and acknowledge or resolve them with its request-specific `PATCH` endpoint. These calls report
+control-plane database presence, not application transaction integrity; use the controlled
+database write/read procedure below before resolving an incident.
+
 Use the readiness and service-log commands above. Inspect host disk, connection limits, locks, database permissions, and connectivity from the affected workload. A read-only connection/activity summary is:
 
 ```bash

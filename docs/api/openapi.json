@@ -254,6 +254,44 @@
         "title": "ConfigurationBody",
         "type": "object"
       },
+      "DataServiceRecoveryRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "reason": {
+            "enum": [
+              "unavailable",
+              "access",
+              "data_integrity",
+              "other"
+            ],
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason"
+        ],
+        "title": "DataServiceRecoveryRequest",
+        "type": "object"
+      },
+      "DataServiceRecoveryReview": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "enum": [
+              "acknowledged",
+              "resolved"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "DataServiceRecoveryReview",
+        "type": "object"
+      },
       "DeploymentCredentialCreate": {
         "additionalProperties": false,
         "properties": {
@@ -1163,6 +1201,80 @@
         "summary": "Operator Capacity"
       }
     },
+    "/operator/data-service-recovery-requests": {
+      "get": {
+        "operationId": "list_data_service_recovery_requests_operator_data_service_recovery_requests_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Data Service Recovery Requests"
+      }
+    },
+    "/operator/data-service-recovery-requests/{request_id}": {
+      "patch": {
+        "operationId": "review_data_service_recovery_request_operator_data_service_recovery_requests__request_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "request_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Request Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataServiceRecoveryReview"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Review Data Service Recovery Request"
+      }
+    },
     "/operator/projects/{name}/permissions": {
       "get": {
         "description": "Inspect project grants; this is intentionally unavailable to project members.",
@@ -1911,6 +2023,102 @@
           }
         ],
         "summary": "Put Configuration"
+      }
+    },
+    "/projects/{name}/data-services": {
+      "get": {
+        "description": "Report managed-database availability and the latest recovery outcome.",
+        "operationId": "data_services_projects__name__data_services_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Data Services"
+      }
+    },
+    "/projects/{name}/data-services/recovery-requests": {
+      "post": {
+        "description": "Create a bounded operator-reviewable recovery request without incident details or credentials.",
+        "operationId": "request_data_service_recovery_projects__name__data_services_recovery_requests_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataServiceRecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Data Service Recovery"
       }
     },
     "/projects/{name}/deployment-credentials": {
