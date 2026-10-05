@@ -628,6 +628,24 @@
           register: peer_before
           changed_when: false
 
+        - name: Refresh the project administrator token before the API-only update
+          ansible.builtin.uri:
+            url: "{{ component_admin_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ component_admin_credential.json.client_id }}"
+              client_secret: "{{ component_admin_credential.json.client_secret }}"
+            status_code: 200
+          register: component_admin_token_refresh
+          no_log: true
+
+        - name: Use the refreshed project administrator token for the API-only update
+          ansible.builtin.set_fact:
+            component_admin_access_token: "{{ component_admin_token_refresh.json.access_token }}"
+          no_log: true
+
         - name: Update only the API component
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ component_project }}"
@@ -745,6 +763,24 @@
           become: "{{ platform_component_drill_become | bool }}"
           register: services_before_scheduled_update
           changed_when: false
+
+        - name: Refresh the project administrator token before the scheduled-only update
+          ansible.builtin.uri:
+            url: "{{ component_admin_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ component_admin_credential.json.client_id }}"
+              client_secret: "{{ component_admin_credential.json.client_secret }}"
+            status_code: 200
+          register: component_admin_token_refresh
+          no_log: true
+
+        - name: Use the refreshed project administrator token for the scheduled-only update
+          ansible.builtin.set_fact:
+            component_admin_access_token: "{{ component_admin_token_refresh.json.access_token }}"
+          no_log: true
 
         - name: Update only the failing scheduled component
           ansible.builtin.uri:
@@ -876,6 +912,24 @@
                 migrated_secret_listing.json.secrets | selectattr('name', 'equalto',
                 'COMPONENT_ACCEPTANCE_SECRET') | list | length == 1
               - (component_run_id ~ '-secret') not in (migrated_secret_listing.json | to_json)
+          no_log: true
+
+        - name: Refresh the project administrator token before rollback
+          ansible.builtin.uri:
+            url: "{{ component_admin_credential.json.token_endpoint }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ component_admin_credential.json.client_id }}"
+              client_secret: "{{ component_admin_credential.json.client_secret }}"
+            status_code: 200
+          register: component_admin_token_refresh
+          no_log: true
+
+        - name: Use the refreshed project administrator token for rollback
+          ansible.builtin.set_fact:
+            component_admin_access_token: "{{ component_admin_token_refresh.json.access_token }}"
           no_log: true
 
         - name: Roll back to the first component revision
