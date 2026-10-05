@@ -485,6 +485,37 @@
           delay: 5
           no_log: true
 
+        - name: Verify authorized component log filtering and polling cursor
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/logs?component=probe&search=component-api&tail=100"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: filtered_scheduled_logs
+          until: >-
+            filtered_scheduled_logs.json.next_cursor is string and
+            (filtered_scheduled_logs.json.lines | length) > 0 and
+            (filtered_scheduled_logs.json.lines | map(attribute='message') | join('\n')) is search('component-api')
+          retries: 12
+          delay: 5
+          no_log: true
+
+        - name: Verify the cursor accepts a no-new-lines poll
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/logs?component=probe&after={{ filtered_scheduled_logs.json.next_cursor | urlencode }}&tail=100"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: cursor_scheduled_logs
+          no_log: true
+
+        - name: Require cursor response to retain the explicit retention boundary
+          ansible.builtin.assert:
+            that:
+              - cursor_scheduled_logs.json.retention.source == 'kubernetes-kubelet'
+              - cursor_scheduled_logs.json.retention.state == 'best_effort'
+          no_log: true
+
         - name: Capture the unchanged peer Deployment generation before an API-only update
           ansible.builtin.command:
             argv:

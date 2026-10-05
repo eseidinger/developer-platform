@@ -80,7 +80,8 @@ class ComponentApiTests(unittest.TestCase):
             response = main.project_logs("shop", tail=20, since_seconds=None, component="worker",
                                          principal=self.principal)
         self.assertEqual(response, {"project": "shop", **logs})
-        observe.assert_called_once_with(main.runtime, "shop", main.log, 20, None, component="worker")
+        observe.assert_called_once_with(main.runtime, "shop", main.log, 20, None, component="worker",
+                                        instance=None, search=None, after=None, before=None)
 
         with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
              patch.object(main, "connect", return_value=nullcontext(conn)), \

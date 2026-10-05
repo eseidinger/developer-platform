@@ -1405,8 +1405,18 @@ def resource_usage(name: str, principal: Principal = Depends(current_principal))
 def project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
                  since_seconds: Optional[int] = Query(None, ge=1, le=86400),
                  component: Optional[str] = Query(None, pattern=r"^[a-z][a-z0-9-]{0,31}$"),
+                 instance: Optional[str] = Query(None, pattern=r"^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$"),
+                 search: Optional[str] = Query(None, min_length=1, max_length=256),
+                 after: Optional[str] = Query(None, max_length=64),
+                 before: Optional[str] = Query(None, max_length=64),
                  principal: Principal = Depends(current_principal)):
-    """Recent timestamped log lines with pod and container attribution; never streams."""
+    """Authorized log snapshot; repeat with `after=next_cursor` to follow new entries."""
+    # FastAPI resolves Query defaults for HTTP requests. Keep direct handler tests and
+    # other in-process callers from leaking those sentinel objects into audit/results.
+    instance = instance if isinstance(instance, str) else None
+    search = search if isinstance(search, str) else None
+    after = after if isinstance(after, str) else None
+    before = before if isinstance(before, str) else None
     require_permission(principal, "view", name)
     actor = actor_for(principal)
     with connect() as conn:
@@ -1424,12 +1434,14 @@ def project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
             required_audit(actor, "project.logs.read", "project", name, "rejected",
                            {"project": name}, {"reason": "unknown_component", "component": component})
             raise HTTPException(404, "Unknown component")
-        result = observe_logs(runtime, name, log, tail, since_seconds, component=component)
+        result = observe_logs(runtime, name, log, tail, since_seconds, component=component,
+                              instance=instance, search=search, after=after, before=before)
     else:
-        result = observe_logs(runtime, name, log, tail, since_seconds)
+        result = observe_logs(runtime, name, log, tail, since_seconds, instance=instance,
+                              search=search, after=after, before=before)
     required_audit(actor, "project.logs.read", "project", name, "succeeded",
                    {"project": name}, {"state": result["state"], "lines": len(result["lines"]),
-                    "component": component})
+                    "component": component, "instance": instance, "search": bool(search)})
     return {"project": name, **result}
 
 

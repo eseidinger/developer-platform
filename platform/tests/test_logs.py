@@ -118,6 +118,23 @@ class LogTests(unittest.TestCase):
         runtime.resources.get.return_value.get.assert_called_with(
             namespace="project-smoke", label_selector="platform.example/component=worker")
 
+    def test_search_instance_time_filters_and_terminal_retention_are_visible(self):
+        completed = pod("finished", "app")
+        completed["status"] = {"phase": "Succeeded"}
+        runtime, api = setup([pod("current"), completed], {
+            ("current", "app"): "2026-10-03T11:00:01Z ignore\n2026-10-03T11:00:03Z match\n",
+            ("finished", "app"): "2026-10-03T11:00:02Z MATCH retained\n"})
+        result = observe_logs(runtime, "smoke", log, tail=10, since_seconds=None, api=api, now=NOW,
+                              search="match", after="2026-10-03T11:00:01Z", before="2026-10-03T11:00:02Z")
+        self.assertEqual([(line["pod"], line["message"], line["terminated"]) for line in result["lines"]],
+                         [("finished", "MATCH retained", True)])
+        self.assertEqual(result["retention"], {"source": "kubernetes-kubelet", "state": "best_effort",
+                                                "terminated_instances": 1})
+        self.assertEqual(result["next_cursor"], "2026-10-03T11:00:02Z")
+        instance = observe_logs(runtime, "smoke", log, tail=10, since_seconds=None, api=api, now=NOW,
+                                instance="current")
+        self.assertEqual({line["pod"] for line in instance["lines"]}, {"current"})
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -9,6 +9,7 @@ from .audit import redact
 MAX_LINE_CHARS = 2000
 MAX_PODS = 10
 MAX_BYTES_PER_CONTAINER = 262144
+MAX_SEARCH_CHARS = 256
 
 
 def _get(value: Any, name: str, default=None):
@@ -17,9 +18,12 @@ def _get(value: Any, name: str, default=None):
     return getattr(value, name, default)
 
 
-def _result(state: str, reason: str | None, now: datetime, lines=None, truncated=False, unavailable=0):
+def _result(state: str, reason: str | None, now: datetime, lines=None, truncated=False, unavailable=0,
+            retention=None, next_cursor=None):
     return {"state": state, "reason": reason, "lines": lines or [], "truncated": truncated,
-            "unavailable_containers": unavailable, "observed_at": now.isoformat()}
+            "unavailable_containers": unavailable, "observed_at": now.isoformat(),
+            "retention": retention or {"source": "kubernetes-kubelet", "state": "best_effort",
+                                        "terminated_instances": 0}, "next_cursor": next_cursor}
 
 
 def _decode(response: Any) -> str:
@@ -28,17 +32,20 @@ def _decode(response: Any) -> str:
     return data.decode("utf-8", errors="replace") if isinstance(data, bytes) else str(data or "")
 
 
-def _parse(text: str, pod: str, container: str, previous: bool) -> list[dict[str, Any]]:
+def _parse(text: str, pod: str, container: str, previous: bool, terminated: bool) -> list[dict[str, Any]]:
     lines = []
     for raw in text.splitlines():
         timestamp, _, message = raw.partition(" ")
         lines.append({"timestamp": timestamp, "pod": pod, "container": container, "previous": previous,
+                      "terminated": terminated,
                       "message": redact(message)[:MAX_LINE_CHARS]})
     return lines
 
 
 def observe_logs(runtime: Any, project: str, log, tail: int, since_seconds: int | None,
-                 api: Any = None, now: datetime | None = None, component: str | None = None) -> dict[str, Any]:
+                 api: Any = None, now: datetime | None = None, component: str | None = None,
+                 instance: str | None = None, search: str | None = None,
+                 after: str | None = None, before: str | None = None) -> dict[str, Any]:
     """Read recent timestamped log lines for a project from the Kubernetes log API.
 
     `state` is `ok`, `no_pods`, `no_output` or `unavailable`. A container that has not started
@@ -65,8 +72,13 @@ def observe_logs(runtime: Any, project: str, log, tail: int, since_seconds: int 
     if since_seconds is not None:
         options["since_seconds"] = since_seconds
     lines, failed, waiting, attempted, truncated = [], 0, 0, 0, False
-    for pod in sorted(pods, key=lambda p: _get(_get(p, "metadata"), "name"))[:MAX_PODS]:
+    selected = [pod for pod in pods if instance is None or _get(_get(pod, "metadata"), "name") == instance]
+    terminated_instances = 0
+    for pod in sorted(selected, key=lambda p: _get(_get(p, "metadata"), "name"))[:MAX_PODS]:
         pod_name = _get(_get(pod, "metadata"), "name")
+        phase = _get(_get(pod, "status"), "phase")
+        terminated = phase in {"Succeeded", "Failed"}
+        terminated_instances += int(terminated)
         for container in _get(_get(pod, "spec"), "containers") or []:
             container_name = _get(container, "name")
             attempted += 1
@@ -88,14 +100,24 @@ def observe_logs(runtime: Any, project: str, log, tail: int, since_seconds: int 
                     failed += 1
                     log.error("Pod log read failed project=%s error_type=%s", project, type(exc).__name__)
                     break
-                lines.extend(_parse(_decode(text), pod_name, container_name, previous))
+                lines.extend(_parse(_decode(text), pod_name, container_name, previous, terminated))
                 break
     if failed == attempted:
         return _result("unavailable", "LogApiUnavailable", now, unavailable=failed)
     failed += waiting
     lines.sort(key=lambda l: l["timestamp"])
+    if after is not None:
+        lines = [line for line in lines if line["timestamp"] > after]
+    if before is not None:
+        lines = [line for line in lines if line["timestamp"] <= before]
+    if search is not None:
+        lines = [line for line in lines if search.casefold() in line["message"].casefold()]
     if len(lines) > tail:
         lines, truncated = lines[-tail:], True
     if not lines:
-        return _result("no_output", "NoLogLines", now, unavailable=failed)
-    return _result("ok", None, now, lines, truncated, failed)
+        return _result("no_output", "NoLogLines", now, unavailable=failed,
+                       retention={"source": "kubernetes-kubelet", "state": "best_effort",
+                                  "terminated_instances": terminated_instances})
+    return _result("ok", None, now, lines, truncated, failed,
+                   {"source": "kubernetes-kubelet", "state": "best_effort",
+                    "terminated_instances": terminated_instances}, lines[-1]["timestamp"])

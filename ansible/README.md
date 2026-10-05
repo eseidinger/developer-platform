@@ -106,6 +106,8 @@ migration, two stable internal Services, a scheduled internal connectivity probe
 non-overlap, invalid-cron rejection, an isolated component update, revision
 history, and component retirement scope. It deliberately does not trigger or
 inspect backup storage: backup evidence remains a separate operational track.
+It also checks the authorized component-log search and polling-cursor contract;
+Kubernetes log retention remains explicitly best effort.
 
 `revoke-platform-test-runner.yml` removes exactly one active named runner. Supply
 `platform_api_url` and a fresh human platform-administrator token; the runner JSON

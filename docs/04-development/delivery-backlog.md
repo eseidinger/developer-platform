@@ -198,6 +198,8 @@ Phase tasks:
 - [x] **DEV-004-T01 · 1C** — Collect timestamped single-component logs with project/component/instance attribution; demonstrate authorized failure diagnosis and cross-project denial. Prerequisites: OPS-004-T01; PLAN-001.
 - [ ] **DEV-004-T02 · 2C** — Add search, follow and project/component/instance/time filters; retrieve terminated-instance logs, show retention, and prove direct backend access cannot bypass authorization. Prerequisites: DEV-004-T01.
 
+  **Progress (October 5, 2026):** The authorized log endpoint now supports bounded case-insensitive text search, exact pod-instance selection, component selection, and `after`/`before` timestamp filters. `next_cursor` supports client polling for new entries. Lines from listed `Succeeded`/`Failed` pods are marked `terminated`; the response makes kubelet retention explicitly `best_effort` and reports its terminal-instance count. Unit tests cover filters, cursor, terminal attribution, redaction and Kubernetes-query bounds. Direct backend-bypass proof remains an infrastructure acceptance check.
+
 **Task evidence (B-2026-09-26):** T01 — source partial through [Alloy](../../infrastructure/monitoring/config.alloy) host Docker JSON logs. Explicit Kubernetes application-log collection inside k3d and project/environment/revision attribution are absent, as are authorized log endpoints. T02 — source absent for the requested query/retention workflow. Local task acceptance is unverified for both; shared dashboards do not enforce project boundaries.
 
 
