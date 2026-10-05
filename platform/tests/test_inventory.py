@@ -17,14 +17,16 @@ class InventoryTests(unittest.TestCase):
         runtime = Mock()
         resources = runtime.resources.get
         values = {
-            "Deployment": [item("web", {"replicas": 2}, {"ready_replicas": 1})],
+            "Deployment": [item("web", {"replicas": 2, "template": {"spec": {"containers": [
+                {"name": "web", "resources": {"requests": {"cpu": "100m"}, "limits": {"cpu": "500m"}}}]}}}, {"ready_replicas": 1})],
             "Pod": [item("web-1", status={"phase": "Running"})], "Service": [item("web")],
             "Ingress": [item("web")], "ResourceQuota": [item("project", status={"hard": {"cpu": "2"}})],
             "LimitRange": [item("defaults")]}
         resources.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
         result = observe_inventory(runtime, "smoke", logging.getLogger("test"))
         self.assertEqual(result["state"], "ok")
-        self.assertEqual(result["deployments"][0], {"name": "web", "replicas": 2, "ready_replicas": 1})
+        self.assertEqual(result["deployments"][0], {"name": "web", "replicas": 2, "ready_replicas": 1,
+                         "containers": [{"name": "web", "requests": {"cpu": "100m"}, "limits": {"cpu": "500m"}}]})
         self.assertEqual(result["instances"][0]["phase"], "Running")
         self.assertEqual(result["data_services"], [{"type": "postgresql", "name": "managed", "scope": "project"}])
 

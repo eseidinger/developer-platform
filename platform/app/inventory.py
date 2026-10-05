@@ -14,6 +14,14 @@ def _name(item: Any) -> str:
     return _get(_get(item, "metadata", {}), "name", "")
 
 
+def _allocation(item: Any) -> list[dict]:
+    template = _get(_get(_get(item, "spec", {}), "template", {}), "spec", {})
+    return [{"name": _get(container, "name", ""),
+             "requests": _get(_get(container, "resources", {}), "requests", {}),
+             "limits": _get(_get(container, "resources", {}), "limits", {})}
+            for container in (_get(template, "containers", []) or [])]
+
+
 def observe_inventory(runtime: Any, project: str, log) -> dict:
     """Return safe Kubernetes topology; provider errors are explicit, never empty inventory."""
     if runtime is None:
@@ -31,7 +39,8 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
         return {"state": "unavailable", "reason": "KubernetesApiUnavailable"}
     return {"state": "ok", "reason": None, "namespace": namespace,
             "deployments": [{"name": _name(item), "replicas": _get(_get(item, "spec", {}), "replicas", 0),
-                              "ready_replicas": _get(_get(item, "status", {}), "ready_replicas", 0)}
+                              "ready_replicas": _get(_get(item, "status", {}), "ready_replicas", 0),
+                              "containers": _allocation(item)}
                             for item in deployments],
             "instances": [{"name": _name(item), "phase": _get(_get(item, "status", {}), "phase", "Unknown")}
                           for item in pods],
