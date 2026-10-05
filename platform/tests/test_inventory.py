@@ -6,7 +6,7 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.inventory import observe_inventory
+from app.inventory import observe_inventory, observe_cluster_capacity
 from app import main
 from app.identity import Principal
 
@@ -40,6 +40,14 @@ class InventoryTests(unittest.TestCase):
         runtime.resources.get.side_effect = RuntimeError("private detail")
         result = observe_inventory(runtime, "smoke", logging.getLogger("test"))
         self.assertEqual(result, {"state": "unavailable", "reason": "KubernetesApiUnavailable"})
+
+    def test_cluster_capacity_reports_allocatable_nodes(self):
+        runtime = Mock()
+        runtime.resources.get.return_value.get.return_value = {"items": [item("agent", status={
+            "capacity": {"cpu": "4"}, "allocatable": {"cpu": "3900m"}})]}
+        result = observe_cluster_capacity(runtime, logging.getLogger("test"))
+        self.assertEqual(result["nodes"], [{"name": "agent", "capacity": {"cpu": "4"},
+                                             "allocatable": {"cpu": "3900m"}}])
 
     def test_resource_endpoint_combines_inventory_with_labelled_usage(self):
         conn = Mock()

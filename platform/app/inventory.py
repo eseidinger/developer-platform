@@ -67,3 +67,17 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
             "quotas": [{"name": _name(item), "hard": _get(_get(item, "status", {}), "hard", {})} for item in quotas],
             "limit_ranges": [_name(item) for item in limits],
             "data_services": [{"type": "postgresql", "name": "managed", "scope": "project"}]}
+
+
+def observe_cluster_capacity(runtime: Any, log) -> dict:
+    """Expose allocatable Kubernetes capacity; provider failure is explicit."""
+    if runtime is None:
+        return {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []}
+    try:
+        nodes = _items(runtime, "v1", "Node", "")
+    except Exception as exc:
+        log.error("Capacity query failed error_type=%s", type(exc).__name__)
+        return {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []}
+    return {"state": "ok", "reason": None, "nodes": [
+        {"name": _name(node), "capacity": _get(_get(node, "status", {}), "capacity", {}),
+         "allocatable": _get(_get(node, "status", {}), "allocatable", {})} for node in nodes]}

@@ -440,6 +440,8 @@ Phase tasks:
 - [x] **OPS-003-T01 · 1C** — Measure host, shared-service, workload and storage consumption; record system reserve and representative load baseline without promising unmeasured capacity. Prerequisites: PLAN-001.
 - [ ] **OPS-003-T02 · 2C** — Deliver host/usage/request comparisons and project storage/usage breakdown including shared services; test stale/missing metrics, capacity alerts and unschedulable workload visibility. Prerequisites: OPS-003-T01.
 
+  **Progress (October 5, 2026):** `GET /operator/capacity` supplies audited platform-admin Kubernetes node capacity and allocatable values with explicit provider-unavailable state; unit tests cover aggregation. Host-process/shared-service/storage use, alerts, and unschedulable-workload evidence remain open. **Manual test need:** none for this API increment; add a protected Ansible capacity/alert drill when those host-level collectors are implemented.
+
 **Task evidence (B-2026-09-26):** T01/T02 — source partial: node-exporter, kube-state-metrics, Compose memory limits, fixed workload quotas and some retention settings exist. Representative load/reserve measurements, project/shared-service usage breakdown, storage/capacity comparisons, CPU/memory alerts and dashboards are missing. EV-01/04 verify selected config only; task measurement/alert acceptance remains unverified.
 
 

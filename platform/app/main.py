@@ -40,7 +40,7 @@ from .operations import operation_loop
 from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
-from .inventory import observe_inventory
+from .inventory import observe_inventory, observe_cluster_capacity
 from .logs import observe_logs
 from .component_status import observe_components
 from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
@@ -1418,6 +1418,15 @@ def resource_inventory(name: str, principal: Principal = Depends(current_princip
     required_audit(actor, "project.resources.inspect", "project", name, "succeeded",
                    {"project": name}, {"state": inventory["state"], "usage_state": inventory["usage"]["state"]})
     return {"project": name, **inventory}
+
+
+@app.get("/operator/capacity")
+def operator_capacity(principal: Principal = Depends(current_principal)):
+    require_platform_admin(principal)
+    result = observe_cluster_capacity(runtime, log)
+    required_audit(actor_for(principal), "capacity.inspect", "platform", "capacity", "succeeded", {},
+                   {"state": result["state"]})
+    return result
 
 
 @app.get("/projects/{name}/logs")

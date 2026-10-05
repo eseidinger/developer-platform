@@ -1142,6 +1142,27 @@
         "summary": "Export Audit Events"
       }
     },
+    "/operator/capacity": {
+      "get": {
+        "operationId": "operator_capacity_operator_capacity_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Operator Capacity"
+      }
+    },
     "/operator/projects/{name}/permissions": {
       "get": {
         "description": "Inspect project grants; this is intentionally unavailable to project members.",
