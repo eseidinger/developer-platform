@@ -34,6 +34,10 @@
         that: postgres_drill_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
         fail_msg: Generated PostgreSQL outage project name is not a valid platform project name.
 
+    - name: Report the non-secret disposable PostgreSQL outage project name
+      ansible.builtin.debug:
+        msg: "PostgreSQL outage drill target: {{ postgres_drill_project }}"
+
     - name: Exchange the runner credential for a fresh outage-drill token
       ansible.builtin.uri:
         url: "{{ platform_oidc_token_url }}"
@@ -150,13 +154,16 @@
               become: true
               changed_when: true
 
-            - name: Wait for developer-visible managed database unavailability
+            - name: Wait for a safe managed-database outage response
               ansible.builtin.uri:
                 url: "{{ platform_api_url }}/projects/{{ postgres_drill_project }}/data-services"
                 headers: {Authorization: "Bearer {{ postgres_developer_token.json.access_token }}"}
-                status_code: 200
+                status_code: [200, 503]
               register: postgres_during_outage
-              until: postgres_during_outage.json.services[0].state == 'unavailable'
+              until: >-
+                postgres_during_outage.status == 503 or
+                (((postgres_during_outage.json | default({})).get('services', [{}])[0].get('state', ''))
+                == 'unavailable')
               retries: 20
               delay: 2
               no_log: true
@@ -236,20 +243,26 @@
           failed_when: false
           no_log: true
 
+        - name: Select a cleanup token only when the token exchange completed
+          ansible.builtin.set_fact:
+            postgres_cleanup_token: "{{ postgres_cleanup_runner_token.get('json', {}).get('access_token', '') }}"
+          no_log: true
+
         - name: Read the disposable project's retirement scope for cleanup
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ postgres_drill_project }}/retirement-preview"
-            headers: {Authorization: "Bearer {{ postgres_cleanup_runner_token.json.access_token }}"}
+            headers: {Authorization: "Bearer {{ postgres_cleanup_token }}"}
             status_code: [200, 404]
           register: postgres_cleanup_preview
           failed_when: false
+          when: postgres_cleanup_token | length > 0
           no_log: true
 
         - name: Retire the disposable PostgreSQL outage project
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ postgres_drill_project }}/retire"
             method: POST
-            headers: {Authorization: "Bearer {{ postgres_cleanup_runner_token.json.access_token }}"}
+            headers: {Authorization: "Bearer {{ postgres_cleanup_token }}"}
             body_format: json
             body:
               confirm_name: "{{ postgres_drill_project }}"
@@ -260,17 +273,21 @@
           retries: 60
           delay: 5
           failed_when: false
-          when: postgres_cleanup_preview.status | default(0) | int == 200
+          when:
+            - postgres_cleanup_token | length > 0
+            - postgres_cleanup_preview.status | default(0) | int == 200
           no_log: true
 
         - name: Revoke the disposable PostgreSQL outage developer persona
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/platform/test-identities/{{ postgres_developer_credential.json.credential_id }}"
             method: DELETE
-            headers: {Authorization: "Bearer {{ postgres_cleanup_runner_token.json.access_token }}"}
+            headers: {Authorization: "Bearer {{ postgres_cleanup_token }}"}
             status_code: [200, 202, 404]
           failed_when: false
-          when: postgres_developer_credential is defined
+          when:
+            - postgres_developer_credential is defined
+            - postgres_cleanup_token | length > 0
           no_log: true
 
     - name: Report non-secret PostgreSQL outage-drill evidence

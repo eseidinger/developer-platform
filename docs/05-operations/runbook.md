@@ -120,8 +120,9 @@ as `backup coverage unverified`; do not perform a destructive database action as
 
 `ansible/test-platform-postgres-outage.yml` is a self-contained protected-lab drill. It creates a disposable project,
 developer persona, and database-bound `http-echo` workload; stops only the Compose PostgreSQL service; requires the
-developer-visible `DatabaseUnavailable` state and a failed Platform API readiness check; restores PostgreSQL in an
-`always` block; then requires recovered readiness and a redacted resolved recovery request. Its outer cleanup retires
+safe authenticated outage response (`503` while authorization cannot reach PostgreSQL, or `DatabaseUnavailable` when
+the endpoint can report it) and a failed Platform API readiness check; restores PostgreSQL in an `always` block; then
+requires recovered readiness and a redacted resolved recovery request. Its outer cleanup retires
 the disposable project and revokes the persona. It does not prove application-specific writes because `http-echo`
 does not use its database.
 
