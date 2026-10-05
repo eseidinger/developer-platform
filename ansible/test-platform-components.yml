@@ -639,6 +639,18 @@
           delay: 5
           no_log: true
 
+        - name: Verify changing the API service to private removes its obsolete public route
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ component_project }}/resources"
+            headers:
+              Authorization: "Bearer {{ component_admin_access_token }}"
+            status_code: 200
+          register: private_component_inventory
+          until: "'api-public' not in (private_component_inventory.json.routes | list)"
+          retries: 12
+          delay: 5
+          no_log: true
+
         - name: Capture the peer Deployment generation after the API-only update
           ansible.builtin.command:
             argv:
