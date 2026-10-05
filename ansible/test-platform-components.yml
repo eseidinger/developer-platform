@@ -133,8 +133,8 @@
             status_code: 200
           register: legacy_operation
           until:
-            - legacy_operation.json.state == 'succeeded'
-            - legacy_operation.json.readiness.state == 'ready'
+            - (legacy_operation.json.state | default('')) == 'succeeded'
+            - (legacy_operation.json.readiness.state | default('')) == 'ready'
           retries: 60
           delay: 5
           no_log: true
@@ -161,8 +161,8 @@
             status_code: 200
           register: legacy_configuration_operation
           until:
-            - legacy_configuration_operation.json.state == 'succeeded'
-            - legacy_configuration_operation.json.readiness.state == 'ready'
+            - (legacy_configuration_operation.json.state | default('')) == 'succeeded'
+            - (legacy_configuration_operation.json.readiness.state | default('')) == 'ready'
           retries: 60
           delay: 5
           no_log: true
@@ -662,7 +662,7 @@
                       type: container
                       image: "{{ platform_component_job_image }}"
                       command: ['/bin/sh', '-ec']
-                      args: ['wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75']
+                      args: ['for n in $(seq 1 10); do wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75 && exit 0; sleep 2; done; exit 1']
                     schedule: '* * * * *'
                     timeZone: UTC
                     concurrencyPolicy: Forbid
@@ -687,7 +687,7 @@
               Authorization: "Bearer {{ component_admin_access_token }}"
             status_code: 200
           register: api_update_operation
-          until: api_update_operation.json.state == 'succeeded'
+          until: (api_update_operation.json.state | default('')) == 'succeeded'
           retries: 60
           delay: 5
           no_log: true
@@ -780,7 +780,7 @@
                       type: container
                       image: "{{ platform_component_job_image }}"
                       command: ['/bin/sh', '-ec']
-                      args: ['wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75']
+                      args: ['for n in $(seq 1 10); do wget -qO- http://api:5678/ && wget -qO- http://peer:5678/ && sleep 75 && exit 0; sleep 2; done; exit 1']
                     schedule: '* * * * *'
                     timeZone: UTC
                     concurrencyPolicy: Forbid
@@ -805,7 +805,7 @@
               Authorization: "Bearer {{ component_admin_access_token }}"
             status_code: 200
           register: scheduled_only_update_operation
-          until: scheduled_only_update_operation.json.state == 'succeeded'
+          until: (scheduled_only_update_operation.json.state | default('')) == 'succeeded'
           retries: 60
           delay: 5
           no_log: true
@@ -898,7 +898,7 @@
               Authorization: "Bearer {{ component_admin_access_token }}"
             status_code: 200
           register: component_rollback_operation
-          until: component_rollback_operation.json.state == 'succeeded'
+          until: (component_rollback_operation.json.state | default('')) == 'succeeded'
           retries: 60
           delay: 5
           no_log: true
