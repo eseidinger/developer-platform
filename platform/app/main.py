@@ -1861,6 +1861,11 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                 else:
                     with conn.transaction():
                         conn.execute("UPDATE projects SET status='retired',updated_at=now() WHERE name=%s", (name,))
+                        # Retiring a project ends access immediately. Provider-client deletion is retried by the
+                        # existing fail-closed credential cleanup worker; credentials are never silently retained active.
+                        conn.execute("DELETE FROM platform_grants WHERE scope_kind='project' AND scope_id=%s", (name,))
+                        conn.execute("""UPDATE deployment_credentials SET status='revocation_pending'
+                            WHERE project=%s AND status NOT IN ('revoked', 'revocation_pending')""", (name,))
                         if scope is not None:
                             conn.execute("""INSERT INTO project_retirements(project_id, inventory)
                                 SELECT project_id, %s FROM projects WHERE name=%s
@@ -1868,6 +1873,8 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                                 SET inventory=excluded.inventory, retired_at=now()""",
                                          (Jsonb({"revision": scope["revision"], **scope["retains"]}), name))
                     publish_catalog(conn)
+                    required_audit(actor, "project.retire.access_revoked", "project", name, "succeeded",
+                                   {"project": name}, {"credential_cleanup": "pending"})
             finally:
                 conn.execute("SELECT pg_advisory_unlock(731904)")
     except HTTPException as exc:

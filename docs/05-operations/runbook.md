@@ -80,9 +80,11 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/project
 | Finish a rotation | `POST $P/secrets/NAME/confirm` after the application works with the new value | 200, previous value revoked |
 | Undo a rotation | `POST $P/secrets/NAME/revert` while `rotating` | New version, pods restart |
 | Roll back a release | `POST $P/rollback` body `{"revision": N}` | New operation `succeeded` |
-| Retire | `GET $P/retirement-preview`, then `POST $P/retire` with the `scope_token` and `confirm_name` | Repeat the POST until `200 retired`; database, role and catalog are retained |
+| Retire | `GET $P/retirement-preview`, then `POST $P/retire` with the `scope_token` and `confirm_name` | Repeat the POST until `200 retired`; project grants are removed and deployment credentials enter provider cleanup; database, role and catalog are retained |
 
 Failure responses: 401 no or expired token; 403 missing grant; 404 unknown project or secret; 400 retire confirmation does not match the project name; 409 `revision_conflict`, `scope_changed`, `name_in_use`, `not_adopted`, `no_previous_version` or a retired project; 422 `invalid_spec`, `unsupported_capability`, `invalid_configuration` or `invalid_secret`; 503 dependency unavailable, retry the same request. Secret values are never returned, logged or audited. Secrets are in the backup bundle (ADR-015); previous values are not.
+
+For a protected retirement acceptance, use a disposable project deployment credential. After retirement completes, prove its next token/API request is denied and confirm its provider cleanup reaches `revoked`; do not perform this check with a shared CI credential. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active.
 
 ## Verify component public exposure
 

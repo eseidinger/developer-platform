@@ -528,6 +528,10 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.catalog.rows["smoke"][1], "retired")
         self.assertTrue(any(isinstance(e, str) and e.startswith("INSERT INTO project_retirements")
                             for e in self.catalog.events))
+        self.assertTrue(any(isinstance(e, str) and e.startswith("DELETE FROM platform_grants")
+                            for e in self.catalog.events))
+        self.assertTrue(any(isinstance(e, str) and e.startswith("UPDATE deployment_credentials SET status='revocation_pending'")
+                            for e in self.catalog.events))
         self.assertEqual(self.targets(), [])
         actions = [call.args[1] for call in self.mocks[3].call_args_list]
         self.assertIn("project.retire.requested", actions)
