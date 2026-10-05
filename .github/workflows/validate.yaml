@@ -12,6 +12,7 @@ jobs:
       - run: docker compose config --quiet
       - run: pip install -r platform/tests/requirements.txt 'ansible-core>=2.16,<2.22'
       - run: python3 -m unittest discover -s platform/tests -v
+      - run: python3 -m unittest discover -s ansible/tests -v
       - run: python3 -m unittest discover -s operations/backup/tests -v
       - run: python3 -m unittest discover -s operations/heartbeat/tests -v
       - run: python3 scripts/check-monitoring.py

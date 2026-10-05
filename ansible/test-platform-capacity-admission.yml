@@ -138,6 +138,12 @@
             capacity_padding_cpu_millicores: "{{ capacity_inventory.json.admission.available.cpu_millicores | int - 50 }}"
             capacity_padding_memory_mib: "{{ capacity_inventory.json.admission.available.memory_mib | int - 64 }}"
 
+        - name: Report the non-secret synthetic reservation size
+          ansible.builtin.debug:
+            msg: >-
+              Reserving {{ capacity_padding_cpu_millicores }}m CPU and
+              {{ capacity_padding_memory_mib }}Mi memory as Kubernetes requests.
+
         - name: Create the temporary capacity-reservation namespace
           ansible.builtin.command:
             argv:
@@ -177,7 +183,7 @@
               - "{{ capacity_padding_namespace }}"
               - apply
               - -f
-              - -
+              - "-"
             stdin: "{{ capacity_padding_manifest | to_json }}"
           vars:
             capacity_padding_manifest:
@@ -210,8 +216,16 @@
                       capabilities: {drop: [ALL]}
           delegate_to: "{{ platform_capacity_drill_host }}"
           become: true
-          changed_when: true
-          no_log: true
+          register: capacity_padding_create
+          changed_when: capacity_padding_create.rc == 0
+          failed_when: false
+
+        - name: Require the synthetic reservation Pod to be accepted by Kubernetes
+          ansible.builtin.assert:
+            that: capacity_padding_create.rc == 0
+            fail_msg: >-
+              Kubernetes rejected the non-secret synthetic reservation manifest:
+              {{ capacity_padding_create.stderr | default('no stderr returned') | trim }}
 
         - name: Wait for admission accounting to include the synthetic request
           ansible.builtin.uri:
