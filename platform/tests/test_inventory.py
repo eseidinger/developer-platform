@@ -43,11 +43,12 @@ class InventoryTests(unittest.TestCase):
 
     def test_cluster_capacity_reports_allocatable_nodes(self):
         runtime = Mock()
-        runtime.resources.get.return_value.get.return_value = {"items": [item("agent", status={
-            "capacity": {"cpu": "4"}, "allocatable": {"cpu": "3900m"}})]}
+        values = {"Node": [item("agent", status={"capacity": {"cpu": "4"}, "allocatable": {"cpu": "3900m"}})],
+                  "NodeMetrics": [{"metadata": {"name": "agent"}, "usage": {"cpu": "120m"}}]}
+        runtime.resources.get.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
         result = observe_cluster_capacity(runtime, logging.getLogger("test"))
         self.assertEqual(result["nodes"], [{"name": "agent", "capacity": {"cpu": "4"},
-                                             "allocatable": {"cpu": "3900m"}}])
+                                             "allocatable": {"cpu": "3900m"}, "usage": {"cpu": "120m"}, "usage_state": "ok"}])
 
     def test_resource_endpoint_combines_inventory_with_labelled_usage(self):
         conn = Mock()

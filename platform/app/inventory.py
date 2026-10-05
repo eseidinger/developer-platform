@@ -75,9 +75,13 @@ def observe_cluster_capacity(runtime: Any, log) -> dict:
         return {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []}
     try:
         nodes = _items(runtime, "v1", "Node", "")
+        metrics = _items(runtime, "metrics.k8s.io/v1beta1", "NodeMetrics", "")
     except Exception as exc:
         log.error("Capacity query failed error_type=%s", type(exc).__name__)
         return {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []}
+    by_name = {_name(metric): _get(metric, "usage", {}) for metric in metrics}
     return {"state": "ok", "reason": None, "nodes": [
         {"name": _name(node), "capacity": _get(_get(node, "status", {}), "capacity", {}),
-         "allocatable": _get(_get(node, "status", {}), "allocatable", {})} for node in nodes]}
+         "allocatable": _get(_get(node, "status", {}), "allocatable", {}),
+         "usage": by_name.get(_name(node)), "usage_state": "ok" if _name(node) in by_name else "missing"}
+        for node in nodes]}
