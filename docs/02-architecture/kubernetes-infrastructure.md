@@ -62,7 +62,7 @@ Ingress reaches pods only through Traefik. NetworkPolicies allow same-namespace 
 
 ## Metrics and capacity
 
-`kube-state-metrics` runs in `platform-system` with list/watch access to nodes, namespaces, pods, and workload controllers. Prometheus reaches it through NodePort 30090 on the k3d server. The Platform API reads pod metrics for project usage and NodeMetrics for the audited `/operator/capacity` view. Missing provider data is labelled explicitly rather than represented as zero.
+`kube-state-metrics` runs in `platform-system` with list/watch access to nodes, namespaces, pods, and workload controllers. Prometheus reaches it through NodePort 30090 on the k3d server. The Platform API reads core Node allocatable values and active Pod requests for aggregate admission, plus pod and node metrics for observed usage. The audited `/operator/capacity` view exposes both views with explicit unavailable states rather than treating missing provider data as zero. Admission is opt-in and its enablement and CPU/memory reserves are managed by the deployment inventory.
 
 ## Persistence and failure domain
 
@@ -75,5 +75,5 @@ All local components share one host failure domain: Docker, k3d, edge, PostgreSQ
 - No high availability or multi-host control plane.
 - No hostile-tenant isolation claim.
 - Kubernetes API, Docker socket, PostgreSQL, and monitoring backends are not public interfaces.
-- Host/shared-service/storage capacity, aggregate admission, and capacity alerts remain Phase 2C work.
+- Aggregate admission accounts for Kubernetes requests, not host processes, shared Compose services, storage, or transient runtime usage; those measurements and capacity alerts remain operational work.
 - Pod-log retention is kubelet best effort, not a platform retention guarantee.

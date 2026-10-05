@@ -117,7 +117,12 @@
               - capacity_inventory.json.get('admission', {}).get('enabled', false)
             fail_msg: >-
               The deployed Platform API does not expose usable enabled admission accounting.
-              Deploy the current source and verify Kubernetes node, pod, and metrics access.
+              Cluster capacity state={{ capacity_inventory.json.get('state', 'missing') }},
+              reason={{ capacity_inventory.json.get('reason', 'missing') }};
+              admission state={{ capacity_inventory.json.get('admission', {}).get('state', 'missing') }},
+              reason={{ capacity_inventory.json.get('admission', {}).get('reason', 'missing') }},
+              enabled={{ capacity_inventory.json.get('admission', {}).get('enabled', false) }}.
+              Deploy the current source and verify Kubernetes core Node/Pod and metrics access.
 
         - name: Require enough baseline capacity for the accepted workload
           ansible.builtin.assert:

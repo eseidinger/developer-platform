@@ -43,6 +43,43 @@ class CapacityAdmissionTests(unittest.TestCase):
             "available": {"cpu_millicores": 750, "memory_mib": 896},
         })
 
+    def test_snapshot_accepts_realistic_kubernetes_binary_quantities(self):
+        runtime = Mock()
+        values = {
+            "Node": [{"status": {"allocatable": {"cpu": "3900m", "memory": "16007076Ki"}}}],
+            "Pod": [{"status": {"phase": "Running"}, "spec": {"containers": [
+                {"resources": {"requests": {"cpu": "100m", "memory": "131072Ki"}}},
+            ]}}],
+        }
+        resources = {}
+
+        def resource(api_version, kind):
+            resources[kind] = Mock(get=Mock(return_value={"items": values[kind]}))
+            return resources[kind]
+
+        runtime.resources.get.side_effect = resource
+        result = snapshot(runtime, logging.getLogger("test"))
+        self.assertEqual(result["state"], "ok")
+        self.assertEqual(result["allocatable"], {"cpu_millicores": 3900, "memory_mib": 15631})
+        self.assertEqual(result["requested"], {"cpu_millicores": 100, "memory_mib": 128})
+        resources["Node"].get.assert_called_once_with(namespace="")
+        resources["Pod"].get.assert_called_once_with(namespace="")
+
+    def test_snapshot_distinguishes_invalid_capacity_data_from_api_failure(self):
+        runtime = Mock()
+        values = {"Node": [{"status": {"allocatable": {"cpu": "invalid", "memory": "2Gi"}}}],
+                  "Pod": []}
+        runtime.resources.get.side_effect = lambda api_version, kind: Mock(
+            get=Mock(return_value={"items": values[kind]}))
+        self.assertEqual(snapshot(runtime, logging.getLogger("test")), {
+            "state": "unavailable", "enabled": True, "reason": "InvalidKubernetesCapacityData",
+        })
+
+        runtime.resources.get.side_effect = RuntimeError("provider failed")
+        self.assertEqual(snapshot(runtime, logging.getLogger("test")), {
+            "state": "unavailable", "enabled": True, "reason": "KubernetesApiUnavailable",
+        })
+
     def test_snapshot_discloses_disabled_state_without_querying_kubernetes(self):
         os.environ["CAPACITY_ADMISSION_ENABLED"] = "false"
         runtime = Mock()

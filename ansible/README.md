@@ -53,6 +53,9 @@ Useful inventory overrides:
 | `platform_image_registries` | `docker.io,ghcr.io,quay.io` | Comma-separated registries the API may resolve image tags from |
 | `platform_drift_scan_interval_seconds` | `300` | Seconds between background drift scans |
 | `platform_revision_retention` | `25` | Revisions kept per project; older ones and their finished operations are pruned |
+| `platform_capacity_admission_enabled` | `false` | Enable fail-closed aggregate Kubernetes request admission after measuring the host and choosing reserves |
+| `platform_capacity_reserve_cpu_millicores` | `2000` | CPU excluded from workload admission accounting for the platform and operating margin |
+| `platform_capacity_reserve_memory_mib` | `8192` | Memory excluded from workload admission accounting for the platform and operating margin |
 
 For an existing host with Docker, prefer `platform_install_docker: false` to
 avoid changing its package source. Conflicting distribution Docker packages are
@@ -169,6 +172,9 @@ removes the reservation, and then proves the same-sized real workload is admitte
 It preserves the exact host `.env`, temporarily enables admission with a valid zero reserve,
 recreates only `platform-api`, and restores the original `.env` and API container in an
 `always` block. The reservation namespace is also always removed.
+Normal deployments manage the admission enablement and reserves through the three
+`platform_capacity_*` inventory variables above. The drill deliberately overrides
+them only for its duration and restores the exact pre-drill environment afterward.
 The egress example addresses are documentation ranges and will not work as targets.
 Supply an endpoint you control; never broaden the allow-list merely to pass the drill.
 

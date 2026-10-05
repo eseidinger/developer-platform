@@ -15,3 +15,6 @@ all:
         platform_image_registries: docker.io,ghcr.io,quay.io  # optional
         platform_drift_scan_interval_seconds: 300  # optional
         platform_revision_retention: 25  # optional
+        platform_capacity_admission_enabled: false  # optional; measure reserves before enabling
+        platform_capacity_reserve_cpu_millicores: 2000  # optional
+        platform_capacity_reserve_memory_mib: 8192  # optional

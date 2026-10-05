@@ -28,6 +28,10 @@ rules:
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list]
+  # Aggregate request admission needs allocatable capacity from core Node objects.
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list]
   - apiGroups: [""]
     resources: [pods/log]
     verbs: [get]

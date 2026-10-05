@@ -26,6 +26,15 @@ class ProvisionerRbacManifestTests(unittest.TestCase):
         self.assertEqual({item.strip() for item in match.group(1).split(",")}, {"pods", "nodes"})
         self.assertEqual({item.strip() for item in match.group(2).split(",")}, {"get", "list"})
 
+    def test_capacity_admission_can_read_core_node_allocatable_values(self):
+        """Request admission reads status.allocatable from core Node objects."""
+        manifest = CONTROLLER_MANIFEST.read_text()
+        self.assertRegex(
+            manifest,
+            r'- apiGroups: \[""\]\s+'
+            r'resources: \[nodes\]\s+verbs: \[get, list\]',
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

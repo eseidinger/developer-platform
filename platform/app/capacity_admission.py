@@ -1,7 +1,10 @@
 """Conservative opt-in aggregate Kubernetes request admission."""
+from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 import os
 
-from .manifests import DEFAULT_RESOURCES, _mebibytes, _millicores
+from kubernetes.utils.quantity import parse_quantity
+
+from .manifests import DEFAULT_RESOURCES
 
 
 def _get(value, name, default=None):
@@ -9,14 +12,28 @@ def _get(value, name, default=None):
 
 
 def _items(runtime, api_version, kind):
-    return _get(runtime.resources.get(api_version=api_version, kind=kind).get(), "items", []) or []
+    return _get(runtime.resources.get(api_version=api_version, kind=kind).get(namespace=""), "items", []) or []
+
+
+def _cpu_millicores(value, rounding=ROUND_CEILING):
+    quantity = parse_quantity(str(value)) * Decimal(1000)
+    if quantity < 0:
+        raise ValueError("negative CPU quantity")
+    return int(quantity.to_integral_value(rounding=rounding))
+
+
+def _memory_mib(value, rounding=ROUND_CEILING):
+    quantity = parse_quantity(str(value)) / Decimal(1024 * 1024)
+    if quantity < 0:
+        raise ValueError("negative memory quantity")
+    return int(quantity.to_integral_value(rounding=rounding))
 
 
 def _request_total(containers):
     total = {"cpu": 0, "memory": 0}
     for container in containers:
         requests = _get(_get(container, "resources", {}), "requests", {}) or {}
-        for key, parser in (("cpu", _millicores), ("memory", _mebibytes)):
+        for key, parser in (("cpu", _cpu_millicores), ("memory", _memory_mib)):
             if _get(requests, key) is not None:
                 total[key] += parser(_get(requests, key))
     return total
@@ -42,20 +59,24 @@ def snapshot(runtime, log):
         return {"state": "unavailable", "enabled": True, "reason": "KubernetesApiUnavailable"}
     try:
         nodes, pods = _items(runtime, "v1", "Node"), _items(runtime, "v1", "Pod")
+    except Exception as exc:
+        log.error("Capacity admission query failed error_type=%s", type(exc).__name__)
+        return {"state": "unavailable", "enabled": True, "reason": "KubernetesApiUnavailable"}
+    try:
         allocatable = {"cpu": 0, "memory": 0}
         for node in nodes:
             values = _get(_get(node, "status", {}), "allocatable", {}) or {}
-            allocatable["cpu"] += _millicores(_get(values, "cpu"))
-            allocatable["memory"] += _mebibytes(_get(values, "memory"))
+            allocatable["cpu"] += _cpu_millicores(_get(values, "cpu"), ROUND_FLOOR)
+            allocatable["memory"] += _memory_mib(_get(values, "memory"), ROUND_FLOOR)
         requested = {"cpu": 0, "memory": 0}
         for pod in pods:
             if _get(_get(pod, "status", {}), "phase") not in {"Succeeded", "Failed"}:
                 values = _request_total(_get(_get(pod, "spec", {}), "containers", []) or [])
                 for key in requested:
                     requested[key] += values[key]
-    except Exception as exc:
-        log.error("Capacity admission query failed error_type=%s", type(exc).__name__)
-        return {"state": "unavailable", "enabled": True, "reason": "KubernetesApiUnavailable"}
+    except (ArithmeticError, TypeError, ValueError) as exc:
+        log.error("Capacity admission data invalid error_type=%s", type(exc).__name__)
+        return {"state": "unavailable", "enabled": True, "reason": "InvalidKubernetesCapacityData"}
     try:
         reserve = {"cpu": int(os.environ.get("CAPACITY_RESERVE_CPU_MILLICORES", "2000")),
                    "memory": int(os.environ.get("CAPACITY_RESERVE_MEMORY_MIB", "8192"))}

@@ -14,6 +14,9 @@
       IMAGE_REGISTRIES: "{{ platform_image_registries }}"
       DRIFT_SCAN_INTERVAL_SECONDS: "{{ platform_drift_scan_interval_seconds }}"
       REVISION_RETENTION: "{{ platform_revision_retention }}"
+      CAPACITY_ADMISSION_ENABLED: "{{ (platform_capacity_admission_enabled | bool) | ternary('true', 'false') }}"
+      CAPACITY_RESERVE_CPU_MILLICORES: "{{ platform_capacity_reserve_cpu_millicores | int }}"
+      CAPACITY_RESERVE_MEMORY_MIB: "{{ platform_capacity_reserve_memory_mib | int }}"
 
   pre_tasks:
     - name: Apply defaults only when inventory has not configured them
@@ -28,6 +31,9 @@
         platform_image_registries: "{{ platform_image_registries | default('docker.io,ghcr.io,quay.io') }}"
         platform_drift_scan_interval_seconds: "{{ platform_drift_scan_interval_seconds | default(300) }}"
         platform_revision_retention: "{{ platform_revision_retention | default(25) }}"
+        platform_capacity_admission_enabled: "{{ platform_capacity_admission_enabled | default(false) }}"
+        platform_capacity_reserve_cpu_millicores: "{{ platform_capacity_reserve_cpu_millicores | default(2000) }}"
+        platform_capacity_reserve_memory_mib: "{{ platform_capacity_reserve_memory_mib | default(8192) }}"
         platform_install_docker: "{{ platform_install_docker | default(true) }}"
         platform_kubectl_version: "{{ platform_kubectl_version | default('v1.36.4') }}"
 
@@ -40,6 +46,9 @@
           - platform_install_dir.startswith('/')
           - platform_install_dir != '/'
           - platform_kubectl_version is match('^v1\.(35|36|37)\.[0-9]+$')
+          - (platform_capacity_admission_enabled | string | lower) in ['true', 'false']
+          - (platform_capacity_reserve_cpu_millicores | string) is match('^[0-9]+$')
+          - (platform_capacity_reserve_memory_mib | string) is match('^[0-9]+$')
         fail_msg: Use Ubuntu 22.04 or newer on amd64/arm64 and kubectl compatible with Kubernetes 1.36.
 
     - name: Validate environment values
@@ -346,6 +355,9 @@
                 platform_image_registries: "{{ platform_image_registries }}"
                 platform_drift_scan_interval_seconds: "{{ platform_drift_scan_interval_seconds | int }}"
                 platform_revision_retention: "{{ platform_revision_retention | int }}"
+                platform_capacity_admission_enabled: "{{ platform_capacity_admission_enabled | bool }}"
+                platform_capacity_reserve_cpu_millicores: "{{ platform_capacity_reserve_cpu_millicores | int }}"
+                platform_capacity_reserve_memory_mib: "{{ platform_capacity_reserve_memory_mib | int }}"
                 platform_install_docker: "{{ platform_install_docker | bool }}"
                 platform_kubectl_version: "{{ platform_kubectl_version }}"
               versions: "{{ platform_versions.stdout_lines | select('match', '^[a-z0-9._-]+=') | map('regex_replace', '^([^=]+)=(.*)$', '\\1: \\2') | list }}"
