@@ -377,7 +377,7 @@ From the repository root:
 
 ```bash
 python3 -m pip install -r platform/requirements-dev.txt
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s platform/tests -v
 python3 -m compileall -q platform scripts
 bash -n scripts/up.sh scripts/down.sh
 docker compose config --quiet

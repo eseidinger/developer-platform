@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.security_alerts import publish, render, security_event_rows
 
 

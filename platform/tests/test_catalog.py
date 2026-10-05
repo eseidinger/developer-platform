@@ -3,7 +3,7 @@ import unittest
 from contextlib import nullcontext
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.catalog import component_view, initialize
 
 

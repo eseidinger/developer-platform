@@ -162,7 +162,7 @@ Current procedures: [deployment and lifecycle](docs/05-operations/deployment.md)
 ```bash
 docker compose config --quiet
 python3 -m pip install -r platform/requirements-dev.txt
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s platform/tests -v
 python3 scripts/check-monitoring.py
 python3 -m unittest discover -s operations/backup/tests -v
 python3 -m compileall -q platform scripts operations

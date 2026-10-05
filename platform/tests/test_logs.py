@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 from kubernetes.client.exceptions import ApiException
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.logs import MAX_LINE_CHARS, MAX_PODS, observe_logs
 
 NOW = datetime(2026, 10, 3, 12, 0, 0, tzinfo=timezone.utc)

@@ -24,6 +24,6 @@ The discovery volume is disposable derived state and contains no credentials; th
 
 ## Evidence and evolution
 
-Source and local validation: [monitoring publisher](../../platform/app/monitoring.py), [probe/rule configuration and procedures](../../infrastructure/monitoring/README.md), [lifecycle fixtures](../../tests/test_monitoring_lifecycle.py). OPS-007-T01 and DEV-011-T01 remain open for live evidence and the full lifecycle.
+Source and local validation: [monitoring publisher](../../platform/app/monitoring.py), [probe/rule configuration and procedures](../../infrastructure/monitoring/README.md), [lifecycle fixtures](../../platform/tests/test_monitoring_lifecycle.py). OPS-007-T01 and DEV-011-T01 remain open for live evidence and the full lifecycle.
 
 Extend profiles deliberately when applications need different health paths; revisit identity labels when environments/components exist. An outside-network check is separate evidence. This creates no additional watchdog observer and preserves ADR-011's accepted monitoring boundary.

@@ -6,7 +6,7 @@ from pathlib import Path
 
 from kubernetes.client.exceptions import ApiException
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.readiness import observe_deployment
 
 

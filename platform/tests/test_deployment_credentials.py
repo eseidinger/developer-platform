@@ -5,7 +5,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from uuid import UUID
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.authorization import is_allowed
 from app.deployment_credentials import access_scope, initialize, public_record, reconcile_pending_cleanup
 from app.identity import Principal

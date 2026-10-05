@@ -2,7 +2,7 @@ import json
 import sys
 import unittest
 from pathlib import Path
-root = Path(__file__).resolve().parents[1]
+root = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(root / "platform"))
 from app.main import app
 

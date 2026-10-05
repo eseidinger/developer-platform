@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 from kubernetes.client.exceptions import ApiException
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.drift import observe_drift
 
 SPEC = {"name": "smoke", "image": "example:v1", "resolved_image": "example@sha256:" + "a" * 64,

@@ -4,7 +4,7 @@ from contextlib import nullcontext
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import main
 from app.identity import Principal
 from app.spec import ApplicationEnvelopeV1Alpha2
@@ -26,6 +26,7 @@ class ComponentApiTests(unittest.TestCase):
         queued = Mock(return_value=("operation-1", "queued", 4))
         with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
              patch.object(main, "resolve_image", side_effect=lambda image: image.replace(":v1", "@sha256:resolved")), \
+             patch.object(main, "current_spec", return_value=None), \
              patch.object(main, "connect", return_value=nullcontext(Mock())), patch.object(main, "queue_deploy", queued):
             response = main.provision("shop", self.body, self.principal, if_match=None)
 

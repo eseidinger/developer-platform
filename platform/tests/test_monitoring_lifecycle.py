@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "platform"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from fastapi.testclient import TestClient
 from kubernetes.client.exceptions import ApiException
 from app import main
