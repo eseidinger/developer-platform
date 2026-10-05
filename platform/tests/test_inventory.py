@@ -62,6 +62,17 @@ class InventoryTests(unittest.TestCase):
         result = observe_cluster_capacity(runtime, logging.getLogger("test"))
         self.assertEqual(result, {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []})
 
+    def test_operator_capacity_includes_request_admission_accounting(self):
+        principal = Principal("https://issuer.example", "operator", "Operator")
+        observed = {"state": "ok", "nodes": [{"name": "agent"}]}
+        admission = {"state": "ok", "enabled": True, "available": {
+            "cpu_millicores": 750, "memory_mib": 896}}
+        with patch.object(main, "require_platform_admin"), patch.object(main, "required_audit"), \
+             patch.object(main, "observe_cluster_capacity", return_value=observed), \
+             patch.object(main, "capacity_admission_snapshot", return_value=admission):
+            result = main.operator_capacity(principal)
+        self.assertEqual(result, {**observed, "admission": admission})
+
     def test_resource_endpoint_combines_inventory_with_labelled_usage(self):
         conn = Mock()
         conn.execute.return_value.fetchone.return_value = ("applied",)

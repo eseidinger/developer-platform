@@ -196,6 +196,12 @@ interpreted as zero usage. The deployed `ansible/test-platform.yml` drill
 exercises this endpoint and requires at least one node with capacity,
 allocatable values, and a metrics sample.
 
+The platform-admin response also contains `admission`. When request admission is enabled,
+it reports aggregate `allocatable`, active-pod `requested`, configured `reserve`, and computed
+`available` values using explicit `cpu_millicores` and `memory_mib` units. This is the exact
+request accounting used for admission, not live utilization. Disabled, invalid-policy, and
+Kubernetes-query states are explicit and never imply free capacity.
+
 This endpoint is deliberately not a host-capacity or storage guarantee. Before
 raising project quotas or making a capacity promise, perform a protected,
 recorded manual load exercise: collect host CPU/memory/disk, Docker shared
@@ -213,6 +219,94 @@ requested resources do not fit. It fails closed with `503` if Kubernetes capacit
 until the reserve is measured; it is a request-based admission guard, not a live-usage or storage guarantee. On a
 protected lab, verify one intentionally oversized disposable rollout is rejected with `422`, then confirm a
 within-reserve rollout proceeds and remove the disposable workload.
+
+Automate the protected admission check with a disposable project:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-capacity-admission.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_allow_capacity_drill=true \
+  -e platform_capacity_drill_acknowledgement=I_ACCEPT_CAPACITY_DRILL
+```
+
+The playbook preserves the exact host `.env`, temporarily enables admission with a valid zero
+reserve, and recreates only `platform-api`. It then uses the admission snapshot to create a temporary restricted namespace with a
+synthetic Kubernetes pod request. That request leaves less than the drill workload's 100m CPU
+or 128Mi memory available, so the API must return the specific aggregate-capacity rejection.
+The playbook removes the reservation, waits for request capacity to recover, deploys the real
+workload, and retires its project. Both namespaces and the original `.env`/API configuration
+are restored in `always` handling. The
+synthetic pod may remain Pending and consumes scheduling requests, not representative CPU or
+memory load; do not treat this mechanism test as the operator's reserve measurement.
+Run it only in an exclusive protected acceptance window: it recreates `platform-api` twice
+and temporarily replaces the admission policy, although the original `.env` is retained in
+memory and restored byte-for-byte before cleanup continues.
+
+## Run the remaining automated Phase 2C drills
+
+The data-aware rollback drill creates its own project and managed database, inserts a
+unique SQL marker, rotates and confirms a write-only secret, rolls the application back,
+and verifies the marker and current secret metadata remain. It never reads a secret value:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_rollback_drill_host=platform
+```
+
+For egress, first configure the narrow target CIDR and TCP port in the platform API
+allow-list and provide a non-production listener reachable from workload pods. Then run:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-egress-policy.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_allow_egress_drill=true \
+  -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL \
+  -e platform_egress_target_host=<listener-ip-or-name> \
+  -e platform_egress_target_cidr=<listener-cidr> \
+  -e platform_egress_target_port=<listener-port>
+```
+
+The playbook first proves an undeclared destination is rejected, then deploys a service
+whose readiness depends on reaching the approved listener. Do not use the managed
+PostgreSQL endpoint: its baseline database exception would not prove the requested
+component egress rule.
+
+The identity-provider drill creates its own project, administrator persona and deployment
+credential, stops Keycloak, proves local revocation denies an already-issued token while
+provider cleanup is pending, restores Keycloak in an `always` block, and observes cleanup:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-identity-provider-outage.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_identity_drill_host=platform \
+  -e platform_allow_identity_outage_drill=true \
+  -e platform_identity_outage_acknowledgement=I_ACCEPT_IDENTITY_OUTAGE
+```
+
+These playbooks automate in-platform assertions and cleanup. Final acceptance still needs
+manual evidence for public DNS/TLS from an external network, actual notification receipt,
+and the project-specific backup/retention decision; those properties cannot be established
+by a process running inside the same platform failure boundary.
+
+For application, ingress, and local-monitoring failure/recovery assertions, run the guarded
+failure-signal drill. It waits through the Prometheus alert `for` durations, so allow roughly
+ten minutes:
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-failure-signals.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_failure_drill_host=platform \
+  -e platform_allow_failure_signal_drill=true \
+  -e platform_failure_drill_acknowledgement=I_ACCEPT_FAILURE_SIGNAL_DRILL
+```
+
+It creates and retires a public canary, verifies project-labelled application and ingress
+alerts, restores both boundaries, and proves Prometheus unavailability and recovery. Use the
+existing `operations/heartbeat/ansible/drill-cluster-availability.yml` for the Kubernetes
+control plane and `ansible/test-platform-postgres-outage.yml` for the database boundary.
+Actual FIRING/RESOLVED delivery and detection while Prometheus itself is unavailable still
+require evidence from the independent notification/watchdog systems.
 
 ## Restart an application
 

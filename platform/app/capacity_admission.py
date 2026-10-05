@@ -34,37 +34,52 @@ def _proposed(spec):
     return total
 
 
-def assess(runtime, spec, log):
-    """Return a safe decision; enabled admission never assumes missing capacity is free."""
+def snapshot(runtime, log):
+    """Return the request-based admission inputs using explicit CPU/memory units."""
     if os.environ.get("CAPACITY_ADMISSION_ENABLED", "false").lower() != "true":
-        return {"state": "disabled"}
+        return {"state": "disabled", "enabled": False}
     if runtime is None:
-        return {"state": "unavailable", "reason": "KubernetesApiUnavailable"}
+        return {"state": "unavailable", "enabled": True, "reason": "KubernetesApiUnavailable"}
     try:
         nodes, pods = _items(runtime, "v1", "Node"), _items(runtime, "v1", "Pod")
-        capacity = {"cpu": 0, "memory": 0}
+        allocatable = {"cpu": 0, "memory": 0}
         for node in nodes:
-            allocatable = _get(_get(node, "status", {}), "allocatable", {}) or {}
-            capacity["cpu"] += _millicores(_get(allocatable, "cpu"))
-            capacity["memory"] += _mebibytes(_get(allocatable, "memory"))
-        used = {"cpu": 0, "memory": 0}
+            values = _get(_get(node, "status", {}), "allocatable", {}) or {}
+            allocatable["cpu"] += _millicores(_get(values, "cpu"))
+            allocatable["memory"] += _mebibytes(_get(values, "memory"))
+        requested = {"cpu": 0, "memory": 0}
         for pod in pods:
             if _get(_get(pod, "status", {}), "phase") not in {"Succeeded", "Failed"}:
                 values = _request_total(_get(_get(pod, "spec", {}), "containers", []) or [])
-                for key in used:
-                    used[key] += values[key]
+                for key in requested:
+                    requested[key] += values[key]
     except Exception as exc:
         log.error("Capacity admission query failed error_type=%s", type(exc).__name__)
-        return {"state": "unavailable", "reason": "KubernetesApiUnavailable"}
+        return {"state": "unavailable", "enabled": True, "reason": "KubernetesApiUnavailable"}
     try:
         reserve = {"cpu": int(os.environ.get("CAPACITY_RESERVE_CPU_MILLICORES", "2000")),
                    "memory": int(os.environ.get("CAPACITY_RESERVE_MEMORY_MIB", "8192"))}
         if any(value < 0 for value in reserve.values()):
             raise ValueError
     except ValueError:
-        return {"state": "unavailable", "reason": "InvalidCapacityReserve"}
+        return {"state": "unavailable", "enabled": True, "reason": "InvalidCapacityReserve"}
+    available = {key: allocatable[key] - reserve[key] - requested[key] for key in allocatable}
+    def public(values):
+        return {"cpu_millicores": values["cpu"], "memory_mib": values["memory"]}
+    return {"state": "ok", "enabled": True, "allocatable": public(allocatable),
+            "requested": public(requested), "reserve": public(reserve), "available": public(available)}
+
+
+def assess(runtime, spec, log):
+    """Return a safe decision; enabled admission never assumes missing capacity is free."""
+    current = snapshot(runtime, log)
+    if current["state"] == "disabled":
+        return {"state": "disabled"}
+    if current["state"] != "ok":
+        return {"state": "unavailable", "reason": current["reason"]}
     proposed = _proposed(spec)
-    available = {key: capacity[key] - reserve[key] - used[key] for key in capacity}
+    available = {"cpu": current["available"]["cpu_millicores"],
+                 "memory": current["available"]["memory_mib"]}
     if any(proposed[key] > available[key] for key in proposed):
         return {"state": "rejected", "reason": "InsufficientReservedCapacity", "available": available,
                 "proposed": proposed}

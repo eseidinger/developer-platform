@@ -1,0 +1,353 @@
+---
+- name: Exercise application, ingress, and monitoring failure signals
+  hosts: localhost
+  gather_facts: false
+  vars:
+    platform_failure_drill_acknowledgement: ''
+    platform_failure_drill_install_dir: /opt/developer-platform
+    platform_failure_drill_kubeconfig: /opt/developer-platform/.runtime/admin.kubeconfig
+    platform_failure_drill_image: hashicorp/http-echo:1.0.0
+  tasks:
+    - name: Require explicit approval and protected failure-drill inputs
+      ansible.builtin.assert:
+        that:
+          - platform_allow_failure_signal_drill | default(false) | bool
+          - platform_failure_drill_acknowledgement == 'I_ACCEPT_FAILURE_SIGNAL_DRILL'
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_failure_drill_host is defined
+          - platform_failure_drill_host in groups['all']
+          - platform_failure_drill_install_dir | length > 1
+          - platform_failure_drill_kubeconfig | length > 1
+        fail_msg: >-
+          This drill briefly removes a disposable Deployment and stops the shared proxy and
+          Prometheus. Supply protected runner configuration, a reachable platform inventory
+          host, explicit enablement, and I_ACCEPT_FAILURE_SIGNAL_DRILL.
+      no_log: true
+
+    - name: Establish a unique disposable failure-signal project
+      ansible.builtin.set_fact:
+        failure_project: "{{ platform_failure_project | default('failure-' + lookup('pipe', 'date +%s') + '-' + (9999 | random | string)) }}"
+
+    - name: Require a valid generated failure-signal project name
+      ansible.builtin.assert:
+        that: failure_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+
+    - name: Exchange the runner credential
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: failure_runner_token
+      no_log: true
+
+    - name: Exercise failure signals with a disposable public workload
+      block:
+        - name: Create the disposable failure-signal project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            method: POST
+            headers: {Authorization: "Bearer {{ failure_runner_token.json.access_token }}"}
+            body_format: json
+            body: {name: "{{ failure_project }}"}
+            status_code: 201
+          no_log: true
+
+        - name: Deploy the disposable public canary
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ failure_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ failure_runner_token.json.access_token }}"}
+            body_format: json
+            body:
+              name: "{{ failure_project }}"
+              image: "{{ platform_failure_drill_image }}"
+              port: 5678
+              probe_profile: hello-world
+            status_code: 202
+          register: failure_deployment
+          no_log: true
+
+        - name: Wait for the disposable public canary
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ failure_deployment.json.status_url }}"
+            headers: {Authorization: "Bearer {{ failure_runner_token.json.access_token }}"}
+            status_code: 200
+          register: failure_deployment_operation
+          until:
+            - (failure_deployment_operation.json.state | default('')) == 'succeeded'
+            - (failure_deployment_operation.json.readiness.state | default('')) == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Wait for a healthy project-attributed blackbox sample
+          ansible.builtin.uri:
+            url: >-
+              http://127.0.0.1:9090/api/v1/query?query={{
+              ('probe_success{job="applications",project="' + failure_project + '"} == 1') | urlencode }}
+            status_code: 200
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          register: failure_healthy_probe
+          until: failure_healthy_probe.json.data.result | default([]) | length > 0
+          retries: 40
+          delay: 5
+          no_log: true
+
+        - name: Delete the disposable application Deployment
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ platform_failure_drill_kubeconfig }}"
+              - -n
+              - "project-{{ failure_project }}"
+              - delete
+              - deployment
+              - "{{ failure_project }}"
+              - --wait=true
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Wait for a firing project-attributed application alert
+          ansible.builtin.uri:
+            url: >-
+              http://127.0.0.1:9090/api/v1/query?query={{
+              ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+              '",alertstate="firing"}') | urlencode }}
+            status_code: 200
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          register: failure_application_alert
+          until: failure_application_alert.json.data.result | default([]) | length > 0
+          retries: 55
+          delay: 5
+          no_log: true
+
+        - name: Refresh the runner token before application recovery
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: failure_recovery_token
+          no_log: true
+
+        - name: Reconcile the disposable application after failure
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ failure_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ failure_recovery_token.json.access_token }}"}
+            body_format: json
+            body:
+              name: "{{ failure_project }}"
+              image: "{{ platform_failure_drill_image }}"
+              port: 5678
+              probe_profile: hello-world
+            status_code: 202
+          register: failure_recovery_deployment
+          no_log: true
+
+        - name: Wait for application recovery
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ failure_recovery_deployment.json.status_url }}"
+            headers: {Authorization: "Bearer {{ failure_recovery_token.json.access_token }}"}
+            status_code: 200
+          register: failure_recovery_operation
+          until:
+            - (failure_recovery_operation.json.state | default('')) == 'succeeded'
+            - (failure_recovery_operation.json.readiness.state | default('')) == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Wait for application alert resolution
+          ansible.builtin.uri:
+            url: >-
+              http://127.0.0.1:9090/api/v1/query?query={{
+              ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+              '",alertstate="firing"}') | urlencode }}
+            status_code: 200
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          register: failure_application_resolution
+          until: failure_application_resolution.json.data.result | default([]) | length == 0
+          retries: 40
+          delay: 5
+          no_log: true
+
+        - name: Exercise the shared ingress failure boundary
+          block:
+            - name: Stop the shared edge proxy
+              ansible.builtin.command:
+                argv: [docker, compose, stop, proxy]
+                chdir: "{{ platform_failure_drill_install_dir }}"
+              delegate_to: "{{ platform_failure_drill_host }}"
+              become: true
+              changed_when: true
+
+            - name: Wait for a project-attributed ingress failure alert
+              ansible.builtin.uri:
+                url: >-
+                  http://127.0.0.1:9090/api/v1/query?query={{
+                  ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+                  '",alertstate="firing"}') | urlencode }}
+                status_code: 200
+              delegate_to: "{{ platform_failure_drill_host }}"
+              become: true
+              register: failure_ingress_alert
+              until: failure_ingress_alert.json.data.result | default([]) | length > 0
+              retries: 55
+              delay: 5
+              no_log: true
+          always:
+            - name: Restore the shared edge proxy
+              ansible.builtin.command:
+                argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', proxy]
+                chdir: "{{ platform_failure_drill_install_dir }}"
+              delegate_to: "{{ platform_failure_drill_host }}"
+              become: true
+              changed_when: true
+
+        - name: Wait for ingress alert resolution
+          ansible.builtin.uri:
+            url: >-
+              http://127.0.0.1:9090/api/v1/query?query={{
+              ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+              '",alertstate="firing"}') | urlencode }}
+            status_code: 200
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          register: failure_ingress_resolution
+          until: failure_ingress_resolution.json.data.result | default([]) | length == 0
+          retries: 40
+          delay: 5
+          no_log: true
+
+        - name: Exercise the local monitoring failure boundary
+          block:
+            - name: Stop Prometheus
+              ansible.builtin.command:
+                argv: [docker, compose, stop, prometheus]
+                chdir: "{{ platform_failure_drill_install_dir }}"
+              delegate_to: "{{ platform_failure_drill_host }}"
+              become: true
+              changed_when: true
+
+            - name: Require the Prometheus readiness endpoint to be unavailable
+              ansible.builtin.command:
+                argv: [curl, --fail, --silent, --show-error, http://127.0.0.1:9090/-/ready]
+              delegate_to: "{{ platform_failure_drill_host }}"
+              become: true
+              register: failure_prometheus_down
+              changed_when: false
+              failed_when: failure_prometheus_down.rc == 0
+          always:
+            - name: Restore Prometheus
+              ansible.builtin.command:
+                argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', prometheus]
+                chdir: "{{ platform_failure_drill_install_dir }}"
+              delegate_to: "{{ platform_failure_drill_host }}"
+              become: true
+              changed_when: true
+
+        - name: Require Prometheus readiness after recovery
+          ansible.builtin.command:
+            argv: [curl, --fail, --silent, --show-error, http://127.0.0.1:9090/-/ready]
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          register: failure_prometheus_recovered
+          until: failure_prometheus_recovered.rc == 0
+          retries: 30
+          delay: 2
+          changed_when: false
+      always:
+        - name: Ensure the shared edge proxy is running after the drill
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', proxy]
+            chdir: "{{ platform_failure_drill_install_dir }}"
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: false
+          failed_when: false
+
+        - name: Ensure Prometheus is running after the drill
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', prometheus]
+            chdir: "{{ platform_failure_drill_install_dir }}"
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: false
+          failed_when: false
+
+        - name: Refresh runner token before failure-project cleanup
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: failure_cleanup_response
+          retries: 24
+          delay: 5
+          until: failure_cleanup_response.status | default(0) == 200
+          failed_when: false
+          no_log: true
+
+        - name: Select the failure-project cleanup token
+          ansible.builtin.set_fact:
+            failure_cleanup_token: "{{ failure_cleanup_response.get('json', {}).get('access_token', '') }}"
+          no_log: true
+
+        - name: Read failure-project retirement scope
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ failure_project }}/retirement-preview"
+            headers: {Authorization: "Bearer {{ failure_cleanup_token }}"}
+            status_code: [200, 404]
+          register: failure_cleanup_preview
+          failed_when: false
+          when: failure_cleanup_token | length > 0
+          no_log: true
+
+        - name: Retire the disposable failure-signal project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ failure_project }}/retire"
+            method: POST
+            headers: {Authorization: "Bearer {{ failure_cleanup_token }}"}
+            body_format: json
+            body:
+              confirm_name: "{{ failure_project }}"
+              scope_token: "{{ failure_cleanup_preview.json.scope_token }}"
+            status_code: [200, 202, 404, 409]
+          register: failure_cleanup
+          until: failure_cleanup.status != 202
+          retries: 60
+          delay: 5
+          failed_when: false
+          when:
+            - failure_cleanup_token | length > 0
+            - failure_cleanup_preview.status | default(0) | int == 200
+          no_log: true
+
+    - name: Report non-secret failure-signal evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: {{ failure_project }} produced and resolved project-attributed application and
+          ingress alerts, and Prometheus was observed unavailable and recovered. Confirm actual
+          notification receipt and external monitoring detection separately.

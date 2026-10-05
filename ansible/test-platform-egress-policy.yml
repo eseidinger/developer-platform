@@ -1,0 +1,190 @@
+---
+- name: Accept deny-by-default and explicitly approved component egress
+  hosts: localhost
+  gather_facts: false
+  vars:
+    platform_egress_drill_image: busybox:1.36.1
+    platform_egress_denied_cidr: 192.0.2.1/32
+    platform_egress_denied_port: 9
+  tasks:
+    - name: Require protected runner configuration and explicit egress-drill inputs
+      ansible.builtin.assert:
+        that:
+          - platform_allow_egress_drill | default(false) | bool
+          - platform_egress_drill_acknowledgement | default('') == 'I_ACCEPT_EGRESS_DRILL'
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_egress_target_host is defined
+          - platform_egress_target_host is match('^[A-Za-z0-9][A-Za-z0-9.:-]*$')
+          - platform_egress_target_cidr is defined
+          - platform_egress_target_cidr is match('^[0-9a-fA-F:.]+/[0-9]+$')
+          - platform_egress_target_port is defined
+          - platform_egress_target_port | int >= 1
+          - platform_egress_target_port | int <= 65535
+          - platform_egress_denied_cidr is match('^[0-9a-fA-F:.]+/[0-9]+$')
+          - platform_egress_denied_port | int >= 1
+          - platform_egress_denied_port | int <= 65535
+          - platform_egress_denied_cidr != platform_egress_target_cidr or platform_egress_denied_port | int != platform_egress_target_port | int
+        fail_msg: >-
+          Supply the protected runner configuration and a reachable non-production TCP target.
+          Its CIDR and port must already be present in ALLOWED_EGRESS_CIDRS and
+          ALLOWED_EGRESS_PORTS. Explicitly enable and acknowledge the drill.
+      no_log: true
+
+    - name: Establish a unique disposable egress project
+      ansible.builtin.set_fact:
+        egress_project: "{{ platform_egress_project | default('egress-' + lookup('pipe', 'date +%s') + '-' + (9999 | random | string)) }}"
+
+    - name: Require a valid generated egress project name
+      ansible.builtin.assert:
+        that: egress_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+
+    - name: Exchange the runner credential
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: egress_runner_token
+      no_log: true
+
+    - name: Exercise egress policy with a disposable project
+      block:
+        - name: Create the disposable egress project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            method: POST
+            headers: {Authorization: "Bearer {{ egress_runner_token.json.access_token }}"}
+            body_format: json
+            body: {name: "{{ egress_project }}"}
+            status_code: 201
+          no_log: true
+
+        - name: Require an unapproved destination to be rejected before side effects
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ egress_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ egress_runner_token.json.access_token }}"}
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata: {name: "{{ egress_project }}"}
+              spec:
+                components:
+                  - name: probe
+                    type: service
+                    runtime: {type: container, image: "{{ platform_egress_drill_image }}"}
+                    outbound:
+                      - cidr: "{{ platform_egress_denied_cidr }}"
+                        port: "{{ platform_egress_denied_port | int }}"
+            status_code: 422
+          register: egress_denial
+          failed_when: egress_denial.json.code | default('') != 'policy_denied'
+          no_log: true
+
+        - name: Deploy a service whose startup requires approved connectivity
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ egress_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ egress_runner_token.json.access_token }}"}
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata: {name: "{{ egress_project }}"}
+              spec:
+                components:
+                  - name: probe
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_egress_drill_image }}"
+                      command: [/bin/sh, -ec]
+                      args:
+                        - >-
+                          nc -z -w 10 {{ platform_egress_target_host }}
+                          {{ platform_egress_target_port | int }};
+                          exec httpd -f -p 8080
+                    ports: [{name: http, protocol: http, port: 8080}]
+                    outbound:
+                      - cidr: "{{ platform_egress_target_cidr }}"
+                        port: "{{ platform_egress_target_port | int }}"
+            status_code: 202
+          register: egress_deployment
+          no_log: true
+
+        - name: Wait for the approved-connectivity workload
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ egress_deployment.json.status_url }}"
+            headers: {Authorization: "Bearer {{ egress_runner_token.json.access_token }}"}
+            status_code: 200
+          register: egress_operation
+          until:
+            - (egress_operation.json.state | default('')) == 'succeeded'
+            - (egress_operation.json.readiness.state | default('')) == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+      always:
+        - name: Refresh the runner token before egress-project cleanup
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: egress_cleanup_response
+          failed_when: false
+          no_log: true
+
+        - name: Select the egress cleanup token
+          ansible.builtin.set_fact:
+            egress_cleanup_token: "{{ egress_cleanup_response.get('json', {}).get('access_token', '') }}"
+          no_log: true
+
+        - name: Read egress-project retirement scope
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ egress_project }}/retirement-preview"
+            headers: {Authorization: "Bearer {{ egress_cleanup_token }}"}
+            status_code: [200, 404]
+          register: egress_cleanup_preview
+          failed_when: false
+          when: egress_cleanup_token | length > 0
+          no_log: true
+
+        - name: Retire the disposable egress project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ egress_project }}/retire"
+            method: POST
+            headers: {Authorization: "Bearer {{ egress_cleanup_token }}"}
+            body_format: json
+            body:
+              confirm_name: "{{ egress_project }}"
+              scope_token: "{{ egress_cleanup_preview.json.scope_token }}"
+            status_code: [200, 202, 404, 409]
+          register: egress_cleanup
+          until: egress_cleanup.status != 202
+          retries: 60
+          delay: 5
+          failed_when: false
+          when:
+            - egress_cleanup_token | length > 0
+            - egress_cleanup_preview.status | default(0) | int == 200
+          no_log: true
+
+    - name: Report non-secret egress-policy evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: {{ egress_project }} rejected an unapproved destination and became ready only
+          after connecting to {{ platform_egress_target_host }}:{{ platform_egress_target_port }}
+          through the approved {{ platform_egress_target_cidr }} policy.

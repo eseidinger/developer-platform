@@ -1,0 +1,418 @@
+---
+- name: Accept reserved-capacity admission with a disposable project
+  hosts: localhost
+  gather_facts: false
+  vars:
+    platform_capacity_image: hashicorp/http-echo:1.0.0
+    platform_capacity_padding_image: busybox:1.36.1
+    platform_capacity_drill_kubeconfig: /opt/developer-platform/.runtime/admin.kubeconfig
+    platform_capacity_drill_install_dir: /opt/developer-platform
+    platform_capacity_drill_host: "{{ (groups.get('developer_platform', []) | first) | default('') }}"
+  tasks:
+    - name: Require protected runner configuration and explicit capacity-drill approval
+      ansible.builtin.assert:
+        that:
+          - platform_allow_capacity_drill | default(false) | bool
+          - platform_capacity_drill_acknowledgement | default('') == 'I_ACCEPT_CAPACITY_DRILL'
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_capacity_drill_host is defined
+          - platform_capacity_drill_host in groups['all']
+          - platform_capacity_drill_kubeconfig | length > 1
+          - platform_capacity_drill_install_dir | length > 1
+        fail_msg: >-
+          Supply the protected runner configuration and normal platform inventory, then set
+          platform_allow_capacity_drill=true and acknowledge I_ACCEPT_CAPACITY_DRILL. The drill
+          temporarily recreates platform-api and restores its exact original environment.
+      no_log: true
+
+    - name: Establish a unique disposable capacity project
+      ansible.builtin.set_fact:
+        capacity_project: "{{ platform_capacity_project | default('capacity-' + lookup('pipe', 'date +%s') + '-' + (9999 | random | string)) }}"
+
+    - name: Require a valid capacity project name
+      ansible.builtin.assert:
+        that: capacity_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+
+    - name: Derive the temporary capacity-reservation namespace
+      ansible.builtin.set_fact:
+        capacity_padding_namespace: "platform-{{ capacity_project }}"
+
+    - name: Read the exact platform environment before temporary admission enablement
+      ansible.builtin.slurp:
+        src: "{{ platform_capacity_drill_install_dir }}/.env"
+      delegate_to: "{{ platform_capacity_drill_host }}"
+      become: true
+      register: capacity_original_environment
+      no_log: true
+
+    - name: Exercise capacity admission
+      block:
+        - name: Enable request admission with a valid temporary reserve
+          ansible.builtin.lineinfile:
+            path: "{{ platform_capacity_drill_install_dir }}/.env"
+            regexp: "^{{ item.key }}="
+            line: "{{ item.key }}={{ item.value }}"
+            owner: root
+            group: root
+            mode: '0600'
+          loop:
+            - {key: CAPACITY_ADMISSION_ENABLED, value: 'true'}
+            - {key: CAPACITY_RESERVE_CPU_MILLICORES, value: '0'}
+            - {key: CAPACITY_RESERVE_MEMORY_MIB, value: '0'}
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          no_log: true
+
+        - name: Recreate only the Platform API with temporary admission policy
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --force-recreate, --wait, --wait-timeout, '120', platform-api]
+            chdir: "{{ platform_capacity_drill_install_dir }}"
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Exchange the runner credential after API recreation
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: capacity_runner_token
+          retries: 24
+          delay: 5
+          until: capacity_runner_token.status | default(0) == 200
+          no_log: true
+
+        - name: Create the disposable capacity project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            method: POST
+            headers: {Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"}
+            body_format: json
+            body: {name: "{{ capacity_project }}"}
+            status_code: 201
+          no_log: true
+
+        - name: Inspect current cluster capacity before admission checks
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/operator/capacity"
+            headers: {Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"}
+            status_code: 200
+          register: capacity_inventory
+          no_log: true
+
+        - name: Require the deployed admission snapshot contract
+          ansible.builtin.assert:
+            that:
+              - capacity_inventory.json.get('state', '') == 'ok'
+              - capacity_inventory.json.get('nodes', []) | length > 0
+              - capacity_inventory.json.get('admission', {}).get('state', '') == 'ok'
+              - capacity_inventory.json.get('admission', {}).get('enabled', false)
+            fail_msg: >-
+              The deployed Platform API does not expose usable enabled admission accounting.
+              Deploy the current source and verify Kubernetes node, pod, and metrics access.
+
+        - name: Require enough baseline capacity for the accepted workload
+          ansible.builtin.assert:
+            that:
+              - capacity_inventory.json.admission.available.cpu_millicores | int >= 100
+              - capacity_inventory.json.admission.available.memory_mib | int >= 128
+            fail_msg: >-
+              Capacity admission is enabled, but less than 100m CPU or 128Mi memory remains.
+              Recover capacity before running this acceptance drill.
+
+        - name: Calculate a temporary request reservation
+          ansible.builtin.set_fact:
+            capacity_padding_cpu_millicores: "{{ capacity_inventory.json.admission.available.cpu_millicores | int - 50 }}"
+            capacity_padding_memory_mib: "{{ capacity_inventory.json.admission.available.memory_mib | int - 64 }}"
+
+        - name: Create the temporary capacity-reservation namespace
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ platform_capacity_drill_kubeconfig }}"
+              - create
+              - namespace
+              - "{{ capacity_padding_namespace }}"
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Enforce restricted pod security in the reservation namespace
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ platform_capacity_drill_kubeconfig }}"
+              - label
+              - namespace
+              - "{{ capacity_padding_namespace }}"
+              - pod-security.kubernetes.io/enforce=restricted
+              - pod-security.kubernetes.io/enforce-version=v1.36
+              - --overwrite
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Create a bounded synthetic pod request that leaves less than one workload available
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ platform_capacity_drill_kubeconfig }}"
+              - -n
+              - "{{ capacity_padding_namespace }}"
+              - apply
+              - -f
+              - -
+            stdin: "{{ capacity_padding_manifest | to_json }}"
+          vars:
+            capacity_padding_manifest:
+              apiVersion: v1
+              kind: Pod
+              metadata: {name: request-reservation}
+              spec:
+                restartPolicy: Never
+                automountServiceAccountToken: false
+                securityContext:
+                  runAsNonRoot: true
+                  runAsUser: 10000
+                  runAsGroup: 10000
+                  seccompProfile: {type: RuntimeDefault}
+                containers:
+                  - name: reservation
+                    image: "{{ platform_capacity_padding_image }}"
+                    command: [/bin/sh, -ec]
+                    args: [sleep 900]
+                    resources:
+                      requests:
+                        cpu: "{{ capacity_padding_cpu_millicores }}m"
+                        memory: "{{ capacity_padding_memory_mib }}Mi"
+                      limits:
+                        cpu: "{{ capacity_padding_cpu_millicores }}m"
+                        memory: "{{ capacity_padding_memory_mib }}Mi"
+                    securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities: {drop: [ALL]}
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          changed_when: true
+          no_log: true
+
+        - name: Wait for admission accounting to include the synthetic request
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/operator/capacity"
+            headers: {Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"}
+            status_code: 200
+          register: capacity_with_padding
+          until:
+            - capacity_with_padding.json.admission.state | default('') == 'ok'
+            - >-
+              capacity_with_padding.json.admission.available.cpu_millicores | int < 100 or
+              capacity_with_padding.json.admission.available.memory_mib | int < 128
+          retries: 24
+          delay: 2
+          no_log: true
+
+        - name: Require the configured oversized request to be rejected before side effects
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ capacity_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"}
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata: {name: "{{ capacity_project }}"}
+              spec:
+                components:
+                  - name: api
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_capacity_image }}"
+                      args: ['-listen=:5678', '-text=capacity-rejected']
+                    ports: [{name: http, protocol: http, port: 5678}]
+                    resources:
+                      requests:
+                        cpu: 100m
+                        memory: 128Mi
+                      limits:
+                        cpu: 100m
+                        memory: 128Mi
+            status_code: 422
+          register: rejected_capacity
+          failed_when: >-
+            rejected_capacity.status != 422 or
+            rejected_capacity.json.detail != 'Requested rollout exceeds remaining reserved cluster capacity'
+          no_log: true
+
+        - name: Remove the temporary capacity reservation
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ platform_capacity_drill_kubeconfig }}"
+              - delete
+              - namespace
+              - "{{ capacity_padding_namespace }}"
+              - --wait=true
+              - --timeout=120s
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Wait for admission capacity to recover after reservation removal
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/operator/capacity"
+            headers: {Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"}
+            status_code: 200
+          register: capacity_after_padding
+          until:
+            - capacity_after_padding.json.admission.state | default('') == 'ok'
+            - capacity_after_padding.json.admission.available.cpu_millicores | int >= 100
+            - capacity_after_padding.json.admission.available.memory_mib | int >= 128
+          retries: 24
+          delay: 2
+          no_log: true
+
+        - name: Deploy a within-reserve workload
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ capacity_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"}
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata: {name: "{{ capacity_project }}"}
+              spec:
+                components:
+                  - name: api
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_capacity_image }}"
+                      args: ['-listen=:5678', '-text=capacity-accepted']
+                    ports: [{name: http, protocol: http, port: 5678}]
+                    resources:
+                      requests:
+                        cpu: 100m
+                        memory: 128Mi
+                      limits: {cpu: 500m, memory: 256Mi}
+            status_code: 202
+          register: accepted_capacity
+          no_log: true
+
+        - name: Wait for the within-reserve workload
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ accepted_capacity.json.status_url }}"
+            headers: {Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"}
+            status_code: 200
+          register: accepted_capacity_operation
+          until:
+            - (accepted_capacity_operation.json.state | default('')) == 'succeeded'
+            - (accepted_capacity_operation.json.readiness.state | default('')) == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+      always:
+        - name: Remove any remaining temporary capacity reservation
+          ansible.builtin.command:
+            argv:
+              - kubectl
+              - --kubeconfig
+              - "{{ platform_capacity_drill_kubeconfig }}"
+              - delete
+              - namespace
+              - "{{ capacity_padding_namespace }}"
+              - --ignore-not-found=true
+              - --wait=false
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          changed_when: false
+          failed_when: false
+
+        - name: Restore the exact original platform environment
+          ansible.builtin.copy:
+            content: "{{ capacity_original_environment.content | b64decode }}"
+            dest: "{{ platform_capacity_drill_install_dir }}/.env"
+            owner: root
+            group: root
+            mode: '0600'
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          no_log: true
+
+        - name: Recreate only the Platform API with its original policy
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --force-recreate, --wait, --wait-timeout, '120', platform-api]
+            chdir: "{{ platform_capacity_drill_install_dir }}"
+          delegate_to: "{{ platform_capacity_drill_host }}"
+          become: true
+          register: capacity_policy_restore
+          until: capacity_policy_restore.rc == 0
+          retries: 3
+          delay: 5
+          changed_when: true
+
+        - name: Refresh runner token before capacity-project cleanup
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: capacity_cleanup_token
+          failed_when: false
+          no_log: true
+
+        - name: Read capacity-project retirement scope
+          vars:
+            capacity_cleanup_access_token: "{{ capacity_cleanup_token.get('json', {}).get('access_token', '') }}"
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ capacity_project }}/retirement-preview"
+            headers: {Authorization: "Bearer {{ capacity_cleanup_access_token }}"}
+            status_code: [200, 404]
+          register: capacity_cleanup_preview
+          failed_when: false
+          when: capacity_cleanup_access_token | length > 0
+          no_log: true
+
+        - name: Retire the disposable capacity project
+          vars:
+            capacity_cleanup_access_token: "{{ capacity_cleanup_token.get('json', {}).get('access_token', '') }}"
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ capacity_project }}/retire"
+            method: POST
+            headers: {Authorization: "Bearer {{ capacity_cleanup_access_token }}"}
+            body_format: json
+            body:
+              confirm_name: "{{ capacity_project }}"
+              scope_token: "{{ capacity_cleanup_preview.json.scope_token }}"
+            status_code: [200, 202, 404, 409]
+          register: capacity_cleanup
+          until: capacity_cleanup.status != 202
+          retries: 60
+          delay: 5
+          failed_when: false
+          when:
+            - capacity_cleanup_access_token | length > 0
+            - capacity_cleanup_preview.status | default(0) | int == 200
+          no_log: true
+
+    - name: Report non-secret capacity admission evidence
+      ansible.builtin.debug:
+        msg: "PASS: {{ capacity_project }} rejected the oversized rollout and admitted the within-reserve workload."

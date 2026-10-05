@@ -121,12 +121,62 @@ and polls until cleanup is complete.
 drill for a dedicated one-day test runner: run it once with
 `platform_expiry_drill_phase=active`, then schedule the same protected credential
 file after its recorded expiry with `platform_expiry_drill_phase=expired`.
-`test-platform-identity-provider-outage.yml` is an operator-only Keycloak outage
-drill. It requires an inventory, a protected project-administrator token, an
-explicit acknowledgement, and `platform_allow_identity_outage_drill=true`; its
-`always` block restores Keycloak. The two drills are intentionally deferred and
-accepted for the current lab, so do not add either to routine CI without a new
-owner decision.
+The following Phase 2C playbooks create and retire their own disposable projects.
+They consume the protected test-runner file; no reusable human or project token is
+accepted:
+
+```bash
+# Application rollback retains PostgreSQL contents and the current secret version.
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_rollback_drill_host=platform
+
+# Temporarily enable and exercise reserved-capacity admission, then restore policy.
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-capacity-admission.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_allow_capacity_drill=true \
+  -e platform_capacity_drill_acknowledgement=I_ACCEPT_CAPACITY_DRILL
+
+# The target must be a reachable non-production TCP listener already allowed by
+# ALLOWED_EGRESS_CIDRS and ALLOWED_EGRESS_PORTS on the platform host.
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-egress-policy.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_allow_egress_drill=true \
+  -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL \
+  -e platform_egress_target_host=198.51.100.10 \
+  -e platform_egress_target_cidr=198.51.100.10/32 \
+  -e platform_egress_target_port=8443
+
+# Controlled shared Keycloak outage; the always block restores the service.
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-identity-provider-outage.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_identity_drill_host=platform \
+  -e platform_allow_identity_outage_drill=true \
+  -e platform_identity_outage_acknowledgement=I_ACCEPT_IDENTITY_OUTAGE
+
+# Disposable application plus shared proxy/Prometheus failure and recovery signals.
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-failure-signals.yml \
+  -e @~/.local/state/developer-platform/platform-test-runner.json \
+  -e platform_failure_drill_host=platform \
+  -e platform_allow_failure_signal_drill=true \
+  -e platform_failure_drill_acknowledgement=I_ACCEPT_FAILURE_SIGNAL_DRILL
+```
+
+The capacity drill reads the API's request-accounting snapshot, creates a temporary
+restricted namespace containing one synthetic pod request, and automatically leaves
+less than 100m CPU or 128Mi memory available. It proves the fixed workload is rejected,
+removes the reservation, and then proves the same-sized real workload is admitted.
+It preserves the exact host `.env`, temporarily enables admission with a valid zero reserve,
+recreates only `platform-api`, and restores the original `.env` and API container in an
+`always` block. The reservation namespace is also always removed.
+The egress example addresses are documentation ranges and will not work as targets.
+Supply an endpoint you control; never broaden the allow-list merely to pass the drill.
+
+The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally disrupt shared services and
+must not run in routine CI. The rollback drill is safe for a protected acceptance
+environment. Egress alters only a disposable workload but depends on operator policy
+and an external listener. Keep these drills in an explicitly approved protected pipeline
+rather than pull-request CI.
 
 Installation references: [Docker on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
 and [kubectl on Linux](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/).

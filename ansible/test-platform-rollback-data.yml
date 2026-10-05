@@ -1,0 +1,365 @@
+---
+- name: Prove application rollback retains database data and the current secret version
+  hosts: localhost
+  gather_facts: false
+  vars:
+    platform_rollback_drill_install_dir: /opt/developer-platform
+    platform_rollback_drill_image: hashicorp/http-echo:1.0.0
+  tasks:
+    - name: Require protected runner configuration and a platform inventory host
+      ansible.builtin.assert:
+        that:
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_rollback_drill_host is defined
+          - platform_rollback_drill_host in groups['all']
+          - platform_rollback_drill_install_dir | length > 1
+        fail_msg: >-
+          Supply the protected runner configuration and platform_rollback_drill_host from the
+          normal platform inventory. The host is used only for a bounded SQL marker check.
+      no_log: true
+
+    - name: Establish unique disposable rollback inputs
+      ansible.builtin.set_fact:
+        rollback_run_id: "{{ lookup('pipe', 'date +%s') }}-{{ 99999 | random }}"
+        rollback_project: "{{ platform_rollback_project | default('rollback-' + lookup('pipe', 'date +%s') + '-' + (9999 | random | string)) }}"
+
+    - name: Derive bounded database and marker names
+      ansible.builtin.set_fact:
+        rollback_database: "project_{{ rollback_project | replace('-', '_') }}"
+        rollback_marker: "marker-{{ rollback_run_id }}"
+
+    - name: Require safe generated rollback identifiers
+      ansible.builtin.assert:
+        that:
+          - rollback_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+          - rollback_database is match('^[a-z0-9_]+$')
+          - rollback_marker is match('^[a-z0-9-]+$')
+
+    - name: Exchange the runner credential
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: rollback_runner_token
+      no_log: true
+
+    - name: Use the initial rollback drill token
+      ansible.builtin.set_fact:
+        rollback_access_token: "{{ rollback_runner_token.json.access_token }}"
+      no_log: true
+
+    - name: Exercise data-aware rollback on a disposable project
+      block:
+        - name: Create the disposable rollback project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects"
+            method: POST
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body: {name: "{{ rollback_project }}"}
+            status_code: 201
+          no_log: true
+
+        - name: Deploy the first application revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body:
+              name: "{{ rollback_project }}"
+              image: "{{ platform_rollback_drill_image }}"
+              port: 5678
+              probe_profile: hello-world
+            status_code: 202
+          register: rollback_first_deployment
+          no_log: true
+
+        - name: Wait for the first application revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ rollback_first_deployment.json.status_url }}"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_first_operation
+          until:
+            - (rollback_first_operation.json.state | default('')) == 'succeeded'
+            - (rollback_first_operation.json.readiness.state | default('')) == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Insert a unique marker into the managed project database
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - exec
+              - -T
+              - postgres
+              - psql
+              - -v
+              - ON_ERROR_STOP=1
+              - -U
+              - postgres
+              - -d
+              - "{{ rollback_database }}"
+              - -c
+              - >-
+                CREATE TABLE IF NOT EXISTS platform_rollback_probe
+                (marker text PRIMARY KEY);
+                INSERT INTO platform_rollback_probe(marker)
+                VALUES ('{{ rollback_marker }}') ON CONFLICT DO NOTHING;
+            chdir: "{{ platform_rollback_drill_install_dir }}"
+          delegate_to: "{{ platform_rollback_drill_host }}"
+          become: true
+          changed_when: true
+          no_log: true
+
+        - name: Create the first write-only secret version
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/secrets/ROLLBACK_PROBE"
+            method: PUT
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body: {value: "first-{{ rollback_run_id }}"}
+            status_code: 202
+          no_log: true
+
+        - name: Wait for first secret activation
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/secrets"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_first_secret
+          until:
+            - (rollback_first_secret.json.activation.state | default('')) == 'active'
+            - rollback_first_secret.json.secrets | selectattr('name', 'equalto', 'ROLLBACK_PROBE') | list | length == 1
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Rotate to the current write-only secret version
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/secrets/ROLLBACK_PROBE"
+            method: PUT
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body: {value: "current-{{ rollback_run_id }}"}
+            status_code: 202
+          no_log: true
+
+        - name: Wait for rotated secret activation
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/secrets"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_rotated_secret
+          until:
+            - (rollback_rotated_secret.json.activation.state | default('')) == 'active'
+            - rollback_rotated_secret.json.secrets[0].version | int == 2
+            - rollback_rotated_secret.json.secrets[0].state == 'rotating'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Confirm the current secret version
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/secrets/ROLLBACK_PROBE/confirm"
+            method: POST
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_secret_confirmation
+          failed_when: >-
+            rollback_secret_confirmation.json.version | int != 2 or
+            rollback_secret_confirmation.json.state != 'active'
+          no_log: true
+
+        - name: Refresh the runner token before the second revision and rollback
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: rollback_refreshed_runner_token
+          no_log: true
+
+        - name: Use the refreshed rollback drill token
+          ansible.builtin.set_fact:
+            rollback_access_token: "{{ rollback_refreshed_runner_token.json.access_token }}"
+          no_log: true
+
+        - name: Deploy a second application revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}"
+            method: PUT
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata: {name: "{{ rollback_project }}"}
+              spec:
+                components:
+                  - name: api
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_rollback_drill_image }}"
+                      args: ['-listen=:5678', '-text=rollback-second-revision']
+                    ports: [{name: http, protocol: http, port: 5678}]
+            status_code: 202
+          register: rollback_second_deployment
+          no_log: true
+
+        - name: Wait for the second application revision
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ rollback_second_deployment.json.status_url }}"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_second_operation
+          until:
+            - (rollback_second_operation.json.state | default('')) == 'succeeded'
+            - (rollback_second_operation.json.readiness.state | default('')) == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Roll back the application to revision one
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/rollback"
+            method: POST
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body: {revision: 1}
+            status_code: 202
+          register: rollback_request
+          no_log: true
+
+        - name: Wait for application rollback
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}{{ rollback_request.json.status_url }}"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_operation
+          until:
+            - (rollback_operation.json.state | default('')) == 'succeeded'
+            - (rollback_operation.json.readiness.state | default('')) == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Require the database marker to survive application rollback
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - exec
+              - -T
+              - postgres
+              - psql
+              - -U
+              - postgres
+              - -d
+              - "{{ rollback_database }}"
+              - -Atc
+              - "SELECT count(*) FROM platform_rollback_probe WHERE marker='{{ rollback_marker }}';"
+            chdir: "{{ platform_rollback_drill_install_dir }}"
+          delegate_to: "{{ platform_rollback_drill_host }}"
+          become: true
+          register: rollback_marker_check
+          changed_when: false
+          failed_when: rollback_marker_check.stdout | trim != '1'
+          no_log: true
+
+        - name: Require rollback to retain the current secret metadata without disclosure
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/secrets"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_secret_after
+          failed_when: >-
+            rollback_secret_after.json.secrets | length != 1 or
+            rollback_secret_after.json.secrets[0].name != 'ROLLBACK_PROBE' or
+            rollback_secret_after.json.secrets[0].version | int != 2 or
+            rollback_secret_after.json.secrets[0].state != 'active' or
+            rollback_secret_after.json | to_json is search('first-' + rollback_run_id + '|current-' + rollback_run_id)
+          no_log: true
+
+        - name: Require revision metadata to disclose retained dependency semantics
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/revisions"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_revisions
+          failed_when: >-
+            rollback_revisions.json.current_revision | int != 3 or
+            rollback_revisions.json.revisions[0].dependencies.database.state != 'retained' or
+            rollback_revisions.json.revisions[0].dependencies.application_secrets.state != 'current_only'
+          no_log: true
+      always:
+        - name: Refresh the runner token before rollback-project cleanup
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: rollback_cleanup_response
+          failed_when: false
+          no_log: true
+
+        - name: Select the rollback cleanup token
+          ansible.builtin.set_fact:
+            rollback_cleanup_token: "{{ rollback_cleanup_response.get('json', {}).get('access_token', '') }}"
+          no_log: true
+
+        - name: Read rollback-project retirement scope
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/retirement-preview"
+            headers: {Authorization: "Bearer {{ rollback_cleanup_token }}"}
+            status_code: [200, 404]
+          register: rollback_cleanup_preview
+          failed_when: false
+          when: rollback_cleanup_token | length > 0
+          no_log: true
+
+        - name: Retire the disposable rollback project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ rollback_project }}/retire"
+            method: POST
+            headers: {Authorization: "Bearer {{ rollback_cleanup_token }}"}
+            body_format: json
+            body:
+              confirm_name: "{{ rollback_project }}"
+              scope_token: "{{ rollback_cleanup_preview.json.scope_token }}"
+            status_code: [200, 202, 404, 409]
+          register: rollback_cleanup
+          until: rollback_cleanup.status != 202
+          retries: 60
+          delay: 5
+          failed_when: false
+          when:
+            - rollback_cleanup_token | length > 0
+            - rollback_cleanup_preview.status | default(0) | int == 200
+          no_log: true
+
+    - name: Report non-secret data-aware rollback evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: {{ rollback_project }} restored application revision one while retaining the
+          database marker and active secret version 2 without disclosing either secret value.

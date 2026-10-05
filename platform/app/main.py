@@ -42,7 +42,7 @@ from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
 from .inventory import observe_inventory, observe_cluster_capacity
-from .capacity_admission import assess as assess_capacity
+from .capacity_admission import assess as assess_capacity, snapshot as capacity_admission_snapshot
 from .rollback import dependency_report
 from .logs import observe_logs
 from .component_status import observe_components
@@ -1537,9 +1537,10 @@ def review_data_service_recovery_request(request_id: UUID, body: DataServiceReco
 def operator_capacity(principal: Principal = Depends(current_principal)):
     require_platform_admin(principal)
     result = observe_cluster_capacity(runtime, log)
+    admission = capacity_admission_snapshot(runtime, log)
     required_audit(actor_for(principal), "capacity.inspect", "platform", "capacity", "succeeded", {},
-                   {"state": result["state"]})
-    return result
+                   {"state": result["state"], "admission_state": admission["state"]})
+    return {**result, "admission": admission}
 
 
 @app.get("/projects/{name}/logs")
