@@ -5,6 +5,10 @@
 Diagrams are maintained directly in the repository as Markdown files containing Mermaid blocks.
 
 - [Hybrid topology and failure boundaries](topology.md)
+- [Kubernetes infrastructure](../kubernetes-infrastructure.md)
+- [Platform application](../platform-application.md)
+- [Keycloak and Kubernetes authorization](../authorization-keycloak-kubernetes.md)
+- [Keycloak and Kubernetes authorization principles](../keycloak-kubernetes-authorization-principles.md)
 - [Provisioning and partial failures](provisioning.md)
 - [Component overview](../overview.md)
 - [Lifecycle state machine](../software-architecture.md)
