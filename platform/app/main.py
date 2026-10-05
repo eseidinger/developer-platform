@@ -256,6 +256,13 @@ async def validation_error(request: Request, exc: RequestValidationError):
             "code": error_code(getattr(exc, "body", None), exc.errors())})
     return await request_validation_exception_handler(request, exc)
 
+
+@app.exception_handler(psycopg.OperationalError)
+async def database_unavailable(request: Request, exc: psycopg.OperationalError):
+    """Fail closed without leaking connection details when the control database is unavailable."""
+    log.error("Platform database unavailable while handling request")
+    return JSONResponse(status_code=503, content={"detail": "Platform database is temporarily unavailable"})
+
 class Project(BaseModel):
     model_config = ConfigDict(extra="forbid")
 

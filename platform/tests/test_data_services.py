@@ -1,5 +1,6 @@
 import sys
 import unittest
+import asyncio
 from contextlib import nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
@@ -47,6 +48,11 @@ class DataServiceTests(unittest.TestCase):
             body = main.review_data_service_recovery_request(request_id, main.DataServiceRecoveryReview(status="acknowledged"), self.principal)
         self.assertEqual(body["status"], "acknowledged")
         self.assertEqual(body["project"], "smoke")
+
+    def test_database_connection_failure_maps_to_a_safe_service_unavailable_response(self):
+        response = asyncio.run(main.database_unavailable(Mock(), main.psycopg.OperationalError("sensitive detail")))
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.body, b'{"detail":"Platform database is temporarily unavailable"}')
 
 
 if __name__ == "__main__":
