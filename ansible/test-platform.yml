@@ -35,6 +35,22 @@
       register: runner_token_response
       no_log: true
 
+    - name: Verify the platform administrator can inspect Kubernetes capacity and node usage
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/operator/capacity"
+        headers:
+          Authorization: "Bearer {{ runner_token_response.json.access_token }}"
+        status_code: 200
+      register: capacity_response
+      failed_when: >-
+        capacity_response.status != 200 or
+        capacity_response.json.state != 'ok' or
+        (capacity_response.json.nodes | length) == 0 or
+        (capacity_response.json.nodes | selectattr('capacity.cpu', 'undefined') | list | length) != 0 or
+        (capacity_response.json.nodes | selectattr('allocatable.cpu', 'undefined') | list | length) != 0 or
+        (capacity_response.json.nodes | selectattr('usage_state', 'equalto', 'ok') | list | length) == 0
+      no_log: true
+
     - name: Exercise the platform using disposable identities and projects
       block:
         - name: Create empty project scopes before any application deployment

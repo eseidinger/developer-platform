@@ -84,6 +84,34 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/project
 
 Failure responses: 401 no or expired token; 403 missing grant; 404 unknown project or secret; 400 retire confirmation does not match the project name; 409 `revision_conflict`, `scope_changed`, `name_in_use`, `not_adopted`, `no_previous_version` or a retired project; 422 `invalid_spec`, `unsupported_capability`, `invalid_configuration` or `invalid_secret`; 503 dependency unavailable, retry the same request. Secret values are never returned, logged or audited. Secrets are in the backup bundle (ADR-015); previous values are not.
 
+## Inspect platform capacity
+
+Use a short-lived **platform-admin** token to inspect Kubernetes node capacity,
+allocatable CPU/memory, and current NodeMetrics usage. This is a cluster-wide
+operator surface, not a project endpoint:
+
+```bash
+curl --fail-with-body http://127.0.0.1:8000/operator/capacity \
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" | jq
+```
+
+`state: ok` means the Kubernetes API answered. Each node has `capacity` and
+`allocatable`; `usage_state: ok` means metrics-server supplied a current sample,
+while `missing` means no sample was returned. `state: unavailable` means the
+platform could not query either node inventory or NodeMetrics; it must not be
+interpreted as zero usage. The deployed `ansible/test-platform.yml` drill
+exercises this endpoint and requires at least one node with capacity,
+allocatable values, and a metrics sample.
+
+This endpoint is deliberately not a host-capacity or storage guarantee. Before
+raising project quotas or making a capacity promise, perform a protected,
+recorded manual load exercise: collect host CPU/memory/disk, Docker shared
+service usage, `kubectl top nodes` and project usage during representative load;
+then verify the workload receives an `Unschedulable` diagnostic before its
+requested resources exceed the agreed reserve. Confirm alert delivery for the
+chosen threshold at the same time. Do not run that exercise against production
+data without an approved load plan and rollback conditions.
+
 ## Restart an application
 
 `POST /projects/{name}/restart` (same `change` permission as PUT) queues a rolling restart of the current spec without creating a revision. It returns an operation ID; poll `GET /v1/operations/{id}`, where readiness reports `progressing` until the new pods are ready. Repeating the call while a restart is pending reuses that operation. Only `applied` projects can be restarted.

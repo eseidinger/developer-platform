@@ -533,7 +533,8 @@
             component_inventory.json.state == 'ok' and
             'api' in (component_inventory.json.deployments | map(attribute='name') | list) and
             'peer' in (component_inventory.json.services | list) and
-            (component_inventory.json.data_services | selectattr('type', 'equalto', 'postgresql') | list | length) == 1
+            (component_inventory.json.data_services | selectattr('type', 'equalto', 'postgresql') | list | length) == 1 and
+            (component_inventory.json.quota_comparisons | length) > 0
           retries: 12
           delay: 5
           no_log: true

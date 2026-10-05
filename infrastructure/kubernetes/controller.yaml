@@ -29,7 +29,8 @@ rules:
     resources: [pods/log]
     verbs: [get]
   - apiGroups: [metrics.k8s.io]
-    resources: [pods]
+    # Pod metrics support project usage; node metrics support the platform-admin capacity view.
+    resources: [pods, nodes]
     verbs: [get, list]
   - apiGroups: [apps]
     resources: [deployments]

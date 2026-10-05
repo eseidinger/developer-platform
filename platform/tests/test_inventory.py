@@ -23,7 +23,8 @@ class InventoryTests(unittest.TestCase):
             "Deployment": [item("web", {"replicas": 2, "template": {"spec": {"containers": [
                 {"name": "web", "resources": {"requests": {"cpu": "100m"}, "limits": {"cpu": "500m"}}}]}}}, {"ready_replicas": 1})],
             "Pod": [item("web-1", status={"phase": "Running"})], "Service": [item("web")],
-            "Ingress": [item("web")], "ResourceQuota": [item("project", status={"hard": {"cpu": "2"}})],
+            "Ingress": [item("web")], "ResourceQuota": [item("project", status={"hard": {
+                "requests.cpu": "250m", "limits.cpu": "900m"}})],
             "LimitRange": [item("defaults")]}
         resources.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
         result = observe_inventory(runtime, "smoke", logging.getLogger("test"))
@@ -33,6 +34,9 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(result["instances"][0]["phase"], "Running")
         self.assertEqual(result["declared_totals"], {"requests": {"cpu_millicores": 200, "memory_bytes": 0},
                                                        "limits": {"cpu_millicores": 1000, "memory_bytes": 0}})
+        self.assertEqual(result["quota_comparisons"], [{"name": "project", "resources": {
+            "requests.cpu": {"declared": 200, "hard": 250, "remaining": 50, "state": "within"},
+            "limits.cpu": {"declared": 1000, "hard": 900, "remaining": 0, "state": "exceeded"}}}])
         self.assertEqual(result["data_services"], [{"type": "postgresql", "name": "managed", "scope": "project"}])
 
     def test_provider_failure_is_not_reported_as_empty_inventory(self):
@@ -49,6 +53,12 @@ class InventoryTests(unittest.TestCase):
         result = observe_cluster_capacity(runtime, logging.getLogger("test"))
         self.assertEqual(result["nodes"], [{"name": "agent", "capacity": {"cpu": "4"},
                                              "allocatable": {"cpu": "3900m"}, "usage": {"cpu": "120m"}, "usage_state": "ok"}])
+
+    def test_cluster_capacity_labels_node_metrics_provider_failure(self):
+        runtime = Mock()
+        runtime.resources.get.side_effect = RuntimeError("forbidden")
+        result = observe_cluster_capacity(runtime, logging.getLogger("test"))
+        self.assertEqual(result, {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []})
 
     def test_resource_endpoint_combines_inventory_with_labelled_usage(self):
         conn = Mock()

@@ -39,6 +39,33 @@ def _totals(deployments: list[Any]) -> dict:
     return totals
 
 
+def _quota_comparisons(quotas: list[Any], declared: dict) -> list[dict]:
+    """Compare desired Deployment allocation with every applicable ResourceQuota hard limit."""
+    quantities = {
+        "requests.cpu": ("requests", "cpu_millicores", parse_cpu),
+        "requests.memory": ("requests", "memory_bytes", parse_memory),
+        "limits.cpu": ("limits", "cpu_millicores", parse_cpu),
+        "limits.memory": ("limits", "memory_bytes", parse_memory),
+    }
+    comparisons = []
+    for quota in quotas:
+        hard = _get(_get(quota, "status", {}), "hard", {}) or {}
+        resources = {}
+        for resource, (section, unit, parser) in quantities.items():
+            if resource not in hard:
+                continue
+            try:
+                limit = parser(hard[resource])
+            except (TypeError, ValueError):
+                continue
+            allocated = declared[section][unit]
+            resources[resource] = {"declared": allocated, "hard": limit,
+                                   "remaining": max(0, round(limit - allocated, 3)),
+                                   "state": "within" if allocated <= limit else "exceeded"}
+        comparisons.append({"name": _name(quota), "resources": resources})
+    return comparisons
+
+
 def observe_inventory(runtime: Any, project: str, log) -> dict:
     """Return safe Kubernetes topology; provider errors are explicit, never empty inventory."""
     if runtime is None:
@@ -54,17 +81,19 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
     except Exception as exc:
         log.error("Project inventory query failed project=%s error_type=%s", project, type(exc).__name__)
         return {"state": "unavailable", "reason": "KubernetesApiUnavailable"}
+    declared = _totals(deployments)
     return {"state": "ok", "reason": None, "namespace": namespace,
             "deployments": [{"name": _name(item), "replicas": _get(_get(item, "spec", {}), "replicas", 0),
                               "ready_replicas": _get(_get(item, "status", {}), "ready_replicas", 0),
                               "containers": _allocation(item)}
                             for item in deployments],
-            "declared_totals": _totals(deployments),
+            "declared_totals": declared,
             "instances": [{"name": _name(item), "phase": _get(_get(item, "status", {}), "phase", "Unknown")}
                           for item in pods],
             "services": [_name(item) for item in services],
             "routes": [_name(item) for item in ingresses],
             "quotas": [{"name": _name(item), "hard": _get(_get(item, "status", {}), "hard", {})} for item in quotas],
+            "quota_comparisons": _quota_comparisons(quotas, declared),
             "limit_ranges": [_name(item) for item in limits],
             "data_services": [{"type": "postgresql", "name": "managed", "scope": "project"}]}
 
