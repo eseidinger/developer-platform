@@ -1041,8 +1041,10 @@
             status_code: [200, 202, 404, 409]
           register: component_cleanup
           until: component_cleanup.status != 202
-          retries: 20
-          delay: 2
+          # Namespace garbage collection is asynchronous; allow the same bounded window used
+          # for workload operations before recording an incomplete cleanup.
+          retries: 60
+          delay: 5
           failed_when: false
           when: component_cleanup_preview.status | default(0) | int == 200
           no_log: true
