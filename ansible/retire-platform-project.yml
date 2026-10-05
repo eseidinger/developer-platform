@@ -8,6 +8,8 @@
     platform_retire_credential_cleanup_retries: 72
     platform_retire_credential_cleanup_delay_seconds: 5
     platform_retire_create_disposable_project: false
+    platform_retire_deploy_disposable_workload: true
+    platform_retire_disposable_image: hashicorp/http-echo:1.0.0
     platform_retire_verify_credential_revocation: false
   tasks:
     - name: Require protected runner configuration and a safe retirement target mode
@@ -66,6 +68,42 @@
       register: retirement_project_created
       no_log: true
 
+    - name: Deploy a minimal public workload in generated disposable-project mode
+      when:
+        - platform_retire_create_disposable_project | bool
+        - platform_retire_deploy_disposable_workload | bool
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects/{{ retirement_project }}"
+        method: PUT
+        headers:
+          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+        body_format: json
+        body:
+          name: "{{ retirement_project }}"
+          image: "{{ platform_retire_disposable_image }}"
+          port: 5678
+          probe_profile: hello-world
+        status_code: 202
+      register: retirement_workload_deployment
+      no_log: true
+
+    - name: Wait for the generated disposable workload to become ready
+      when:
+        - platform_retire_create_disposable_project | bool
+        - platform_retire_deploy_disposable_workload | bool
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}{{ retirement_workload_deployment.json.status_url }}"
+        headers:
+          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+        status_code: 200
+      register: retirement_workload_operation
+      until:
+        - (retirement_workload_operation.json.state | default('')) == 'succeeded'
+        - (retirement_workload_operation.json.readiness.state | default('')) == 'ready'
+      retries: 60
+      delay: 5
+      no_log: true
+
     - name: Create a disposable credential-revocation probe when explicitly requested
       when: platform_retire_verify_credential_revocation | bool
       ansible.builtin.uri:
@@ -112,6 +150,18 @@
           - retirement_preview.json.access.credentials_by_status is mapping
           - retirement_preview.json.retains.catalog_and_revisions | bool
         fail_msg: Retirement preview did not provide the required safe access and retained-data scope.
+      no_log: true
+
+    - name: Require generated workload retirement scope to include its route and workload
+      when:
+        - platform_retire_create_disposable_project | bool
+        - platform_retire_deploy_disposable_workload | bool
+      ansible.builtin.assert:
+        that:
+          - retirement_preview.json.removes | selectattr('kind', 'equalto', 'Deployment') | list | length == 1
+          - retirement_preview.json.removes | selectattr('kind', 'equalto', 'Ingress') | list | length == 1
+          - retirement_preview.json.routes | length == 1
+        fail_msg: Generated workload retirement preview is missing its Deployment or public route.
       no_log: true
 
     - name: Retire the explicitly confirmed project and its workload resources

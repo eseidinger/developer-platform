@@ -91,7 +91,7 @@ separate controlled procedures before declaring a rollback recovery complete.
 
 For a protected retirement acceptance, `ansible/retire-platform-project.yml` can create and verify a disposable credential probe when invoked with `-e platform_retire_verify_credential_revocation=true`. After retirement it proves the issued token is denied and polls the platform-administrator retirement view until provider cleanup reaches `revoked`. Do not enable this check for a shared CI credential or a non-disposable project. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active; the drill fails after its bounded wait rather than treating that condition as acceptance.
 
-To have the drill create and retire its own unique empty project, run:
+To have the drill create a unique disposable project, deploy a minimal public workload, and retire both workload and project, run:
 
 ```bash
 ansible-playbook -i ansible/inventory.yml ansible/retire-platform-project.yml \
