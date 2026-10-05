@@ -109,7 +109,7 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         spec = desired[1]
         if spec.get("components") is not None:
             manifests = component_resources(project, spec["components"], os.environ["POSTGRES_IP"], password,
-                                            spec.get("configuration"))
+                                            spec.get("configuration"), os.environ["APPS_DOMAIN"])
         else:
             manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
                                   os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
@@ -119,11 +119,11 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
                                 (application_id, revision)).fetchone()
         if remove and previous and previous[0].get("components") is not None:
             old_manifests = component_resources(project, previous[0]["components"], os.environ["POSTGRES_IP"],
-                                                password, previous[0].get("configuration"))
+                                                password, previous[0].get("configuration"), os.environ["APPS_DOMAIN"])
             desired_ids = {(m["apiVersion"], m["kind"], m["metadata"]["name"]) for m in manifests}
             for manifest in old_manifests:
                 identity = (manifest["apiVersion"], manifest["kind"], manifest["metadata"]["name"])
-                if manifest["kind"] in {"Deployment", "Service", "CronJob"} and identity not in desired_ids:
+                if manifest["kind"] in {"Deployment", "Service", "CronJob", "Ingress"} and identity not in desired_ids:
                     step = f"delete:{manifest['kind']}"
                     remove(manifest)
         if operation_kind == "restart":

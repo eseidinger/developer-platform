@@ -100,6 +100,12 @@ class EnvelopeContract(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "pod quota"):
             spec.to_flat(body)
 
+    def test_v1alpha2_exposes_one_declared_service_only(self):
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"}, "spec": {"components": [
+            {"name": "api", "type": "service", "runtime": {"type": "container", "image": "registry/api:v1"},
+             "ports": [{"name": "http", "protocol": "http", "port": 8080}], "exposure": "public"}]}}
+        self.assertEqual(spec.to_flat(body)["components"][0]["exposure"], "public")
+
 
 if __name__ == "__main__":
     unittest.main()

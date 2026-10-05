@@ -124,12 +124,12 @@ def resources(name, image, port, domain, database_ip, password, workload_resourc
     ]
 
 
-def component_resources(name, components, database_ip, password, configuration=None):
+def component_resources(name, components, database_ip, password, configuration=None, domain=None):
     """Build internal service and scheduled-job resources for a v1alpha2 application.
 
     Component names are scoped by the application namespace, so they form the stable
     DNS names used for service-to-service communication (``<component>`` or
-    ``<component>.<namespace>``).  This deliberately creates no public Ingress.
+    ``<component>.<namespace>``). Services remain private unless explicitly declared public.
     """
     validate_name(name)
     ipaddress.IPv4Address(database_ip)
@@ -186,7 +186,11 @@ def component_resources(name, components, database_ip, password, configuration=N
             "PGPASSWORD": password}),
         obj("networking.k8s.io/v1", "NetworkPolicy", "isolation", spec={
             "podSelector": {}, "policyTypes": ["Ingress", "Egress"],
-            "ingress": [{"from": [{"podSelector": {}}]}],
+            "ingress": [{"from": [{"podSelector": {}}]}] + [
+                {"from": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
+                            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}}}],
+                 "ports": [{"protocol": "TCP", "port": component["ports"][0]["port"]}]}
+                for component in components if component["type"] == "service" and component.get("exposure") == "public"],
             "egress": [{"to": [{"podSelector": {}}]},
                 {"to": [{"namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
                           "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}}}],
@@ -205,6 +209,11 @@ def component_resources(name, components, database_ip, password, configuration=N
                 manifests.append(obj("v1", "Service", component["name"], spec={"selector": component_labels,
                     "ports": [{"name": port["name"], "port": port["port"], "targetPort": port["name"]}
                               for port in ports]}))
+            if component.get("exposure") == "public":
+                manifests.append(obj("networking.k8s.io/v1", "Ingress", component["name"] + "-public", spec={
+                    "ingressClassName": "traefik", "rules": [{"host": component["name"] + "-" + name + "." + domain,
+                    "http": {"paths": [{"path": "/", "pathType": "Prefix", "backend": {
+                        "service": {"name": component["name"], "port": {"number": ports[0]["port"]}}}}]}}]}))
         else:
             manifests.append(obj("batch/v1", "CronJob", component["name"], spec={
                 "schedule": component["schedule"], "timeZone": component.get("time_zone", "UTC"),

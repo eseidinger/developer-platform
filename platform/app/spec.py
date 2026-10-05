@@ -152,6 +152,7 @@ class ServiceComponent(_Component):
     type: Literal["service"]
     ports: Optional[List[InternalPort]] = Field(default=None, max_length=10)
     replicas: int = Field(default=1, ge=1, le=5)
+    exposure: Literal["private", "public"] = "private"
     health: Optional[Health] = None
 
     @model_validator(mode="after")
@@ -186,6 +187,11 @@ class ComponentSpec(_Strict):
         names = [component.name for component in self.components]
         if len(set(names)) != len(names):
             raise ValueError("component names must be unique")
+        public = [c for c in self.components if isinstance(c, ServiceComponent) and c.exposure == "public"]
+        if len(public) > 1:
+            raise ValueError("only one public service component is supported")
+        if public and not public[0].ports:
+            raise ValueError("a public service component requires an internal HTTP port")
         # Namespace quota is 10 pods, 2 CPU/2Gi requests and 4 CPU/4Gi limits.
         # One Deployment may temporarily run both old and new replicas while it rolls.
         steady_pods = 0
@@ -284,6 +290,8 @@ def to_flat(body):
                 flat_component["resources"] = component.resources
             if isinstance(component, ServiceComponent):
                 flat_component["replicas"] = component.replicas
+                if component.exposure == "public":
+                    flat_component["exposure"] = "public"
                 if component.ports:
                     flat_component["ports"] = [port.model_dump() for port in component.ports]
                 if component.health:

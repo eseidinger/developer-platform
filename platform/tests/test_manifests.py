@@ -113,5 +113,13 @@ class WorkloadContract(unittest.TestCase):
         self.assertEqual(template(before, "web"), template(after, "web"))
         self.assertNotEqual(template(before, "api"), template(after, "api"))
 
+    def test_public_component_creates_only_its_route_and_traefik_policy_rule(self):
+        docs = component_resources("shop", [{"name": "api", "type": "service", "resolved_image": "x@sha256:a",
+            "ports": [{"name": "http", "port": 8080}], "exposure": "public"}], "172.30.80.10", "secret", domain="apps.test")
+        ingress = next(d for d in docs if d["kind"] == "Ingress")
+        self.assertEqual(ingress["spec"]["rules"][0]["host"], "api-shop.apps.test")
+        policy = next(d for d in docs if d["kind"] == "NetworkPolicy")
+        self.assertEqual(policy["spec"]["ingress"][1]["ports"][0]["port"], 8080)
+
 if __name__ == "__main__":
     unittest.main()

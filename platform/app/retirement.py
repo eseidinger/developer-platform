@@ -16,7 +16,7 @@ def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
     # Only kinds and names are used; the placeholder address and password never leave this function.
     if spec.get("components") is not None:
         manifests = component_resources(name, spec["components"], DOCUMENTATION_ADDRESS, "unused",
-                                        spec.get("configuration"))
+                                        spec.get("configuration"), domain)
     else:
         manifests = resources(name, spec.get("resolved_image", spec["image"]), spec.get("port", 8080),
                               domain, DOCUMENTATION_ADDRESS, "unused", spec.get("resources"), spec.get("configuration"))
