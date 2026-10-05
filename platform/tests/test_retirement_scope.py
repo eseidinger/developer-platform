@@ -3,7 +3,7 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from app.retirement import removal_scope
+from app.retirement import removal_scope, scope_token
 
 
 class RetirementScopeTests(unittest.TestCase):
@@ -22,6 +22,10 @@ class RetirementScopeTests(unittest.TestCase):
         self.assertEqual(scope["routes"], ["api-shop.apps.localhost"])
         self.assertEqual(scope["route"], "api-shop.apps.localhost")
         self.assertEqual(scope["retains"]["database"], "project_shop")
+
+    def test_access_inventory_changes_the_confirmation_token(self):
+        self.assertNotEqual(scope_token("shop", 4, {"grants_by_role": {"developer": 1}}),
+                            scope_token("shop", 4, {"grants_by_role": {"developer": 2}}))
 
 
 if __name__ == "__main__":

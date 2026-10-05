@@ -1764,6 +1764,13 @@ def current_retirement_scope(conn, name):
     return removal_scope(name, row[0], row[1], os.environ["APPS_DOMAIN"])
 
 
+def retirement_access_inventory(conn, name):
+    grants = conn.execute("SELECT role, count(*) FROM platform_grants WHERE scope_kind='project' AND scope_id=%s GROUP BY role", (name,)).fetchall()
+    credentials = conn.execute("SELECT status, count(*) FROM deployment_credentials WHERE project=%s GROUP BY status", (name,)).fetchall()
+    return {"grants_by_role": {role: count for role, count in grants},
+            "credentials_by_status": {state: count for state, count in credentials}}
+
+
 def namespace_exists(name):
     try:
         runtime.resources.get(api_version="v1", kind="Namespace").get(name="project-" + name)
@@ -1787,8 +1794,7 @@ def retirement_preview(name: str, principal: Principal = Depends(current_princip
         status = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
         scope = current_retirement_scope(conn, name) if status else None
         active = bool(status and conn.execute(ACTIVE_OPERATION_SQL, (name,)).fetchone())
-        grants = conn.execute("SELECT role, count(*) FROM platform_grants WHERE scope_kind='project' AND scope_id=%s GROUP BY role", (name,)).fetchall() if status else []
-        credentials = conn.execute("SELECT status, count(*) FROM deployment_credentials WHERE project=%s GROUP BY status", (name,)).fetchall() if status else []
+        access = retirement_access_inventory(conn, name) if status else {"grants_by_role": {}, "credentials_by_status": {}}
     if scope is None:
         required_audit(actor, "project.retire.preview", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
@@ -1796,9 +1802,9 @@ def retirement_preview(name: str, principal: Principal = Depends(current_princip
     blockers = (["active_operation"] if active else []) + (["already_retired"] if status[0] == "retired" else [])
     required_audit(actor, "project.retire.preview", "project", name, "succeeded",
                    {"project": name}, {"revision": scope["revision"], "blockers": blockers})
-    return {**scope, "status": status[0], "blockers": blockers,
-            "access": {"grants_by_role": {role: count for role, count in grants},
-                       "credentials_by_status": {state: count for state, count in credentials}}}
+    scope["access"] = access
+    scope["scope_token"] = retirement_scope_token(name, scope["revision"], access)
+    return {**scope, "status": status[0], "blockers": blockers}
 
 
 @app.post("/projects/{name}/retire")
@@ -1831,6 +1837,9 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                 if conn.execute(ACTIVE_OPERATION_SQL, (name,)).fetchone():
                     raise HTTPException(409, "Wait for active application operations before retirement")
                 scope = current_retirement_scope(conn, name)
+                if scope is not None:
+                    access = retirement_access_inventory(conn, name)
+                    scope["scope_token"] = retirement_scope_token(name, scope["revision"], access)
                 if confirmation.scope_token is not None:
                     if scope is None or not hmac.compare_digest(confirmation.scope_token, scope["scope_token"]):
                         required_audit(actor, "project.retire", "project", name, "rejected",
