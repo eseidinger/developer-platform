@@ -31,6 +31,8 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(result["deployments"][0], {"name": "web", "replicas": 2, "ready_replicas": 1,
                          "containers": [{"name": "web", "requests": {"cpu": "100m"}, "limits": {"cpu": "500m"}}]})
         self.assertEqual(result["instances"][0]["phase"], "Running")
+        self.assertEqual(result["declared_totals"], {"requests": {"cpu_millicores": 200, "memory_bytes": 0},
+                                                       "limits": {"cpu_millicores": 1000, "memory_bytes": 0}})
         self.assertEqual(result["data_services"], [{"type": "postgresql", "name": "managed", "scope": "project"}])
 
     def test_provider_failure_is_not_reported_as_empty_inventory(self):

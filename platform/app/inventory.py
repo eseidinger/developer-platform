@@ -1,5 +1,6 @@
 """Provider-neutral project resource inventory for the developer API."""
 from typing import Any
+from .usage import parse_cpu, parse_memory
 
 
 def _get(value: Any, name: str, default=None):
@@ -22,6 +23,22 @@ def _allocation(item: Any) -> list[dict]:
             for container in (_get(template, "containers", []) or [])]
 
 
+def _totals(deployments: list[Any]) -> dict:
+    totals = {section: {"cpu_millicores": 0.0, "memory_bytes": 0} for section in ("requests", "limits")}
+    for deployment in deployments:
+        replicas = _get(_get(deployment, "spec", {}), "replicas", 0) or 0
+        for container in _allocation(deployment):
+            for section in totals:
+                values = container[section]
+                if values.get("cpu") is not None:
+                    totals[section]["cpu_millicores"] += replicas * parse_cpu(values["cpu"])
+                if values.get("memory") is not None:
+                    totals[section]["memory_bytes"] += replicas * parse_memory(values["memory"])
+    for section in totals:
+        totals[section]["cpu_millicores"] = round(totals[section]["cpu_millicores"], 3)
+    return totals
+
+
 def observe_inventory(runtime: Any, project: str, log) -> dict:
     """Return safe Kubernetes topology; provider errors are explicit, never empty inventory."""
     if runtime is None:
@@ -42,6 +59,7 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
                               "ready_replicas": _get(_get(item, "status", {}), "ready_replicas", 0),
                               "containers": _allocation(item)}
                             for item in deployments],
+            "declared_totals": _totals(deployments),
             "instances": [{"name": _name(item), "phase": _get(_get(item, "status", {}), "phase", "Unknown")}
                           for item in pods],
             "services": [_name(item) for item in services],
