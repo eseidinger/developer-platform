@@ -1787,6 +1787,8 @@ def retirement_preview(name: str, principal: Principal = Depends(current_princip
         status = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
         scope = current_retirement_scope(conn, name) if status else None
         active = bool(status and conn.execute(ACTIVE_OPERATION_SQL, (name,)).fetchone())
+        grants = conn.execute("SELECT role, count(*) FROM platform_grants WHERE scope_kind='project' AND scope_id=%s GROUP BY role", (name,)).fetchall() if status else []
+        credentials = conn.execute("SELECT status, count(*) FROM deployment_credentials WHERE project=%s GROUP BY status", (name,)).fetchall() if status else []
     if scope is None:
         required_audit(actor, "project.retire.preview", "project", name, "rejected",
                        {"project": name}, {"reason": "not_found"})
@@ -1794,7 +1796,9 @@ def retirement_preview(name: str, principal: Principal = Depends(current_princip
     blockers = (["active_operation"] if active else []) + (["already_retired"] if status[0] == "retired" else [])
     required_audit(actor, "project.retire.preview", "project", name, "succeeded",
                    {"project": name}, {"revision": scope["revision"], "blockers": blockers})
-    return {**scope, "status": status[0], "blockers": blockers}
+    return {**scope, "status": status[0], "blockers": blockers,
+            "access": {"grants_by_role": {role: count for role, count in grants},
+                       "credentials_by_status": {state: count for state, count in credentials}}}
 
 
 @app.post("/projects/{name}/retire")

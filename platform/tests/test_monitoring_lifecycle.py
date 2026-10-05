@@ -142,6 +142,10 @@ class Catalog:
             self.result = [(row[1],)] if row else []
         elif query.startswith("SELECT 1 FROM projects"):
             self.result = [(1,)] if params[0] in self.rows else []
+        elif query.startswith("SELECT role, count(*) FROM platform_grants"):
+            self.result = [("developer", 1)]
+        elif query.startswith("SELECT status, count(*) FROM deployment_credentials"):
+            self.result = [("active", 1)]
         elif "FROM deployment_credentials WHERE issuer=" in query:
             self.result = []
         return self
@@ -500,6 +504,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue({("Namespace", "project-smoke"), ("Deployment", "smoke"), ("Ingress", "smoke"),
                          ("Secret", "database")} <= kinds)
         self.assertEqual(body["retains"]["database"], "project_smoke")
+        self.assertEqual(body["access"], {"grants_by_role": {"developer": 1},
+                                           "credentials_by_status": {"active": 1}})
         self.assertNotIn("PGPASSWORD", json.dumps(body))
         self.assertEqual(self.preview().json()["scope_token"], body["scope_token"])
 
