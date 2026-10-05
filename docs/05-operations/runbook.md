@@ -84,6 +84,16 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/project
 
 Failure responses: 401 no or expired token; 403 missing grant; 404 unknown project or secret; 400 retire confirmation does not match the project name; 409 `revision_conflict`, `scope_changed`, `name_in_use`, `not_adopted`, `no_previous_version` or a retired project; 422 `invalid_spec`, `unsupported_capability`, `invalid_configuration` or `invalid_secret`; 503 dependency unavailable, retry the same request. Secret values are never returned, logged or audited. Secrets are in the backup bundle (ADR-015); previous values are not.
 
+## Verify component public exposure
+
+Component services are private unless their v1alpha2 declaration sets `exposure: public`.
+Only one public service is supported; its hostname is `<component>-<project>.<APPS_DOMAIN>`.
+The component acceptance playbook verifies the generated route object. On the protected lab,
+after DNS and certificate readiness, make one HTTPS request to that hostname; then deploy a
+private revision and confirm the ingress is removed and no application response remains. This
+is a manual edge/TLS check because local unit tests and cluster object checks do not prove
+public DNS, certificate issuance, or proxy forwarding. Follow ADR-009 before testing a public domain.
+
 ## Inspect platform capacity
 
 Use a short-lived **platform-admin** token to inspect Kubernetes node capacity,

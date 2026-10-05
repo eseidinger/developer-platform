@@ -234,6 +234,7 @@
                   - name: api
                     type: service
                     replicas: 2
+                    exposure: public
                     runtime:
                       type: container
                       image: "{{ platform_component_service_image }}"
@@ -533,6 +534,7 @@
             component_inventory.json.state == 'ok' and
             'api' in (component_inventory.json.deployments | map(attribute='name') | list) and
             'peer' in (component_inventory.json.services | list) and
+            'api-public' in (component_inventory.json.routes | list) and
             (component_inventory.json.data_services | selectattr('type', 'equalto', 'postgresql') | list | length) == 1 and
             (component_inventory.json.quota_comparisons | length) > 0
           retries: 12

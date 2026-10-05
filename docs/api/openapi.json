@@ -849,6 +849,15 @@
       "ServiceComponent": {
         "additionalProperties": false,
         "properties": {
+          "exposure": {
+            "default": "private",
+            "enum": [
+              "private",
+              "public"
+            ],
+            "title": "Exposure",
+            "type": "string"
+          },
           "health": {
             "anyOf": [
               {
