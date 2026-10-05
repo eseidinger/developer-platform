@@ -5,6 +5,7 @@
   vars:
     platform_retire_project_retries: 20
     platform_retire_project_delay_seconds: 2
+    platform_retire_verify_credential_revocation: false
   tasks:
     - name: Require protected runner configuration and an exact project confirmation
       ansible.builtin.assert:
@@ -19,6 +20,35 @@
         fail_msg: >-
           Supply the protected runner configuration, platform_retire_project, and a matching
           platform_confirm_retire_project.
+      no_log: true
+
+    - name: Create a disposable credential-revocation probe when explicitly requested
+      when: platform_retire_verify_credential_revocation | bool
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects/{{ platform_retire_project }}/deployment-credentials"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+        body_format: json
+        body:
+          name: "retire-probe-{{ 999999 | random }}"
+          expires_in_days: 1
+        status_code: 201
+      register: retirement_probe
+      no_log: true
+
+    - name: Exchange the optional retirement probe credential before retirement
+      when: platform_retire_verify_credential_revocation | bool
+      ansible.builtin.uri:
+        url: "{{ retirement_probe.json.token_endpoint }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ retirement_probe.json.client_id }}"
+          client_secret: "{{ retirement_probe.json.client_secret }}"
+        status_code: 200
+      register: retirement_probe_token
       no_log: true
 
     - name: Exchange the runner credential for a fresh cleanup token
@@ -43,6 +73,16 @@
       register: retirement_preview
       no_log: true
 
+    - name: Require a scope-bound redacted access and retention inventory
+      ansible.builtin.assert:
+        that:
+          - retirement_preview.json.scope_token is string
+          - retirement_preview.json.access.grants_by_role is mapping
+          - retirement_preview.json.access.credentials_by_status is mapping
+          - retirement_preview.json.retains.catalog_and_revisions | bool
+        fail_msg: Retirement preview did not provide the required safe access and retained-data scope.
+      no_log: true
+
     - name: Retire the explicitly confirmed project and its workload resources
       ansible.builtin.uri:
         url: "{{ platform_api_url }}/projects/{{ platform_retire_project }}/retire"
@@ -58,6 +98,23 @@
       until: project_retirement.status == 200
       retries: "{{ platform_retire_project_retries | int }}"
       delay: "{{ platform_retire_project_delay_seconds | int }}"
+      no_log: true
+
+    - name: Require completed project retirement to retain data and revoke project access
+      ansible.builtin.assert:
+        that:
+          - project_retirement.json.data_retained | bool
+          - project_retirement.json.status == 'retired'
+        fail_msg: Retirement did not complete with the expected retained-data status.
+      no_log: true
+
+    - name: Require the optional retired-project credential to be denied
+      when: platform_retire_verify_credential_revocation | bool
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects"
+        headers:
+          Authorization: "Bearer {{ retirement_probe_token.json.access_token }}"
+        status_code: 403
       no_log: true
 
     - name: Report non-secret retirement evidence

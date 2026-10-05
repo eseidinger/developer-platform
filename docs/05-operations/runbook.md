@@ -84,7 +84,7 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/project
 
 Failure responses: 401 no or expired token; 403 missing grant; 404 unknown project or secret; 400 retire confirmation does not match the project name; 409 `revision_conflict`, `scope_changed`, `name_in_use`, `not_adopted`, `no_previous_version` or a retired project; 422 `invalid_spec`, `unsupported_capability`, `invalid_configuration` or `invalid_secret`; 503 dependency unavailable, retry the same request. Secret values are never returned, logged or audited. Secrets are in the backup bundle (ADR-015); previous values are not.
 
-For a protected retirement acceptance, use a disposable project deployment credential. After retirement completes, prove its next token/API request is denied and confirm its provider cleanup reaches `revoked`; do not perform this check with a shared CI credential. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active.
+For a protected retirement acceptance, `ansible/retire-platform-project.yml` can create and verify a disposable credential probe when invoked with `-e platform_retire_verify_credential_revocation=true`. After retirement it proves the issued token is denied; confirm provider cleanup reaches `revoked` separately. Do not enable this check for a shared CI credential or a non-disposable project. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active.
 
 ## Verify component public exposure
 
