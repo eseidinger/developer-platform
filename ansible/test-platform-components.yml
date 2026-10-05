@@ -233,6 +233,7 @@
                 components:
                   - name: api
                     type: service
+                    replicas: 2
                     runtime:
                       type: container
                       image: "{{ platform_component_service_image }}"
@@ -301,6 +302,27 @@
           retries: 60
           delay: 5
           no_log: true
+
+        - name: Require the declared API replica count in Kubernetes
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_component_kubectl }}"
+              - --kubeconfig
+              - "{{ platform_component_kubeconfig }}"
+              - get
+              - deployment
+              - api
+              - -n
+              - "project-{{ component_project }}"
+              - -o
+              - jsonpath={.spec.replicas}
+          delegate_to: "{{ platform_component_drill_host }}"
+          register: api_replicas
+          changed_when: false
+
+        - name: Assert the API service scaled to two replicas
+          ansible.builtin.assert:
+            that: api_replicas.stdout == '2'
 
         - name: Require stable internal Services on Kubernetes
           ansible.builtin.command:
