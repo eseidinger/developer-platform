@@ -1,0 +1,155 @@
+---
+- name: Prove managed PostgreSQL failure and recovery handling on a disposable project
+  hosts: localhost
+  gather_facts: false
+  vars:
+    platform_postgres_outage_acknowledgement: ''
+    platform_postgres_drill_install_dir: /opt/developer-platform
+  tasks:
+    - name: Require explicit approval and protected PostgreSQL outage-drill inputs
+      ansible.builtin.assert:
+        that:
+          - platform_allow_postgres_outage_drill | default(false) | bool
+          - platform_postgres_outage_acknowledgement == 'I_ACCEPT_POSTGRES_OUTAGE'
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_project_admin_token is defined
+          - platform_test_project is defined
+          - platform_postgres_drill_host is defined
+          - platform_postgres_drill_host in groups['all']
+          - platform_postgres_drill_install_dir | length > 1
+        fail_msg: >-
+          This drill stops PostgreSQL. Supply a deployed disposable project, its protected project
+          administrator token, a reachable inventory host, and explicit outage acknowledgement.
+      no_log: true
+
+    - name: Exchange the runner credential for recovery-request review
+      ansible.builtin.uri:
+        url: "{{ platform_oidc_token_url }}"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          grant_type: client_credentials
+          client_id: "{{ platform_test_runner_client_id }}"
+          client_secret: "{{ platform_test_runner_client_secret }}"
+        status_code: 200
+      register: postgres_runner_token
+      no_log: true
+
+    - name: Require the disposable project's database to be available before the outage
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/data-services"
+        headers:
+          Authorization: "Bearer {{ platform_project_admin_token }}"
+        status_code: 200
+      register: postgres_before_outage
+      failed_when: postgres_before_outage.json.services[0].state != 'available'
+      no_log: true
+
+    - name: Create a developer-visible recovery request before the controlled outage
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/data-services/recovery-requests"
+        method: POST
+        headers:
+          Authorization: "Bearer {{ platform_project_admin_token }}"
+        body_format: json
+        body:
+          reason: unavailable
+        status_code: 201
+      register: postgres_recovery_request
+      no_log: true
+
+    - name: Run the controlled PostgreSQL outage and restoration sequence
+      block:
+        - name: Stop PostgreSQL for the approved outage drill
+          ansible.builtin.command:
+            argv: [docker, compose, stop, postgres]
+            chdir: "{{ platform_postgres_drill_install_dir }}"
+          delegate_to: "{{ platform_postgres_drill_host }}"
+          become: true
+          changed_when: true
+
+        - name: Wait for developer-visible managed database unavailability
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/data-services"
+            headers:
+              Authorization: "Bearer {{ platform_project_admin_token }}"
+            status_code: 200
+          register: postgres_during_outage
+          until: postgres_during_outage.json.services[0].state == 'unavailable'
+          retries: 20
+          delay: 2
+          no_log: true
+
+        - name: Require Platform API readiness to fail while PostgreSQL is unavailable
+          ansible.builtin.command:
+            argv: [curl, --fail, --silent, --show-error, http://127.0.0.1:8000/readyz]
+          delegate_to: "{{ platform_postgres_drill_host }}"
+          become: true
+          register: postgres_outage_readyz
+          changed_when: false
+          failed_when: postgres_outage_readyz.rc == 0
+      always:
+        - name: Restore PostgreSQL even if the outage drill fails
+          ansible.builtin.command:
+            argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', postgres]
+            chdir: "{{ platform_postgres_drill_install_dir }}"
+          delegate_to: "{{ platform_postgres_drill_host }}"
+          become: true
+          changed_when: true
+
+    - name: Wait for Platform API readiness after PostgreSQL recovery
+      ansible.builtin.command:
+        argv: [curl, --fail, --silent, --show-error, http://127.0.0.1:8000/readyz]
+      delegate_to: "{{ platform_postgres_drill_host }}"
+      become: true
+      register: postgres_recovered_readyz
+      changed_when: false
+      until: postgres_recovered_readyz.rc == 0
+      retries: 30
+      delay: 2
+
+    - name: Require developer-visible managed database availability after recovery
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/data-services"
+        headers:
+          Authorization: "Bearer {{ platform_project_admin_token }}"
+        status_code: 200
+      register: postgres_after_recovery
+      until: postgres_after_recovery.json.services[0].state == 'available'
+      retries: 30
+      delay: 2
+      no_log: true
+
+    - name: Acknowledge the recovery request as platform administrator
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/operator/data-service-recovery-requests/{{ postgres_recovery_request.json.request_id }}"
+        method: PATCH
+        headers:
+          Authorization: "Bearer {{ postgres_runner_token.json.access_token }}"
+        body_format: json
+        body:
+          status: resolved
+        status_code: 200
+      no_log: true
+
+    - name: Require a redacted developer-visible resolved recovery outcome
+      ansible.builtin.uri:
+        url: "{{ platform_api_url }}/projects/{{ platform_test_project }}/data-services"
+        headers:
+          Authorization: "Bearer {{ platform_project_admin_token }}"
+        status_code: 200
+      register: postgres_recovery_outcome
+      failed_when: >-
+        postgres_recovery_outcome.json.services[0].state != 'available' or
+        postgres_recovery_outcome.json.latest_recovery_request.status != 'resolved' or
+        postgres_recovery_outcome.json | to_json is search('password|PGPASSWORD')
+      no_log: true
+
+    - name: Report non-secret PostgreSQL outage-drill evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: {{ platform_test_project }} exposed PostgreSQL unavailability, recovered API and
+          database readiness, and a resolved developer-visible recovery outcome.
