@@ -40,6 +40,7 @@ from .operations import operation_loop
 from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
+from .inventory import observe_inventory
 from .logs import observe_logs
 from .component_status import observe_components
 from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
@@ -1399,6 +1400,23 @@ def resource_usage(name: str, principal: Principal = Depends(current_principal))
     required_audit(actor, "project.usage.inspect", "project", name, "succeeded",
                    {"project": name}, {"state": usage["state"]})
     return {"project": name, **usage}
+
+
+@app.get("/projects/{name}/resources")
+def resource_inventory(name: str, principal: Principal = Depends(current_principal)):
+    """Authorized deployed-resource inventory; unavailable provider data is explicit."""
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    with connect() as conn:
+        known = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
+    if not known:
+        raise HTTPException(404, "Unknown project")
+    if known[0] == "empty":
+        raise HTTPException(409, "Project has not been deployed")
+    inventory = observe_inventory(runtime, name, log)
+    required_audit(actor, "project.resources.inspect", "project", name, "succeeded",
+                   {"project": name}, {"state": inventory["state"]})
+    return {"project": name, **inventory}
 
 
 @app.get("/projects/{name}/logs")
