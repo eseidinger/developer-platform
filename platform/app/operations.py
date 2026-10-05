@@ -123,7 +123,7 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
             desired_ids = {(m["apiVersion"], m["kind"], m["metadata"]["name"]) for m in manifests}
             for manifest in old_manifests:
                 identity = (manifest["apiVersion"], manifest["kind"], manifest["metadata"]["name"])
-                if manifest["kind"] in {"Deployment", "Service", "CronJob", "Ingress"} and identity not in desired_ids:
+                if manifest["kind"] in {"Deployment", "Service", "CronJob", "Ingress", "NetworkPolicy"} and identity not in desired_ids:
                     step = f"delete:{manifest['kind']}"
                     remove(manifest)
         if operation_kind == "restart":

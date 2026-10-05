@@ -150,7 +150,7 @@ class OperationWorkerTests(OperationWorkerFixture):
             self.assertTrue(self.run_one())
 
         build.assert_called_once_with("smoke", self.conn.spec["components"], "172.30.80.10",
-                                      "derived-password", None)
+                                      "derived-password", None, "apps.localhost")
         self.resources.assert_not_called()
         self.assertEqual([call.args[0]["kind"] for call in self.apply.call_args_list],
                          ["Secret", "Deployment", "CronJob"])
@@ -169,11 +169,15 @@ class OperationWorkerTests(OperationWorkerFixture):
         desired = [{"apiVersion": "v1", **self.secret()}, {"apiVersion": "apps/v1", **self.deployment()}]
         obsolete = [{"apiVersion": "v1", **self.secret()}, {"apiVersion": "apps/v1", **self.deployment()},
                     {"apiVersion": "batch/v1", "kind": "CronJob",
-                     "metadata": {"name": "worker", "namespace": "project-smoke"}}]
+                     "metadata": {"name": "worker", "namespace": "project-smoke"}},
+                    {"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+                     "metadata": {"name": "api-public", "namespace": "project-smoke"}},
+                    {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+                     "metadata": {"name": "api-egress", "namespace": "project-smoke"}}]
         with patch("app.operations.component_resources", side_effect=[desired, obsolete]):
             self.assertTrue(self.run_one())
 
-        self.remove.assert_called_once_with(obsolete[-1])
+        self.assertEqual([call.args[0] for call in self.remove.call_args_list], obsolete[2:])
         self.assertEqual([call.args[0]["kind"] for call in self.apply.call_args_list], ["Secret", "Deployment"])
         self.assertEqual(self.conn.state, "succeeded")
 

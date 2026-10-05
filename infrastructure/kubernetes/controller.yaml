@@ -18,6 +18,9 @@ rules:
   - apiGroups: [""]
     resources: [namespaces, secrets, services, resourcequotas, limitranges]
     verbs: [get, list, create, patch, update]
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [delete]
   # RBAC cannot scope delete by name; the admission policy below limits it to managed project namespaces.
   - apiGroups: [""]
     resources: [namespaces]
@@ -35,12 +38,18 @@ rules:
   - apiGroups: [apps]
     resources: [deployments]
     verbs: [get, list, create, patch, update]
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [delete]
   - apiGroups: [batch]
     resources: [cronjobs, jobs]
     verbs: [get, list, create, patch, update, delete]
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies, ingresses]
     verbs: [get, list, create, patch, update]
+  - apiGroups: [networking.k8s.io]
+    resources: [networkpolicies, ingresses]
+    verbs: [delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

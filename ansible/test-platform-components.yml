@@ -983,7 +983,7 @@
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ component_project }}/retirement-preview"
             headers:
-              Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+              Authorization: "Bearer {{ component_admin_access_token }}"
             status_code: 200
           register: component_retirement
           no_log: true
@@ -1033,7 +1033,7 @@
             url: "{{ platform_api_url }}/projects/{{ component_project }}/retire"
             method: POST
             headers:
-              Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+              Authorization: "Bearer {{ component_cleanup_runner_token.json.access_token }}"
             body_format: json
             body:
               confirm_name: "{{ component_project }}"
