@@ -4,7 +4,7 @@ Created: September 25, 2026. Status: **Proposed**.
 
 ## Context
 
-Developing Angular and the backend separately does not require separate deployments. The first platform contract should make small web applications easy to deploy.
+Developing a browser UI and backend separately does not require separate deployments. The first platform contract should make small web applications easy to deploy.
 
 ## Proposed decision
 

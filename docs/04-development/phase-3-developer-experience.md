@@ -6,7 +6,10 @@ Execution tracking: use the [phase task index and acceptance checkboxes](deliver
 
 ## Goal
 
-Offer the Python Platform API lifecycle as understandable self-service. Angular is a portal technology candidate; the final selection remains open.
+Offer the Python Platform API lifecycle as understandable self-service. The portal
+uses the React stack selected in
+[ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md); delivery follows the
+[UI implementation plan](ui-implementation-plan.md).
 
 ## Work packages
 
@@ -30,4 +33,7 @@ A database user uses credentials distinct from the application. Revoking a grant
 
 A reproducible demo flow with a template, documented role matrix, and UI/API compatibility checks. Demonstrate usability through the complete journey, not screenshots alone.
 
-Foundations: [Use cases](../01-product/use-cases.md), [Security](../02-architecture/security.md), [ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).
+Foundations: [Use cases](../01-product/use-cases.md),
+[Security](../02-architecture/security.md),
+[ADR-007](../03-decisions/ADR-007-ui-api-deployment.md), and
+[ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md).

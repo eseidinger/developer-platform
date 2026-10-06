@@ -24,6 +24,13 @@ Kubernetes/k3d is the only application workload environment. PostgreSQL stores p
 
 Docker hosts these platform components but is not a second application compute provider.
 
+The Phase 3 browser portal is a React and TypeScript client of the same public
+Platform API. Vite builds it; React Router owns navigation; TanStack Query owns
+remote state; OpenAPI-generated types and `openapi-fetch` define its contract
+boundary; and shadcn components over Base UI and Tailwind provide the UI layer. It
+does not own authorization or platform lifecycle state. See
+[ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md).
+
 ## Optional evolution
 
 If an explicit need justifies independently deploying a responsibility, [optional Phase 5](../04-development/phase-5-optional-architecture-expansion.md) retains a candidate allocation:

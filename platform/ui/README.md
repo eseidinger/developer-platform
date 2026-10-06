@@ -1,78 +1,65 @@
-# React + TypeScript + Vite
+# Platform UI
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This directory contains the React and TypeScript workspace for the Platform Control
+Plane portal. The technology selection is recorded in
+[ADR-019](../../docs/03-decisions/ADR-019-react-ui-technology-stack.md), and delivery
+is sequenced in the
+[UI implementation plan](../../docs/04-development/ui-implementation-plan.md).
 
-Currently, two official plugins are available:
+## Status
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+The toolchain and initial shadcn components are present, but the application is not
+implemented. `src/App.tsx` still renders the Vite demonstration. Generated shadcn
+files currently live under `@/`; the configured `@` alias actually resolves to
+`src`, so those files must move under `src/components`, `src/hooks`, and `src/lib`
+before application code imports them.
 
-## React Compiler
+The production build succeeds as of October 6, 2026. Lint is not yet clean: four
+generated component modules violate the React Refresh export rule and the generated
+mobile hook violates the hooks state-in-effect rule. The implementation plan treats
+these as foundation work, not accepted suppressions. The build also reports that
+`vite.config.ts` uses `__dirname`, which is incompatible with Vite's planned native
+configuration loader default.
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+## Selected stack
 
-Note: This will impact Vite dev & build performances.
-You can also try [the experimental native React Compiler support in plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md#rust-react-compiler) by using `compiler: true` in the plugin options instead of using the Babel plugin.
+- React 19, TypeScript 5, Vite 8, and React Compiler
+- React Router 7 and TanStack Query 5
+- OpenAPI TypeScript and `openapi-fetch`
+- React Hook Form, Zod, and Hook Form resolvers
+- shadcn Base Nova components using Base UI primitives
+- Tailwind CSS 4, Class Variance Authority, `cn`, and `tw-animate-css`
+- Lucide icons and the locally bundled Geist Variable font
+- Vitest, jsdom, Testing Library, and Playwright
+- ESLint and npm with the committed lockfile
 
-## Expanding the ESLint configuration
+Authentication remains one bounded selection: no OIDC browser client is installed
+yet. It must implement Authorization Code with PKCE, keep access tokens in memory,
+and preserve the provider-neutral authorization boundary described in the ADR.
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Current commands
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+Run these from `platform/ui`:
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+npm ci
+npm run dev
+npm run lint
+npm run build
+npm run preview
 ```
 
-You can also install [eslint-plugin-react-x](https://npmx.dev/package/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://npmx.dev/package/eslint-plugin-react-dom) for React-specific lint rules:
+The test, type-check, API generation, and browser-test scripts listed in the
+implementation plan do not exist yet and belong to foundation increment 0.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Contract and security boundaries
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+The backend-generated contract is
+[`docs/api/openapi.json`](../../docs/api/openapi.json). The UI will generate types
+from that file and call the API through one adapter. FastAPI remains authoritative
+for authorization, validation, lifecycle, audit, and redaction. Client-side role
+checks only explain or hide unavailable actions; they never grant them.
 
-```
+Bearer tokens and one-time secrets must not enter persistent browser storage, URLs,
+logs, query-cache keys, screenshots, or test artifacts. One-time secret responses
+must also bypass the ordinary TanStack Query cache.

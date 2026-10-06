@@ -812,6 +812,8 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. REST/curl and interactive API docs are not a domain CLI or self-service portal; no UI/API compatibility journey exists.
 
+  **Planning update (October 6, 2026):** [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md) selects the React UI stack, and the [UI implementation plan](ui-implementation-plan.md) defines gated foundation, authentication, read-only diagnosis, lifecycle, administration and operator increments. The dependency scaffold is present under `platform/ui`; its production build succeeds, but it still renders the Vite demonstration, generated components are outside the configured source alias, lint is not clean, and no portal acceptance journey exists. This records a decision and plan, not PLAN-006 implementation or acceptance evidence; CLI work remains separate within this task.
+
 - [ ] **PLAN-007 · 3** — Deliver the web/PostgreSQL template and reproducible create/deploy/diagnose journey; verify UI/API compatibility and document the role matrix. Prerequisites: PLAN-006.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. The sample project JSON/http-echo demonstrates provisioning only, not a combined UI/API template or application/database journey (ADR-007).
