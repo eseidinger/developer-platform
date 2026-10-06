@@ -293,7 +293,8 @@ class LifecycleTests(unittest.TestCase):
             response = self.client.get("/projects/smoke/logs?tail=50&since_seconds=60", headers=self.headers)
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"project": "smoke", **logs})
-            observe.assert_called_once_with(self.runtime, "smoke", main.log, 50, 60)
+            observe.assert_called_once_with(self.runtime, "smoke", main.log, 50, 60,
+                                            instance=None, search=None, after=None, before=None)
             self.assertEqual(self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke"))
             for query in ("tail=0", "tail=1001", "since_seconds=0", "since_seconds=86401"):
                 self.assertEqual(self.client.get("/projects/smoke/logs?" + query, headers=self.headers).status_code, 422)
