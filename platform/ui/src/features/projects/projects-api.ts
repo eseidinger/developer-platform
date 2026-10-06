@@ -23,6 +23,13 @@ type ProjectRevisions = {
   revisions: ProjectRevision[]
 }
 
+type ProjectDeployment = {
+  name: string
+  image: string
+  port: number
+  probe_profile: 'status' | 'hello-world'
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null
@@ -109,5 +116,15 @@ async function getProjectRevisions(name: string) {
   return parseProjectRevisions(data)
 }
 
-export { createEmptyProject, getProjectRevisions, listProjects, parseProjectList, parseProjectRevisions }
-export type { EmptyProjectCreate, ProjectRevision, ProjectRevisions, ProjectSummary }
+async function deployProject(name: string, body: ProjectDeployment) {
+  const { error, response } = await apiClient.PUT('/projects/{name}', {
+    params: { path: { name } },
+    body,
+  })
+  if (error) {
+    throw apiErrorFromResponse(response, error)
+  }
+}
+
+export { createEmptyProject, deployProject, getProjectRevisions, listProjects, parseProjectList, parseProjectRevisions }
+export type { EmptyProjectCreate, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary }

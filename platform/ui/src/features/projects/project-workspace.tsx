@@ -4,6 +4,7 @@ import { Link, useParams } from 'react-router-dom'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
+import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
 import { getProjectRevisions } from '@/features/projects/projects-api'
 
 function ProjectWorkspace() {
@@ -51,6 +52,7 @@ function ProjectWorkspace() {
                   : `Current desired revision: ${revisionsQuery.data.currentRevision}.`}
               </p>
             </div>
+            <DeployProjectDialog name={name} />
           </div>
           {revisionsQuery.data.revisions.length > 0 && (
             <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
