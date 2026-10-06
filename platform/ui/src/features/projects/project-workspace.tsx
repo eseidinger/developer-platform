@@ -12,6 +12,7 @@ import { SetSecretDialog } from '@/features/projects/set-secret-dialog'
 import { RollbackProjectDialog } from '@/features/projects/rollback-project-dialog'
 import { RestartProjectDialog } from '@/features/projects/restart-project-dialog'
 import { EditConfigurationDialog } from '@/features/projects/edit-configuration-dialog'
+import { RetireProjectDialog } from '@/features/projects/retire-project-dialog'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -80,9 +81,7 @@ function ProjectWorkspace() {
             <h1 id="project-title" className="text-3xl font-semibold tracking-tight">{name}</h1>
             <p className="mt-1 text-muted-foreground">Desired revision history and deployment context.</p>
           </div>
-          <Button variant="outline" onClick={() => void refreshProject()} disabled={isRefreshing}>
-            {isRefreshing ? 'Refreshing…' : 'Refresh'}
-          </Button>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void refreshProject()} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</Button><RetireProjectDialog name={name} /></div>
         </div>
       </div>
 

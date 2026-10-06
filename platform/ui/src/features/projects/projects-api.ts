@@ -38,6 +38,7 @@ type ResourceInventory = { state: string; reason: string | null; deployments: { 
 type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean; nextCursor: string | null }
 type ProjectConfiguration = { revision: number; values: Record<string, string>; activationState: string; activationReason: string | null }
 type ProjectSecrets = { secrets: { name: string; version: number; state: string; changedAt: string | null }[]; activationState: string; activationReason: string | null }
+type RetirementPreview = { removes: { kind: string; name: string }[]; retains: Record<string, string | boolean | null>; blockers: string[]; scopeToken: string }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -277,5 +278,23 @@ async function deleteProjectSecret(name: string, secret: string) {
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, restartProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
-export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage }
+async function getRetirementPreview(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/retirement-preview', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data); const retains = record && asRecord(record.retains)
+  if (!record || !retains || !Array.isArray(record.removes) || !Array.isArray(record.blockers) || typeof record.scope_token !== 'string' || record.blockers.some((blocker) => typeof blocker !== 'string')) throw new Error('The platform returned an invalid retirement preview.')
+  const removes = record.removes.map((resource) => { const item = asRecord(resource); if (!item || typeof item.kind !== 'string' || typeof item.name !== 'string') throw new Error('The platform returned an invalid retirement preview.'); return { kind: item.kind, name: item.name } })
+  if (Object.values(retains).some((value) => value !== null && typeof value !== 'string' && typeof value !== 'boolean')) throw new Error('The platform returned an invalid retirement preview.')
+  return { removes, retains: retains as Record<string, string | boolean | null>, blockers: record.blockers as string[], scopeToken: record.scope_token }
+}
+
+async function retireProject(name: string, scopeToken: string) {
+  const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || typeof record.status !== 'string') throw new Error('The platform returned an invalid retirement result.')
+  return { status: record.status }
+}
+
+export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
+export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
