@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
@@ -62,7 +63,9 @@ function ProjectList() {
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
           {projectsQuery.data.map((project) => (
             <li key={project.name} className="flex items-center justify-between gap-4 px-4 py-3">
-              <span className="font-medium">{project.name}</span>
+              <Link className="font-medium underline-offset-4 hover:underline" to={`/projects/${project.name}`}>
+                {project.name}
+              </Link>
               <span className="text-sm text-muted-foreground">{project.status}</span>
             </li>
           ))}
