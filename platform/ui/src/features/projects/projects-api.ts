@@ -328,6 +328,11 @@ async function createDeploymentCredential(name: string, body: { name: string; ex
   return { clientId: record.client_id, clientSecret: record.client_secret, tokenEndpoint: record.token_endpoint }
 }
 
+async function revokeDeploymentCredential(name: string, credentialId: string) {
+  const { error, response } = await apiClient.DELETE('/projects/{name}/deployment-credentials/{credential_id}', { params: { path: { name, credential_id: credentialId } } })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
 async function retireProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -336,5 +341,5 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
+export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, setProjectSecret, updateProjectConfiguration }
 export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
