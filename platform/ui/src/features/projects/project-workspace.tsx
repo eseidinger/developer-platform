@@ -1,3 +1,4 @@
+import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router-dom'
 
@@ -5,15 +6,22 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
-import { getProjectRevisions } from '@/features/projects/projects-api'
+import { getOperation, getProjectRevisions } from '@/features/projects/projects-api'
 
 function ProjectWorkspace() {
   const { name } = useParams()
   const { status } = useAuth()
+  const [operationId, setOperationId] = React.useState<string | null>(null)
   const revisionsQuery = useQuery({
     queryKey: ['projects', name, 'revisions'],
     queryFn: () => getProjectRevisions(name ?? ''),
     enabled: status === 'authenticated' && Boolean(name),
+  })
+  const operationQuery = useQuery({
+    queryKey: ['operations', operationId],
+    queryFn: () => getOperation(operationId ?? ''),
+    enabled: status === 'authenticated' && Boolean(operationId),
+    refetchInterval: (query) => ['queued', 'running'].includes(query.state.data?.state ?? '') ? 2_000 : false,
   })
 
   if (!name) {
@@ -40,6 +48,13 @@ function ProjectWorkspace() {
       {status !== 'authenticated' && <p className="text-sm text-muted-foreground">Sign in to view this project.</p>}
       {revisionsQuery.isLoading && <p role="status" className="text-sm text-muted-foreground">Loading project revisions…</p>}
       {revisionsQuery.isError && <p role="alert" className="text-sm text-destructive">{revisionsQuery.error.message}</p>}
+      {operationQuery.data && (
+        <section aria-labelledby="operation-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h2 id="operation-title" className="text-lg font-medium">Deployment operation</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Revision {operationQuery.data.revision}: {operationQuery.data.state}; readiness {operationQuery.data.readinessState}{operationQuery.data.readinessReason ? ` (${operationQuery.data.readinessReason})` : ''}.</p>
+          {operationQuery.data.errorCode && <p role="alert" className="mt-2 text-sm text-destructive">{operationQuery.data.errorCode}</p>}
+        </section>
+      )}
 
       {revisionsQuery.data && (
         <section aria-labelledby="revisions-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
@@ -52,7 +67,7 @@ function ProjectWorkspace() {
                   : `Current desired revision: ${revisionsQuery.data.currentRevision}.`}
               </p>
             </div>
-            <DeployProjectDialog name={name} />
+            <DeployProjectDialog name={name} onAccepted={(operation) => setOperationId(operation.operationId)} />
           </div>
           {revisionsQuery.data.revisions.length > 0 && (
             <ul className="mt-4 divide-y divide-border rounded-lg border border-border">

@@ -30,6 +30,9 @@ type ProjectDeployment = {
   probe_profile: 'status' | 'hello-world'
 }
 
+type OperationAccepted = { operationId: string; state: string; revision: number }
+type OperationStatus = { state: string; revision: number; errorCode: string | null; readinessState: string; readinessReason: string | null }
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null
@@ -117,14 +120,30 @@ async function getProjectRevisions(name: string) {
 }
 
 async function deployProject(name: string, body: ProjectDeployment) {
-  const { error, response } = await apiClient.PUT('/projects/{name}', {
+  const { data, error, response } = await apiClient.PUT('/projects/{name}', {
     params: { path: { name } },
     body,
   })
   if (error) {
     throw apiErrorFromResponse(response, error)
   }
+  const record = asRecord(data)
+  if (!record || typeof record.operation_id !== 'string' || typeof record.state !== 'string' || typeof record.revision !== 'number') {
+    throw new Error('The platform returned an invalid deployment operation.')
+  }
+  return { operationId: record.operation_id, state: record.state, revision: record.revision }
 }
 
-export { createEmptyProject, deployProject, getProjectRevisions, listProjects, parseProjectList, parseProjectRevisions }
-export type { EmptyProjectCreate, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary }
+async function getOperation(operationId: string) {
+  const { data, error, response } = await apiClient.GET('/v1/operations/{operation_id}', { params: { path: { operation_id: operationId } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  const readiness = record && asRecord(record.readiness)
+  if (!record || !readiness || typeof record.state !== 'string' || typeof record.revision !== 'number' || (record.error_code !== null && typeof record.error_code !== 'string') || typeof readiness.state !== 'string' || (readiness.reason !== null && typeof readiness.reason !== 'string')) {
+    throw new Error('The platform returned an invalid operation status.')
+  }
+  return { state: record.state, revision: record.revision, errorCode: record.error_code, readinessState: readiness.state, readinessReason: readiness.reason }
+}
+
+export { createEmptyProject, deployProject, getOperation, getProjectRevisions, listProjects, parseProjectList, parseProjectRevisions }
+export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary }

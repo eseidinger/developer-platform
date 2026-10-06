@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { deployProject } from '@/features/projects/projects-api'
+import { deployProject, type OperationAccepted } from '@/features/projects/projects-api'
 
 const deploymentSchema = z.object({
   image: z.string().trim().min(1, 'Enter a container image.').max(512),
@@ -18,7 +18,7 @@ const deploymentSchema = z.object({
 
 type DeploymentFormValues = z.infer<typeof deploymentSchema>
 
-function DeployProjectDialog({ name }: { name: string }) {
+function DeployProjectDialog({ name, onAccepted }: { name: string; onAccepted: (operation: OperationAccepted) => void }) {
   const [open, setOpen] = React.useState(false)
   const queryClient = useQueryClient()
   const form = useForm<DeploymentFormValues>({
@@ -27,9 +27,10 @@ function DeployProjectDialog({ name }: { name: string }) {
   })
   const deployment = useMutation({
     mutationFn: (values: DeploymentFormValues) => deployProject(name, { name, ...values }),
-    onSuccess: async () => {
+    onSuccess: async (operation) => {
       await queryClient.invalidateQueries({ queryKey: ['projects', name, 'revisions'] })
       await queryClient.invalidateQueries({ queryKey: ['projects'] })
+      onAccepted(operation)
       setOpen(false)
     },
   })
