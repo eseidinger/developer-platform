@@ -35,7 +35,7 @@ type OperationStatus = { state: string; revision: number; errorCode: string | nu
 type ResourceUsagePod = { name: string; cpuMillicores: number; memoryBytes: number; sampledAt: string }
 type ResourceUsage = { state: string; reason: string | null; observedAt: string; totals: { cpuMillicores: number; memoryBytes: number } | null; pods: ResourceUsagePod[] }
 type ResourceInventory = { state: string; reason: string | null; deployments: { name: string; replicas: number | null; readyReplicas: number | null }[] }
-type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean }
+type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean; nextCursor: string | null }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -180,13 +180,13 @@ async function getResourceInventory(name: string) {
   return { state: record.state, reason: record.reason, deployments }
 }
 
-async function getProjectLogs(name: string, tail: number, search: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', { params: { path: { name }, query: { tail, ...(search ? { search } : {}) } } })
+async function getProjectLogs(name: string, tail: number, search: string, after?: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', { params: { path: { name }, query: { tail, ...(search ? { search } : {}), ...(after ? { after } : {}) } } })
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.lines) || typeof record.truncated !== 'boolean') throw new Error('The platform returned invalid project logs.')
+  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.lines) || typeof record.truncated !== 'boolean' || (record.next_cursor !== null && typeof record.next_cursor !== 'string')) throw new Error('The platform returned invalid project logs.')
   const lines = record.lines.map((line) => { const item = asRecord(line); if (!item || typeof item.timestamp !== 'string' || typeof item.pod !== 'string' || typeof item.message !== 'string') throw new Error('The platform returned invalid project logs.'); return { timestamp: item.timestamp, pod: item.pod, message: item.message } })
-  return { state: record.state, reason: record.reason, lines, truncated: record.truncated }
+  return { state: record.state, reason: record.reason, lines, truncated: record.truncated, nextCursor: record.next_cursor }
 }
 
 export { createEmptyProject, deployProject, getOperation, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
