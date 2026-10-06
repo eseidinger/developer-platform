@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
-import { getOperation, getProjectRevisions, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
+import { getOperation, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -37,6 +37,10 @@ function ProjectWorkspace() {
     queryKey: ['projects', name, 'resources'], queryFn: () => getResourceInventory(name ?? ''),
     enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
     refetchInterval: 15_000,
+  })
+  const logsQuery = useQuery({
+    queryKey: ['projects', name, 'logs', 200], queryFn: () => getProjectLogs(name ?? ''),
+    enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
   })
 
   if (!name) {
@@ -91,6 +95,8 @@ function ProjectWorkspace() {
       {usageQuery.isError && <p role="alert" className="text-sm text-destructive">{usageQuery.error.message}</p>}
       {inventoryQuery.data && <section aria-labelledby="inventory-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><h2 id="inventory-title" className="text-lg font-medium">Deployment inventory</h2><p className="mt-2 text-sm text-muted-foreground">Inventory state: {inventoryQuery.data.state}{inventoryQuery.data.reason ? ` (${inventoryQuery.data.reason})` : ''}.</p>{inventoryQuery.data.deployments.map((deployment) => <p key={deployment.name} className="mt-2 text-sm"><span className="font-medium">{deployment.name}</span>: {deployment.readyReplicas ?? 'unknown'}/{deployment.replicas ?? 'unknown'} ready replicas</p>)}</section>}
       {inventoryQuery.isError && <p role="alert" className="text-sm text-destructive">{inventoryQuery.error.message}</p>}
+      {logsQuery.data && <section aria-labelledby="logs-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h2 id="logs-title" className="text-lg font-medium">Recent logs</h2><p className="mt-1 text-sm text-muted-foreground">State: {logsQuery.data.state}{logsQuery.data.reason ? ` (${logsQuery.data.reason})` : ''}.{logsQuery.data.truncated ? ' Output is truncated.' : ''}</p></div><Button variant="outline" onClick={() => void logsQuery.refetch()} disabled={logsQuery.isFetching}>{logsQuery.isFetching ? 'Refreshing…' : 'Refresh'}</Button></div>{logsQuery.data.lines.length > 0 && <ol className="mt-4 max-h-80 space-y-2 overflow-auto rounded-lg bg-muted p-4 text-xs leading-5">{logsQuery.data.lines.map((line, index) => <li key={`${line.timestamp}-${line.pod}-${index}`}><span className="text-muted-foreground">{line.timestamp} {line.pod}</span><br />{line.message}</li>)}</ol>}</section>}
+      {logsQuery.isError && <p role="alert" className="text-sm text-destructive">{logsQuery.error.message}</p>}
 
       {revisionsQuery.data && (
         <section aria-labelledby="revisions-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">

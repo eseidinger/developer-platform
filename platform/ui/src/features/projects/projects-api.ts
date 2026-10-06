@@ -35,6 +35,7 @@ type OperationStatus = { state: string; revision: number; errorCode: string | nu
 type ResourceUsagePod = { name: string; cpuMillicores: number; memoryBytes: number; sampledAt: string }
 type ResourceUsage = { state: string; reason: string | null; observedAt: string; totals: { cpuMillicores: number; memoryBytes: number } | null; pods: ResourceUsagePod[] }
 type ResourceInventory = { state: string; reason: string | null; deployments: { name: string; replicas: number | null; readyReplicas: number | null }[] }
+type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -179,5 +180,14 @@ async function getResourceInventory(name: string) {
   return { state: record.state, reason: record.reason, deployments }
 }
 
-export { createEmptyProject, deployProject, getOperation, getProjectRevisions, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
-export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceInventory, ResourceUsage }
+async function getProjectLogs(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', { params: { path: { name }, query: { tail: 200 } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.lines) || typeof record.truncated !== 'boolean') throw new Error('The platform returned invalid project logs.')
+  const lines = record.lines.map((line) => { const item = asRecord(line); if (!item || typeof item.timestamp !== 'string' || typeof item.pod !== 'string' || typeof item.message !== 'string') throw new Error('The platform returned invalid project logs.'); return { timestamp: item.timestamp, pod: item.pod, message: item.message } })
+  return { state: record.state, reason: record.reason, lines, truncated: record.truncated }
+}
+
+export { createEmptyProject, deployProject, getOperation, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
+export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceInventory, ResourceUsage }
