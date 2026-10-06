@@ -41,6 +41,7 @@ type ProjectSecrets = { secrets: { name: string; version: number; state: string;
 type RetirementPreview = { removes: { kind: string; name: string }[]; retains: Record<string, string | boolean | null>; blockers: string[]; scopeToken: string }
 type DataServices = { services: { type: string; name: string; state: string; reason: string | null }[]; latestRecoveryRequest: { reason: string; status: string; requestedAt: string; reviewedAt: string | null } | null }
 type DeploymentCredentials = { credentials: { id: string; name: string; status: string; createdAt: string; expiresAt: string; lastUsedAt: string | null; rotatedFrom: string | null }[] }
+type OneTimeDeploymentCredential = { clientId: string; clientSecret: string; tokenEndpoint: string }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -319,6 +320,14 @@ async function getDeploymentCredentials(name: string) {
   return { credentials }
 }
 
+async function createDeploymentCredential(name: string, body: { name: string; expiresInDays: number }): Promise<OneTimeDeploymentCredential> {
+  const { data, error, response } = await apiClient.POST('/projects/{name}/deployment-credentials', { params: { path: { name } }, body: { name: body.name, expires_in_days: body.expiresInDays } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || typeof record.client_id !== 'string' || typeof record.client_secret !== 'string' || typeof record.token_endpoint !== 'string') throw new Error('The platform returned an invalid deployment credential.')
+  return { clientId: record.client_id, clientSecret: record.client_secret, tokenEndpoint: record.token_endpoint }
+}
+
 async function retireProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -327,5 +336,5 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
-export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
+export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
+export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
