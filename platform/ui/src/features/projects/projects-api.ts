@@ -40,6 +40,7 @@ type ProjectConfiguration = { revision: number; values: Record<string, string>; 
 type ProjectSecrets = { secrets: { name: string; version: number; state: string; changedAt: string | null }[]; activationState: string; activationReason: string | null }
 type RetirementPreview = { removes: { kind: string; name: string }[]; retains: Record<string, string | boolean | null>; blockers: string[]; scopeToken: string }
 type DataServices = { services: { type: string; name: string; state: string; reason: string | null }[]; latestRecoveryRequest: { reason: string; status: string; requestedAt: string; reviewedAt: string | null } | null }
+type DeploymentCredentials = { credentials: { id: string; name: string; status: string; createdAt: string; expiresAt: string; lastUsedAt: string | null; rotatedFrom: string | null }[] }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -305,6 +306,19 @@ async function requestDataServiceRecovery(name: string, reason: 'unavailable' | 
   if (error) throw apiErrorFromResponse(response, error)
 }
 
+async function getDeploymentCredentials(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/deployment-credentials', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || !Array.isArray(record.credentials)) throw new Error('The platform returned an invalid deployment credential inventory.')
+  const credentials = record.credentials.map((credential) => {
+    const item = asRecord(credential)
+    if (!item || typeof item.credential_id !== 'string' || typeof item.name !== 'string' || typeof item.status !== 'string' || typeof item.created_at !== 'string' || typeof item.expires_at !== 'string' || (item.last_used_at !== null && typeof item.last_used_at !== 'string') || (item.rotated_from !== null && typeof item.rotated_from !== 'string')) throw new Error('The platform returned an invalid deployment credential inventory.')
+    return { id: item.credential_id, name: item.name, status: item.status, createdAt: item.created_at, expiresAt: item.expires_at, lastUsedAt: item.last_used_at, rotatedFrom: item.rotated_from }
+  })
+  return { credentials }
+}
+
 async function retireProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -313,5 +327,5 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
-export type { DataServices, EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
+export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
+export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
