@@ -36,7 +36,7 @@ type ResourceUsagePod = { name: string; cpuMillicores: number; memoryBytes: numb
 type ResourceUsage = { state: string; reason: string | null; observedAt: string; totals: { cpuMillicores: number; memoryBytes: number } | null; pods: ResourceUsagePod[] }
 type ResourceInventory = { state: string; reason: string | null; deployments: { name: string; replicas: number | null; readyReplicas: number | null }[] }
 type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean; nextCursor: string | null }
-type ProjectConfiguration = { revision: number; names: string[]; activationState: string; activationReason: string | null }
+type ProjectConfiguration = { revision: number; values: Record<string, string>; activationState: string; activationReason: string | null }
 type ProjectSecrets = { secrets: { name: string; version: number; state: string; changedAt: string | null }[]; activationState: string; activationReason: string | null }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -219,7 +219,21 @@ async function getProjectConfiguration(name: string) {
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data); const values = record && asRecord(record.values); const activation = record && asRecord(record.activation)
   if (!record || !values || !activation || typeof record.revision !== 'number' || typeof activation.state !== 'string' || (activation.reason !== null && typeof activation.reason !== 'string')) throw new Error('The platform returned invalid configuration status.')
-  return { revision: record.revision, names: Object.keys(values).sort(), activationState: activation.state, activationReason: activation.reason }
+  if (Object.values(values).some((value) => typeof value !== 'string')) throw new Error('The platform returned invalid configuration status.')
+  return { revision: record.revision, values: Object.fromEntries(Object.entries(values).sort(([left], [right]) => left.localeCompare(right))) as Record<string, string>, activationState: activation.state, activationReason: activation.reason }
+}
+
+async function updateProjectConfiguration(name: string, values: Record<string, string>, expectedRevision: number) {
+  const { data, error, response } = await apiClient.PUT('/projects/{name}/configuration', {
+    params: { path: { name }, header: { 'if-match': String(expectedRevision) } },
+    body: { values },
+  })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || typeof record.operation_id !== 'string' || typeof record.state !== 'string' || typeof record.revision !== 'number') {
+    throw new Error('The platform returned an invalid configuration operation.')
+  }
+  return { operationId: record.operation_id, state: record.state, revision: record.revision }
 }
 
 async function getProjectSecrets(name: string) {
@@ -263,5 +277,5 @@ async function deleteProjectSecret(name: string, secret: string) {
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, restartProject, revertProjectSecretRotation, rollbackProject, setProjectSecret }
+export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, restartProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
 export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage }
