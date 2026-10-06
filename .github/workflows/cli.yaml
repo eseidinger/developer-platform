@@ -1,0 +1,14 @@
+name: cli
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install -e 'platform/cli[dev]'
+      - run: python3 -m pytest platform/cli/tests
+      - run: python3 -m pip wheel --no-deps --wheel-dir /tmp/devplat-wheel platform/cli

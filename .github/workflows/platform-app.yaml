@@ -1,0 +1,14 @@
+name: platform app
+on: [push, pull_request]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - run: pip install -r platform/tests/requirements.txt
+      - run: python3 -m unittest discover -s platform/tests -v
+      - run: python3 -m compileall -q platform/app
