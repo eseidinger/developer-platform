@@ -73,6 +73,13 @@ host = "smoke." + cfg["APPS_DOMAIN"]
 
 
 def edge_status():
+    if host.endswith(".localhost"):
+        connection = http.client.HTTPConnection("127.0.0.1", 80, timeout=10)
+        try:
+            connection.request("GET", "/", headers={"Host": host})
+            return connection.getresponse().status
+        finally:
+            connection.close()
     # Connect to the local proxy but verify and route by the public hostname.
     connection = http.client.HTTPSConnection(host, 443, timeout=10)
     connection.sock = ssl.create_default_context().wrap_socket(
