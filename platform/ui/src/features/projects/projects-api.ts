@@ -300,6 +300,11 @@ async function getDataServices(name: string) {
   return { services, latestRecoveryRequest: recovery ? { reason: recovery.reason as string, status: recovery.status as string, requestedAt: recovery.requested_at as string, reviewedAt: recovery.reviewed_at as string | null } : null }
 }
 
+async function requestDataServiceRecovery(name: string, reason: 'unavailable' | 'access' | 'data_integrity' | 'other') {
+  const { error, response } = await apiClient.POST('/projects/{name}/data-services/recovery-requests', { params: { path: { name } }, body: { reason } })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
 async function retireProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -308,5 +313,5 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
+export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
 export type { DataServices, EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
