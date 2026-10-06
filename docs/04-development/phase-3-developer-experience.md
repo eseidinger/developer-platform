@@ -9,12 +9,14 @@ Execution tracking: use the [phase task index and acceptance checkboxes](deliver
 Offer the Python Platform API lifecycle as understandable self-service. The portal
 uses the React stack selected in
 [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md); delivery follows the
-[UI implementation plan](ui-implementation-plan.md).
+[UI implementation plan](ui-implementation-plan.md). CLI delivery follows the
+[CLI implementation plan](cli-implementation-plan.md).
 
 ## Work packages
 
 - Provide a portal that uses the Platform API for application metadata, ownership, deployments, redacted configuration, logs, and operations; do not reproduce server-side authorization rules in the UI.
-- Provide a CLI over the same versioned public contracts, with understandable errors and progress.
+- Provide a CLI over the same versioned public contracts, with understandable errors
+  and progress, following the [CLI implementation plan](cli-implementation-plan.md).
 - Create a web-application/PostgreSQL template, preferably as one deployable artifact.
 - Extend the accepted ADR-004 boundary by automating OIDC clients and controlled redirect URIs for hosted applications while preserving the separation between platform and application permissions. F-10 remains a Phase 3 requirement; deferring it requires an explicit scope amendment.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
