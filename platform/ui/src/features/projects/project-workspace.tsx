@@ -9,6 +9,7 @@ import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
 import { getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
 import { SecretActions } from '@/features/projects/secret-rotation-actions'
 import { SetSecretDialog } from '@/features/projects/set-secret-dialog'
+import { RollbackProjectDialog } from '@/features/projects/rollback-project-dialog'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -144,6 +145,7 @@ function ProjectWorkspace() {
                   </div>
                   <div className="flex items-center gap-3 text-sm text-muted-foreground">
                     {revision.current && <Badge variant="secondary">Current</Badge>}
+                    {!revision.current && revisionsQuery.data.currentRevision !== null && <RollbackProjectDialog name={name} targetRevision={revision.revision} currentRevision={revisionsQuery.data.currentRevision} onAccepted={(operation) => setOperationId(operation.operationId)} />}
                     <time dateTime={revision.createdAt}>{new Date(revision.createdAt).toLocaleString()}</time>
                   </div>
                 </li>
