@@ -225,5 +225,15 @@ async function setProjectSecret(name: string, secret: string, value: string) {
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-export { createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, setProjectSecret }
+async function confirmProjectSecretRotation(name: string, secret: string) {
+  const { error, response } = await apiClient.POST('/projects/{name}/secrets/{secret}/confirm', { params: { path: { name, secret } } })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
+async function revertProjectSecretRotation(name: string, secret: string) {
+  const { error, response } = await apiClient.POST('/projects/{name}/secrets/{secret}/revert', { params: { path: { name, secret } } })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
+export { confirmProjectSecretRotation, createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, revertProjectSecretRotation, setProjectSecret }
 export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage }
