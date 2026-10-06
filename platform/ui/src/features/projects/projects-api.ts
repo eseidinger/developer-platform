@@ -39,6 +39,7 @@ type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: s
 type ProjectConfiguration = { revision: number; values: Record<string, string>; activationState: string; activationReason: string | null }
 type ProjectSecrets = { secrets: { name: string; version: number; state: string; changedAt: string | null }[]; activationState: string; activationReason: string | null }
 type RetirementPreview = { removes: { kind: string; name: string }[]; retains: Record<string, string | boolean | null>; blockers: string[]; scopeToken: string }
+type DataServices = { services: { type: string; name: string; state: string; reason: string | null }[]; latestRecoveryRequest: { reason: string; status: string; requestedAt: string; reviewedAt: string | null } | null }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -288,6 +289,17 @@ async function getRetirementPreview(name: string) {
   return { removes, retains: retains as Record<string, string | boolean | null>, blockers: record.blockers as string[], scopeToken: record.scope_token }
 }
 
+async function getDataServices(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/data-services', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || !Array.isArray(record.services) || (record.latest_recovery_request !== null && !asRecord(record.latest_recovery_request))) throw new Error('The platform returned invalid data-service status.')
+  const services = record.services.map((service) => { const item = asRecord(service); if (!item || typeof item.type !== 'string' || typeof item.name !== 'string' || typeof item.state !== 'string' || (item.reason !== null && typeof item.reason !== 'string')) throw new Error('The platform returned invalid data-service status.'); return { type: item.type, name: item.name, state: item.state, reason: item.reason } })
+  const recovery = record.latest_recovery_request === null ? null : asRecord(record.latest_recovery_request)
+  if (recovery && (typeof recovery.reason !== 'string' || typeof recovery.status !== 'string' || typeof recovery.requested_at !== 'string' || (recovery.reviewed_at !== null && typeof recovery.reviewed_at !== 'string'))) throw new Error('The platform returned invalid data-service status.')
+  return { services, latestRecoveryRequest: recovery ? { reason: recovery.reason as string, status: recovery.status as string, requestedAt: recovery.requested_at as string, reviewedAt: recovery.reviewed_at as string | null } : null }
+}
+
 async function retireProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -296,5 +308,5 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
-export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
+export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, restartProject, retireProject, revertProjectSecretRotation, rollbackProject, setProjectSecret, updateProjectConfiguration }
+export type { DataServices, EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
