@@ -3,11 +3,11 @@ import { useQueryClient } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { confirmProjectSecretRotation, revertProjectSecretRotation } from '@/features/projects/projects-api'
+import { confirmProjectSecretRotation, deleteProjectSecret, revertProjectSecretRotation } from '@/features/projects/projects-api'
 
-type Action = 'confirm' | 'revert'
+type Action = 'confirm' | 'revert' | 'delete'
 
-function SecretRotationActions({ name, secret, activationState }: { name: string; secret: string; activationState: string }) {
+function SecretActions({ name, secret, state, activationState }: { name: string; secret: string; state: string; activationState: string }) {
   const [action, setAction] = React.useState<Action | null>(null)
   const [error, setError] = React.useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = React.useState(false)
@@ -25,7 +25,8 @@ function SecretRotationActions({ name, secret, activationState }: { name: string
     setError(null)
     try {
       if (action === 'confirm') await confirmProjectSecretRotation(name, secret)
-      else await revertProjectSecretRotation(name, secret)
+      else if (action === 'revert') await revertProjectSecretRotation(name, secret)
+      else await deleteProjectSecret(name, secret)
       await queryClient.invalidateQueries({ queryKey: ['projects', name, 'secrets'] })
       setAction(null)
     } catch (caught) {
@@ -37,24 +38,27 @@ function SecretRotationActions({ name, secret, activationState }: { name: string
 
   const canConfirm = activationState === 'active'
   const isConfirm = action === 'confirm'
+  const isRevert = action === 'revert'
+  const isDelete = action === 'delete'
 
   return (
     <>
       <div className="flex flex-wrap gap-2">
-        <Button size="sm" variant="outline" onClick={() => setAction('revert')}>Revert rotation</Button>
-        <Button size="sm" variant="outline" onClick={() => setAction('confirm')} disabled={!canConfirm}>Confirm rotation</Button>
+        {state === 'rotating' && <Button size="sm" variant="outline" onClick={() => setAction('revert')}>Revert rotation</Button>}
+        {state === 'rotating' && <Button size="sm" variant="outline" onClick={() => setAction('confirm')} disabled={!canConfirm}>Confirm rotation</Button>}
+        <Button size="sm" variant="destructive" onClick={() => setAction('delete')}>Delete</Button>
       </div>
-      {!canConfirm && <p className="text-xs text-muted-foreground">Confirmation is available after activation is active.</p>}
+      {state === 'rotating' && !canConfirm && <p className="text-xs text-muted-foreground">Confirmation is available after activation is active.</p>}
       <Dialog open={action !== null} onOpenChange={(open) => { if (!open) close() }}>
         <DialogContent showCloseButton={!isSubmitting}>
           <DialogHeader>
-            <DialogTitle>{isConfirm ? 'Confirm secret rotation' : 'Revert secret rotation'}</DialogTitle>
-            <DialogDescription>{isConfirm ? `This permanently discards the previous value for ${secret}.` : `This restores the previous value for ${secret} and restarts the workload.`}</DialogDescription>
+            <DialogTitle>{isConfirm ? 'Confirm secret rotation' : isRevert ? 'Revert secret rotation' : 'Delete project secret'}</DialogTitle>
+            <DialogDescription>{isConfirm ? `This permanently discards the previous value for ${secret}.` : isRevert ? `This restores the previous value for ${secret} and restarts the workload.` : `This permanently removes ${secret} and restarts the workload.`}</DialogDescription>
           </DialogHeader>
           {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={close} disabled={isSubmitting}>Cancel</Button>
-            <Button type="button" onClick={() => void submit()} disabled={isSubmitting}>{isSubmitting ? 'Applying…' : isConfirm ? 'Confirm rotation' : 'Revert rotation'}</Button>
+            <Button type="button" variant={isDelete ? 'destructive' : 'default'} onClick={() => void submit()} disabled={isSubmitting}>{isSubmitting ? 'Applying…' : isConfirm ? 'Confirm rotation' : isRevert ? 'Revert rotation' : 'Delete secret'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -62,4 +66,4 @@ function SecretRotationActions({ name, secret, activationState }: { name: string
   )
 }
 
-export { SecretRotationActions }
+export { SecretActions }

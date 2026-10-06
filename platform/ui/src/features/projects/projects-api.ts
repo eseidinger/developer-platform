@@ -235,5 +235,10 @@ async function revertProjectSecretRotation(name: string, secret: string) {
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, revertProjectSecretRotation, setProjectSecret }
+async function deleteProjectSecret(name: string, secret: string) {
+  const { error, response } = await apiClient.DELETE('/projects/{name}/secrets/{secret}', { params: { path: { name, secret } } })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
+export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, revertProjectSecretRotation, setProjectSecret }
 export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage }
