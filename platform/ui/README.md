@@ -8,18 +8,15 @@ is sequenced in the
 
 ## Status
 
-The toolchain and initial shadcn components are present, but the application is not
-implemented. `src/App.tsx` still renders the Vite demonstration. Generated shadcn
-files currently live under `@/`; the configured `@` alias actually resolves to
-`src`, so those files must move under `src/components`, `src/hooks`, and `src/lib`
-before application code imports them.
+Foundation increment 0 is implemented in source: generated shadcn code lives under
+`src`, the Vite demo has been removed, strict type-aware linting is enabled, the
+application has a routed shell and TanStack Query provider, and API types are
+generated from the committed OpenAPI document. Lint, type checking, component tests,
+and the production build pass.
 
-The production build succeeds as of October 6, 2026. Lint is not yet clean: four
-generated component modules violate the React Refresh export rule and the generated
-mobile hook violates the hooks state-in-effect rule. The implementation plan treats
-these as foundation work, not accepted suppressions. The build also reports that
-`vite.config.ts` uses `__dirname`, which is incompatible with Vite's planned native
-configuration loader default.
+Authentication, API feature queries, project lifecycle screens, and deployment
+integration have not been implemented yet. The next increment selects and integrates
+the OIDC client for Authorization Code with PKCE.
 
 ## Selected stack
 
@@ -45,12 +42,18 @@ Run these from `platform/ui`:
 npm ci
 npm run dev
 npm run lint
+npm run typecheck
+npm test
+npm run test:e2e
+npm run api:generate
+npm run api:check
+npm run check
 npm run build
 npm run preview
 ```
 
-The test, type-check, API generation, and browser-test scripts listed in the
-implementation plan do not exist yet and belong to foundation increment 0.
+`test:e2e` requires Playwright's browser binaries. Install them with
+`npx playwright install` when preparing a local browser-test environment.
 
 ## Contract and security boundaries
 

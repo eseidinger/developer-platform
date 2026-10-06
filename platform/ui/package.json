@@ -7,7 +7,14 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "api:generate": "openapi-typescript ../../docs/api/openapi.json -o src/api/generated/schema.ts",
+    "api:check": "npm run api:generate && git diff --exit-code -- src/api/generated/schema.ts",
+    "check": "npm run api:check && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

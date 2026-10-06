@@ -1,9 +1,12 @@
 # Platform UI Implementation Plan
 
-Status: planned as of October 6, 2026. This plan implements the React stack
-selected in [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md) for the
-Phase 3 Platform Control Plane portal. It does not change the hosted-application
-packaging choice in [ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).
+Status: in progress as of October 6, 2026. Foundation increment 0 is implemented
+in source and passes its local static, component-test, and production-build checks;
+authentication and product features remain planned. This plan implements the React
+stack selected in [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md)
+for the Phase 3 Platform Control Plane portal. It does not change the
+hosted-application packaging choice in
+[ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).
 
 ## Outcome and scope
 
