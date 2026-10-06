@@ -217,5 +217,13 @@ async function getProjectSecrets(name: string) {
   return { secrets, activationState: activation.state, activationReason: activation.reason }
 }
 
-export { createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
+async function setProjectSecret(name: string, secret: string, value: string) {
+  const { error, response } = await apiClient.PUT('/projects/{name}/secrets/{secret}', {
+    params: { path: { name, secret } },
+    body: { value },
+  })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
+export { createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, setProjectSecret }
 export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage }
