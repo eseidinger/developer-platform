@@ -180,8 +180,8 @@ async function getResourceInventory(name: string) {
   return { state: record.state, reason: record.reason, deployments }
 }
 
-async function getProjectLogs(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', { params: { path: { name }, query: { tail: 200 } } })
+async function getProjectLogs(name: string, tail: number, search: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', { params: { path: { name }, query: { tail, ...(search ? { search } : {}) } } })
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
   if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.lines) || typeof record.truncated !== 'boolean') throw new Error('The platform returned invalid project logs.')

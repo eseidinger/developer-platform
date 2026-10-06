@@ -16,6 +16,9 @@ function ProjectWorkspace() {
   const { name } = useParams()
   const { status } = useAuth()
   const [operationId, setOperationId] = React.useState<string | null>(null)
+  const [logTail, setLogTail] = React.useState(200)
+  const [logSearch, setLogSearch] = React.useState('')
+  const [appliedLogSearch, setAppliedLogSearch] = React.useState('')
   const revisionsQuery = useQuery({
     queryKey: ['projects', name, 'revisions'],
     queryFn: () => getProjectRevisions(name ?? ''),
@@ -39,7 +42,7 @@ function ProjectWorkspace() {
     refetchInterval: 15_000,
   })
   const logsQuery = useQuery({
-    queryKey: ['projects', name, 'logs', 200], queryFn: () => getProjectLogs(name ?? ''),
+    queryKey: ['projects', name, 'logs', logTail, appliedLogSearch], queryFn: () => getProjectLogs(name ?? '', logTail, appliedLogSearch),
     enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
   })
 
@@ -95,7 +98,7 @@ function ProjectWorkspace() {
       {usageQuery.isError && <p role="alert" className="text-sm text-destructive">{usageQuery.error.message}</p>}
       {inventoryQuery.data && <section aria-labelledby="inventory-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><h2 id="inventory-title" className="text-lg font-medium">Deployment inventory</h2><p className="mt-2 text-sm text-muted-foreground">Inventory state: {inventoryQuery.data.state}{inventoryQuery.data.reason ? ` (${inventoryQuery.data.reason})` : ''}.</p>{inventoryQuery.data.deployments.map((deployment) => <p key={deployment.name} className="mt-2 text-sm"><span className="font-medium">{deployment.name}</span>: {deployment.readyReplicas ?? 'unknown'}/{deployment.replicas ?? 'unknown'} ready replicas</p>)}</section>}
       {inventoryQuery.isError && <p role="alert" className="text-sm text-destructive">{inventoryQuery.error.message}</p>}
-      {logsQuery.data && <section aria-labelledby="logs-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h2 id="logs-title" className="text-lg font-medium">Recent logs</h2><p className="mt-1 text-sm text-muted-foreground">State: {logsQuery.data.state}{logsQuery.data.reason ? ` (${logsQuery.data.reason})` : ''}.{logsQuery.data.truncated ? ' Output is truncated.' : ''}</p></div><Button variant="outline" onClick={() => void logsQuery.refetch()} disabled={logsQuery.isFetching}>{logsQuery.isFetching ? 'Refreshing…' : 'Refresh'}</Button></div>{logsQuery.data.lines.length > 0 && <ol className="mt-4 max-h-80 space-y-2 overflow-auto rounded-lg bg-muted p-4 text-xs leading-5">{logsQuery.data.lines.map((line, index) => <li key={`${line.timestamp}-${line.pod}-${index}`}><span className="text-muted-foreground">{line.timestamp} {line.pod}</span><br />{line.message}</li>)}</ol>}</section>}
+      {logsQuery.data && <section aria-labelledby="logs-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h2 id="logs-title" className="text-lg font-medium">Recent logs</h2><p className="mt-1 text-sm text-muted-foreground">State: {logsQuery.data.state}{logsQuery.data.reason ? ` (${logsQuery.data.reason})` : ''}.{logsQuery.data.truncated ? ' Output is truncated.' : ''}</p></div><Button variant="outline" onClick={() => void logsQuery.refetch()} disabled={logsQuery.isFetching}>{logsQuery.isFetching ? 'Refreshing…' : 'Refresh'}</Button></div><form className="mt-4 flex gap-2" onSubmit={(event) => { event.preventDefault(); setAppliedLogSearch(logSearch) }}><input aria-label="Search logs" className="h-8 flex-1 rounded-lg border border-input bg-transparent px-2.5 text-sm" value={logSearch} maxLength={256} onChange={(event) => setLogSearch(event.target.value)} placeholder="Search logs" /><Button type="submit" variant="outline">Search</Button><select aria-label="Log line limit" className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm" value={logTail} onChange={(event) => setLogTail(Number(event.target.value))}><option value={50}>50 lines</option><option value={200}>200 lines</option><option value={500}>500 lines</option></select></form>{logsQuery.data.lines.length > 0 && <ol className="mt-4 max-h-80 space-y-2 overflow-auto rounded-lg bg-muted p-4 text-xs leading-5">{logsQuery.data.lines.map((line, index) => <li key={`${line.timestamp}-${line.pod}-${index}`}><span className="text-muted-foreground">{line.timestamp} {line.pod}</span><br />{line.message}</li>)}</ol>}</section>}
       {logsQuery.isError && <p role="alert" className="text-sm text-destructive">{logsQuery.error.message}</p>}
 
       {revisionsQuery.data && (
