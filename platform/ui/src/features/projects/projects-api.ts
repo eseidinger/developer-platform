@@ -6,6 +6,10 @@ type ProjectSummary = {
   status: string
 }
 
+type EmptyProjectCreate = {
+  name: string
+}
+
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
     return null
@@ -38,5 +42,12 @@ async function listProjects() {
   return parseProjectList(data)
 }
 
-export { listProjects, parseProjectList }
-export type { ProjectSummary }
+async function createEmptyProject(body: EmptyProjectCreate) {
+  const { error, response } = await apiClient.POST('/projects', { body })
+  if (error) {
+    throw apiErrorFromResponse(response, error)
+  }
+}
+
+export { createEmptyProject, listProjects, parseProjectList }
+export type { EmptyProjectCreate, ProjectSummary }

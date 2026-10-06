@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
+import { CreateProjectDialog } from '@/features/projects/create-project-dialog'
 import { listProjects } from '@/features/projects/projects-api'
 
 function ProjectList() {
@@ -27,13 +28,16 @@ function ProjectList() {
             Projects returned by your current platform grants.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => void projectsQuery.refetch()}
-          disabled={projectsQuery.isFetching}
-        >
-          {projectsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <CreateProjectDialog />
+          <Button
+            variant="outline"
+            onClick={() => void projectsQuery.refetch()}
+            disabled={projectsQuery.isFetching}
+          >
+            {projectsQuery.isFetching ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </div>
       </div>
 
       {projectsQuery.isLoading && (
