@@ -32,6 +32,8 @@ type ProjectDeployment = {
 
 type OperationAccepted = { operationId: string; state: string; revision: number }
 type OperationStatus = { state: string; revision: number; errorCode: string | null; readinessState: string; readinessReason: string | null }
+type ResourceUsagePod = { name: string; cpuMillicores: number; memoryBytes: number; sampledAt: string }
+type ResourceUsage = { state: string; reason: string | null; observedAt: string; totals: { cpuMillicores: number; memoryBytes: number } | null; pods: ResourceUsagePod[] }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -145,5 +147,23 @@ async function getOperation(operationId: string) {
   return { state: record.state, revision: record.revision, errorCode: record.error_code, readinessState: readiness.state, readinessReason: readiness.reason }
 }
 
-export { createEmptyProject, deployProject, getOperation, getProjectRevisions, listProjects, parseProjectList, parseProjectRevisions }
-export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary }
+async function getResourceUsage(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/resource-usage', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  const totals = record && asRecord(record.totals)
+  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || typeof record.observed_at !== 'string' || !Array.isArray(record.pods) || (record.totals !== null && (!totals || typeof totals.cpu_millicores !== 'number' || typeof totals.memory_bytes !== 'number'))) {
+    throw new Error('The platform returned invalid resource usage.')
+  }
+  const pods = record.pods.map((pod) => {
+    const item = asRecord(pod)
+    if (!item || typeof item.name !== 'string' || typeof item.cpu_millicores !== 'number' || typeof item.memory_bytes !== 'number' || typeof item.sampled_at !== 'string') {
+      throw new Error('The platform returned invalid resource usage.')
+    }
+    return { name: item.name, cpuMillicores: item.cpu_millicores, memoryBytes: item.memory_bytes, sampledAt: item.sampled_at }
+  })
+  return { state: record.state, reason: record.reason, observedAt: record.observed_at, totals: totals ? { cpuMillicores: totals.cpu_millicores as number, memoryBytes: totals.memory_bytes as number } : null, pods }
+}
+
+export { createEmptyProject, deployProject, getOperation, getProjectRevisions, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
+export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceUsage }

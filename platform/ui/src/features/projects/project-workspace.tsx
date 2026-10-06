@@ -6,7 +6,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
-import { getOperation, getProjectRevisions } from '@/features/projects/projects-api'
+import { getOperation, getProjectRevisions, getResourceUsage } from '@/features/projects/projects-api'
+
+function memoryMebibytes(bytes: number) {
+  return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
+}
 
 function ProjectWorkspace() {
   const { name } = useParams()
@@ -22,6 +26,12 @@ function ProjectWorkspace() {
     queryFn: () => getOperation(operationId ?? ''),
     enabled: status === 'authenticated' && Boolean(operationId),
     refetchInterval: (query) => ['queued', 'running'].includes(query.state.data?.state ?? '') ? 2_000 : false,
+  })
+  const usageQuery = useQuery({
+    queryKey: ['projects', name, 'resource-usage'],
+    queryFn: () => getResourceUsage(name ?? ''),
+    enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
+    refetchInterval: 15_000,
   })
 
   if (!name) {
@@ -55,6 +65,25 @@ function ProjectWorkspace() {
           {operationQuery.data.errorCode && <p role="alert" className="mt-2 text-sm text-destructive">{operationQuery.data.errorCode}</p>}
         </section>
       )}
+      {usageQuery.data && (
+        <section aria-labelledby="usage-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
+          <h2 id="usage-title" className="text-lg font-medium">Resource usage</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Metrics state: {usageQuery.data.state}{usageQuery.data.reason ? ` (${usageQuery.data.reason})` : ''}.</p>
+          {usageQuery.data.totals && (
+            <dl className="mt-4 grid grid-cols-2 gap-4 rounded-lg border border-border p-4 text-sm">
+              <div><dt className="text-muted-foreground">Total CPU</dt><dd className="mt-1 font-medium">{usageQuery.data.totals.cpuMillicores} mCPU</dd></div>
+              <div><dt className="text-muted-foreground">Total memory</dt><dd className="mt-1 font-medium">{memoryMebibytes(usageQuery.data.totals.memoryBytes)}</dd></div>
+            </dl>
+          )}
+          {usageQuery.data.pods.length > 0 && (
+            <ul className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">
+              {usageQuery.data.pods.map((pod) => <li key={pod.name} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"><span className="font-medium">{pod.name}</span><span className="text-muted-foreground">{pod.cpuMillicores} mCPU · {memoryMebibytes(pod.memoryBytes)}</span></li>)}
+            </ul>
+          )}
+          <p className="mt-1 text-xs text-muted-foreground">Observed {new Date(usageQuery.data.observedAt).toLocaleString()}.</p>
+        </section>
+      )}
+      {usageQuery.isError && <p role="alert" className="text-sm text-destructive">{usageQuery.error.message}</p>}
 
       {revisionsQuery.data && (
         <section aria-labelledby="revisions-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
