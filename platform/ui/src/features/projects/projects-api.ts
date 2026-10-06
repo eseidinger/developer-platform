@@ -34,6 +34,7 @@ type OperationAccepted = { operationId: string; state: string; revision: number 
 type OperationStatus = { state: string; revision: number; errorCode: string | null; readinessState: string; readinessReason: string | null }
 type ResourceUsagePod = { name: string; cpuMillicores: number; memoryBytes: number; sampledAt: string }
 type ResourceUsage = { state: string; reason: string | null; observedAt: string; totals: { cpuMillicores: number; memoryBytes: number } | null; pods: ResourceUsagePod[] }
+type ResourceInventory = { state: string; reason: string | null; deployments: { name: string; replicas: number | null; readyReplicas: number | null }[] }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -165,5 +166,18 @@ async function getResourceUsage(name: string) {
   return { state: record.state, reason: record.reason, observedAt: record.observed_at, totals: totals ? { cpuMillicores: totals.cpu_millicores as number, memoryBytes: totals.memory_bytes as number } : null, pods }
 }
 
-export { createEmptyProject, deployProject, getOperation, getProjectRevisions, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
-export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceUsage }
+async function getResourceInventory(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/resources', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.deployments)) throw new Error('The platform returned invalid resource inventory.')
+  const deployments = record.deployments.map((deployment) => {
+    const item = asRecord(deployment)
+    if (!item || typeof item.name !== 'string' || (item.replicas !== null && typeof item.replicas !== 'number') || (item.ready_replicas !== null && typeof item.ready_replicas !== 'number')) throw new Error('The platform returned invalid resource inventory.')
+    return { name: item.name, replicas: item.replicas, readyReplicas: item.ready_replicas }
+  })
+  return { state: record.state, reason: record.reason, deployments }
+}
+
+export { createEmptyProject, deployProject, getOperation, getProjectRevisions, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
+export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceInventory, ResourceUsage }

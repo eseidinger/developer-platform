@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
-import { getOperation, getProjectRevisions, getResourceUsage } from '@/features/projects/projects-api'
+import { getOperation, getProjectRevisions, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -30,6 +30,11 @@ function ProjectWorkspace() {
   const usageQuery = useQuery({
     queryKey: ['projects', name, 'resource-usage'],
     queryFn: () => getResourceUsage(name ?? ''),
+    enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
+    refetchInterval: 15_000,
+  })
+  const inventoryQuery = useQuery({
+    queryKey: ['projects', name, 'resources'], queryFn: () => getResourceInventory(name ?? ''),
     enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
     refetchInterval: 15_000,
   })
@@ -84,6 +89,8 @@ function ProjectWorkspace() {
         </section>
       )}
       {usageQuery.isError && <p role="alert" className="text-sm text-destructive">{usageQuery.error.message}</p>}
+      {inventoryQuery.data && <section aria-labelledby="inventory-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><h2 id="inventory-title" className="text-lg font-medium">Deployment inventory</h2><p className="mt-2 text-sm text-muted-foreground">Inventory state: {inventoryQuery.data.state}{inventoryQuery.data.reason ? ` (${inventoryQuery.data.reason})` : ''}.</p>{inventoryQuery.data.deployments.map((deployment) => <p key={deployment.name} className="mt-2 text-sm"><span className="font-medium">{deployment.name}</span>: {deployment.readyReplicas ?? 'unknown'}/{deployment.replicas ?? 'unknown'} ready replicas</p>)}</section>}
+      {inventoryQuery.isError && <p role="alert" className="text-sm text-destructive">{inventoryQuery.error.message}</p>}
 
       {revisionsQuery.data && (
         <section aria-labelledby="revisions-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
