@@ -36,6 +36,7 @@ type ResourceUsagePod = { name: string; cpuMillicores: number; memoryBytes: numb
 type ResourceUsage = { state: string; reason: string | null; observedAt: string; totals: { cpuMillicores: number; memoryBytes: number } | null; pods: ResourceUsagePod[] }
 type ResourceInventory = { state: string; reason: string | null; deployments: { name: string; replicas: number | null; readyReplicas: number | null }[] }
 type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean; nextCursor: string | null }
+type ProjectConfiguration = { revision: number; names: string[]; activationState: string; activationReason: string | null }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -189,5 +190,13 @@ async function getProjectLogs(name: string, tail: number, search: string, after?
   return { state: record.state, reason: record.reason, lines, truncated: record.truncated, nextCursor: record.next_cursor }
 }
 
-export { createEmptyProject, deployProject, getOperation, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
-export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceInventory, ResourceUsage }
+async function getProjectConfiguration(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/configuration', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data); const values = record && asRecord(record.values); const activation = record && asRecord(record.activation)
+  if (!record || !values || !activation || typeof record.revision !== 'number' || typeof activation.state !== 'string' || (activation.reason !== null && typeof activation.reason !== 'string')) throw new Error('The platform returned invalid configuration status.')
+  return { revision: record.revision, names: Object.keys(values).sort(), activationState: activation.state, activationReason: activation.reason }
+}
+
+export { createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
+export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceInventory, ResourceUsage }

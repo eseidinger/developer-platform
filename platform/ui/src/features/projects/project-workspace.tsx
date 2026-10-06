@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
-import { getOperation, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
+import { getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -46,6 +46,7 @@ function ProjectWorkspace() {
     queryKey: ['projects', name, 'logs', logTail, appliedLogSearch, logAfter], queryFn: () => getProjectLogs(name ?? '', logTail, appliedLogSearch, logAfter),
     enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
   })
+  const configurationQuery = useQuery({ queryKey: ['projects', name, 'configuration'], queryFn: () => getProjectConfiguration(name ?? ''), enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined })
 
   if (!name) {
     return null
@@ -101,6 +102,8 @@ function ProjectWorkspace() {
       {inventoryQuery.isError && <p role="alert" className="text-sm text-destructive">{inventoryQuery.error.message}</p>}
       {logsQuery.data && <section aria-labelledby="logs-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><div className="flex items-center justify-between gap-3"><div><h2 id="logs-title" className="text-lg font-medium">Recent logs</h2><p className="mt-1 text-sm text-muted-foreground">State: {logsQuery.data.state}{logsQuery.data.reason ? ` (${logsQuery.data.reason})` : ''}.{logsQuery.data.truncated ? ' Output is truncated.' : ''}</p></div><Button variant="outline" onClick={() => void logsQuery.refetch()} disabled={logsQuery.isFetching}>{logsQuery.isFetching ? 'Refreshing…' : 'Refresh'}</Button></div><form className="mt-4 flex gap-2" onSubmit={(event) => { event.preventDefault(); setLogAfter(undefined); setAppliedLogSearch(logSearch) }}><input aria-label="Search logs" className="h-8 flex-1 rounded-lg border border-input bg-transparent px-2.5 text-sm" value={logSearch} maxLength={256} onChange={(event) => setLogSearch(event.target.value)} placeholder="Search logs" /><Button type="submit" variant="outline">Search</Button><select aria-label="Log line limit" className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm" value={logTail} onChange={(event) => setLogTail(Number(event.target.value))}><option value={50}>50 lines</option><option value={200}>200 lines</option><option value={500}>500 lines</option></select></form>{logsQuery.data.lines.length > 0 && <ol className="mt-4 max-h-80 space-y-2 overflow-auto rounded-lg bg-muted p-4 text-xs leading-5">{logsQuery.data.lines.map((line, index) => <li key={`${line.timestamp}-${line.pod}-${index}`}><span className="text-muted-foreground">{line.timestamp} {line.pod}</span><br />{line.message}</li>)}</ol>}{logsQuery.data.nextCursor && <Button className="mt-4" variant="outline" onClick={() => setLogAfter(logsQuery.data?.nextCursor ?? undefined)}>Load newer logs</Button>}</section>}
       {logsQuery.isError && <p role="alert" className="text-sm text-destructive">{logsQuery.error.message}</p>}
+      {configurationQuery.data && <section aria-labelledby="configuration-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><h2 id="configuration-title" className="text-lg font-medium">Configuration</h2><p className="mt-2 text-sm text-muted-foreground">Revision {configurationQuery.data.revision}; activation {configurationQuery.data.activationState}{configurationQuery.data.activationReason ? ` (${configurationQuery.data.activationReason})` : ''}.</p><p className="mt-2 text-sm">{configurationQuery.data.names.length ? configurationQuery.data.names.join(', ') : 'No configuration keys.'}</p></section>}
+      {configurationQuery.isError && <p role="alert" className="text-sm text-destructive">{configurationQuery.error.message}</p>}
 
       {revisionsQuery.data && (
         <section aria-labelledby="revisions-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
