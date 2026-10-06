@@ -10,6 +10,7 @@ import { getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisi
 import { SecretActions } from '@/features/projects/secret-rotation-actions'
 import { SetSecretDialog } from '@/features/projects/set-secret-dialog'
 import { RollbackProjectDialog } from '@/features/projects/rollback-project-dialog'
+import { RestartProjectDialog } from '@/features/projects/restart-project-dialog'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -133,7 +134,10 @@ function ProjectWorkspace() {
                   : `Current desired revision: ${revisionsQuery.data.currentRevision}.`}
               </p>
             </div>
-            <DeployProjectDialog name={name} onAccepted={(operation) => setOperationId(operation.operationId)} />
+            <div className="flex flex-wrap gap-2">
+              {revisionsQuery.data.currentRevision !== null && <RestartProjectDialog name={name} onAccepted={(operation) => setOperationId(operation.operationId)} />}
+              <DeployProjectDialog name={name} onAccepted={(operation) => setOperationId(operation.operationId)} />
+            </div>
           </div>
           {revisionsQuery.data.revisions.length > 0 && (
             <ul className="mt-4 divide-y divide-border rounded-lg border border-border">

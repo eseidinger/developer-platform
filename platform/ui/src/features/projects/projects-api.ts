@@ -153,6 +153,16 @@ async function rollbackProject(name: string, revision: number, expectedRevision:
   return { operationId: record.operation_id, state: record.state, revision: record.revision }
 }
 
+async function restartProject(name: string) {
+  const { data, error, response } = await apiClient.POST('/projects/{name}/restart', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || typeof record.operation_id !== 'string' || typeof record.state !== 'string' || typeof record.revision !== 'number') {
+    throw new Error('The platform returned an invalid restart operation.')
+  }
+  return { operationId: record.operation_id, state: record.state, revision: record.revision }
+}
+
 async function getOperation(operationId: string) {
   const { data, error, response } = await apiClient.GET('/v1/operations/{operation_id}', { params: { path: { operation_id: operationId } } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -253,5 +263,5 @@ async function deleteProjectSecret(name: string, secret: string) {
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, revertProjectSecretRotation, rollbackProject, setProjectSecret }
+export { confirmProjectSecretRotation, createEmptyProject, deleteProjectSecret, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions, restartProject, revertProjectSecretRotation, rollbackProject, setProjectSecret }
 export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage }
