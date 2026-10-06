@@ -333,6 +333,14 @@ async function revokeDeploymentCredential(name: string, credentialId: string) {
   if (error) throw apiErrorFromResponse(response, error)
 }
 
+async function rotateDeploymentCredential(name: string, credentialId: string, body: { expiresInDays: number; overlapHours: number }): Promise<OneTimeDeploymentCredential> {
+  const { data, error, response } = await apiClient.POST('/projects/{name}/deployment-credentials/{credential_id}/rotate', { params: { path: { name, credential_id: credentialId } }, body: { expires_in_days: body.expiresInDays, overlap_hours: body.overlapHours } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || typeof record.client_id !== 'string' || typeof record.client_secret !== 'string' || typeof record.token_endpoint !== 'string') throw new Error('The platform returned an invalid rotated deployment credential.')
+  return { clientId: record.client_id, clientSecret: record.client_secret, tokenEndpoint: record.token_endpoint }
+}
+
 async function retireProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -341,5 +349,5 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, setProjectSecret, updateProjectConfiguration }
+export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, rotateDeploymentCredential, setProjectSecret, updateProjectConfiguration }
 export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
