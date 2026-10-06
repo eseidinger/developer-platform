@@ -37,6 +37,7 @@ type ResourceUsage = { state: string; reason: string | null; observedAt: string;
 type ResourceInventory = { state: string; reason: string | null; deployments: { name: string; replicas: number | null; readyReplicas: number | null }[] }
 type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean; nextCursor: string | null }
 type ProjectConfiguration = { revision: number; names: string[]; activationState: string; activationReason: string | null }
+type ProjectSecrets = { secrets: { name: string; version: number; state: string; changedAt: string | null }[]; activationState: string; activationReason: string | null }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -198,5 +199,23 @@ async function getProjectConfiguration(name: string) {
   return { revision: record.revision, names: Object.keys(values).sort(), activationState: activation.state, activationReason: activation.reason }
 }
 
-export { createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
-export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSummary, ResourceInventory, ResourceUsage }
+async function getProjectSecrets(name: string) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/secrets', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  const activation = record && asRecord(record.activation)
+  if (!record || !activation || !Array.isArray(record.secrets) || typeof activation.state !== 'string' || (activation.reason !== null && typeof activation.reason !== 'string')) {
+    throw new Error('The platform returned invalid secret metadata.')
+  }
+  const secrets = record.secrets.map((secret) => {
+    const item = asRecord(secret)
+    if (!item || typeof item.name !== 'string' || typeof item.version !== 'number' || typeof item.state !== 'string' || (item.changed_at !== null && typeof item.changed_at !== 'string')) {
+      throw new Error('The platform returned invalid secret metadata.')
+    }
+    return { name: item.name, version: item.version, state: item.state, changedAt: item.changed_at }
+  })
+  return { secrets, activationState: activation.state, activationReason: activation.reason }
+}
+
+export { createEmptyProject, deployProject, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects, parseProjectList, parseProjectRevisions }
+export type { EmptyProjectCreate, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage }

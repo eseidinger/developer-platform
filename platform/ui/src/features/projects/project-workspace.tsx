@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
-import { getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
+import { getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -47,6 +47,7 @@ function ProjectWorkspace() {
     enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined,
   })
   const configurationQuery = useQuery({ queryKey: ['projects', name, 'configuration'], queryFn: () => getProjectConfiguration(name ?? ''), enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined })
+  const secretsQuery = useQuery({ queryKey: ['projects', name, 'secrets'], queryFn: () => getProjectSecrets(name ?? ''), enabled: status === 'authenticated' && Boolean(name) && revisionsQuery.data?.currentRevision !== null && revisionsQuery.data !== undefined })
 
   if (!name) {
     return null
@@ -104,6 +105,8 @@ function ProjectWorkspace() {
       {logsQuery.isError && <p role="alert" className="text-sm text-destructive">{logsQuery.error.message}</p>}
       {configurationQuery.data && <section aria-labelledby="configuration-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><h2 id="configuration-title" className="text-lg font-medium">Configuration</h2><p className="mt-2 text-sm text-muted-foreground">Revision {configurationQuery.data.revision}; activation {configurationQuery.data.activationState}{configurationQuery.data.activationReason ? ` (${configurationQuery.data.activationReason})` : ''}.</p><p className="mt-2 text-sm">{configurationQuery.data.names.length ? configurationQuery.data.names.join(', ') : 'No configuration keys.'}</p></section>}
       {configurationQuery.isError && <p role="alert" className="text-sm text-destructive">{configurationQuery.error.message}</p>}
+      {secretsQuery.data && <section aria-labelledby="secrets-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><h2 id="secrets-title" className="text-lg font-medium">Secrets</h2><p className="mt-2 text-sm text-muted-foreground">Activation {secretsQuery.data.activationState}{secretsQuery.data.activationReason ? ` (${secretsQuery.data.activationReason})` : ''}. Values are never displayed.</p>{secretsQuery.data.secrets.length > 0 ? <ul className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">{secretsQuery.data.secrets.map((secret) => <li key={secret.name} className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"><div><p className="font-medium">{secret.name}</p><p className="text-muted-foreground">Version {secret.version} · {secret.state}</p></div><time className="text-muted-foreground" dateTime={secret.changedAt ?? undefined}>{secret.changedAt ? new Date(secret.changedAt).toLocaleString() : 'Change time unavailable'}</time></li>)}</ul> : <p className="mt-2 text-sm">No secret names configured.</p>}</section>}
+      {secretsQuery.isError && <p role="alert" className="text-sm text-destructive">{secretsQuery.error.message}</p>}
 
       {revisionsQuery.data && (
         <section aria-labelledby="revisions-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
