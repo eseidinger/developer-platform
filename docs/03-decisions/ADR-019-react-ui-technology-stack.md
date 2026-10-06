@@ -28,6 +28,7 @@ Use the following stack for the Platform Control Plane portal:
 | Compilation | React Compiler through the Vite Babel integration | Compiler-managed component optimization; manual memoization is reserved for measured cases |
 | Navigation | React Router 7 | Nested routes, route parameters, not-found handling, and URL-owned filter/tab state |
 | Remote state | TanStack Query 5 | API query cache, cancellation, invalidation, bounded polling, and mutation state |
+| Browser authentication | `oidc-client-ts` 3 | Provider-neutral OIDC Authorization Code with PKCE, discovery, callback validation, and in-memory user/token management |
 | API contract | `openapi-typescript` and `openapi-fetch` | Generate types from `docs/api/openapi.json` and expose one typed HTTP adapter |
 | Forms and validation | React Hook Form, Zod 4, and Hook Form resolvers | Accessible form state and client-side guidance derived from the API contract; server validation remains authoritative |
 | Components | shadcn Base Nova components over Base UI primitives | Repository-owned, composable and accessible component source rather than an opaque runtime design-system dependency |
@@ -58,13 +59,14 @@ calls. TanStack Query owns remote server state; React state owns transient view
 state; React Hook Form owns form state; shareable filters and selections belong in
 the URL. A separate client-side state framework is not selected.
 
-Human authentication uses provider-neutral OIDC Authorization Code with PKCE. The
-public browser client has no secret, and access tokens remain in memory: they are not
-written to local storage, session storage, logs, URLs, error reports, or query-cache
-keys. Selecting the concrete OIDC client library remains a bounded implementation
-choice because the current dependency set does not contain one. That choice must
-support issuer discovery, state and nonce validation, PKCE, callback cleanup,
-expiry, and logout without introducing Keycloak-specific authorization logic.
+Human authentication uses provider-neutral OIDC Authorization Code with PKCE through
+`oidc-client-ts`. The public browser client has no secret, and access tokens remain
+in memory: they are not written to local storage, session storage, logs, URLs, error
+reports, or query-cache keys. The client uses discovery, state and nonce validation,
+PKCE, callback cleanup, expiry, and local session clearing without introducing
+Keycloak-specific authorization logic. Its user store is an in-memory store; only the
+short-lived protocol transaction state needed to survive the redirect is in session
+storage.
 
 shadcn is used as a source registry. Generated components are reviewed, tested, and
 maintained as application code. Base UI supplies their behavior primitives. The

@@ -14,9 +14,12 @@ application has a routed shell and TanStack Query provider, and API types are
 generated from the committed OpenAPI document. Lint, type checking, component tests,
 and the production build pass.
 
-Authentication, API feature queries, project lifecycle screens, and deployment
-integration have not been implemented yet. The next increment selects and integrates
-the OIDC client for Authorization Code with PKCE.
+The browser authentication boundary uses `oidc-client-ts` for provider-neutral
+Authorization Code with PKCE. The public `/portal/config` endpoint supplies the
+issuer, client ID, and redirect URI. User and access-token state stays in memory;
+only the protocol transaction state needed across the redirect uses session storage.
+Live Keycloak validation, API feature queries, project lifecycle screens, and
+deployment integration are not implemented yet.
 
 ## Selected stack
 

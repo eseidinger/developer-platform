@@ -16,6 +16,20 @@ export default defineConfig({
       '@': path.resolve(import.meta.dirname, './src'),
     },
   },
+  server: {
+    proxy: {
+      '/portal/config': {
+        target: 'http://127.0.0.1:8000',
+        changeOrigin: false,
+      },
+      '/healthz': 'http://127.0.0.1:8000',
+      '/readyz': 'http://127.0.0.1:8000',
+      '/projects': 'http://127.0.0.1:8000',
+      '/v1': 'http://127.0.0.1:8000',
+      '/operator': 'http://127.0.0.1:8000',
+      '/platform': 'http://127.0.0.1:8000',
+    },
+  },
   test: {
     environment: 'jsdom',
     setupFiles: './src/test/setup.ts',

@@ -1,10 +1,11 @@
 # Platform UI Implementation Plan
 
-Status: in progress as of October 6, 2026. Foundation increment 0 is implemented
-in source and passes its local static, component-test, and production-build checks;
-authentication and product features remain planned. This plan implements the React
-stack selected in [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md)
-for the Phase 3 Platform Control Plane portal. It does not change the
+Status: in progress as of October 6, 2026. Foundation increment 0, the first
+authentication source increment, and an initial authenticated project-list view are
+implemented in source and pass local static, component-test, and production-build
+checks; the remaining product features are planned. This plan implements the React
+stack selected in [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md) for
+the Phase 3 Platform Control Plane portal. It does not change the
 hosted-application packaging choice in
 [ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).
 
@@ -97,9 +98,10 @@ bundle; editing the OpenAPI document without regenerating types fails CI.
 - Implement the application shell, skip link, responsive navigation, breadcrumbs,
   document titles, route-level error boundary, not-found view, and accessible
   loading/empty/error patterns.
-- Add `/portal/login`, `/portal/callback`, and authenticated routes. Select a focused
-  OIDC client after a short proof of discovery, PKCE, state/nonce validation, expiry,
-  logout, and Keycloak interoperability.
+- Use `oidc-client-ts` for discovery, Authorization Code with PKCE, state/nonce
+  validation, and callback handling. Wire the existing public `/portal/config`
+  endpoint to the client, retain user/token state only in memory, and prove the flow
+  against the Keycloak reference deployment.
 - Hold access tokens only in memory. Remove authorization parameters from browser
   history after callback; never include tokens in storage, logs, telemetry, query
   keys, rendered errors, or copied diagnostics.
@@ -114,8 +116,10 @@ redaction tests pass.
 
 ### 2. Deliver the read-only project workspace
 
-- Add an authorized project list with search and explicit loading, empty, unavailable,
-  and forbidden states.
+- An initial authorized project list is implemented with loading, empty, error, and
+  refresh states. It validates the currently `unknown` OpenAPI response at the UI
+  boundary and renders only project name and lifecycle status. Search, project detail,
+  and the remaining views below are still planned.
 - Add a project workspace with overview, components, resources, resource usage,
   revisions, configuration metadata, secret metadata, and deployment status.
 - Add a logs view with component and instance filters, time bounds, search, bounded
@@ -225,9 +229,9 @@ or a successful production build alone are not completion evidence.
 
 ## Known risks and decisions still bounded by the plan
 
-- **OIDC client:** no browser OIDC library is currently selected. Choose the smallest
-  maintained client that meets the security gate; document it in ADR-019 if it becomes
-  a durable architectural dependency.
+- **OIDC integration:** `oidc-client-ts` is selected and source integration uses the
+  existing public configuration endpoint. Live Keycloak login, expiry, callback
+  failure, and logout validation remain required before the authentication gate closes.
 - **Control-plane deployment:** same-origin FastAPI asset serving is the proposed first
   increment, not a consequence of ADR-007. Validate build integration, deep links,
   cache behavior, and rollback before accepting it permanently.
