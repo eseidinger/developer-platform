@@ -1,5 +1,9 @@
 name: cli
-on: [push, pull_request]
+on:
+  push:
+    branches: ["**"]
+    tags: ["cli-v*"]
+  pull_request:
 
 jobs:
   test:
@@ -12,3 +16,29 @@ jobs:
       - run: pip install -e 'platform/cli[dev]'
       - run: python3 -m pytest platform/cli/tests
       - run: python3 -m pip wheel --no-deps --wheel-dir /tmp/devplat-wheel platform/cli
+
+  publish:
+    name: Publish CLI to PyPI
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/cli-v')
+    runs-on: ubuntu-latest
+    environment: pypi
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - name: Build distribution
+        working-directory: platform/cli
+        run: |
+          python3 -m pip install --upgrade build
+          python3 -m build --outdir dist
+      - name: Check distribution metadata
+        run: python3 -m pipx run twine check platform/cli/dist/*
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
