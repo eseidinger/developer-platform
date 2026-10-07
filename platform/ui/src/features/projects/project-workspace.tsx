@@ -13,6 +13,7 @@ import { RollbackProjectDialog } from '@/features/projects/rollback-project-dial
 import { RestartProjectDialog } from '@/features/projects/restart-project-dialog'
 import { EditConfigurationDialog } from '@/features/projects/edit-configuration-dialog'
 import { RetireProjectDialog } from '@/features/projects/retire-project-dialog'
+import { PurgeProjectDialog } from '@/features/projects/purge-project-dialog'
 import { RequestRecoveryDialog } from '@/features/projects/request-recovery-dialog'
 import { CreateDeploymentCredentialDialog } from '@/features/projects/create-deployment-credential-dialog'
 import { RevokeDeploymentCredentialDialog } from '@/features/projects/revoke-deployment-credential-dialog'
@@ -88,7 +89,7 @@ function ProjectWorkspace() {
             <h1 id="project-title" className="text-3xl font-semibold tracking-tight">{name}</h1>
             <p className="mt-1 text-muted-foreground">Desired revision history and deployment context.</p>
           </div>
-          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void refreshProject()} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</Button><RetireProjectDialog name={name} /></div>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void refreshProject()} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</Button>{revisionsQuery.data?.status === 'retired' ? <PurgeProjectDialog name={name} /> : <RetireProjectDialog name={name} />}</div>
         </div>
       </div>
 

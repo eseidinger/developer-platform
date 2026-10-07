@@ -49,7 +49,7 @@ from .logs import observe_logs
 from .component_status import observe_components
 from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
                       remove_secret, revert_secret, roll_pods, validate_secret_name, validate_secret_value, write_secret)
-from .retirement import removal_scope, scope_token as retirement_scope_token
+from .retirement import purge_scope_token, removal_scope, scope_token as retirement_scope_token
 from .security_alerts import security_alert_loop
 from .deployment_credentials import access_scope, cleanup_loop as credential_cleanup_loop
 from .deployment_credentials import initialize as initialize_deployment_credentials, record_use
@@ -1424,10 +1424,10 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
     if not rows:
         required_audit(actor, "project.revisions.list", "project", name, "succeeded",
                        {"project": name}, {"count": 0})
-        return {"project": name, "current_revision": None, "revisions": []}
+        return {"project": name, "status": project[0], "current_revision": None, "revisions": []}
     required_audit(actor, "project.revisions.list", "project", name, "succeeded",
                    {"project": name}, {"count": len(rows)})
-    return {"project": name, "current_revision": rows[0][0], "revisions": [
+    return {"project": name, "status": project[0], "current_revision": rows[0][0], "revisions": [
         {"revision": r[0], "created_at": r[1].isoformat(), "current": r[0] == rows[0][0],
          "image": r[2].get("resolved_image", r[2].get("image")), "port": r[2].get("port"),
          "dependencies": dependency_report(r[2]),
@@ -1779,6 +1779,13 @@ class Retirement(BaseModel):
     scope_token: Optional[str] = Field(default=None, max_length=128)
 
 
+class ProjectPurge(BaseModel):
+    """Explicit confirmation required to permanently purge a retired project."""
+    model_config = ConfigDict(extra="forbid")
+    confirm_name: str = Field(min_length=1, max_length=63)
+    scope_token: str = Field(min_length=32, max_length=128)
+
+
 ACTIVE_OPERATION_SQL = """SELECT 1
     FROM application_operations o
     JOIN project_applications a ON a.application_id=o.application_id
@@ -1812,6 +1819,66 @@ def retirement_access_inventory(conn, name):
             "credentials_by_status": {state: count for state, count in credentials}}
 
 
+def project_database_name(name: str) -> str:
+    """Return the deterministic, validated database and role name for a project."""
+    validate_name(name)
+    return "project_" + name.replace("-", "_")
+
+
+def current_purge_scope(conn, name: str):
+    """Return the destructive scope only for a durably retired project."""
+    row = conn.execute("""SELECT p.project_id::text, r.retired_at
+        FROM projects p JOIN project_retirements r ON r.project_id=p.project_id
+        WHERE p.name=%s AND p.status='retired'""", (name,)).fetchone()
+    if row is None:
+        return None
+    credential_rows = conn.execute("""SELECT status, count(*) FROM deployment_credentials
+        WHERE project=%s GROUP BY status""", (name,)).fetchall()
+    credential_states = {status: count for status, count in credential_rows}
+    database = project_database_name(name)
+    return {
+        "project": name,
+        "database": database,
+        "role": database,
+        "catalog": ["project", "environments", "applications", "revisions", "operations", "retirement inventory"],
+        "audit_records_retained": True,
+        "credential_cleanup": credential_states,
+        "scope_token": purge_scope_token(name, row[0], row[1].isoformat(), credential_states),
+    }
+
+
+def drop_project_database_and_role(conn, name: str) -> None:
+    """Drop only the deterministic SQL resources after a verified purge confirmation."""
+    database = project_database_name(name)
+    conn.execute("""SELECT pg_terminate_backend(pid) FROM pg_stat_activity
+        WHERE datname=%s AND pid <> pg_backend_pid()""", (database,))
+    conn.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(database)))
+    conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(database)))
+
+
+def delete_project_catalog(conn, name: str) -> None:
+    """Delete the complete project-owned catalog in foreign-key order."""
+    conn.execute("DELETE FROM data_service_recovery_requests WHERE project=%s", (name,))
+    conn.execute("DELETE FROM deployment_credentials WHERE project=%s", (name,))
+    conn.execute("DELETE FROM platform_grants WHERE scope_kind='project' AND scope_id=%s", (name,))
+    conn.execute("""DELETE FROM application_operations WHERE application_id IN (
+        SELECT a.application_id FROM project_applications a
+        JOIN project_environments e ON e.environment_id=a.environment_id
+        JOIN projects p ON p.project_id=e.project_id WHERE p.name=%s)""", (name,))
+    conn.execute("""DELETE FROM application_revisions WHERE application_id IN (
+        SELECT a.application_id FROM project_applications a
+        JOIN project_environments e ON e.environment_id=a.environment_id
+        JOIN projects p ON p.project_id=e.project_id WHERE p.name=%s)""", (name,))
+    conn.execute("""DELETE FROM project_applications WHERE environment_id IN (
+        SELECT e.environment_id FROM project_environments e
+        JOIN projects p ON p.project_id=e.project_id WHERE p.name=%s)""", (name,))
+    conn.execute("""DELETE FROM project_environments WHERE project_id IN (
+        SELECT project_id FROM projects WHERE name=%s)""", (name,))
+    conn.execute("""DELETE FROM project_retirements WHERE project_id IN (
+        SELECT project_id FROM projects WHERE name=%s)""", (name,))
+    conn.execute("DELETE FROM projects WHERE name=%s", (name,))
+
+
 @app.get("/operator/projects/{name}/retirement")
 def inspect_retirement(name: str, principal: Principal = Depends(current_principal)):
     """Inspect retained retirement inventory and fail-closed credential cleanup progress."""
@@ -1826,6 +1893,73 @@ def inspect_retirement(name: str, principal: Principal = Depends(current_princip
                    {"scope": "platform"}, {"status": row[0]})
     return {"project": name, "status": row[0], "retired_at": row[1].isoformat() if row[1] else None,
             "retained": row[2], "credential_cleanup": access["credentials_by_status"]}
+
+
+@app.get("/operator/projects/{name}/purge-preview")
+def purge_preview(name: str, principal: Principal = Depends(current_principal)):
+    """Show permanent-deletion scope for a retired project to a platform administrator."""
+    require_platform_admin(principal)
+    try:
+        validate_name(name)
+    except ValueError:
+        raise HTTPException(400, "Invalid project name")
+    with connect() as conn:
+        scope = current_purge_scope(conn, name)
+    if scope is None:
+        raise HTTPException(409, "Only a durably retired project can be permanently purged")
+    required_audit(actor_for(principal), "project.purge.preview", "project", name, "succeeded",
+                   {"scope": "platform", "project": name}, {"credential_cleanup": scope["credential_cleanup"]})
+    return scope
+
+
+@app.post("/operator/projects/{name}/purge")
+def purge_project(name: str, confirmation: ProjectPurge, principal: Principal = Depends(current_principal)):
+    """Permanently remove a retired project's SQL resources and catalog, retaining audit evidence."""
+    require_platform_admin(principal)
+    actor = actor_for(principal)
+    if confirmation.confirm_name != name:
+        required_audit(actor, "project.purge", "project", name, "rejected",
+                       {"scope": "platform", "project": name}, {"reason": "confirmation_mismatch"})
+        raise HTTPException(400, "Confirmation must match the project name")
+    try:
+        validate_name(name)
+    except ValueError:
+        raise HTTPException(400, "Invalid project name")
+    with connect() as conn:
+        conn.execute("SELECT pg_advisory_lock(731904)")
+        try:
+            scope = current_purge_scope(conn, name)
+            if scope is None:
+                raise HTTPException(409, "Only a durably retired project can be permanently purged")
+            if not hmac.compare_digest(confirmation.scope_token, scope["scope_token"]):
+                required_audit(actor, "project.purge", "project", name, "rejected",
+                               {"scope": "platform", "project": name}, {"reason": "scope_changed"})
+                return JSONResponse(status_code=409, content={
+                    "detail": "The retained project state changed; request a new purge preview",
+                    "code": "scope_changed"})
+            pending = sum(count for status, count in scope["credential_cleanup"].items() if status != "revoked")
+            if pending:
+                raise HTTPException(409, "Wait for all deployment credentials to be revoked before purging")
+            required_audit(actor, "project.purge.requested", "project", name, "succeeded",
+                           {"scope": "platform", "project": name}, {"audit_records_retained": True})
+            drop_project_database_and_role(conn, name)
+            with conn.transaction():
+                delete_project_catalog(conn, name)
+            publish_catalog(conn)
+        except HTTPException as exc:
+            required_audit(actor, "project.purge", "project", name, "rejected",
+                           {"scope": "platform", "project": name}, {"status_code": exc.status_code})
+            raise
+        except Exception as exc:
+            required_audit(actor, "project.purge", "project", name, "failed",
+                           {"scope": "platform", "project": name}, {"error_type": type(exc).__name__})
+            log.error("Permanent project purge failed project=%s error_type=%s", name, type(exc).__name__)
+            raise HTTPException(503, "Purge did not complete; verify state before retrying")
+        finally:
+            conn.execute("SELECT pg_advisory_unlock(731904)")
+    required_audit(actor, "project.purge", "project", name, "succeeded",
+                   {"scope": "platform", "project": name}, {"audit_records_retained": True})
+    return {"name": name, "status": "purged", "audit_records_retained": True}
 
 
 def namespace_exists(name):

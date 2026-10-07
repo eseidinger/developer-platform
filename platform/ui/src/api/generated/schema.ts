@@ -112,6 +112,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/operator/projects/{name}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Purge Project
+         * @description Permanently remove a retired project's SQL resources and catalog, retaining audit evidence.
+         */
+        post: operations["purge_project_operator_projects__name__purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/operator/projects/{name}/purge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Purge Preview
+         * @description Show permanent-deletion scope for a retired project to a platform administrator.
+         */
+        get: operations["purge_preview_operator_projects__name__purge_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/operator/projects/{name}/retirement": {
         parameters: {
             query?: never;
@@ -1070,6 +1110,16 @@ export interface components {
             /** Subject */
             subject: string;
         };
+        /**
+         * ProjectPurge
+         * @description Explicit confirmation required to permanently purge a retired project.
+         */
+        ProjectPurge: {
+            /** Confirm Name */
+            confirm_name: string;
+            /** Scope Token */
+            scope_token: string;
+        };
         /** Readiness */
         Readiness: {
             /**
@@ -1361,6 +1411,72 @@ export interface operations {
         };
     };
     inspect_project_permissions_operator_projects__name__permissions_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_project_operator_projects__name__purge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProjectPurge"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_preview_operator_projects__name__purge_preview_get: {
         parameters: {
             query?: never;
             header?: never;

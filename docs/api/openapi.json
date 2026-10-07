@@ -716,6 +716,30 @@
         "title": "ProjectGrant",
         "type": "object"
       },
+      "ProjectPurge": {
+        "additionalProperties": false,
+        "description": "Explicit confirmation required to permanently purge a retired project.",
+        "properties": {
+          "confirm_name": {
+            "maxLength": 63,
+            "minLength": 1,
+            "title": "Confirm Name",
+            "type": "string"
+          },
+          "scope_token": {
+            "maxLength": 128,
+            "minLength": 32,
+            "title": "Scope Token",
+            "type": "string"
+          }
+        },
+        "required": [
+          "confirm_name",
+          "scope_token"
+        ],
+        "title": "ProjectPurge",
+        "type": "object"
+      },
       "Readiness": {
         "additionalProperties": false,
         "properties": {
@@ -1355,6 +1379,102 @@
           }
         ],
         "summary": "Inspect Project Permissions"
+      }
+    },
+    "/operator/projects/{name}/purge": {
+      "post": {
+        "description": "Permanently remove a retired project's SQL resources and catalog, retaining audit evidence.",
+        "operationId": "purge_project_operator_projects__name__purge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectPurge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Purge Project"
+      }
+    },
+    "/operator/projects/{name}/purge-preview": {
+      "get": {
+        "description": "Show permanent-deletion scope for a retired project to a platform administrator.",
+        "operationId": "purge_preview_operator_projects__name__purge_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Purge Preview"
       }
     },
     "/operator/projects/{name}/retirement": {

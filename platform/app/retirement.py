@@ -1,6 +1,8 @@
 """Retirement scope: what removal deletes, what it keeps, and the token that pins that scope."""
 import hashlib
+import hmac
 import json
+import os
 
 from .manifests import SECRET_NAME, component_resources, resources
 from .secrets import PREVIOUS_SECRET_NAME
@@ -12,6 +14,13 @@ def scope_token(name: str, revision: int, access=None) -> str:
     """Fingerprint of the removal scope; any new revision changes it and forces a new preview."""
     encoded = json.dumps(access or {}, sort_keys=True, separators=(",", ":"))
     return hashlib.sha256(f"retire:{name}:{revision}:{encoded}".encode()).hexdigest()[:32]
+
+
+def purge_scope_token(name: str, project_id: str, retired_at: str, credential_states: dict[str, int]) -> str:
+    """Bind a destructive purge confirmation to one retired catalog state."""
+    state = json.dumps(credential_states, sort_keys=True, separators=(",", ":"))
+    message = f"purge:{name}:{project_id}:{retired_at}:{state}".encode()
+    return hmac.new(os.environ["DATABASE_KEY"].encode(), message, hashlib.sha256).hexdigest()[:32]
 
 
 def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:

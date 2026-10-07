@@ -19,6 +19,7 @@ type ProjectRevision = {
 
 type ProjectRevisions = {
   project: string
+  status: string
   currentRevision: number | null
   revisions: ProjectRevision[]
 }
@@ -39,6 +40,7 @@ type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: s
 type ProjectConfiguration = { revision: number; values: Record<string, string>; activationState: string; activationReason: string | null }
 type ProjectSecrets = { secrets: { name: string; version: number; state: string; changedAt: string | null }[]; activationState: string; activationReason: string | null }
 type RetirementPreview = { removes: { kind: string; name: string }[]; retains: Record<string, string | boolean | null>; blockers: string[]; scopeToken: string }
+type PurgePreview = { database: string; role: string; catalog: string[]; auditRecordsRetained: boolean; credentialCleanup: Record<string, number>; scopeToken: string }
 type DataServices = { services: { type: string; name: string; state: string; reason: string | null }[]; latestRecoveryRequest: { reason: string; status: string; requestedAt: string; reviewedAt: string | null } | null }
 type DeploymentCredentials = { credentials: { id: string; name: string; status: string; createdAt: string; expiresAt: string; lastUsedAt: string | null; rotatedFrom: string | null }[] }
 type OneTimeDeploymentCredential = { clientId: string; clientSecret: string; tokenEndpoint: string }
@@ -71,7 +73,7 @@ function parseProjectList(value: unknown): ProjectSummary[] {
 
 function parseProjectRevisions(value: unknown): ProjectRevisions {
   const record = asRecord(value)
-  if (!record || typeof record.project !== 'string' || !Array.isArray(record.revisions)) {
+  if (!record || typeof record.project !== 'string' || typeof record.status !== 'string' || !Array.isArray(record.revisions)) {
     throw new Error('The platform returned invalid project revisions.')
   }
 
@@ -82,6 +84,7 @@ function parseProjectRevisions(value: unknown): ProjectRevisions {
 
   return {
     project: record.project,
+    status: record.status,
     currentRevision,
     revisions: record.revisions.map((revision) => {
       const item = asRecord(revision)
@@ -408,5 +411,23 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deletePlatformGrant, deleteProjectGrant, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getPlatformGrants, getProjectConfiguration, getProjectGrants, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, putPlatformGrant, putProjectGrant, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, rotateDeploymentCredential, setProjectSecret, updateProjectConfiguration }
-export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, PlatformGrant, ProjectConfiguration, ProjectDeployment, ProjectGrant, ProjectGrants, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
+async function getPurgePreview(name: string): Promise<PurgePreview> {
+  const { data, error, response } = await apiClient.GET('/operator/projects/{name}/purge-preview', { params: { path: { name } } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  const credentials = record && asRecord(record.credential_cleanup)
+  if (!record || typeof record.database !== 'string' || typeof record.role !== 'string' || !Array.isArray(record.catalog) || record.catalog.some((item) => typeof item !== 'string') || typeof record.audit_records_retained !== 'boolean' || !credentials || Object.values(credentials).some((count) => typeof count !== 'number') || typeof record.scope_token !== 'string') {
+    throw new Error('The platform returned an invalid purge preview.')
+  }
+  return { database: record.database, role: record.role, catalog: record.catalog as string[], auditRecordsRetained: record.audit_records_retained, credentialCleanup: credentials as Record<string, number>, scopeToken: record.scope_token }
+}
+
+async function purgeProject(name: string, scopeToken: string) {
+  const { data, error, response } = await apiClient.POST('/operator/projects/{name}/purge', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || record.status !== 'purged') throw new Error('The platform returned an invalid purge result.')
+}
+
+export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deletePlatformGrant, deleteProjectGrant, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getPlatformGrants, getProjectConfiguration, getProjectGrants, getProjectLogs, getProjectRevisions, getProjectSecrets, getPurgePreview, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, purgeProject, putPlatformGrant, putProjectGrant, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, rotateDeploymentCredential, setProjectSecret, updateProjectConfiguration }
+export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, PlatformGrant, ProjectConfiguration, ProjectDeployment, ProjectGrant, ProjectGrants, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, PurgePreview, ResourceInventory, ResourceUsage, RetirementPreview }

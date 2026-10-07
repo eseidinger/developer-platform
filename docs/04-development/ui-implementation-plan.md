@@ -162,6 +162,11 @@ handles validation, conflict, unavailable-provider, and denied responses.
   platform administrators. It lists, grants, and revokes `platform-admin` access
   through a platform-admin-only API read endpoint; server authorization remains
   decisive, and both the UI and API prevent self-revocation.
+- A retired project can be permanently purged only by a platform administrator.
+  The UI loads a server-authorized destructive-scope preview, requires the exact
+  project name, and refuses to submit while provider credential revocation is
+  pending. The API binds confirmation to the preview, serializes lifecycle work,
+  preserves append-only audit evidence, and never accepts the UI as authorization.
 - Keep test-runner and test-identity administration out of ordinary developer
   navigation; expose it only in a clearly labelled platform-administration area if
   Phase 2B operational use requires a UI.
