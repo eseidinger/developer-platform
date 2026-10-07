@@ -28,7 +28,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, ValidationIn
 
 from .audit import Actor, initialize as initialize_audit, read_events, record_event, redact
 from .authorization import (bootstrap_platform_admin, grant as grant_role, initialize as initialize_authorization,
-                            grants_for_project, is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
+                            grants_for_platform, grants_for_project, is_allowed, is_platform_admin, projects_for_principal, revoke as revoke_role,
                             upsert_principal)
 from .catalog import component_view, ensure_default_application, initialize as initialize_catalog
 from .images import ImageResolutionError, allowed_registries, resolve_image
@@ -139,6 +139,13 @@ app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets"), c
 def portal():
     """Serve the built browser portal without embedding credentials in the API."""
     return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/projects/{name}", include_in_schema=False)
+@app.get("/platform/administration", include_in_schema=False)
+def portal_route(name: str | None = None):
+    """Serve the browser portal for supported client-side routes and deep links."""
+    return portal()
 
 
 @app.get("/favicon.svg", include_in_schema=False)
@@ -2016,6 +2023,18 @@ def put_platform_grant(grant: PlatformGrant, principal: Principal = Depends(curr
     required_audit(actor, "membership.grant", "principal", grant.issuer + "|" + grant.subject, "succeeded",
                    {"scope": "platform"}, {"role": grant.role})
     return {"issuer": grant.issuer, "subject": grant.subject, "role": grant.role}
+
+
+@app.get("/platform/grants")
+def get_platform_grants(principal: Principal = Depends(current_principal)):
+    """List platform administrators for platform-administration UI and automation."""
+    require_platform_admin(principal)
+    with connect() as conn:
+        rows = grants_for_platform(conn)
+    return {"grants": [
+        {"issuer": issuer, "subject": subject, "display_name": display_name, "role": role,
+         "granted_at": granted_at.isoformat()} for issuer, subject, display_name, role, granted_at in rows
+    ]}
 
 
 @app.delete("/platform/grants")

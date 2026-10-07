@@ -23,6 +23,14 @@ function AppLayout() {
             >
               Projects
             </NavLink>
+            <NavLink
+              className={({ isActive }) =>
+                `rounded-md px-3 py-2 text-sm font-medium ${isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`
+              }
+              to="/platform/administration"
+            >
+              Platform admin
+            </NavLink>
           </nav>
         </div>
       </header>

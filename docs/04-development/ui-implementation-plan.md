@@ -158,6 +158,10 @@ handles validation, conflict, unavailable-provider, and denied responses.
   authorization from mutable identity claims or hidden/disabled controls.
 - Deployment-credential creation, rotation, expiry, and revocation are implemented.
   One-time client-secret handling remains non-cacheable and acknowledgement-bound.
+- A separately routed platform-administration grant view is implemented for
+  platform administrators. It lists, grants, and revokes `platform-admin` access
+  through a platform-admin-only API read endpoint; server authorization remains
+  decisive, and both the UI and API prevent self-revocation.
 - Keep test-runner and test-identity administration out of ordinary developer
   navigation; expose it only in a clearly labelled platform-administration area if
   Phase 2B operational use requires a UI.

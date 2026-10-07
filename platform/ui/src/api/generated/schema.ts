@@ -159,7 +159,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Platform Grants
+         * @description List platform administrators for platform-administration UI and automation.
+         */
+        get: operations["get_platform_grants_platform_grants_get"];
         /** Put Platform Grant */
         put: operations["put_platform_grant_platform_grants_put"];
         post?: never;
@@ -1445,6 +1449,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_platform_grants_platform_grants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
                 };
             };
         };

@@ -1483,6 +1483,26 @@
         ],
         "summary": "Delete Platform Grant"
       },
+      "get": {
+        "description": "List platform administrators for platform-administration UI and automation.",
+        "operationId": "get_platform_grants_platform_grants_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Platform Grants"
+      },
       "put": {
         "operationId": "put_platform_grant_platform_grants_put",
         "requestBody": {

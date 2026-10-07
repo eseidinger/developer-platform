@@ -13,6 +13,10 @@ class PortalTests(unittest.TestCase):
         response = main.portal()
         self.assertTrue(response.path.endswith("app/static/index.html"))
 
+    def test_portal_routes_serve_the_single_page_ui(self):
+        self.assertTrue(main.portal_route().path.endswith("app/static/index.html"))
+        self.assertTrue(main.portal_route("example").path.endswith("app/static/index.html"))
+
     def test_portal_config_has_only_public_oidc_settings(self):
         request = Mock()
         request.base_url = "https://platform.example.com/"

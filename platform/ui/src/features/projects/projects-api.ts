@@ -44,6 +44,7 @@ type DeploymentCredentials = { credentials: { id: string; name: string; status: 
 type OneTimeDeploymentCredential = { clientId: string; clientSecret: string; tokenEndpoint: string }
 type ProjectGrant = { issuer: string; subject: string; displayName: string | null; role: 'viewer' | 'developer' | 'project-admin'; grantedAt: string }
 type ProjectGrants = { project: string; grants: ProjectGrant[] }
+type PlatformGrant = { issuer: string; subject: string; displayName: string | null; role: 'platform-admin'; grantedAt: string }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -352,6 +353,32 @@ async function deleteProjectGrant(name: string, grant: Pick<ProjectGrant, 'issue
   if (error) throw apiErrorFromResponse(response, error)
 }
 
+async function getPlatformGrants(): Promise<PlatformGrant[]> {
+  const { data, error, response } = await apiClient.GET('/platform/grants')
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (!record || !Array.isArray(record.grants)) throw new Error('The platform returned an invalid platform grant list.')
+  return record.grants.map((grant) => {
+    const item = asRecord(grant)
+    if (!item || typeof item.issuer !== 'string' || typeof item.subject !== 'string' || (item.display_name !== null && typeof item.display_name !== 'string') || item.role !== 'platform-admin' || typeof item.granted_at !== 'string') {
+      throw new Error('The platform returned an invalid platform grant list.')
+    }
+    return { issuer: item.issuer, subject: item.subject, displayName: item.display_name, role: 'platform-admin', grantedAt: item.granted_at }
+  })
+}
+
+async function putPlatformGrant(grant: Omit<PlatformGrant, 'grantedAt' | 'role'>) {
+  const { error, response } = await apiClient.PUT('/platform/grants', {
+    body: { issuer: grant.issuer, subject: grant.subject, display_name: grant.displayName, role: 'platform-admin' },
+  })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
+async function deletePlatformGrant(grant: Pick<PlatformGrant, 'issuer' | 'subject'>) {
+  const { error, response } = await apiClient.DELETE('/platform/grants', { body: grant })
+  if (error) throw apiErrorFromResponse(response, error)
+}
+
 async function createDeploymentCredential(name: string, body: { name: string; expiresInDays: number }): Promise<OneTimeDeploymentCredential> {
   const { data, error, response } = await apiClient.POST('/projects/{name}/deployment-credentials', { params: { path: { name } }, body: { name: body.name, expires_in_days: body.expiresInDays } })
   if (error) throw apiErrorFromResponse(response, error)
@@ -381,5 +408,5 @@ async function retireProject(name: string, scopeToken: string) {
   return { status: record.status }
 }
 
-export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deleteProjectGrant, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectGrants, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, putProjectGrant, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, rotateDeploymentCredential, setProjectSecret, updateProjectConfiguration }
-export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, ProjectConfiguration, ProjectDeployment, ProjectGrant, ProjectGrants, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }
+export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deletePlatformGrant, deleteProjectGrant, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getPlatformGrants, getProjectConfiguration, getProjectGrants, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, putPlatformGrant, putProjectGrant, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, rotateDeploymentCredential, setProjectSecret, updateProjectConfiguration }
+export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, PlatformGrant, ProjectConfiguration, ProjectDeployment, ProjectGrant, ProjectGrants, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, ResourceInventory, ResourceUsage, RetirementPreview }

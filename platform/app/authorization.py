@@ -109,6 +109,15 @@ def grants_for_project(conn, project: str):
         ORDER BY g.granted_at, g.issuer, g.subject""", (project,)).fetchall()
 
 
+def grants_for_platform(conn):
+    """Return platform-administrator grants to an authorized platform administrator."""
+    return conn.execute("""SELECT g.issuer, g.subject, p.display_name, g.role, g.granted_at
+        FROM platform_grants g
+        JOIN platform_principals p ON p.issuer=g.issuer AND p.subject=g.subject
+        WHERE g.scope_kind='platform' AND g.scope_id='*'
+        ORDER BY g.granted_at, g.issuer, g.subject""").fetchall()
+
+
 def grant(conn, principal: Principal, scope_kind: str, scope_id: str | None, role: str) -> None:
     if role not in ROLE_ORDER or scope_kind not in {"platform", "project"}:
         raise ValueError("Unsupported role or scope")
