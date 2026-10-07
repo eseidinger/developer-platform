@@ -19,7 +19,6 @@ type ProjectRevision = {
 
 type ProjectRevisions = {
   project: string
-  status: string
   currentRevision: number | null
   revisions: ProjectRevision[]
 }
@@ -73,7 +72,7 @@ function parseProjectList(value: unknown): ProjectSummary[] {
 
 function parseProjectRevisions(value: unknown): ProjectRevisions {
   const record = asRecord(value)
-  if (!record || typeof record.project !== 'string' || typeof record.status !== 'string' || !Array.isArray(record.revisions)) {
+  if (!record || typeof record.project !== 'string' || !Array.isArray(record.revisions)) {
     throw new Error('The platform returned invalid project revisions.')
   }
 
@@ -84,7 +83,6 @@ function parseProjectRevisions(value: unknown): ProjectRevisions {
 
   return {
     project: record.project,
-    status: record.status,
     currentRevision,
     revisions: record.revisions.map((revision) => {
       const item = asRecord(revision)

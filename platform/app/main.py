@@ -1424,10 +1424,10 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
     if not rows:
         required_audit(actor, "project.revisions.list", "project", name, "succeeded",
                        {"project": name}, {"count": 0})
-        return {"project": name, "status": project[0], "current_revision": None, "revisions": []}
+        return {"project": name, "current_revision": None, "revisions": []}
     required_audit(actor, "project.revisions.list", "project", name, "succeeded",
                    {"project": name}, {"count": len(rows)})
-    return {"project": name, "status": project[0], "current_revision": rows[0][0], "revisions": [
+    return {"project": name, "current_revision": rows[0][0], "revisions": [
         {"revision": r[0], "created_at": r[1].isoformat(), "current": r[0] == rows[0][0],
          "image": r[2].get("resolved_image", r[2].get("image")), "port": r[2].get("port"),
          "dependencies": dependency_report(r[2]),

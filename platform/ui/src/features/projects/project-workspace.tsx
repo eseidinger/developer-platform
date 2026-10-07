@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
-import { getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage } from '@/features/projects/projects-api'
+import { getDataServices, getDeploymentCredentials, getOperation, getProjectConfiguration, getProjectLogs, getProjectRevisions, getProjectSecrets, getResourceInventory, getResourceUsage, listProjects } from '@/features/projects/projects-api'
 import { SecretActions } from '@/features/projects/secret-rotation-actions'
 import { SetSecretDialog } from '@/features/projects/set-secret-dialog'
 import { RollbackProjectDialog } from '@/features/projects/rollback-project-dialog'
@@ -34,6 +34,8 @@ function ProjectWorkspace() {
   const [logSearch, setLogSearch] = React.useState('')
   const [appliedLogSearch, setAppliedLogSearch] = React.useState('')
   const [logAfter, setLogAfter] = React.useState<string | undefined>()
+  const projectsQuery = useQuery({ queryKey: ['projects'], queryFn: listProjects, enabled: status === 'authenticated' })
+  const projectStatus = projectsQuery.data?.find((project) => project.name === name)?.status
   const revisionsQuery = useQuery({
     queryKey: ['projects', name, 'revisions'],
     queryFn: () => getProjectRevisions(name ?? ''),
@@ -89,7 +91,7 @@ function ProjectWorkspace() {
             <h1 id="project-title" className="text-3xl font-semibold tracking-tight">{name}</h1>
             <p className="mt-1 text-muted-foreground">Desired revision history and deployment context.</p>
           </div>
-          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void refreshProject()} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</Button>{revisionsQuery.data?.status === 'retired' ? <PurgeProjectDialog name={name} /> : <RetireProjectDialog name={name} />}</div>
+          <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void refreshProject()} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</Button>{projectStatus === 'retired' ? <PurgeProjectDialog name={name} /> : <RetireProjectDialog name={name} />}</div>
         </div>
       </div>
 
