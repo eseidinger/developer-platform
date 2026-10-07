@@ -1826,9 +1826,13 @@ def project_database_name(name: str) -> str:
 
 
 def current_purge_scope(conn, name: str):
-    """Return the destructive scope only for a durably retired project."""
-    row = conn.execute("""SELECT p.project_id::text, r.retired_at
-        FROM projects p JOIN project_retirements r ON r.project_id=p.project_id
+    """Return the destructive scope only for a retired project.
+
+    Older retired projects may predate retirement-inventory records, so their
+    durable project status is authoritative and ``updated_at`` anchors the token.
+    """
+    row = conn.execute("""SELECT p.project_id::text, COALESCE(r.retired_at, p.updated_at)
+        FROM projects p LEFT JOIN project_retirements r ON r.project_id=p.project_id
         WHERE p.name=%s AND p.status='retired'""", (name,)).fetchone()
     if row is None:
         return None
@@ -1906,7 +1910,7 @@ def purge_preview(name: str, principal: Principal = Depends(current_principal)):
     with connect() as conn:
         scope = current_purge_scope(conn, name)
     if scope is None:
-        raise HTTPException(409, "Only a durably retired project can be permanently purged")
+        raise HTTPException(409, "Only a retired project can be permanently purged")
     required_audit(actor_for(principal), "project.purge.preview", "project", name, "succeeded",
                    {"scope": "platform", "project": name}, {"credential_cleanup": scope["credential_cleanup"]})
     return scope
@@ -1930,7 +1934,7 @@ def purge_project(name: str, confirmation: ProjectPurge, principal: Principal = 
         try:
             scope = current_purge_scope(conn, name)
             if scope is None:
-                raise HTTPException(409, "Only a durably retired project can be permanently purged")
+                raise HTTPException(409, "Only a retired project can be permanently purged")
             if not hmac.compare_digest(confirmation.scope_token, scope["scope_token"]):
                 required_audit(actor, "project.purge", "project", name, "rejected",
                                {"scope": "platform", "project": name}, {"reason": "scope_changed"})

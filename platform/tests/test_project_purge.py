@@ -1,5 +1,7 @@
 import sys
 import unittest
+from datetime import datetime, timezone
+from os import environ
 from pathlib import Path
 from unittest.mock import patch
 
@@ -25,6 +27,29 @@ class Connection:
 
     def transaction(self):
         return self
+
+
+class Result:
+    def __init__(self, row=None, rows=None):
+        self.row = row
+        self.rows = rows or []
+
+    def fetchone(self):
+        return self.row
+
+    def fetchall(self):
+        return self.rows
+
+
+class RetiredWithoutInventoryConnection:
+    def __init__(self):
+        self.queries = []
+
+    def execute(self, query, _params=()):
+        self.queries.append(str(query))
+        if "FROM projects p LEFT JOIN project_retirements" in str(query):
+            return Result(("project-id", datetime(2026, 10, 7, tzinfo=timezone.utc)))
+        return Result(rows=[])
 
 
 class ProjectPurgeTests(unittest.TestCase):
@@ -83,6 +108,22 @@ class ProjectPurgeTests(unittest.TestCase):
 
         self.assertEqual(raised.exception.status_code, 409)
         drop_database.assert_not_called()
+
+    def test_retired_project_without_inventory_is_purge_eligible(self):
+        conn = RetiredWithoutInventoryConnection()
+        previous = environ.get("DATABASE_KEY")
+        environ["DATABASE_KEY"] = "x" * 32
+        try:
+            scope = main.current_purge_scope(conn, "retired-app")
+        finally:
+            if previous is None:
+                del environ["DATABASE_KEY"]
+            else:
+                environ["DATABASE_KEY"] = previous
+
+        self.assertIsNotNone(scope)
+        self.assertTrue(scope["scope_token"])
+        self.assertTrue(any("LEFT JOIN project_retirements" in query for query in conn.queries))
 
 
 if __name__ == "__main__":
