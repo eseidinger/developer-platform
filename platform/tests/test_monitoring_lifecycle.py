@@ -872,6 +872,19 @@ class LifecycleTests(unittest.TestCase):
         denied = self.mocks[3].call_args
         self.assertEqual(denied.args[1:5], ("authorization", "project", "smoke", "denied"))
 
+    def test_project_administrator_can_list_project_grants(self):
+        self.deploy()
+        granted_at = datetime.now(timezone.utc)
+        with patch.object(main, "grants_for_project", return_value=[
+            ("https://issuer.example", "person-2", "Viewer", "viewer", granted_at)
+        ]):
+            response = self.client.get("/projects/smoke/grants", headers=self.headers)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"project": "smoke", "grants": [{
+            "issuer": "https://issuer.example", "subject": "person-2", "display_name": "Viewer",
+            "role": "viewer", "granted_at": granted_at.isoformat(),
+        }]})
+
     def test_operator_inspection_and_export_are_platform_admin_only(self):
         self.deploy()
         with patch.object(main, "is_platform_admin", return_value=True), \

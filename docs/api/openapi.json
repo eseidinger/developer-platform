@@ -2506,6 +2506,47 @@
         ],
         "summary": "Delete Project Grant"
       },
+      "get": {
+        "description": "List grants for a project administrator; operator inspection remains separate.",
+        "operationId": "get_project_grants_projects__name__grants_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Project Grants"
+      },
       "put": {
         "operationId": "put_project_grant_projects__name__grants_put",
         "parameters": [

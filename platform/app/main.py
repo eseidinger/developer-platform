@@ -1963,6 +1963,20 @@ class PlatformGrant(ProjectGrant):
     role: Literal["platform-admin"]
 
 
+@app.get("/projects/{name}/grants")
+def get_project_grants(name: str, principal: Principal = Depends(current_principal)):
+    """List grants for a project administrator; operator inspection remains separate."""
+    require_permission(principal, "grant", name)
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+            raise HTTPException(404, "Unknown project")
+        rows = grants_for_project(conn, name)
+    return {"project": name, "grants": [
+        {"issuer": issuer, "subject": subject, "display_name": display_name, "role": role,
+         "granted_at": granted_at.isoformat()} for issuer, subject, display_name, role, granted_at in rows
+    ]}
+
+
 @app.put("/projects/{name}/grants")
 def put_project_grant(name: str, grant: ProjectGrant, principal: Principal = Depends(current_principal)):
     actor = actor_for(principal)

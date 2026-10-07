@@ -1,13 +1,14 @@
 # Platform UI Implementation Plan
 
-Status: in progress as of October 6, 2026. Foundation increment 0, the first
-authentication source increment, and an initial authenticated project-list view are
-implemented in source and pass local static, component-test, and production-build
-checks; the remaining product features are planned. This plan implements the React
-stack selected in [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md) for
-the Phase 3 Platform Control Plane portal. It does not change the
-hosted-application packaging choice in
-[ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).
+Status: in progress as of October 7, 2026. Foundation, the authentication boundary,
+the project workspace, and the core developer lifecycle are implemented in source:
+project creation, deployment and operation polling, diagnostics, logs, configuration,
+secrets, restart, rollback, retirement, recovery requests, and deployment
+credentials. Project-grant management is also implemented; operator workflows and
+delivery hardening remain planned. This plan implements the React stack selected
+in [ADR-019](../03-decisions/ADR-019-react-ui-technology-stack.md) for the Phase 3
+Platform Control Plane portal. It does not change the hosted-application packaging
+choice in [ADR-007](../03-decisions/ADR-007-ui-api-deployment.md).
 
 ## Outcome and scope
 
@@ -114,17 +115,14 @@ Gate: an authenticated user can enter and leave the shell through the reference
 Keycloak deployment; direct navigation and reload work; token-storage inspection and
 redaction tests pass.
 
-### 2. Deliver the read-only project workspace
+### 2. Deliver the project workspace — implemented in source
 
-- An initial authorized project list is implemented with loading, empty, error, and
-  refresh states. It validates the currently `unknown` OpenAPI response at the UI
-  boundary and renders only project name and lifecycle status. Search, project detail,
-  and the remaining views below are still planned.
-- Add a project workspace with overview, components, resources, resource usage,
-  revisions, configuration metadata, secret metadata, and deployment status.
-- Add a logs view with component and instance filters, time bounds, search, bounded
-  tail size, cursor-based refresh, pause/resume, best-effort retention disclosure,
-  and safe copy/download behavior.
+- The authorized project list and workspace provide revision history, deployment
+  operation state and readiness, inventory, resource usage, bounded searchable logs,
+  configuration and secret metadata, data-service status, and credential metadata.
+- Component-specific filters, pause/resume, safe log download, URL-persisted
+  workspace filters, and a dedicated component-status presentation remain follow-up
+  work.
 - Represent desired state, apply outcome, and live readiness separately. Do not turn
   missing metrics into zero or unavailable provider data into an empty result.
 - Keep selected tabs and useful filters in the URL so diagnosis links are shareable
@@ -133,36 +131,33 @@ redaction tests pass.
 Gate: viewer and developer personas see only API-authorized projects and can diagnose
 an image-pull failure from operation, readiness, resource, and log evidence.
 
-### 3. Add project lifecycle mutations
+### 3. Add project lifecycle mutations — implemented in source
 
-- Build create and deployment forms from declared capabilities and the OpenAPI
-  contract. Use Zod and React Hook Form for immediate guidance while rendering the
-  API's field and stable error codes as authoritative.
-- Submit revisions with optimistic-concurrency data such as `If-Match`; on conflict,
-  preserve the draft and offer comparison/reload rather than silently overwriting.
-- Follow accepted operations with bounded polling, visible timeout/retry behavior,
-  and invalidation of affected project queries when terminal state arrives.
-- Add restart and rollback flows with revision context and explicit confirmation.
-- Add configuration and secret metadata workflows. One-time secret material must use
-  an isolated, non-cached response path with deliberate reveal/copy/close behavior;
-  it must never enter TanStack Query state.
-- Implement retirement as preview followed by name and scope-token confirmation.
-  Render blockers and retained resources before the destructive action.
+- The workspace creates empty projects, submits deployments, polls accepted
+  operations, and supports restart, rollback, configuration changes, secret
+  rotation, retirement preview/confirmation, recovery requests, and deployment
+  credential lifecycle actions.
+- Mutation dialogs preserve server errors and use query invalidation after success.
+  Deployment and configuration updates use the API's revision-concurrency contract;
+  richer draft comparison/reload UX remains follow-up work.
+- One-time deployment credential material is isolated from query state and cleared
+  when its acknowledgement dialog closes.
 
 Gate: the end-to-end developer journey creates or updates a sample application,
 follows the operation, observes healthy state, rolls back or retries safely, and
 handles validation, conflict, unavailable-provider, and denied responses.
 
-### 4. Add access and automation administration
+### 4. Add access and automation administration — partially implemented
 
-- Show project ownership and effective role context returned by the API without
-  deriving permissions from mutable identity claims.
-- Add grant management for authorized project and platform administrators. Refresh
-  affected views after mutation and clearly explain that revocation is enforced on
-  the next API request.
-- Add deployment-credential creation, rotation, expiry, and revocation. Treat the
-  one-time client secret as non-cacheable and test that it disappears after the
-  acknowledgement view closes.
+- Project grant listing, creation, role changes, and revocation are implemented for
+  callers the API authorizes to manage that project. A dedicated grant-authorized
+  API read endpoint keeps this project-administrator view separate from the
+  operator-only permission-inspection endpoint. The UI refreshes grants after each
+  mutation and explains that revocation is enforced on the recipient's next request.
+- Show current-user role context only when returned by the API; never infer
+  authorization from mutable identity claims or hidden/disabled controls.
+- Deployment-credential creation, rotation, expiry, and revocation are implemented.
+  One-time client-secret handling remains non-cacheable and acknowledgement-bound.
 - Keep test-runner and test-identity administration out of ordinary developer
   navigation; expose it only in a clearly labelled platform-administration area if
   Phase 2B operational use requires a UI.

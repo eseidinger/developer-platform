@@ -481,7 +481,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get Project Grants
+         * @description List grants for a project administrator; operator inspection remains separate.
+         */
+        get: operations["get_project_grants_projects__name__grants_get"];
         /** Put Project Grant */
         put: operations["put_project_grant_projects__name__grants_put"];
         post?: never;
@@ -2115,6 +2119,37 @@ export interface operations {
         };
     };
     drift_projects__name__drift_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_project_grants_projects__name__grants_get: {
         parameters: {
             query?: never;
             header?: never;
