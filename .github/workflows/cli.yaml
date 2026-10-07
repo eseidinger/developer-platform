@@ -33,10 +33,10 @@ jobs:
       - name: Build distribution
         working-directory: platform/cli
         run: |
-          python3 -m pip install --upgrade build
+          python3 -m pip install --upgrade build twine
           python3 -m build --outdir dist
       - name: Check distribution metadata
-        run: python3 -m pipx run twine check platform/cli/dist/*
+        run: python3 -m twine check platform/cli/dist/*
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
