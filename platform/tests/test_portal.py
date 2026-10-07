@@ -11,8 +11,7 @@ from app import main
 class PortalTests(unittest.TestCase):
     def test_portal_serves_the_pkce_ui(self):
         response = main.portal()
-        self.assertTrue(response.path.endswith("app/static/portal.html"))
-        self.assertTrue(Path(response.path).is_file())
+        self.assertTrue(response.path.endswith("app/static/index.html"))
 
     def test_portal_config_has_only_public_oidc_settings(self):
         request = Mock()

@@ -20,6 +20,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi.staticfiles import StaticFiles
 from kubernetes import config, dynamic
 from kubernetes.client import ApiClient
 from kubernetes.client.exceptions import ApiException
@@ -130,12 +131,24 @@ async def lifespan(app):
         credential_cleanup_worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets"), check_dir=False), name="static-assets")
 
 
 @app.get("/", include_in_schema=False)
 def portal():
-    """Serve the Keycloak PKCE portal without embedding credentials in the API."""
-    return FileResponse(os.path.join(os.path.dirname(__file__), "static", "portal.html"))
+    """Serve the built browser portal without embedding credentials in the API."""
+    return FileResponse(os.path.join(STATIC_DIR, "index.html"))
+
+
+@app.get("/favicon.svg", include_in_schema=False)
+def favicon():
+    return FileResponse(os.path.join(STATIC_DIR, "favicon.svg"))
+
+
+@app.get("/icons.svg", include_in_schema=False)
+def icons():
+    return FileResponse(os.path.join(STATIC_DIR, "icons.svg"))
 
 
 @app.get("/portal/config", include_in_schema=False)
