@@ -17,6 +17,8 @@
       CAPACITY_ADMISSION_ENABLED: "{{ (platform_capacity_admission_enabled | bool) | ternary('true', 'false') }}"
       CAPACITY_RESERVE_CPU_MILLICORES: "{{ platform_capacity_reserve_cpu_millicores | int }}"
       CAPACITY_RESERVE_MEMORY_MIB: "{{ platform_capacity_reserve_memory_mib | int }}"
+      ALLOWED_EGRESS_CIDRS: "{{ platform_allowed_egress_cidrs }}"
+      ALLOWED_EGRESS_PORTS: "{{ platform_allowed_egress_ports }}"
 
   pre_tasks:
     - name: Apply defaults only when inventory has not configured them
@@ -34,6 +36,8 @@
         platform_capacity_admission_enabled: "{{ platform_capacity_admission_enabled | default(false) }}"
         platform_capacity_reserve_cpu_millicores: "{{ platform_capacity_reserve_cpu_millicores | default(2000) }}"
         platform_capacity_reserve_memory_mib: "{{ platform_capacity_reserve_memory_mib | default(8192) }}"
+        platform_allowed_egress_cidrs: "{{ platform_allowed_egress_cidrs | default('') }}"
+        platform_allowed_egress_ports: "{{ platform_allowed_egress_ports | default('') }}"
         platform_install_docker: "{{ platform_install_docker | default(true) }}"
         platform_kubectl_version: "{{ platform_kubectl_version | default('v1.36.4') }}"
 
@@ -49,12 +53,14 @@
           - (platform_capacity_admission_enabled | string | lower) in ['true', 'false']
           - (platform_capacity_reserve_cpu_millicores | string) is match('^[0-9]+$')
           - (platform_capacity_reserve_memory_mib | string) is match('^[0-9]+$')
+          - (platform_allowed_egress_cidrs | string) is match('^$|^[0-9A-Fa-f:.]+/[0-9]{1,3}(?:,[0-9A-Fa-f:.]+/[0-9]{1,3})*$')
+          - (platform_allowed_egress_ports | string) is match('^$|^[0-9]+(?:,[0-9]+)*$')
         fail_msg: Use Ubuntu 22.04 or newer on amd64/arm64 and kubectl compatible with Kubernetes 1.36.
 
     - name: Validate environment values
       ansible.builtin.assert:
         that:
-          - item.value | string is match('^[A-Za-z0-9.@:,_-]+$')
+          - item.key in ['ALLOWED_EGRESS_CIDRS', 'ALLOWED_EGRESS_PORTS'] or item.value | string is match('^[A-Za-z0-9.@:,_-]+$')
         fail_msg: Platform settings must be nonempty single-line domain, email, or IP values.
       loop: "{{ platform_settings | dict2items }}"
 

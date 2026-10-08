@@ -18,3 +18,5 @@ all:
         platform_capacity_admission_enabled: false  # optional; measure reserves before enabling
         platform_capacity_reserve_cpu_millicores: 2000  # optional
         platform_capacity_reserve_memory_mib: 8192  # optional
+        platform_allowed_egress_cidrs: ""  # optional; comma-separated CIDRs, e.g. 0.0.0.0/0,::/0
+        platform_allowed_egress_ports: ""  # optional; comma-separated TCP ports, e.g. 443,80

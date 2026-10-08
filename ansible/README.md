@@ -56,6 +56,8 @@ Useful inventory overrides:
 | `platform_capacity_admission_enabled` | `false` | Enable fail-closed aggregate Kubernetes request admission after measuring the host and choosing reserves |
 | `platform_capacity_reserve_cpu_millicores` | `2000` | CPU excluded from workload admission accounting for the platform and operating margin |
 | `platform_capacity_reserve_memory_mib` | `8192` | Memory excluded from workload admission accounting for the platform and operating margin |
+| `platform_allowed_egress_cidrs` | empty | Comma-separated external CIDRs that components may request; empty denies external component egress |
+| `platform_allowed_egress_ports` | empty | Comma-separated TCP ports that components may request; empty denies external component egress |
 
 For an existing host with Docker, prefer `platform_install_docker: false` to
 avoid changing its package source. Conflicting distribution Docker packages are

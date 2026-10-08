@@ -52,6 +52,16 @@ class PlaybookCommandTests(unittest.TestCase):
         self.assertIn("Restore the exact original platform environment", source)
         self.assertIn("Recreate only the Platform API with its original failure-drill policy", source)
 
+    def test_inventory_egress_settings_are_rendered_into_platform_environment(self):
+        deploy = yaml.safe_load((ANSIBLE_DIR / "deploy.yml").read_text(encoding="utf-8"))
+        settings = deploy[0]["vars"]["platform_settings"]
+        self.assertEqual(settings["ALLOWED_EGRESS_CIDRS"], "{{ platform_allowed_egress_cidrs }}")
+        self.assertEqual(settings["ALLOWED_EGRESS_PORTS"], "{{ platform_allowed_egress_ports }}")
+        example = yaml.safe_load((ANSIBLE_DIR / "inventory.example.yml").read_text(encoding="utf-8"))
+        variables = example["all"]["children"]["developer_platform"]["vars"]
+        self.assertEqual(variables["platform_allowed_egress_cidrs"], "")
+        self.assertEqual(variables["platform_allowed_egress_ports"], "")
+
 
 if __name__ == "__main__":
     unittest.main()
