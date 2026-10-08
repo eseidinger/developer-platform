@@ -98,6 +98,22 @@ class WorkloadContract(unittest.TestCase):
         pod = cronjob["jobTemplate"]["spec"]["template"]["spec"]
         self.assertEqual(pod["restartPolicy"], "Never")
         self.assertEqual(pod["containers"][0]["env"], [{"name": "MODE", "value": "batch"}])
+        self.assertEqual(cronjob["jobTemplate"]["spec"]["backoffLimit"], 6)
+
+    def test_component_http_readiness_and_job_deadline(self):
+        docs = component_resources("shop", [
+            {"name": "web", "type": "service", "resolved_image": "registry/web@sha256:one",
+             "ports": [{"name": "http", "port": 8080}],
+             "readiness_path": "/actuator/health/readiness"},
+            {"name": "worker", "type": "scheduled", "resolved_image": "registry/worker@sha256:two",
+             "schedule": "* * * * *", "retry_limit": 8, "max_run_seconds": 600},
+        ], "172.30.80.10", "secret")
+        deployment = next(d for d in docs if d["kind"] == "Deployment")
+        probe = deployment["spec"]["template"]["spec"]["containers"][0]["readinessProbe"]
+        self.assertEqual(probe["httpGet"], {"path": "/actuator/health/readiness", "port": 8080})
+        job = next(d for d in docs if d["kind"] == "CronJob")
+        self.assertEqual(job["spec"]["jobTemplate"]["spec"]["backoffLimit"], 8)
+        self.assertEqual(job["spec"]["jobTemplate"]["spec"]["activeDeadlineSeconds"], 600)
 
     def test_updating_one_component_leaves_other_service_pod_template_unchanged(self):
         shared = [{"name": "api", "type": "service", "resolved_image": "registry/api@sha256:one",

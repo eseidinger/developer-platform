@@ -73,11 +73,17 @@ class EnvelopeContract(unittest.TestCase):
                 {"name": "database", "type": "postgres", "profile": "shared-dev", "deletionPolicy": "delete"}]}),
             "configuration secrets": envelope(spec={"application": app, "configuration": {"secrets": {}}}),
             "reserved configuration": envelope(spec={"application": app, "configuration": {"values": {"PGHOST": "b"}}}),
-            "readiness path": envelope(spec={"application": {**app, "health": {"readiness": {"path": "/x"}}}}),
         }
         for label, body in cases.items():
             with self.subTest(label), self.assertRaises(ValueError):
                 spec.to_flat(body)
+
+    def test_http_readiness_path_maps_to_the_flat_project_fields(self):
+        app = envelope()["spec"]["application"]
+        body = envelope(spec={"application": {**app, "health": {"readiness": {
+            "path": "/actuator/health/readiness", "port": 5678}}}})
+        self.assertEqual(spec.to_flat(body)["readiness_path"], "/actuator/health/readiness")
+        self.assertEqual(spec.to_flat(body)["readiness_port"], 5678)
 
     def test_v1alpha2_maps_service_and_scheduled_components(self):
         body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application",
@@ -91,7 +97,7 @@ class EnvelopeContract(unittest.TestCase):
              "ports": [{"name": "http", "protocol": "http", "port": 8080}]},
             {"name": "worker", "type": "scheduled", "image": "registry/worker:v1",
              "command": ["python", "-m", "jobs"], "schedule": "*/15 * * * *", "time_zone": "UTC",
-             "concurrency_policy": "Forbid"}]})
+             "concurrency_policy": "Forbid", "retry_limit": 6}]})
 
     def test_v1alpha2_rejects_invalid_schedule(self):
         body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"},
@@ -114,6 +120,18 @@ class EnvelopeContract(unittest.TestCase):
             {"name": "api", "type": "service", "runtime": {"type": "container", "image": "registry/api:v1"},
              "ports": [{"name": "http", "protocol": "http", "port": 8080}], "exposure": "public"}]}}
         self.assertEqual(spec.to_flat(body)["components"][0]["exposure"], "public")
+
+    def test_v1alpha2_maps_http_readiness_and_scheduled_retry_controls(self):
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"}, "spec": {"components": [
+            {"name": "web", "type": "service", "runtime": {"type": "container", "image": "registry/web:v1"},
+             "ports": [{"name": "http", "protocol": "http", "port": 8080}],
+             "health": {"readiness": {"path": "/actuator/health/readiness"}}},
+            {"name": "worker", "type": "scheduled", "runtime": {"type": "container", "image": "registry/worker:v1"},
+             "schedule": "* * * * *", "retryLimit": 8, "maxRunSeconds": 600}]}}
+        flattened = spec.to_flat(body)["components"]
+        self.assertEqual(flattened[0]["readiness_path"], "/actuator/health/readiness")
+        self.assertEqual(flattened[1]["retry_limit"], 8)
+        self.assertEqual(flattened[1]["max_run_seconds"], 600)
 
     def test_v1alpha2_allows_only_operator_approved_outbound_cidr_port(self):
         body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"}, "spec": {"components": [

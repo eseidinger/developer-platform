@@ -53,7 +53,8 @@ def normalize_resources(value):
     return {section: {"cpu": f"{v['cpu']}m", "memory": f"{v['memory']}Mi"} for section, v in parsed.items()}
 
 
-def resources(name, image, port, domain, database_ip, password, workload_resources=None, configuration=None):
+def resources(name, image, port, domain, database_ip, password, workload_resources=None, configuration=None,
+              readiness_path=None, readiness_port=None):
     validate_name(name)
     ipaddress.IPv4Address(database_ip)
     namespace = "project-" + name
@@ -108,7 +109,9 @@ def resources(name, image, port, domain, database_ip, password, workload_resourc
                     "securityContext": {"allowPrivilegeEscalation": False,
                         "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
                     "resources": workload_resources or DEFAULT_RESOURCES,
-                    "readinessProbe": {"tcpSocket": {"port": port}, "periodSeconds": 5},
+                    "readinessProbe": ({"httpGet": {"path": readiness_path,
+                                                       "port": readiness_port or port}, "periodSeconds": 5}
+                                       if readiness_path else {"tcpSocket": {"port": port}, "periodSeconds": 5}),
                     "livenessProbe": {"tcpSocket": {"port": port}, "initialDelaySeconds": 30},
                     "volumeMounts": [{"name": "tmp", "mountPath": "/tmp"}]}],
                 "volumes": [{"name": "tmp", "emptyDir": {"sizeLimit": "64Mi"}}]}}}),
@@ -155,7 +158,12 @@ def component_resources(name, components, database_ip, password, configuration=N
             if ports:
                 container["ports"] = [{"name": port["name"], "containerPort": port["port"]} for port in ports]
                 probe_port = ports[0]["port"]
-                container["readinessProbe"] = {"tcpSocket": {"port": probe_port}, "periodSeconds": 5}
+                if component.get("readiness_path"):
+                    container["readinessProbe"] = {"httpGet": {"path": component["readiness_path"],
+                                                                "port": component.get("readiness_port") or probe_port},
+                                                   "periodSeconds": 5}
+                else:
+                    container["readinessProbe"] = {"tcpSocket": {"port": probe_port}, "periodSeconds": 5}
                 container["livenessProbe"] = {"tcpSocket": {"port": probe_port}, "initialDelaySeconds": 30}
         spec = {"automountServiceAccountToken": False,
                 "securityContext": {"runAsNonRoot": True, "runAsUser": 10001,
@@ -218,6 +226,10 @@ def component_resources(name, components, database_ip, password, configuration=N
                 "schedule": component["schedule"], "timeZone": component.get("time_zone", "UTC"),
                 "concurrencyPolicy": component.get("concurrency_policy", "Forbid"),
                 "successfulJobsHistoryLimit": 3, "failedJobsHistoryLimit": 3,
-                "jobTemplate": {"metadata": {"labels": component_labels}, "spec": {"backoffLimit": 1, "template": {"metadata": {"labels": component_labels},
+                "jobTemplate": {"metadata": {"labels": component_labels}, "spec": {
+                    "backoffLimit": component.get("retry_limit", 6),
+                    **({"activeDeadlineSeconds": component["max_run_seconds"]}
+                       if component.get("max_run_seconds") is not None else {}),
+                    "template": {"metadata": {"labels": component_labels},
                     "spec": pod_spec(component, "Never")}}}}))
     return manifests

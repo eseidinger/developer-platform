@@ -132,7 +132,7 @@ approved it.
 | `ports[].port` | Yes when `ports` is used | Integer from 1024 through 65535. Port names must be unique within the component. |
 | `replicas` | No | Integer from 1 through 5; default `1`. Subject to the project quota. |
 | `exposure` | No | `private` (default) or `public`. At most one service in an application can be public. |
-| `health.readiness.profile` | No | `status` or `hello-world`. The platform uses a TCP probe on the first declared port; custom paths and ports are not supported. |
+| `health.readiness` | No | Exactly one of `profile` or `path`. `profile` is `status` or `hello-world` and retains the TCP readiness probe on the first declared port. `path` configures an HTTP GET readiness probe; it must begin with `/` and uses the first declared port unless `port` matches another declared port number. |
 | `outbound` | No | Up to five `{ "cidr": "…", "port": N }` destinations. CIDR must be valid and each TCP port is 1–65535, but every destination must also be in the operator allow-list. |
 
 A public service gets an ingress at
@@ -146,9 +146,22 @@ DNS and can be reached by other project workloads through their component name.
 | `schedule` | Yes | Five-field cron expression. Each field supports `*`, a number, an increasing numeric range, comma-separated values, and a `/step`. |
 | `timeZone` | No | Only `UTC`; default `UTC`. |
 | `concurrencyPolicy` | No | Only `Forbid`; default `Forbid`. This prevents overlapping runs. |
+| `retryLimit` | No | Integer 0–10; default `6`. Kubernetes retries a failed Job with exponential backoff. This does not establish dependency ordering. |
+| `maxRunSeconds` | No | Integer 60–86400. Stops a Job that exceeds this duration. |
 
 Scheduled components do not accept `ports`, `replicas`, `exposure`, `health`, or
 `outbound`.
+
+For an application such as Spring Boot that becomes reachable before its database
+migrations and initialization are complete, use its application readiness endpoint:
+
+```json
+"health": {"readiness": {"path": "/actuator/health/readiness"}}
+```
+
+This makes Kubernetes withhold the Service endpoint until the endpoint returns a
+successful response. It does not order a scheduled Job after the service; clients
+must still retry transient connection failures.
 
 ### Resource limits
 

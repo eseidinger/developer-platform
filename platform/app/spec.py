@@ -41,7 +41,18 @@ class Scaling(_Strict):
 
 
 class Readiness(_Strict):
-    profile: Literal["status", "hello-world"]
+    # A profile keeps the original externally monitored root-path contract.  A
+    # path is an application readiness endpoint used by Kubernetes.
+    profile: Optional[Literal["status", "hello-world"]] = None
+    path: Optional[str] = Field(default=None, min_length=1, max_length=256,
+                                pattern=r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$")
+    port: Optional[int] = Field(default=None, ge=1024, le=65535)
+
+    @model_validator(mode="after")
+    def exactly_one_probe_kind(self):
+        if (self.profile is None) == (self.path is None):
+            raise ValueError("readiness requires exactly one of profile or path")
+        return self
 
 
 class Health(_Strict):
@@ -175,6 +186,12 @@ class ServiceComponent(_Component):
     def unique_ports(self):
         if self.ports and len({port.name for port in self.ports}) != len(self.ports):
             raise ValueError("service port names must be unique")
+        if self.health and self.health.readiness.path:
+            if not self.ports:
+                raise ValueError("HTTP readiness requires a declared service port")
+            declared = {port.port for port in self.ports}
+            if self.health.readiness.port is not None and self.health.readiness.port not in declared:
+                raise ValueError("readiness port must be one of the declared service ports")
         return self
 
 
@@ -183,6 +200,8 @@ class ScheduledComponent(_Component):
     schedule: str
     timeZone: Literal["UTC"] = "UTC"
     concurrencyPolicy: Literal["Forbid"] = "Forbid"
+    retryLimit: int = Field(default=6, ge=0, le=10)
+    maxRunSeconds: Optional[int] = Field(default=None, ge=60, le=86400)
 
     @field_validator("schedule")
     @classmethod
@@ -233,7 +252,7 @@ CAPABILITIES = {
         "endpoints": {"protocols": ["http"], "exposure": ["public"], "maxCount": 1},
         "scaling": {"minInstances": 1, "maxInstances": 1, "autoscaling": False},
         "resources": {"requests": "up to 1 CPU / 1Gi", "limits": "up to 2 CPU / 2Gi", "requestsMustNotExceedLimits": True},
-        "health": {"readiness": {"profiles": ["status", "hello-world"], "customPath": False}},
+        "health": {"readiness": {"profiles": ["status", "hello-world"], "customPath": True}},
         "externalResources": [{"type": "postgres", "profiles": ["shared-dev"], "deletionPolicies": ["retain"], "maxCount": 1}],
         "configuration": {"values": True, "maxValues": 50, "maxValueLength": 1024, "secrets": True, "bindings": ["PG"]},
         "components": {"types": ["service", "scheduled"], "maxCount": 5,
@@ -296,10 +315,19 @@ def to_flat(body):
                 if component.ports:
                     flat_component["ports"] = [port.model_dump() for port in component.ports]
                 if component.health:
-                    flat_component["probe_profile"] = component.health.readiness.profile
+                    readiness = component.health.readiness
+                    if readiness.profile:
+                        flat_component["probe_profile"] = readiness.profile
+                    else:
+                        flat_component["readiness_path"] = readiness.path
+                        if readiness.port is not None:
+                            flat_component["readiness_port"] = readiness.port
             else:
                 flat_component.update({"schedule": component.schedule, "time_zone": component.timeZone,
-                                       "concurrency_policy": component.concurrencyPolicy})
+                                       "concurrency_policy": component.concurrencyPolicy,
+                                       "retry_limit": component.retryLimit})
+                if component.maxRunSeconds is not None:
+                    flat_component["max_run_seconds"] = component.maxRunSeconds
             components.append(flat_component)
         flat = {"name": envelope.metadata.name, "components": components}
         if envelope.spec.configuration is not None:
@@ -311,7 +339,13 @@ def to_flat(body):
     if application.endpoints:
         flat["port"] = application.endpoints[0].port
     if application.health:
-        flat["probe_profile"] = application.health.readiness.profile
+        readiness = application.health.readiness
+        if readiness.profile:
+            flat["probe_profile"] = readiness.profile
+        else:
+            flat["readiness_path"] = readiness.path
+            if readiness.port is not None:
+                flat["readiness_port"] = readiness.port
     if application.resources is not None:
         flat["resources"] = application.resources
     if envelope.spec.configuration is not None:

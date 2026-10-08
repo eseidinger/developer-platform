@@ -653,6 +653,33 @@
             "title": "Probe Profile",
             "type": "string"
           },
+          "readiness_path": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Readiness Path"
+          },
+          "readiness_port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1024.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Readiness Port"
+          },
           "resources": {
             "anyOf": [
               {
@@ -743,18 +770,49 @@
       "Readiness": {
         "additionalProperties": false,
         "properties": {
-          "profile": {
-            "enum": [
-              "status",
-              "hello-world"
+          "path": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "pattern": "^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
             ],
-            "title": "Profile",
-            "type": "string"
+            "title": "Path"
+          },
+          "port": {
+            "anyOf": [
+              {
+                "maximum": 65535.0,
+                "minimum": 1024.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Port"
+          },
+          "profile": {
+            "anyOf": [
+              {
+                "enum": [
+                  "status",
+                  "hello-world"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Profile"
           }
         },
-        "required": [
-          "profile"
-        ],
         "title": "Readiness",
         "type": "object"
       },
@@ -848,6 +906,19 @@
             "title": "Concurrencypolicy",
             "type": "string"
           },
+          "maxRunSeconds": {
+            "anyOf": [
+              {
+                "maximum": 86400.0,
+                "minimum": 60.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maxrunseconds"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -863,6 +934,13 @@
               }
             ],
             "title": "Resources"
+          },
+          "retryLimit": {
+            "default": 6,
+            "maximum": 10.0,
+            "minimum": 0.0,
+            "title": "Retrylimit",
+            "type": "integer"
           },
           "runtime": {
             "$ref": "#/components/schemas/ComponentRuntime"

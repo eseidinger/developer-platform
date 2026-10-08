@@ -290,6 +290,9 @@ class Project(BaseModel):
     image: Optional[str] = Field(default=None, min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$")
     port: int = Field(default=8080, ge=1024, le=65535)
     probe_profile: Literal["status", "hello-world"] = "status"
+    readiness_path: Optional[str] = Field(default=None, min_length=1, max_length=256,
+                                          pattern=r"^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$")
+    readiness_port: Optional[int] = Field(default=None, ge=1024, le=65535)
     resources: Optional[dict] = None
     configuration: Optional[dict] = None
     components: Optional[list[dict]] = None
@@ -305,6 +308,8 @@ class Project(BaseModel):
     def one_workload_shape(self):
         if (self.image is None) == (self.components is None):
             raise ValueError("provide either image or components")
+        if self.readiness_port is not None and self.image is not None and self.readiness_port != self.port:
+            raise ValueError("readiness_port must equal the application port")
         components = self.components if self.components is not None else [{"type": "service", "resources": self.resources}]
         validate_component_capacity(self.name, components)
         return self

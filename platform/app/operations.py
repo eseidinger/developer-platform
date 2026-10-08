@@ -113,7 +113,9 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         else:
             manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
                                   os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
-                                  spec.get("resources"), spec.get("configuration"))
+                                  spec.get("resources"), spec.get("configuration"),
+                                  readiness_path=spec.get("readiness_path"),
+                                  readiness_port=spec.get("readiness_port"))
         previous = conn.execute("""SELECT spec FROM application_revisions
             WHERE application_id=%s AND revision<%s ORDER BY revision DESC LIMIT 1""",
                                 (application_id, revision)).fetchone()

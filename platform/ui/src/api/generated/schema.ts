@@ -1091,6 +1091,10 @@ export interface components {
              * @enum {string}
              */
             probe_profile: "status" | "hello-world";
+            /** Readiness Path */
+            readiness_path?: string | null;
+            /** Readiness Port */
+            readiness_port?: number | null;
             /** Resources */
             resources?: {
                 [key: string]: unknown;
@@ -1122,11 +1126,12 @@ export interface components {
         };
         /** Readiness */
         Readiness: {
-            /**
-             * Profile
-             * @enum {string}
-             */
-            profile: "status" | "hello-world";
+            /** Path */
+            path?: string | null;
+            /** Port */
+            port?: number | null;
+            /** Profile */
+            profile?: ("status" | "hello-world") | null;
         };
         /** Retirement */
         Retirement: {
@@ -1171,12 +1176,19 @@ export interface components {
              * @constant
              */
             concurrencyPolicy: "Forbid";
+            /** Maxrunseconds */
+            maxRunSeconds?: number | null;
             /** Name */
             name: string;
             /** Resources */
             resources?: {
                 [key: string]: unknown;
             } | null;
+            /**
+             * Retrylimit
+             * @default 6
+             */
+            retryLimit: number;
             runtime: components["schemas"]["ComponentRuntime"];
             /** Schedule */
             schedule: string;

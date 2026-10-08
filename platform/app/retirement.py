@@ -30,7 +30,8 @@ def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
                                         spec.get("configuration"), domain)
     else:
         manifests = resources(name, spec.get("resolved_image", spec["image"]), spec.get("port", 8080),
-                              domain, DOCUMENTATION_ADDRESS, "unused", spec.get("resources"), spec.get("configuration"))
+                              domain, DOCUMENTATION_ADDRESS, "unused", spec.get("resources"), spec.get("configuration"),
+                              spec.get("readiness_path"), spec.get("readiness_port"))
     database = "project_" + name.replace("-", "_")
     routes = [rule["host"] for manifest in manifests if manifest["kind"] == "Ingress"
               for rule in manifest["spec"].get("rules", [])]
