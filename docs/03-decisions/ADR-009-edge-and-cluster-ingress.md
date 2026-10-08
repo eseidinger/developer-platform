@@ -12,7 +12,7 @@ Retain the implemented division of responsibility:
 
 - **Caddy outside k3d:** terminate public TLS, route the platform hostname to the API, and forward application traffic to the k3d load balancer.
 - **Traefik inside k3d:** route application HTTP traffic using Kubernetes Ingress resources created by the provisioner.
-- **Platform API:** authorize on-demand application certificates through `/internal/tls`; only names under `APPS_DOMAIN` with stored project status `applied` are eligible.
+- **Platform API:** authorize on-demand application certificates through `/internal/tls`; only the exact legacy project hostname or a service hostname generated from an `applied` stored spec under `APPS_DOMAIN` is eligible. A component hostname is `<component>-<project>.<APPS_DOMAIN>` and must correspond to a declared public service.
 
 The current [Caddyfile](../../infrastructure/proxy/Caddyfile) has two upstream destinations and requires neither Docker discovery nor Kubernetes credentials. Caddy owns public certificate management; the internal application hop uses HTTP. Local `*.apps.localhost` traffic has an explicit HTTP route. The API's `applied` state is certificate eligibility, not observed application health.
 

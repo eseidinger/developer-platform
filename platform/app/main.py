@@ -2201,13 +2201,22 @@ def delete_platform_grant(grant: GrantReference, principal: Principal = Depends(
 
 @app.get("/internal/tls", include_in_schema=False)
 def allow_certificate(domain: str = Query(max_length=253)):
-    # Caddy on-demand TLS gate: only registered projects may obtain certificates.
+    """Authorize only the exact public hostname generated from an applied spec."""
     suffix = "." + os.environ["APPS_DOMAIN"]
     if not domain.endswith(suffix):
         raise HTTPException(403)
-    name = domain[:-len(suffix)]
+    host = domain[:-len(suffix)]
     with connect() as conn:
-        row = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
-    if not row or row[0] != "applied":
-        raise HTTPException(403)
-    return {"allowed": True}
+        projects = conn.execute("SELECT name, spec FROM projects WHERE status='applied'").fetchall()
+    for name, spec in projects:
+        components = (spec or {}).get("components")
+        if components is None:
+            # The legacy shape has exactly one public route at <project>.<domain>.
+            if host == name:
+                return {"allowed": True}
+            continue
+        for component in components:
+            if (component.get("type") == "service" and component.get("exposure") == "public"
+                    and host == f"{component.get('name')}-{name}"):
+                return {"allowed": True}
+    raise HTTPException(403)
