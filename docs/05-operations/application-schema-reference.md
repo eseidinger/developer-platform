@@ -163,6 +163,11 @@ This makes Kubernetes withhold the Service endpoint until the endpoint returns a
 successful response. It does not order a scheduled Job after the service; clients
 must still retry transient connection failures.
 
+Every service with a declared port also receives a platform-managed TCP startup
+probe. It allows up to three minutes for the container to bind its first port
+before liveness and readiness failures are enforced. Startup-probe timing is not
+currently configurable in the application schema.
+
 ### Resource limits
 
 `resources` is optional on each component. If omitted, the platform applies:

@@ -14,6 +14,9 @@ def validate_name(value):
 SECRET_NAME = "app-secrets"
 DEFAULT_RESOURCES = {"requests": {"cpu": "100m", "memory": "128Mi"},
                      "limits": {"cpu": "500m", "memory": "256Mi"}}
+# JVM applications can take appreciably longer than the liveness window to bind
+# their port. Kubernetes suppresses liveness and readiness until this succeeds.
+STARTUP_PROBE = {"periodSeconds": 5, "failureThreshold": 36}
 # Rolling updates briefly run two pods, so twice these maxima must fit the namespace quota.
 MAX_RESOURCES = {"requests": {"cpu": 1000, "memory": 1024}, "limits": {"cpu": 2000, "memory": 2048}}
 
@@ -109,6 +112,7 @@ def resources(name, image, port, domain, database_ip, password, workload_resourc
                     "securityContext": {"allowPrivilegeEscalation": False,
                         "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
                     "resources": workload_resources or DEFAULT_RESOURCES,
+                    "startupProbe": {"tcpSocket": {"port": port}, **STARTUP_PROBE},
                     "readinessProbe": ({"httpGet": {"path": readiness_path,
                                                        "port": readiness_port or port}, "periodSeconds": 5}
                                        if readiness_path else {"tcpSocket": {"port": port}, "periodSeconds": 5}),
@@ -158,6 +162,7 @@ def component_resources(name, components, database_ip, password, configuration=N
             if ports:
                 container["ports"] = [{"name": port["name"], "containerPort": port["port"]} for port in ports]
                 probe_port = ports[0]["port"]
+                container["startupProbe"] = {"tcpSocket": {"port": probe_port}, **STARTUP_PROBE}
                 if component.get("readiness_path"):
                     container["readinessProbe"] = {"httpGet": {"path": component["readiness_path"],
                                                                 "port": component.get("readiness_port") or probe_port},

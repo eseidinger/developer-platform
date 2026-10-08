@@ -111,9 +111,18 @@ class WorkloadContract(unittest.TestCase):
         deployment = next(d for d in docs if d["kind"] == "Deployment")
         probe = deployment["spec"]["template"]["spec"]["containers"][0]["readinessProbe"]
         self.assertEqual(probe["httpGet"], {"path": "/actuator/health/readiness", "port": 8080})
+        startup = deployment["spec"]["template"]["spec"]["containers"][0]["startupProbe"]
+        self.assertEqual(startup, {"tcpSocket": {"port": 8080}, "periodSeconds": 5, "failureThreshold": 36})
         job = next(d for d in docs if d["kind"] == "CronJob")
         self.assertEqual(job["spec"]["jobTemplate"]["spec"]["backoffLimit"], 8)
         self.assertEqual(job["spec"]["jobTemplate"]["spec"]["activeDeadlineSeconds"], 600)
+
+    def test_legacy_service_gets_startup_probe(self):
+        docs = resources("shop", "registry/web@sha256:one", 8080, "apps.test", "172.30.80.10", "secret")
+        deployment = next(d for d in docs if d["kind"] == "Deployment")
+        container = deployment["spec"]["template"]["spec"]["containers"][0]
+        self.assertEqual(container["startupProbe"],
+                         {"tcpSocket": {"port": 8080}, "periodSeconds": 5, "failureThreshold": 36})
 
     def test_updating_one_component_leaves_other_service_pod_template_unchanged(self):
         shared = [{"name": "api", "type": "service", "resolved_image": "registry/api@sha256:one",
