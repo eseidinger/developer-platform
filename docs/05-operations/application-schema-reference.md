@@ -133,7 +133,7 @@ approved it.
 | `replicas` | No | Integer from 1 through 5; default `1`. Subject to the project quota. |
 | `exposure` | No | `private` (default) or `public`. At most one service in an application can be public. |
 | `health.readiness` | No | Exactly one of `profile` or `path`. `profile` is `status` or `hello-world` and retains the TCP readiness probe on the first declared port. `path` configures an HTTP GET readiness probe; it must begin with `/` and uses the first declared port unless `port` matches another declared port number. |
-| `outbound` | No | Up to five `{ "cidr": "…", "port": N }` destinations. CIDR must be valid and each TCP port is 1–65535, but every destination must also be in the operator allow-list. |
+| `outbound` | No | Up to five `{ "cidr": "…", "port": N }` or `{ "dns": "api.example.com", "port": N }` destinations. CIDRs, and every IP address currently resolved for DNS destinations, must be in the operator allow-list. DNS rules are resolved to fixed NetworkPolicy IP rules when the deployment is applied; reapply when the destination address changes. |
 
 A public service gets an ingress at
 `https://<component>-<project>.<apps-domain>`. Private services get in-project
@@ -148,9 +148,9 @@ DNS and can be reached by other project workloads through their component name.
 | `concurrencyPolicy` | No | Only `Forbid`; default `Forbid`. This prevents overlapping runs. |
 | `retryLimit` | No | Integer 0–10; default `6`. Kubernetes retries a failed Job with exponential backoff. This does not establish dependency ordering. |
 | `maxRunSeconds` | No | Integer 60–86400. Stops a Job that exceeds this duration. |
+| `outbound` | No | Same CIDR or DNS TCP egress declaration supported by service components. |
 
-Scheduled components do not accept `ports`, `replicas`, `exposure`, `health`, or
-`outbound`.
+Scheduled components do not accept `ports`, `replicas`, `exposure`, or `health`.
 
 For an application such as Spring Boot that becomes reachable before its database
 migrations and initialization are complete, use its application readiness endpoint:

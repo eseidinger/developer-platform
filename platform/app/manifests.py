@@ -3,6 +3,7 @@ import ipaddress
 import re
 
 from .config import env_list
+from .egress import resolve as resolve_egress_dns
 from .project_policy import quota_for
 
 def validate_name(value):
@@ -221,11 +222,6 @@ def component_resources(name, components, database_ip, password, configuration=N
                     "ingressClassName": "traefik", "rules": [{"host": component["name"] + "-" + name + "." + domain,
                     "http": {"paths": [{"path": "/", "pathType": "Prefix", "backend": {
                         "service": {"name": component["name"], "port": {"number": ports[0]["port"]}}}}]}}]}))
-            if component.get("outbound"):
-                manifests.append(obj("networking.k8s.io/v1", "NetworkPolicy", component["name"] + "-egress", spec={
-                    "podSelector": {"matchLabels": component_labels}, "policyTypes": ["Egress"],
-                    "egress": [{"to": [{"ipBlock": {"cidr": item["cidr"]}}],
-                                "ports": [{"protocol": "TCP", "port": item["port"]}]} for item in component["outbound"]]}))
         else:
             manifests.append(obj("batch/v1", "CronJob", component["name"], spec={
                 "schedule": component["schedule"], "timeZone": component.get("time_zone", "UTC"),
@@ -237,4 +233,12 @@ def component_resources(name, components, database_ip, password, configuration=N
                        if component.get("max_run_seconds") is not None else {}),
                     "template": {"metadata": {"labels": component_labels},
                     "spec": pod_spec(component, "Never")}}}}))
+        if component.get("outbound"):
+            rules = []
+            for item in component["outbound"]:
+                cidrs = [item["cidr"]] if item.get("cidr") else resolve_egress_dns(item)["resolved_cidrs"]
+                rules.extend({"to": [{"ipBlock": {"cidr": cidr}}],
+                              "ports": [{"protocol": "TCP", "port": item["port"]}]} for cidr in cidrs)
+            manifests.append(obj("networking.k8s.io/v1", "NetworkPolicy", component["name"] + "-egress", spec={
+                "podSelector": {"matchLabels": component_labels}, "policyTypes": ["Egress"], "egress": rules}))
     return manifests

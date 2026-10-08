@@ -1044,11 +1044,13 @@ export interface components {
         };
         /**
          * OutboundDestination
-         * @description One operator-approved TCP egress exception for a service component.
+         * @description One operator-approved TCP egress exception for any component.
          */
         OutboundDestination: {
             /** Cidr */
-            cidr: string;
+            cidr?: string | null;
+            /** Dns */
+            dns?: string | null;
             /** Port */
             port: number;
         };
@@ -1180,6 +1182,8 @@ export interface components {
             maxRunSeconds?: number | null;
             /** Name */
             name: string;
+            /** Outbound */
+            outbound?: components["schemas"]["OutboundDestination"][];
             /** Resources */
             resources?: {
                 [key: string]: unknown;

@@ -529,11 +529,31 @@
       },
       "OutboundDestination": {
         "additionalProperties": false,
-        "description": "One operator-approved TCP egress exception for a service component.",
+        "description": "One operator-approved TCP egress exception for any component.",
         "properties": {
           "cidr": {
-            "title": "Cidr",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cidr"
+          },
+          "dns": {
+            "anyOf": [
+              {
+                "maxLength": 253,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dns"
           },
           "port": {
             "maximum": 65535.0,
@@ -543,7 +563,6 @@
           }
         },
         "required": [
-          "cidr",
           "port"
         ],
         "title": "OutboundDestination",
@@ -922,6 +941,14 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "outbound": {
+            "items": {
+              "$ref": "#/components/schemas/OutboundDestination"
+            },
+            "maxItems": 5,
+            "title": "Outbound",
+            "type": "array"
           },
           "resources": {
             "anyOf": [

@@ -2,6 +2,7 @@ import sys
 import unittest
 import os
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app import spec
 
@@ -139,6 +140,15 @@ class EnvelopeContract(unittest.TestCase):
              "outbound": [{"cidr": "203.0.113.10/32", "port": 443}]}]}}
         os.environ["ALLOWED_EGRESS_CIDRS"], os.environ["ALLOWED_EGRESS_PORTS"] = "203.0.113.0/24", "443"
         self.assertEqual(spec.to_flat(body)["components"][0]["outbound"], [{"cidr": "203.0.113.10/32", "port": 443}])
+
+    def test_v1alpha2_allows_scheduled_dns_egress(self):
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"}, "spec": {"components": [
+            {"name": "worker", "type": "scheduled", "runtime": {"type": "container", "image": "registry/worker:v1"},
+             "schedule": "* * * * *", "outbound": [{"dns": "api.example.test", "port": 443}]}]}}
+        os.environ["ALLOWED_EGRESS_CIDRS"], os.environ["ALLOWED_EGRESS_PORTS"] = "203.0.113.0/24", "443"
+        with patch("app.spec.resolve_egress_dns", return_value={"resolved_cidrs": ["203.0.113.8/32"]}):
+            self.assertEqual(spec.to_flat(body)["components"][0]["outbound"],
+                             [{"dns": "api.example.test", "port": 443}])
 
     def test_v1alpha2_rejects_unapproved_or_malformed_operator_egress_policy(self):
         body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"}, "spec": {"components": [

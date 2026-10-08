@@ -1,6 +1,7 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.manifests import component_resources, normalize_resources, resources, validate_name
 
@@ -152,6 +153,15 @@ class WorkloadContract(unittest.TestCase):
         policy = next(d for d in docs if d["metadata"]["name"] == "api-egress")
         self.assertEqual(policy["spec"]["podSelector"]["matchLabels"]["platform.example/component"], "api")
         self.assertEqual(policy["spec"]["egress"][0]["to"][0]["ipBlock"]["cidr"], "203.0.113.10/32")
+
+    def test_scheduled_component_dns_egress_is_scoped_to_its_pods(self):
+        with patch("app.manifests.resolve_egress_dns", return_value={"resolved_cidrs": ["203.0.113.8/32"]}):
+            docs = component_resources("shop", [{"name": "worker", "type": "scheduled",
+                "resolved_image": "x@sha256:a", "schedule": "* * * * *",
+                "outbound": [{"dns": "api.example.test", "port": 443}]}], "172.30.80.10", "secret")
+        policy = next(d for d in docs if d["metadata"]["name"] == "worker-egress")
+        self.assertEqual(policy["spec"]["podSelector"]["matchLabels"]["platform.example/component"], "worker")
+        self.assertEqual(policy["spec"]["egress"][0]["to"][0]["ipBlock"]["cidr"], "203.0.113.8/32")
 
 if __name__ == "__main__":
     unittest.main()

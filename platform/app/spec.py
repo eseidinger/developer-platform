@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 from .config import normalize_configuration
 from .manifests import normalize_resources
-from .egress import validate as validate_egress
+from .egress import resolve as resolve_egress_dns, validate as validate_egress
 from .project_policy import validate_component_capacity
 
 API_VERSION = "platform.example/v1alpha1"
@@ -147,6 +147,7 @@ class _Component(_Strict):
     name: str
     runtime: ComponentRuntime
     resources: Optional[dict] = None
+    outbound: List["OutboundDestination"] = Field(default_factory=list, max_length=5)
 
     @field_validator("name")
     @classmethod
@@ -160,11 +161,28 @@ class _Component(_Strict):
     def check_resources(cls, value):
         return None if value is None else normalize_resources(value)
 
+    @field_validator("outbound")
+    @classmethod
+    def check_outbound(cls, value):
+        for item in value:
+            if item.cidr is not None:
+                validate_egress(item.model_dump(exclude_none=True))
+            else:
+                resolve_egress_dns(item.model_dump(exclude_none=True))
+        return value
+
 
 class OutboundDestination(_Strict):
-    """One operator-approved TCP egress exception for a service component."""
-    cidr: str
+    """One operator-approved TCP egress exception for any component."""
+    cidr: Optional[str] = None
+    dns: Optional[str] = Field(default=None, min_length=1, max_length=253)
     port: int = Field(ge=1, le=65535)
+
+    @model_validator(mode="after")
+    def exactly_one_destination(self):
+        if (self.cidr is None) == (self.dns is None):
+            raise ValueError("outbound requires exactly one of cidr or dns")
+        return self
 
 
 class ServiceComponent(_Component):
@@ -172,14 +190,6 @@ class ServiceComponent(_Component):
     ports: Optional[List[InternalPort]] = Field(default=None, max_length=10)
     replicas: int = Field(default=1, ge=1, le=5)
     exposure: Literal["private", "public"] = "private"
-    outbound: List[OutboundDestination] = Field(default_factory=list, max_length=5)
-
-    @field_validator("outbound")
-    @classmethod
-    def check_outbound(cls, value):
-        for item in value:
-            validate_egress(item.model_dump())
-        return value
     health: Optional[Health] = None
 
     @model_validator(mode="after")
@@ -256,9 +266,10 @@ CAPABILITIES = {
         "externalResources": [{"type": "postgres", "profiles": ["shared-dev"], "deletionPolicies": ["retain"], "maxCount": 1}],
         "configuration": {"values": True, "maxValues": 50, "maxValueLength": 1024, "secrets": True, "bindings": ["PG"]},
         "components": {"types": ["service", "scheduled"], "maxCount": 5,
-                       "service": {"internalHttpPorts": True, "maxReplicas": 5,
-                                   "outbound": {"cidrAndTcpPort": True, "maxDestinations": 5,
-                                                "operatorAllowListRequired": True}},
+                       "outbound": {"cidrOrDnsAndTcpPort": True, "maxDestinations": 5,
+                                    "operatorAllowListRequired": True,
+                                    "dnsResolvedAtApply": True},
+                       "service": {"internalHttpPorts": True, "maxReplicas": 5},
                        "scheduled": {"cronFields": 5, "timeZone": ["UTC"], "concurrencyPolicy": ["Forbid"]}},
     }},
 }
@@ -310,8 +321,6 @@ def to_flat(body):
                 flat_component["replicas"] = component.replicas
                 if component.exposure == "public":
                     flat_component["exposure"] = "public"
-                if component.outbound:
-                    flat_component["outbound"] = [destination.model_dump() for destination in component.outbound]
                 if component.ports:
                     flat_component["ports"] = [port.model_dump() for port in component.ports]
                 if component.health:
@@ -328,6 +337,8 @@ def to_flat(body):
                                        "retry_limit": component.retryLimit})
                 if component.maxRunSeconds is not None:
                     flat_component["max_run_seconds"] = component.maxRunSeconds
+            if component.outbound:
+                flat_component["outbound"] = [destination.model_dump(exclude_none=True) for destination in component.outbound]
             components.append(flat_component)
         flat = {"name": envelope.metadata.name, "components": components}
         if envelope.spec.configuration is not None:
