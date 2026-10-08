@@ -29,7 +29,7 @@ def validate(destination: dict) -> dict:
     except ValueError as exc:
         raise ValueError("outbound cidr must be a valid CIDR") from exc
     port = destination["port"]
-    if not any(network.subnet_of(allowed) for allowed in _cidrs()) or port not in _ports():
+    if not any(network.version == allowed.version and network.subnet_of(allowed) for allowed in _cidrs()) or port not in _ports():
         raise ValueError("outbound destination is not allowed by operator policy")
     return {"cidr": str(network), "port": port}
 

@@ -36,3 +36,10 @@ class DnsEgressTests(unittest.TestCase):
         with patch("app.egress.socket.getaddrinfo", side_effect=socket.gaierror):
             with self.assertRaisesRegex(ValueError, "could not be resolved"):
                 resolve({"dns": "api.example.test", "port": 443})
+
+    def test_mixed_address_families_are_denied_cleanly_when_ipv6_is_not_allowed(self):
+        answers = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("203.0.113.8", 443)),
+                   (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:db8::8", 443, 0, 0))]
+        with patch("app.egress.socket.getaddrinfo", return_value=answers):
+            with self.assertRaisesRegex(ValueError, "not allowed"):
+                resolve({"dns": "api.example.test", "port": 443})
