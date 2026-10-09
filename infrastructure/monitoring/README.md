@@ -1,5 +1,10 @@
 # Application availability monitoring
 
+This source-adjacent guide documents monitoring generation and validation. Use
+the [operator monitoring guide](../../docs/operators/monitoring.md) for live
+operations and the [maintainer monitoring guide](../../docs/maintainers/monitoring.md)
+for implementation ownership.
+
 The platform API publishes application targets from PostgreSQL to a shared
 `monitoring_discovery` volume. Prometheus reads `applications.json` with file
 service discovery and probes each target through the blackbox exporter. Target
@@ -89,7 +94,7 @@ that the application is down.
 
 There is no additional external watchdog monitor. The existing heartbeat checks
 API and Prometheus readiness; it does not prove Alertmanager delivery. Watchdog
-silent failure remains accepted under [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md).
+silent failure remains accepted under [ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md).
 
 ## Retirement
 
@@ -156,7 +161,7 @@ live discovery removal. It never deploys the platform or sends notifications.
 API lifecycle tests use simulated PostgreSQL/Kubernetes dependencies; they do not
 establish real cluster deletion or notification delivery.
 
-For a fresh local platform, follow the [quick start](../../README.md#quick-start-on-ubuntu--wsl2).
+For a fresh local platform, follow the [quick start](../../README.md#quick-start).
 For an existing installation, after other drills finish and with no provisioning
 request in progress, deploy the changed source and recreate the affected services:
 

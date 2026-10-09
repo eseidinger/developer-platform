@@ -1,13 +1,19 @@
 # Docker-based Developer Platform Lab: platform guide
 
+This is the source-adjacent Platform API reference for maintainers. Application
+developers should use the canonical [developer guide](../docs/developers/README.md),
+and administrators should use the [operator guide](../docs/operators/README.md).
+Implementation ownership and validation are summarized in the
+[Platform API maintainer guide](../docs/maintainers/platform-api.md).
+
 The platform API provisions applications on the lab's Kubernetes cluster and
 creates a PostgreSQL database for each project. The current interface includes a
 small browser portal plus a REST API with interactive documentation. Both enforce
 individual OIDC identities and platform-owned project grants.
 
 For installation and prerequisites, start with the [main README](../README.md).
-See [architecture](../docs/02-architecture/infrastructure.md) for isolation and availability limits,
-and [backup and recovery](../docs/05-operations/backup-recovery.md) for operational procedures.
+See [architecture](../docs/architecture/deployment-topology.md) for isolation and availability limits,
+and [backup and recovery](../docs/operators/backup-and-recovery.md) for operational procedures.
 
 ## Access the platform
 
@@ -42,7 +48,7 @@ to PostgreSQL and will not recreate it on later starts. Remove the bootstrap set
 after recording the controlled setup evidence.
 
 For the full local bootstrap, Device Authorization with PKCE, scoped-role, and
-revocation evidence procedure, see the [human access and authorization validation runbook](../docs/05-operations/human-access-and-authorization-validation.md).
+revocation evidence procedure, see the [human access and authorization validation runbook](../docs/operators/validation/access-and-authorization.md).
 
 ## Access-validation portal
 
@@ -138,7 +144,7 @@ resolver supports wildcard localhost names. Public applications use
 
 ## Project specification
 
-`PUT /projects/{name}` accepts a versioned envelope (the preferred format for new integrations) or the flat body below, which remains supported without a sunset date and maps to the same revisions. The envelope has (`apiVersion: platform.example/v1alpha1`, `kind: Application`; see [ApplicationSpec](../docs/02-architecture/application-spec.md)). The generated API contract is [docs/api/openapi.json](../docs/api/openapi.json); refresh it with `scripts/export_openapi.py` after API changes (a test fails when it is stale).
+`PUT /projects/{name}` accepts a versioned envelope (the preferred format for new integrations) or the flat body below, which remains supported without a sunset date and maps to the same revisions. The envelope has (`apiVersion: platform.example/v1alpha1`, `kind: Application`; see [ApplicationSpec](../docs/architecture/application-contract.md)). The generated API contract is [docs/api/openapi.json](../docs/api/openapi.json); refresh it with `scripts/export_openapi.py` after API changes (a test fails when it is stale).
 
 | Field | Required | Contract |
 | --- | --- | --- |
@@ -148,7 +154,7 @@ resolver supports wildcard localhost names. Public applications use
 | `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
 | `resources` | No | `{"requests": {"cpu", "memory"}, "limits": {"cpu", "memory"}}`; CPU as `250m` or `0.25`, memory as `Mi`/`Gi`. Omitted values default to requests `100m`/`128Mi` and limits `500m`/`256Mi`. Requests must not exceed limits; maxima are requests 1 CPU/1Gi and limits 2 CPU/2Gi (a rolling update briefly runs two pods within the namespace quota). Invalid values return 422. Spec rejections return 422 with a stable `code`: `unsupported_capability` (a field or value outside the declared capabilities) or `invalid_spec` (anything else malformed). Stored canonically (`250m`, `512Mi`), so equivalent spellings reuse the revision. |
 
-Unknown project request fields are rejected with `422` before catalog or provider side effects. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/02-architecture/application-spec.md) is a future contract, not an input format for this endpoint.
+Unknown project request fields are rejected with `422` before catalog or provider side effects. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/architecture/application-contract.md) is a future contract, not an input format for this endpoint.
 
 The API currently accepts no configuration fields for replicas, resource limits,
 custom environment variables, volumes, image pull secrets, or application commands.
@@ -204,7 +210,7 @@ Retirement is a two-step, confirmed action. `GET /projects/{name}/retirement-pre
 `bash scripts/down.sh --volumes`, then bootstrap again. Running `down.sh` without
 `--volumes` retains the stored project catalog and databases, but removes Kubernetes
 workloads. Reapply the saved specifications after bootstrap as described in
-[recovery](../docs/05-operations/backup-recovery.md).
+[recovery](../docs/operators/backup-and-recovery.md).
 
 ## Automatic availability monitoring
 
@@ -310,7 +316,7 @@ updates and apply relevant settings to `.env` explicitly.
 Choose network settings before startup. Updating a domain or IP does not rewrite
 previously provisioned project resources until they are reapplied. Updating
 `K3S_IMAGE` does not replace an existing cluster. See the
-[recreation instructions](../docs/05-operations/backup-recovery.md) when changing lab versions.
+[recreation instructions](../docs/operators/backup-and-recovery.md) when changing lab versions.
 
 The API's internal `POSTGRES_HOST` and `KUBECONFIG` settings are supplied by
 [its Compose module](compose.yaml). Bootstrap generates the controller kubeconfig
@@ -371,7 +377,7 @@ kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello logs deployment/
 
 [app/main.py](app/main.py) implements request validation, authentication, database
 provisioning, and request-driven Kubernetes apply. [app/manifests.py](app/manifests.py)
-defines the workload resources and can be tested without a live cluster. [app/monitoring.py](app/monitoring.py) rebuilds catalog-derived probe discovery. The implemented boundaries are recorded in [ADRs 012–015](../docs/03-decisions/README.md).
+defines the workload resources and can be tested without a live cluster. [app/monitoring.py](app/monitoring.py) rebuilds catalog-derived probe discovery. The implemented boundaries are recorded in [ADRs 012–015](../docs/architecture/decisions/README.md).
 [requirements.txt](requirements.txt) pins direct Python dependencies, while
 [Dockerfile](Dockerfile) defines the Python 3.14.7 API runtime.
 

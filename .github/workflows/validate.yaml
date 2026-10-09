@@ -15,6 +15,7 @@ jobs:
       - run: python3 -m unittest discover -s operations/backup/tests -v
       - run: python3 -m unittest discover -s operations/heartbeat/tests -v
       - run: python3 scripts/check-monitoring.py
+      - run: python3 scripts/check-doc-links.py
       - run: python3 -m compileall -q scripts operations
       - run: bash -n scripts/up.sh scripts/down.sh
       - name: Validate platform Ansible playbooks

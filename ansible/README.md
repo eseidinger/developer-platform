@@ -1,5 +1,9 @@
 # Ansible deployment
 
+This source-adjacent guide is the detailed playbook and variable reference. Use
+the [remote installation guide](../docs/operators/install-remote.md) for the
+canonical deployment sequence and post-install handoff.
+
 Deploy the local checkout to an existing Ubuntu 22.04+ host (amd64 or arm64)
 with SSH access, Python 3, systemd, and sudo privileges. Use a Linux controller
 with Python, tar, and `ansible-core >= 2.16`; no extra Ansible collections are needed.
@@ -35,7 +39,7 @@ manage only `PLATFORM_DOMAIN`, `APPS_DOMAIN`, `IDENTITY_DOMAIN`, `TLS_EMAIL`, an
 Other settings retain their generated or existing values. For a custom subnet or
 K3S image, prepare the target `.env` using `scripts/init.py` and edit it before the
 first deployment. Existing clusters are not automatically upgraded by bootstrap.
-Back up `.env`, especially `DATABASE_KEY`, as described in [operations](../docs/05-operations/backup-recovery.md).
+Back up `.env`, especially `DATABASE_KEY`, as described in [operations](../docs/operators/backup-and-recovery.md).
 
 Useful inventory overrides:
 
@@ -77,7 +81,7 @@ k3d installation and bootstrap run on every deployment and report changes, even
 if configuration is unchanged. Bootstrap refreshes the k3d load balancer when
 the Kubernetes API is stale after a Docker restart. Source extraction does not
 delete obsolete remote files. Backups and the external watchdog require the
-separate [operations](../docs/05-operations/backup-recovery.md) and
+separate [operations](../docs/operators/backup-and-recovery.md) and
 [watchdog](../operations/watchdog/README.md) setup.
 
 ```bash
@@ -90,7 +94,7 @@ fresh host. After deployment, the optional `scripts/smoke.py` test creates and
 retains a project; it is not run automatically.
 
 For a fresh-install sequence covering basic users, revocable CI credentials, and
-platform tests, use [Fresh deployment and basic platform tests](../docs/05-operations/fresh-deployment-and-platform-tests.md).
+platform tests, use [Fresh deployment and basic platform tests](../docs/operators/validation/acceptance.md).
 Backup, watchdog/heartbeat, and Alertmanager setup and drills remain separate
 operational tracks with their own inventories and protected credentials.
 

@@ -1,5 +1,9 @@
 # External PHP/MySQL watchdog
 
+Use the canonical [external watchdog overview](../../docs/operators/components/watchdog.md)
+for its place in the operating model. This page retains deployment, layout, and
+test detail close to the component source.
+
 Requirements: independent web hosting, PHP >=8.2, PDO-MySQL, a cron job running
 every minute, and either working PHP mail() delivery or an SMTP account.
 PHP cURL with SMTP/SMTPS support and a working CA trust store is required for

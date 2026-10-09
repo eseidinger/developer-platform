@@ -1,5 +1,9 @@
 # Watchdog deployment
 
+The canonical component overview is
+[External watchdog](../../../docs/operators/components/watchdog.md). This page is
+the playbook-specific deployment reference.
+
 Run these commands from the repository root.
 
 ## External watchdog via SCP

@@ -1,5 +1,9 @@
 # Platform heartbeat
 
+Use the canonical [heartbeat overview](../../docs/operators/components/heartbeat.md)
+for its place in the operating model. This page retains deployment and drill
+details close to the component source.
+
 Run deployment commands from the repository root.
 
 ## Platform heartbeat

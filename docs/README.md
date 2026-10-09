@@ -1,32 +1,71 @@
-# SaaS / Developer Platform Documentation
+# Developer Platform documentation
 
-Reviewed against source on September 27, 2026. This documentation covers the product, target architecture, architectural decisions, development sequence, and operations.
+Status: current documentation index. Last reviewed October 9, 2026.
 
-## Getting started
+Choose the path that matches what you are trying to do.
 
-| Area | Key question | Documents |
-|---|---|---|
-| Product | Who are we building for, and why? | [Vision](01-product/vision.md), [Use cases](01-product/use-cases.md), [Requirements](01-product/requirements.md), [Roadmap](01-product/roadmap.md) |
-| Architecture | How should the platform work? | [Overview](02-architecture/overview.md), [Technology roles](02-architecture/technology-roles.md), [Infrastructure](02-architecture/infrastructure.md), [Software architecture](02-architecture/software-architecture.md) |
-| Contract and cross-cutting concerns | What do applications declare, and how are they secured and observed? | [ApplicationSpec](02-architecture/application-spec.md), [Security](02-architecture/security.md), [Observability](02-architecture/observability.md), [Diagrams](02-architecture/diagrams/README.md) |
-| Decisions | Why this approach, and what are the alternatives? | [ADR index](03-decisions/README.md) |
-| Development | What has evolved, and what comes next? | [Development plan](04-development/development-plan.md), [Phase 2A multi-service increment](04-development/phase-2a-multi-service-scheduled-application.md), [Phase 2B CI credentials](04-development/phase-2b-ci-deployment-credentials.md), [Phase 2C platform capabilities](04-development/phase-2c-platform-capabilities.md), [UI implementation plan](04-development/ui-implementation-plan.md), [Optional Phase 5 architecture expansion](04-development/phase-5-optional-architecture-expansion.md), [Delivery backlog](04-development/delivery-backlog.md) |
-| Operations | How do we install and test the basic platform, deploy an application, and operate its supporting systems? | [Developer deployment guide](05-operations/developer-deployment-guide.md), [Application schema reference](05-operations/application-schema-reference.md), [Fresh deployment and basic tests](05-operations/fresh-deployment-and-platform-tests.md), [Deployment](05-operations/deployment.md), [Keycloak bootstrap](05-operations/keycloak-bootstrap.md), [Human access and authorization validation](05-operations/human-access-and-authorization-validation.md), [Monitoring](05-operations/monitoring.md), [Backup and recovery](05-operations/backup-recovery.md), [Runbook](05-operations/runbook.md) |
+## Use the platform
 
-## Status and evidence
+For application developers who deploy and operate their own applications:
 
-The [delivery backlog](04-development/delivery-backlog.md#evidence-conventions) is the authoritative task and evidence register. It distinguishes source implementation, executed local checks and operational acceptance, with dated revisions and environment limits. Update those task records as work ships; the development plan defines sequencing and ADRs define decisions.
+1. [Developer overview](developers/README.md)
+2. [Deploy your first application](developers/getting-started.md)
+3. [Use the UI](developers/ui.md) or [CLI](developers/cli.md)
+4. [Declare an application](developers/application-spec.md)
+5. [Use the API](developers/api.md) or [deploy from CI](developers/ci-deployment.md)
 
-- **Confirmed requirement:** an established project constraint, not implementation evidence.
-- **Implemented in source:** a concrete code/configuration path, not proof of deployment.
-- **Verified locally:** a recorded check passed within its stated scope.
-- **Accepted operationally:** the task's acceptance criteria passed in a recorded environment.
-- **Proposed / specification draft:** target behavior or a decision still requiring implementation or acceptance.
+## Operate the platform
 
-Target-contract examples use illustrative domains and names. Current lab defaults and pinned versions come from `.env.example`, Compose modules and deployment scripts; review them before installation. Backup targets and the lab response policy have already been selected in the delivery backlog. Source review does not assess whether dependencies are current or verify a deployed installation.
+For administrators responsible for the shared installation:
 
-## Maintenance
+1. [Operator overview](operators/README.md)
+2. [Install locally](operators/install-local.md) or
+   [install on a remote host](operators/install-remote.md)
+3. [Bootstrap identity and access](operators/identity-and-access.md)
+4. [Monitor](operators/monitoring.md),
+   [back up and recover](operators/backup-and-recovery.md), or
+   [respond to an incident](operators/runbooks/README.md)
 
-Architecture pages distinguish the implemented lab from the intended system. The [September 27 source review](04-development/delivery-backlog.md#documentation-review-september-27-2026) records corrected mismatches and remaining implementation gaps. ADRs record rationale and alternatives; `04-development/` records architectural evolution, evidence and planned work. Operations guides identify executable current procedures and label future or deferred exercises separately.
+## Change the platform
 
-For an architectural change, update the relevant ADR first, followed by affected specifications, requirements, and phases. Supersede accepted ADRs with new records rather than rewriting past decisions. Record verifiable implementation and acceptance evidence beside delivery-backlog tasks; update the development plan only when sequencing or scope changes.
+For contributors and maintainers changing platform code or delivery plans:
+
+1. [Maintainer overview](maintainers/README.md)
+2. [Platform API](maintainers/platform-api.md), [CLI](maintainers/cli.md),
+   [UI](maintainers/ui.md), and [monitoring](maintainers/monitoring.md)
+3. [Delivery status and plans](maintainers/delivery/README.md)
+4. [Delivery backlog and evidence](maintainers/delivery/backlog.md)
+
+## Understand the design
+
+For architects and reviewers:
+
+1. [Architecture overview](architecture/README.md)
+2. [Platform application](architecture/platform-application.md) and
+   [application lifecycle](architecture/application-lifecycle.md)
+3. [Deployment topology](architecture/deployment-topology.md),
+   [security and authorization](architecture/security-and-authorization.md), and
+   [observability](architecture/observability.md)
+4. [Application contract](architecture/application-contract.md),
+   [architecture evolution](architecture/evolution.md), and
+   [decision records](architecture/decisions/README.md)
+
+## Product direction
+
+- [Overview and vision](product/overview.md)
+- [Use cases](product/use-cases.md)
+- [Requirements](product/requirements.md)
+- [Roadmap](product/roadmap.md)
+
+## Document status
+
+- **Current:** describes supported behavior or an executable procedure.
+- **Planned:** approved or proposed work that is not yet supported.
+- **Historical:** preserves completed plans and evidence; it is not a current
+  operating guide.
+- **Generated reference:** produced from source and not edited by hand.
+
+Current guides must not rely on planned behavior. Architecture explains why the
+system has its shape, operator guides explain how to run it, and maintainer guides
+explain how to change and validate its implementation. Source-adjacent READMEs
+cover only their component and link back to the canonical guide here.

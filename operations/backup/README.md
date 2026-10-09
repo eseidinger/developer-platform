@@ -1,10 +1,14 @@
 # Platform backups
 
+Use the canonical [backup and recovery guide](../../docs/operators/backup-and-recovery.md)
+for the operator workflow. This source-adjacent page retains detailed playbook,
+systemd, fixture, and recovery implementation reference.
+
 Run deployment commands from the repository root.
 
 ## Current lab policy
 
-[ADR-010](../../docs/03-decisions/ADR-010-single-environment-lab.md) selects the existing platform and watchdog for controlled, reversible checks. Do not create an additional test or recovery environment as a routine next step. The isolated recovery procedures below remain references for past drills or a future explicitly chosen exercise; new isolated drills are deferred, and their unverified acceptance criteria stay open.
+[ADR-010](../../docs/architecture/decisions/ADR-010-single-environment-lab.md) selects the existing platform and watchdog for controlled, reversible checks. Do not create an additional test or recovery environment as a routine next step. The isolated recovery procedures below remain references for past drills or a future explicitly chosen exercise; new isolated drills are deferred, and their unverified acceptance criteria stay open.
 
 ## Start with the playbooks
 
@@ -162,7 +166,7 @@ service is no longer active. A host reboot releases the lock; the existing
 backup recovery service/timer remains responsible for recovery.
 
 These exercises cover natural backup age and a stalled attempt while local
-monitoring remains available. [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md) accepts skipping the missing-update/local-monitoring-outage exercise for this lab. Notification-delivery-failure injection is an accepted limitation under ADR-011; these exercises do not claim restoration acceptance.
+monitoring remains available. [ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md) accepts skipping the missing-update/local-monitoring-outage exercise for this lab. Notification-delivery-failure injection is an accepted limitation under ADR-011; these exercises do not claim restoration acceptance.
 
 ### Recovery drill
 
@@ -191,7 +195,7 @@ Do not rerun restoration to troubleshoot an acceptance failure.
 
 The sections below explain configuration, recovery behavior, script usage, and
 limitations. Manual restore commands are in the
-[operations guide](../../docs/05-operations/backup-recovery.md#restore-into-an-isolated-installation).
+[operations guide](../../docs/operators/backup-and-recovery.md#restore-into-an-isolated-installation).
 
 ## Read-only recovery failure preflight
 
@@ -204,7 +208,7 @@ ansible-playbook -i operations/backup/ansible/inventory.recovery.yml \
 
 It prompts privately for the real S3 credentials and repository password, then deliberately tests an unreachable loopback S3 endpoint, a wrong password, and a missing password. Each selected command must fail. Restic is invoked with `--no-lock`; the playbook does not initialize, lock, restore, prune, retag, or otherwise write the repository. It saves a non-secret pass/fail report under `.runtime/recovery-evidence/` and removes its temporary credentials even after a failure.
 
-Select a subset with, for example, `-e 'recovery_preflight_cases=["wrong-password","missing-password"]'`. A successful preflight proves only that the negative cases failed; it does not prove an unavailable bundle can be restored. Deliberately corrupting the sole live repository is an accepted limitation under [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md); repository `check`, verified readback, and checksum-rejection tests remain the available evidence. Do not run it against `node-01`.
+Select a subset with, for example, `-e 'recovery_preflight_cases=["wrong-password","missing-password"]'`. A successful preflight proves only that the negative cases failed; it does not prove an unavailable bundle can be restored. Deliberately corrupting the sole live repository is an accepted limitation under [ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md); repository `check`, verified readback, and checksum-rejection tests remain the available evidence. Do not run it against `node-01`.
 
 ## Quarterly recovery review
 
@@ -288,7 +292,7 @@ The confirmed policy remains every 12 hours, retaining 14 daily, 8 weekly and
 6 monthly recovery points, with RPO 24 hours and RTO four hours. This setup
 playbook does **not** schedule capture, apply retention/prune, or perform a backup
 or restore. Use [scheduled backup deployment](#scheduled-backups-and-independent-backup-alerts) for capture, retention and independent reporting. Live verification and restore remain OPS-006-T02/T03 work in the
-[delivery backlog](../../docs/04-development/delivery-backlog.md). Preserve platform
+[delivery backlog](../../docs/maintainers/delivery/backlog.md). Preserve platform
 configuration, database roles/data, secrets and required service state in the
 future recovery bundle; a repository alone does not cover that inventory.
 
@@ -420,7 +424,7 @@ backup, a running attempt older than two hours, or capture age over 24 hours.
 Stale events cannot override newer results; failure does not refresh the last
 successful capture. Notifications are deduplicated and failed mail handoff is
 retried by cron. Host and backup channels share the external hosting/mail provider;
-silent watchdog-hosting/scheduler failure is an accepted lab limitation under [ADR-011](../../docs/03-decisions/ADR-011-watchdog-monitoring-boundary.md), with no additional observer required.
+silent watchdog-hosting/scheduler failure is an accepted lab limitation under [ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md), with no additional observer required.
 
 Notification transport failure does not invalidate a verified snapshot. A durable
 outbox retries every five minutes. If initial start delivery fails, a later success
@@ -430,9 +434,9 @@ accept it without a start event. Meanwhile, its previous success continues aging
 The operator-reported September 26, 2026 drill passed automated restore checks
 including a pre-backup SQL marker. Precisely measured RPO/RTO, live S3 failure
 tests, scenario-specific backup-alert receipt, and database-backed application acceptance
-remain separate evidence requirements. Selected DOWN/UP paths have since been reported; see the [current backlog](../../docs/04-development/delivery-backlog.md#current-backup-and-recovery-progress).
+remain separate evidence requirements. Selected DOWN/UP paths have since been reported; see the [current backlog](../../docs/maintainers/delivery/backlog.md#current-backup-and-recovery-progress).
 Exact-file readback is not an application restore exercise. Continue with
-[backup and recovery](../../docs/05-operations/backup-recovery.md).
+[backup and recovery](../../docs/operators/backup-and-recovery.md).
 
 Local validation:
 
@@ -520,7 +524,7 @@ developer_platform:
 ```
 
 Store it under `.runtime/`. The VM helper provisions only the operating system and
-SSH. Follow the [isolated recovery procedure](../../docs/05-operations/backup-recovery.md#restore-into-an-isolated-installation)
+SSH. Follow the [isolated recovery procedure](../../docs/operators/backup-and-recovery.md#restore-into-an-isolated-installation)
 for platform prerequisites, original credentials, SQL import, and acceptance;
 ordinary fresh-platform deployment is not a complete restore procedure. Configure
 restic with existing S3 credentials/password and **do not initialize a repository**.
@@ -659,7 +663,7 @@ and `APPS_DOMAIN=apps.localhost`. Leave production alert senders disabled.
    ```
 
    If this is a fresh VM, first complete the
-   [isolated restore and project reapply](../../docs/05-operations/backup-recovery.md#restore-into-an-isolated-installation).
+   [isolated restore and project reapply](../../docs/operators/backup-and-recovery.md#restore-into-an-isolated-installation).
    For an existing restored VM, allow the services time to restart. The suite
    retries API readiness and ingress, and allows up to 180 seconds per monitoring
    check for Prometheus readiness, Grafana health, and scrape convergence. Persistent

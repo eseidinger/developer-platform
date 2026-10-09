@@ -1,5 +1,9 @@
 # Developer Platform CLI
 
+This source-adjacent README provides the minimal development example. The
+canonical user documentation is the [CLI guide](../../docs/developers/cli.md);
+implementation ownership is in the [maintainer guide](../../docs/maintainers/cli.md).
+
 `devplat` is the command-line client for the Developer Platform API. Its first
 supported workflow is CI-style deployment using a project-scoped deployment
 credential supplied only through environment variables.

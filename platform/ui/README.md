@@ -1,10 +1,14 @@
 # Platform UI
 
+This is the source-adjacent UI implementation reference. Portal workflows belong
+in the [developer UI guide](../../docs/developers/ui.md), and cross-component
+maintenance guidance belongs in the [UI maintainer guide](../../docs/maintainers/ui.md).
+
 This directory contains the React and TypeScript workspace for the Platform Control
 Plane portal. The technology selection is recorded in
-[ADR-019](../../docs/03-decisions/ADR-019-react-ui-technology-stack.md), and delivery
+[ADR-019](../../docs/architecture/decisions/ADR-019-react-ui-technology-stack.md), and delivery
 is sequenced in the
-[UI implementation plan](../../docs/04-development/ui-implementation-plan.md).
+[UI implementation plan](../../docs/maintainers/delivery/plans/ui.md).
 
 ## Status
 

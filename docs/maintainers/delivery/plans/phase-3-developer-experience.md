@@ -1,0 +1,41 @@
+# Phase 3 – Developer Experience and Access
+
+Status: planned. Covers [F-09, F-10, and N-03](../../../product/requirements.md).
+
+Execution tracking: use the [phase task index and acceptance checkboxes](../backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
+
+## Goal
+
+Offer the Python Platform API lifecycle as understandable self-service. The portal
+uses the React stack selected in
+[ADR-019](../../../architecture/decisions/ADR-019-react-ui-technology-stack.md); delivery follows the
+[UI implementation plan](ui.md). CLI delivery follows the
+[CLI implementation plan](cli.md).
+
+## Work packages
+
+- Provide a portal that uses the Platform API for application metadata, ownership, deployments, redacted configuration, logs, and operations; do not reproduce server-side authorization rules in the UI.
+- Provide a CLI over the same versioned public contracts, with understandable errors
+  and progress, following the [CLI implementation plan](cli.md).
+- Create a web-application/PostgreSQL template, preferably as one deployable artifact.
+- Extend the accepted ADR-004 boundary by automating OIDC clients and controlled redirect URIs for hosted applications while preserving the separation between platform and application permissions. F-10 remains a Phase 3 requirement; deferring it requires an explicit scope amendment.
+- Offer human database access with a separate identity, authorization, and a controlled tunnel.
+- Make ownership, roles, and the distinction between application and platform permissions visible.
+- Build the self-service journey on the multi-service and scheduled-component contract accepted in Phase 2A; do not create a portal-only component model.
+
+Entry requires the Phase 1, Phase 2A, Phase 2B, and Phase 2C backlog gates, including usable authorized diagnostics, recovery, retirement, and CI-credential APIs. Portal completion cannot substitute for those API acceptance results.
+
+## Acceptance
+
+A developer creates a sample application, deploys it, and locates an intentionally introduced failure using operation status, health, and logs. Disallowed actions remain blocked server-side even when UI checks are bypassed.
+
+A database user uses credentials distinct from the application. Revoking a grant prevents new access; existing sessions terminate according to the defined session policy. An application OIDC client does not create platform administrator permissions.
+
+## Outcome
+
+A reproducible demo flow with a template, documented role matrix, and UI/API compatibility checks. Demonstrate usability through the complete journey, not screenshots alone.
+
+Foundations: [Use cases](../../../product/use-cases.md),
+[Security](../history/security-design.md),
+[ADR-007](../../../architecture/decisions/ADR-007-ui-api-deployment.md), and
+[ADR-019](../../../architecture/decisions/ADR-019-react-ui-technology-stack.md).

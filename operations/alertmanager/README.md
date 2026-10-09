@@ -1,5 +1,9 @@
 # Alertmanager SMTP deployment
 
+The canonical role and operator entry point is
+[Alertmanager](../../docs/operators/components/alertmanager.md). This page retains
+the component-specific playbook and verification reference.
+
 Configure the existing platform Alertmanager from an Ansible inventory. Run
 controller commands from the repository root with ansible-core >= 2.16.
 The target needs an existing platform installation, Docker Compose, SSH and sudo
@@ -82,7 +86,7 @@ watchdog failure detection.
 
 Record deployed revision, environment, response owner, send/receipt times for
 both emails and any failures under OPS-007-T01 in the
-[backlog](../../docs/04-development/delivery-backlog.md#current-monitoring-progress).
+[backlog](../../docs/maintainers/delivery/backlog.md#current-monitoring-progress).
 The playbook never marks live acceptance complete.
 
 ## Backup and recovery
