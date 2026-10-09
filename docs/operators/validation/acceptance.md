@@ -3,6 +3,10 @@
 Status: current acceptance procedure. Individual evidence remains scoped to the
 recorded revision and environment.
 
+Before selecting additional deployment or drill playbooks, consult the
+[playbook component matrix](playbook-component-matrix.md) for their minimum
+platform, Alertmanager, backup, heartbeat, and watchdog dependencies.
+
 This guide covers a clean platform installation, basic human identities, revocable CI deployment credentials, and core platform tests. Backup, external watchdog, heartbeat availability drills, and Alertmanager delivery are separate operational tracks; they are not prerequisites for this sequence.
 
 ## 1. Deploy the platform

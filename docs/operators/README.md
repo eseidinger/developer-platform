@@ -17,6 +17,7 @@ observability, backups, and independent watchdog components.
 - [Backup and recovery](backup-and-recovery.md)
 - [Incident runbooks](runbooks/README.md)
 - [Fresh-install acceptance](validation/acceptance.md)
+- [Playbook component matrix](validation/playbook-component-matrix.md)
 
 ## Optional operational components
 
