@@ -1,6 +1,6 @@
 # Delivery status and plans
 
-Status: current delivery index as of October 9, 2026. Future phases are proposals
+Status: current delivery index as of October 10, 2026. Future phases are proposals
 without confirmed dates.
 
 ## Architectural evolution
@@ -23,10 +23,11 @@ without confirmed dates.
 | October 4, 2026 | Empty-project and machine-driven platform acceptance added to Phase 2B | F-15 and UC-09 add human-bootstrapped test-runner credentials, temporary role personas, and first deployment by CI after empty-project creation |
 | October 4, 2026 | Current runtime architecture retained | Phase 2C remains on the existing Kubernetes infrastructure and single Python/FastAPI application; a Docker compute adapter and polyglot service split move to optional Phase 5 |
 | October 6, 2026 | React UI stack selected for the Phase 3 portal | React, TypeScript and Vite with typed OpenAPI access, TanStack Query, React Router, shadcn/Base UI, Tailwind, forms/validation, and browser/component tests replace the open Angular candidate |
+| October 10, 2026 | Energy-system integration made the Phase 3 priority slice | ODIP/VEF deployment profiles, hosted-application OIDC, authenticated HTTPS egress, component monitoring, restart, and application-level recovery precede new general developer-experience breadth |
 
 ## Implementation status
 
-The [delivery backlog](backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A passed its deployed acceptance suite on October 4 under its recorded owner-accepted deferrals for database-row preservation, backup inventory, and representative capacity measurement. Phase 2B is accepted under its recorded deferrals for expiry, controlled identity-provider outage, and deployed backup coverage. Phase 2C is complete with the protected live-drill evidence and accepted single-lab limits recorded in the backlog. Phase 3 and later gates remain open. The current delivery architecture remains the existing Kubernetes provider and one Python/FastAPI API application. Consult task notes and the verification register for revisions, environments and limits.
+The [delivery backlog](backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A passed its deployed acceptance suite on October 4 under its recorded owner-accepted deferrals for database-row preservation, backup inventory, and representative capacity measurement. Phase 2B is accepted under its recorded deferrals for expiry, controlled identity-provider outage, and deployed backup coverage. Phase 2C is complete with the protected live-drill evidence and accepted single-lab limits recorded in the backlog. Phase 3 and later gates remain open. The [energy-system integration plan](plans/energy-system-integration.md) is the immediate Phase 3 priority; its decision, identity, monitoring, deployed-connection, and recovery tasks precede new general portal, template, or human-database breadth. The current delivery architecture remains the existing Kubernetes provider and one Python/FastAPI API application. Consult task notes and the verification register for revisions, environments and limits.
 
 ## Work sequence and gates
 
@@ -36,13 +37,15 @@ flowchart LR
     P1 --> P2A["2A Multi-service and Scheduled Component"]
     P2A --> P2B["2B CI Deployment Credentials"]
     P2B --> P2C["2C Platform Capabilities"]
-    P2C --> P3["3 Developer Experience"]
+    P2C --> P3E["3 Energy Integration Priority"]
+    P3E --> P3["3 Remaining Developer Experience"]
     P3 --> P4["4 AI Operations / Development"]
     P4 -. "optional" .-> P5["5 Architecture Expansion"]
     P1 --> Evidence["Measurements and Operational Evidence"]
     P2A --> Evidence
     P2B --> Evidence
     P2C --> Evidence
+    P3E --> Evidence
     P3 --> Evidence
     P4 --> Evidence
     P5 --> Evidence
@@ -54,7 +57,8 @@ flowchart LR
 | [2A](history/phase-2a-multi-service-scheduled-application.md) | Accepted Phase 1 vertical slice | Versioned multi-service contract; internal discovery; independently observable long-running services and cron-triggered component on Kubernetes; lossless single-component migration |
 | [2B](history/phase-2b-ci-deployment-credentials.md) | IAM boundary and accepted Phase 2A gate | Empty-project bootstrap; scoped deployment credentials; human-created test runner and temporary role personas; machine-driven deploy/observe and authorization suite; immediate platform denial and redacted audit evidence |
 | [2C](history/phase-2c-platform-capabilities.md) | Accepted Phase 2A and 2B vertical slices | Diagnostics, policy, scaling, connectivity, recovery, and retirement on the current Kubernetes provider and single Python API |
-| [3](plans/phase-3-developer-experience.md) | Reliable lifecycle, authorization, and stable public contracts from Phase 2C | Portal, templates, human database access, and application OIDC through the Python Platform API |
+| [3 priority](plans/energy-system-integration.md) | Reliable lifecycle, authorization, and stable public contracts from Phase 2C | Separately deployed ODIP and VEF with hosted-application identity, authenticated HTTPS connectivity, component-aware monitoring, durability, and application-level recovery evidence |
+| [3 remainder](plans/phase-3-developer-experience.md) | Accepted energy integration priority slice | Portal, templates, human database access, and the broader self-service journey through the Python Platform API |
 | [4](plans/phase-4-ai-operations.md) | Access-controlled data and deployment history | Python-based evidence assistance and controlled actions through the Platform API |
 | [5](../../architecture/evolution.md) | Optional owner decision after Phase 4; demonstrated need for another compute provider or service boundary | Optional Docker compute adapter and/or polyglot service extraction, each gated by parity, migration, rollback, and operational evidence |
 
@@ -83,7 +87,7 @@ Use one authoritative writer per data type at every migration step. Prefer backf
 
 The [delivery backlog](backlog.md) preserves all 20 permanent DEV/OPS IDs and their acceptance criteria. Its [phase task index](backlog.md#phase-task-index) assigns independently checkable tasks to one gate each, including provider, developer-experience and AI work. Stories may span gates; task completion and story completion are recorded separately. This plan supersedes the former six-milestone plan. No story is dropped or marked complete by this amendment.
 
-Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Phase 1 is complete under its recorded limits. Phase 2A multi-service and scheduled components, Phase 2B CI deployment credentials, and Phase 2C platform capabilities are accepted under their recorded evidence and limitations. Phase 3 is the next product increment; Phase 4 depends on its demonstrated foundations. Optional Phase 5 does not gate either phase.
+Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Phase 1 is complete under its recorded limits. Phase 2A multi-service and scheduled components, Phase 2B CI deployment credentials, and Phase 2C platform capabilities are accepted under their recorded evidence and limitations. Phase 3 starts with the energy-system integration priority slice; complete PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 before starting new general Phase 3 breadth. Phase 4 depends on those demonstrated foundations. Optional Phase 5 does not gate either phase.
 
 The table assigns delivery responsibility by role; named delivery owners, dates, and capacity remain unassigned. Alert response is assigned to the project owner under the lab response policy. Assign a named owner before starting each new package. Story-level completion and any deferred criteria are recorded in the backlog; a delivered phase does not erase its accepted limitations.
 
@@ -110,9 +114,9 @@ The table assigns delivery responsibility by role; named delivery owners, dates,
 | OPS-007 | N-06, F-06 | 1A independent failure signals; Phase 2C current-platform coverage and project impact | Operations |
 | OPS-008 | F-01/F-05, N-02/N-08 extension | Phase 2C project retirement after reliable deletion, retention inventory and access revocation | API / operations |
 
-Multi-service support, CI credentials, and the Phase 2C platform capabilities are accepted under their owner-recorded evidence and limitations. Phase 3 is the next gate. The component change uses a successor schema and explicit migration; do not silently transform the existing singular application object or claim acceptance from single-image tests. CI acceptance must use a distinct machine identity rather than a developer token. All three Phase 2 increments stay on the existing Kubernetes infrastructure and in the single Python API application.
+Multi-service support, CI credentials, and the Phase 2C platform capabilities are accepted under their owner-recorded evidence and limitations. Phase 3 is the next gate, beginning with the energy-system integration slice. The component change uses a successor schema and explicit migration; do not silently transform the existing singular application object or claim acceptance from single-image tests. CI acceptance must use a distinct machine identity rather than a developer token. All three Phase 2 increments stay on the existing Kubernetes infrastructure and in the single Python API application.
 
-Human database access, hosted-application OIDC, and AI remain later additions. Docker portability and the polyglot service split are optional Phase 5 packages and do not gate those additions. No calendar or effort commitments are implied.
+Hosted-application OIDC is immediate Phase 3 priority work because the energy integration depends on it. Human database access and general AI operations remain later additions. Docker portability and the polyglot service split are optional Phase 5 packages and do not gate those additions. No calendar or effort commitments are implied.
 
 ## Lab validation constraint
 
@@ -127,6 +131,7 @@ Human database access, hosted-application OIDC, and AI remain later additions. D
 | Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
 | Multi-service scheduled application | Record EV-38 and retain the deferred capacity, database-row, and backup-inventory checks for a later production-like validation | Phase 2A accepted |
 | CI deployment credentials | Retain the deferred expiry, controlled identity-provider outage, and backup-coverage checks for a later production-like validation | Phase 2B accepted |
+| Energy-system integration | Execute PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 in order; record identity, public HTTPS, persistence/TLS, monitoring, and recovery decisions before closing the deployed gate | Phase 3 priority |
 | Optional architecture expansion | Keep the single Python API and Kubernetes provider unless a concrete need justifies activating adapter or service-extraction work | Optional Phase 5 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
 | Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |

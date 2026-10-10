@@ -4,6 +4,7 @@ Status: planned work index.
 
 Only unfinished, owned implementation plans belong here:
 
+- [Energy-system integration priority](energy-system-integration.md)
 - [Phase 3 developer experience](phase-3-developer-experience.md)
 - [Phase 4 AI operations](phase-4-ai-operations.md)
 - [CLI implementation](cli.md)

@@ -12,6 +12,25 @@ uses the React stack selected in
 [UI implementation plan](ui.md). CLI delivery follows the
 [CLI implementation plan](cli.md).
 
+The [energy-system integration plan](energy-system-integration.md) is the first
+Phase 3 delivery slice. Complete its application identity, component monitoring,
+authenticated routing, durability, and recovery gates before starting new Phase 3
+breadth beyond work already in progress. Existing portal and CLI work may continue
+only where it directly enables or verifies that slice.
+
+## Priority sequence
+
+1. Freeze the energy deployment, identity, connectivity, persistence/TLS, limits,
+   and retention decisions (`PLAN-016`).
+2. Deliver hosted-application OIDC and application/platform permission separation
+   (`PLAN-009`).
+3. Correct component-aware monitoring and define safe cross-application correlation
+   (`PLAN-017`).
+4. Pass the deployed ODIP/VEF authenticated-route and denial gate (`PLAN-018`).
+5. Pass restart and application-level backup/restore reproduction (`PLAN-019`).
+6. Resume the broader portal/template journey and human database access
+   (`PLAN-006` through `PLAN-008`).
+
 ## Work packages
 
 - Provide a portal that uses the Platform API for application metadata, ownership, deployments, redacted configuration, logs, and operations; do not reproduce server-side authorization rules in the UI.
@@ -26,6 +45,11 @@ uses the React stack selected in
 Entry requires the Phase 1, Phase 2A, Phase 2B, and Phase 2C backlog gates, including usable authorized diagnostics, recovery, retirement, and CI-credential APIs. Portal completion cannot substitute for those API acceptance results.
 
 ## Acceptance
+
+The priority energy slice first satisfies the exit criteria in the
+[energy-system integration plan](energy-system-integration.md). This establishes
+hosted-application identity and a real multi-project consumer/producer journey
+before the general self-service demonstration.
 
 A developer creates a sample application, deploys it, and locates an intentionally introduced failure using operation status, health, and logs. Disallowed actions remain blocked server-side even when UI checks are bypassed.
 
