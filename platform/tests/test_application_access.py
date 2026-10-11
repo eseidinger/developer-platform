@@ -5,6 +5,7 @@ import time
 import unittest
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import httpx2 as httpx
@@ -19,6 +20,7 @@ from app.access_gateway import Snapshot, admitted_identity, create_gateway, new_
 from app.access_provider import KeycloakAccessProvider
 from app.access_runtime import browser_manifests, protected_ingress, shared_manifests
 from app.access_tokens import TokenVerifier
+from app.access_worker import roll_services
 from app.manifests import component_resources
 
 
@@ -147,6 +149,41 @@ class AccessContractTests(unittest.TestCase):
         self.assertEqual(env["OAUTH2_PROXY_COOKIE_EXPIRE"], "8h")
         self.assertEqual(env["OAUTH2_PROXY_COOKIE_REFRESH"], "4m")
         self.assertNotIn("OAUTH2_PROXY_ALLOWED_GROUPS", env)  # First-login requests need an identity without membership.
+
+
+class CredentialRolloutTests(unittest.TestCase):
+    def test_generated_public_and_private_deployments_receive_every_secret_version(self):
+        components = [{"name": name, "type": "service", "exposure": exposure,
+                       "resolved_image": "example@sha256:" + "0" * 64,
+                       "ports": [{"name": "http", "port": 8080}]}
+                      for name, exposure in (("api", "public"), ("worker", "private"))]
+        deployments = [d for project in ("consumer", "other")
+                       for d in component_resources(project, components, "172.30.80.10", "test", domain="apps.test")
+                       if d["kind"] == "Deployment"]
+        # Model Kubernetes label selection against object metadata, not Pod labels.
+        deployments.append({"metadata": {"name": "unrelated", "namespace": "project-consumer", "labels": {}}})
+        resource = Mock()
+        def select(*, namespace, label_selector):
+            return SimpleNamespace(items=[SimpleNamespace(metadata=SimpleNamespace(name=d["metadata"]["name"]))
+                for d in deployments if d["metadata"]["namespace"] == namespace
+                and label_selector in d["metadata"]["labels"]])
+        resource.get.side_effect = select
+        runtime = Mock()
+        runtime.resources.get.return_value = resource
+        for version in ("provisioned", "rotated", "revoked"):
+            with self.subTest(version=version):
+                resource.patch.reset_mock()
+                roll_services(runtime, "consumer", version)
+                runtime.resources.get.assert_called_with(api_version="apps/v1", kind="Deployment")
+                resource.get.assert_called_with(namespace="project-consumer", label_selector="platform.example/component")
+                self.assertEqual(resource.patch.call_count, 2)
+                self.assertEqual({c.kwargs["name"] for c in resource.patch.call_args_list}, {"api", "worker"})
+                for call in resource.patch.call_args_list:
+                    self.assertEqual(call.kwargs["namespace"], "project-consumer")
+                    self.assertEqual(call.kwargs["body"], {"spec": {"template": {"metadata": {
+                        "annotations": {"platform.example/secrets-version": version}}}}})
+                    self.assertEqual(call.kwargs["content_type"], "application/merge-patch+json")
+                    self.assertEqual(call.kwargs["field_manager"], "developer-platform-access")
 
 
 class AccessTokenTests(unittest.TestCase):

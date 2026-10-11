@@ -208,10 +208,13 @@ def component_resources(name, components, database_ip, password, configuration=N
     for component in components:
         component_labels = {"app.kubernetes.io/name": name, "platform.example/component": component["name"]}
         if component["type"] == "service":
-            manifests.append(obj("apps/v1", "Deployment", component["name"], spec={
+            deployment = obj("apps/v1", "Deployment", component["name"], spec={
                 "replicas": component.get("replicas", 1), "progressDeadlineSeconds": 120,
                 "selector": {"matchLabels": component_labels},
-                "template": {"metadata": {"labels": component_labels}, "spec": pod_spec(component)}}))
+                "template": {"metadata": {"labels": component_labels}, "spec": pod_spec(component)}})
+            # Credential rollouts select Deployment objects, not their Pod templates.
+            deployment["metadata"]["labels"] = {**labels, **component_labels}
+            manifests.append(deployment)
             ports = component.get("ports") or []
             if ports:
                 manifests.append(obj("v1", "Service", component["name"], spec={"selector": component_labels,

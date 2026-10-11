@@ -118,6 +118,23 @@ class WorkloadContract(unittest.TestCase):
         self.assertEqual(job["spec"]["jobTemplate"]["spec"]["backoffLimit"], 8)
         self.assertEqual(job["spec"]["jobTemplate"]["spec"]["activeDeadlineSeconds"], 600)
 
+    def test_service_deployments_have_component_labels_for_credential_rollout(self):
+        docs = component_resources("shop", [
+            {"name": name, "type": "service", "resolved_image": "registry/test@sha256:one"}
+            for name in ("api", "worker")
+        ], "172.30.80.10", "secret")
+        for deployment in (d for d in docs if d["kind"] == "Deployment"):
+            with self.subTest(component=deployment["metadata"]["name"]):
+                labels = deployment["metadata"]["labels"]
+                self.assertEqual(labels["platform.example/component"], deployment["metadata"]["name"])
+                self.assertEqual(labels["platform.example/managed"], "true")
+                self.assertEqual(labels["app.kubernetes.io/name"], "shop")
+                for key, value in deployment["spec"]["selector"]["matchLabels"].items():
+                    self.assertEqual(labels[key], value)
+                    self.assertEqual(deployment["spec"]["template"]["metadata"]["labels"][key], value)
+                container = deployment["spec"]["template"]["spec"]["containers"][0]
+                self.assertIn({"secretRef": {"name": "app-secrets", "optional": True}}, container["envFrom"])
+
     def test_legacy_service_gets_startup_probe(self):
         docs = resources("shop", "registry/web@sha256:one", 8080, "apps.test", "172.30.80.10", "secret")
         deployment = next(d for d in docs if d["kind"] == "Deployment")
