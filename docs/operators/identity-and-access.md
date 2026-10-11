@@ -127,8 +127,15 @@ delivery. There is initially no separate UI or CLI for these resources.
 The supported `scripts/up.sh` installation now builds and imports the authorizer
 image, installs two authorizer replicas in `platform-access`, and applies their
 restricted network policies. `PLATFORM_API_IP` and `KEYCLOAK_IP` default to
-`172.30.80.11` and `172.30.80.12`; reserve those addresses in the platform Docker
-network. The bootstrap sends derived internal and session keys straight to
+`172.30.80.11` and `172.30.80.12`. Bootstrap starts the fixed-address core before
+the remaining Compose services and checks live address ownership. The shared
+network still has a dynamic pool: do not attach unrelated containers to it or
+assign its fixed addresses elsewhere. A conflict owned by an old Compose service
+is recovered using `ansible/deploy.yml`, which removes Compose containers without
+removing data volumes or the k3d network; a conflicting k3d or unrelated container
+requires operator review. Validate custom fixed addresses with
+`python3 scripts/check-network-addresses.py --validate-only` before deployment.
+The bootstrap sends derived internal and session keys straight to
 Kubernetes Secret input, never to a manifest file. Keep `DATABASE_KEY` and the
 encrypted backup containing it protected; changing that key changes derived
 credentials. OAuth2 Proxy is digest-pinned to the tested 7.15.1 image. Browser

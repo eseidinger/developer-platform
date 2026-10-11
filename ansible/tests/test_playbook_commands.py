@@ -18,6 +18,15 @@ def mappings(value):
 
 
 class PlaybookCommandTests(unittest.TestCase):
+    def test_network_settings_are_validated_before_deployment_outage(self):
+        source = (ANSIBLE_DIR / "deploy.yml").read_text()
+        validate = source.index("Validate fixed Docker addresses before stopping services")
+        stop = source.index("Stop existing Compose services cleanly")
+        reconcile = source.index("Reconcile Compose services and Kubernetes cluster")
+        self.assertLess(validate, stop)
+        self.assertLess(stop, reconcile)
+        self.assertIn("--validate-only", source[validate:stop])
+
     def test_command_argv_never_contains_yaml_null(self):
         """An unquoted standalone dash is YAML null, not kubectl's stdin path."""
         for path in sorted(ANSIBLE_DIR.glob("*.yml")):

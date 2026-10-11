@@ -47,6 +47,47 @@ digest. Supply `<registry>/hosted-access-fixture@sha256:<64-hex-digest>` below;
 a local image ID or a mutable tag is insufficient. The fixture is non-root and
 works with a read-only root filesystem.
 
+#### Publish the fixture through GitHub Actions
+
+The [hosted-access fixture workflow](../../../.github/workflows/hosted-access-fixture.yaml)
+publishes the neutral fixture, not the host-side runner. It runs harness safety
+and real PostgreSQL persistence tests, then checks the amd64 container's readiness
+with a non-root user, read-only filesystem, and dropped capabilities. A successful
+tag release builds `linux/amd64` and `linux/arm64` images following
+[Docker's multi-platform publishing pattern](https://docs.docker.com/build/ci/github-actions/multi-platform/).
+It does not deploy the platform, execute live acceptance, or close the gate.
+
+Configure these GitHub repository or `dockerhub` environment settings first:
+
+- Variable `DOCKERHUB_USERNAME`: the Docker Hub account used for login (for example `eseidinger`).
+- Optional variable `DOCKERHUB_NAMESPACE`: the destination organization; defaults to the login account.
+- Secret `DOCKERHUB_TOKEN`: a Docker Hub access token authorized to push to the destination repository.
+
+Create a **public** Docker Hub repository named
+`<namespace>/developer-platform-acceptance-fixture`. Configure the GitHub
+`dockerhub` environment with tag restrictions or required reviewers if desired.
+Do not store the Docker Hub token in inventory, `.env`, Git, or command arguments.
+
+After committing and pushing the workflow and fixture changes, publish a new
+stable version from the intended commit:
+
+```bash
+git tag -a hosted-access-v0.1.0 -m "Release neutral hosted-access fixture 0.1.0"
+git push origin hosted-access-v0.1.0
+```
+
+Only `hosted-access-vMAJOR.MINOR.PATCH` release tags publish images; CLI tags,
+branch pushes, and pull requests do not publish. Use a new version for each
+release; never move or reuse release tags. The example produces
+`docker.io/eseidinger/developer-platform-acceptance-fixture:0.1.0` when the
+namespace is `eseidinger`. No mutable `latest` alias is published.
+
+The workflow verifies anonymous registry access and puts the digest-pinned
+`export HA_IMAGE=docker.io/<namespace>/developer-platform-acceptance-fixture@sha256:<digest>`
+command in its run summary. Copy that reference into the host's shell and use
+`--fixture-image "$HA_IMAGE"` for the plan and run below. No Docker Hub login
+or local fixture build is needed on the platform host for this published image.
+
 Before a live run, wildcard application DNS, public HTTPS certificates trusted
 by the host and fixture container, the hosted authorizer/proxy, the provisioner's
 existing client/user-management permissions, and available workload capacity

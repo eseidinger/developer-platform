@@ -264,6 +264,12 @@
           register: platform_maintenance_units
           changed_when: false
 
+        - name: Validate fixed Docker addresses before stopping services
+          ansible.builtin.command:
+            argv: [python3, scripts/check-network-addresses.py, --validate-only]
+            chdir: "{{ platform_install_dir }}"
+          changed_when: false
+
         - name: Refuse deployment during backup or availability maintenance
           ansible.builtin.assert:
             that: platform_maintenance_units.stdout | trim == ''

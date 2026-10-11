@@ -6,6 +6,7 @@ for tool in docker k3d kubectl python3; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 test -f .env || { echo "Run python3 scripts/init.py first" >&2; exit 1; }
+python3 scripts/check-network-addresses.py
 # Only generated KEY=value settings are accepted; never source arbitrary shell code.
 eval "$(python3 scripts/env.py)"
 umask 077
@@ -52,6 +53,13 @@ test -s .runtime/controller.kubeconfig
 # Container UID 10001 needs read access; .runtime remains private to the host user.
 chmod 644 .runtime/controller.kubeconfig
 rm -f .runtime/token.json
+# Claim the fixed identity/API addresses before monitoring and edge containers
+# can receive them from Docker's dynamic allocator. This starts only the API's
+# required dependencies (PostgreSQL and the two identity initializers).
+python3 scripts/check-network-addresses.py
+echo "Starting fixed-address identity and Platform API services first..."
+docker compose up -d --build --wait --wait-timeout 180 platform-api
+python3 scripts/check-network-addresses.py
 docker compose up -d --build --remove-orphans
 docker build -f platform/Dockerfile.access -t developer-platform-access-authorizer:local platform
 k3d image import developer-platform-access-authorizer:local -c workloads
