@@ -119,14 +119,16 @@ provider-approved machine credentials, immutable policy revisions, normalized
 headers, private backend policies, replicated authorizer, per-application proxy,
 rotation, revocation, and recovery quarantine are implemented. Local regression,
 isolated PostgreSQL lifecycle, real Keycloak PKCE/client-credentials, and pinned
-proxy configuration tests establish source-level behavior. The running platform
-has not been changed and the energy configuration contract remains untouched.
+proxy configuration tests establish source-level behavior. Subsequent deployed
+core evidence is recorded below; the energy configuration contract remains
+untouched.
 
 Implement and verify the platform first; reconcile application-owned declarations
 and the external configuration contract against the resulting API afterward.
-Source/local evidence does not close PLAN-009: the deployed neutral-fixture
-DNS/TLS/private-backend drill, timed revocation/outage bound, and restored-access
-drill remain required. Component monitoring, centralized workload-log retention,
+Source/local evidence does not close PLAN-009. The neutral-fixture DNS/TLS,
+private-backend isolation, expiry and healthy-system revocation checks have now
+passed in [EV-45](../backlog.md#verification-register); dependency-outage and
+restored-access drills remain required. Component monitoring, centralized workload-log retention,
 and the external energy end-to-end gate remain subsequent increments. Operational
 setup is in the [hosted-access runbook](../../../operators/identity-and-access.md#hosted-application-access-installation-and-recovery).
 
@@ -136,12 +138,30 @@ confirmed live core checks, optional held-token expiry and isolated recovery
 reconciliation, safe private evidence, and resumable scope-checked cleanup.
 Provider/consumer fixtures use one public component and a private worker, only
 synthetic PostgreSQL state, and no domain-specific application authorization.
-The fixture image and local regression/persistence checks pass. The running
-platform and external configuration contract remain unchanged. Follow the
+The fixture image and local regression/persistence checks pass. The external
+configuration contract remains unchanged. Follow the
 [harness procedure](../../../operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness)
-to prepare the public digest-pinned image and run the deployed checks next.
+for repeatable digest-pinned deployed checks.
 Reports distinguish core success from deferred checks; reconciliation is not a
 real backup restore. PLAN-009/PLAN-018/PLAN-019 remain open.
+
+Deployed core acceptance (October 11, 2026): the operator-provided node-01 report
+for run `c927adee1d50` records `core-passed`, all 39 named assertions passed,
+held-token expiry enabled, and `completed-data-retained` cleanup. Runner/fixture
+release `hosted-access-v0.1.2` identifies source `e8f74fd`; the report separately
+pins the harness hash and image digest but does not identify the deployed
+control-plane source revision. Public HTTPS managed service access, project-wide
+worker binding, human approval, group enforcement, IPv4 backend/egress isolation
+with positive controls, PostgreSQL isolation and restart read-back, policy
+activation/rollback, rotation, expiry and existing-session/token revocation have
+deployed evidence. See [EV-45](../backlog.md#verification-register) and the
+[detailed run record](../../../operators/validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026).
+This is core capability evidence, not an external energy-workflow result or full
+gate closure (`gateClosed: false`). Backup restore, long browser/rotation timers,
+request retention, component monitoring/central log retention, control-plane
+outage, DNS-change/reapply, recovery reconciliation and the external suite remain
+deferred. Keep those tasks open; reconcile the external contract against the
+implemented API without adding energy-specific platform behavior.
 
 Implement [PLAN-009](../backlog.md#additional-phase-tasks) before the deployed
 connection gate. The capability must support these reusable registration types:

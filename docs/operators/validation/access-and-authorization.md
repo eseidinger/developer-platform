@@ -19,8 +19,10 @@ redacted HTTP results as evidence.
 
 ## Neutral hosted-application acceptance harness
 
-Source status (October 11, 2026): the harness is implemented and tested locally;
-the deployed hosted-access gate has **not** passed or closed. Run it only
+Validation status (October 11, 2026): the deployed neutral-fixture core suite,
+including held-token expiry, passed in run `c927adee1d50` ([EV-45](../../maintainers/delivery/backlog.md#verification-register)).
+The [dated evidence below](#executed-hosted-access-core-acceptance-october-11-2026)
+records its scope and remaining checks; the full hosted-access gate is still open. Run it only
 after the [hosted-access installation](../identity-and-access.md#hosted-application-access-installation-and-recovery)
 is deployed. It does not deploy, upgrade, or reset the platform.
 
@@ -108,14 +110,155 @@ families so that the harness can establish an outside-policy positive control.
 The operator needs access to the host's private `.env`, `kubectl`, and
 `.runtime/admin.kubeconfig`. Override `--kubectl` or `--settings` if necessary.
 
-Use the Device Authorization/PKCE procedure below to authenticate an existing
-**human platform administrator**. Save its token response privately as a mode
+Use the [private operator-session procedure](#obtain-a-private-operator-session-for-the-hosted-access-harness)
+below to authenticate an existing **human platform administrator**. It saves a mode
 `0600` JSON session file containing exactly `access_token`, `refresh_token`, and
 `client_id` (normally `platform-cli`). Do not supply passwords, bearer tokens,
 refresh tokens, or client secrets as command arguments. The harness renews the
 operator session in memory; it never writes renewed credentials to the journal.
 Obtain a fresh session for crash recovery if the original session is no longer
 usable. The existing operator account and its grants are not changed.
+
+### Update the runner without redeploying platform services
+
+A runner/fixture-only release does not require `ansible/deploy.yml`. From the
+controller checkout of the intended release, transfer the changed runner module
+to the existing installation (substitute the actual host/install directory):
+
+```bash
+scp platform/acceptance/harness.py \
+  root@node-01.example.com:/opt/developer-platform/platform/acceptance/harness.py
+```
+
+Run `sha256sum platform/acceptance/harness.py` on both sides and confirm they
+match. For a release that also changes runner dependencies, the entry point or
+other runner modules, update those files and the runner environment as well;
+copying this single file is sufficient only when those inputs are unchanged.
+On the host set `HA_IMAGE` to the new published fixture's immutable registry
+digest before generating a fresh plan/run ID. Copying fixture source onto the
+host does not update its container image. This transfer does not update the
+control-plane revision in `.runtime/installation-record.json`; record runner
+hash and fixture digest separately. Changes to platform services still require
+the supported deployment procedure.
+
+### Obtain a private operator session for the hosted-access harness
+
+Run on the platform host from its installation directory in a trusted shell
+with tracing disabled. Keep `.runtime` private and do not share the printed
+approval URL, session file, or tokens. Set the actual HTTPS issuer; for the local
+development CA, also set `SSL_CERT_FILE` to the trusted CA file (the Python
+example does not use `CURL_CA_BUNDLE`). Never disable certificate verification.
+
+```bash
+cd /opt/developer-platform
+umask 077
+export ISSUER='https://identity.example.com/realms/platform'
+
+python3 - <<'PY'
+import base64
+import hashlib
+import json
+import os
+import secrets
+import ssl
+import tempfile
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+
+issuer = os.environ["ISSUER"].rstrip("/")
+parts = urllib.parse.urlsplit(issuer)
+if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.query or parts.fragment:
+    raise SystemExit("Use the configured HTTPS issuer without credentials or query parameters.")
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, *args, **kwargs):
+        return None
+
+context = ssl.create_default_context(cafile=os.environ.get("SSL_CERT_FILE"))
+opener = urllib.request.build_opener(NoRedirect(), urllib.request.HTTPSHandler(context=context))
+
+def post(path, fields):
+    request = urllib.request.Request(
+        issuer + "/protocol/openid-connect/" + path,
+        data=urllib.parse.urlencode(fields).encode(),
+        headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST",
+    )
+    try:
+        with opener.open(request, timeout=15) as response:
+            result = json.load(response)
+    except urllib.error.HTTPError as error:
+        if error.code != 400:
+            raise SystemExit("Identity endpoint rejected the request; nothing saved.")
+        try:
+            result = json.load(error)
+        except ValueError:
+            raise SystemExit("Identity endpoint returned an unexpected response.")
+    except urllib.error.URLError:
+        raise SystemExit("Identity endpoint could not be reached.")
+    except ValueError:
+        raise SystemExit("Identity endpoint returned an unexpected response.")
+    if not isinstance(result, dict):
+        raise SystemExit("Identity endpoint returned an unexpected response.")
+    return result
+
+verifier = secrets.token_urlsafe(64)
+challenge = base64.urlsafe_b64encode(hashlib.sha256(verifier.encode()).digest()).rstrip(b"=").decode()
+device = post("auth/device", {
+    "client_id": "platform-cli", "scope": "openid",
+    "code_challenge": challenge, "code_challenge_method": "S256",
+})
+if not all(device.get(key) for key in ("device_code", "verification_uri_complete", "expires_in")):
+    raise SystemExit("Device authorization could not be started.")
+
+print("Open:", device["verification_uri_complete"], flush=True)
+print("Sign in as your human platform administrator and approve.", flush=True)
+interval = max(1, int(device.get("interval", 5)))
+deadline = time.monotonic() + int(device["expires_in"])
+while time.monotonic() < deadline:
+    result = post("token", {
+        "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
+        "client_id": "platform-cli", "device_code": device["device_code"], "code_verifier": verifier,
+    })
+    if "access_token" in result:
+        if not all(isinstance(result.get(key), str) and result[key] for key in ("access_token", "refresh_token")):
+            raise SystemExit("No complete renewable session returned; nothing saved.")
+        session = {key: result[key] for key in ("access_token", "refresh_token")}
+        session["client_id"] = "platform-cli"
+        fd, temporary = tempfile.mkstemp(prefix=".operator-session-", dir=".runtime")
+        try:
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w") as output:
+                json.dump(session, output)
+            os.replace(temporary, ".runtime/operator-session.json")
+        finally:
+            if os.path.exists(temporary):
+                os.unlink(temporary)
+        print("Saved private operator session (permissions 600).")
+        break
+    error = result.get("error")
+    if error == "slow_down":
+        interval += 5
+    elif error != "authorization_pending":
+        raise SystemExit("Authorization failed or expired; rerun this command.")
+    time.sleep(min(interval, max(0, deadline - time.monotonic())))
+else:
+    raise SystemExit("Device approval expired; rerun this command.")
+PY
+```
+
+Open the printed URL while the command is polling; approval must finish before
+the device code expires. `authorization_pending` and `slow_down` are expected
+polling responses, not reasons to pipe an empty response into a JSON parser.
+Success atomically replaces `.runtime/operator-session.json` with exactly
+`access_token`, `refresh_token`, and `client_id`, mode `0600`. A rejected, expired,
+or incomplete exchange leaves an existing session untouched; do not run the
+harness until a fresh save succeeds. Avoid `curl --fail | … > session.json`,
+which can truncate the session before authentication succeeds. The harness does
+not persist rotated refresh tokens, so obtain a fresh session for subsequent
+runs or cleanup retries. A successful login still requires an existing human
+platform-admin grant, which the harness checks before provisioning.
 
 ### Plan, execute, and clean up
 
@@ -232,6 +375,116 @@ Local verification: the offline/safety/fixture tests pass, the fixture image
 builds, and its non-root/read-only readiness and real PostgreSQL persistence
 checks pass against disposable containers. These checks do not contact the
 running platform or substitute for the live acceptance run.
+
+## Executed hosted-access core acceptance: October 11, 2026
+
+Evidence ID: [EV-45](../../maintainers/delivery/backlog.md#verification-register).
+Source: the operator-provided `report.json` from the live node-01 lab, reviewed
+after the run. This documentation records that report; it is not an independent
+rerun, a fresh host inspection, or full Phase 3/F-10 acceptance.
+
+### Run identity and retained evidence
+
+- Run ID: `c927adee1d50`.
+- Environment: `node-01.eseidinger.de`, installation `/opt/developer-platform`,
+  API `http://127.0.0.1:8000`, application domain `apps.eseidinger.de`, and
+  identity issuer `https://identity.eseidinger.de/realms/platform`.
+- Started: `2026-10-11T16:34:39.146765+00:00`; finished:
+  `2026-10-11T16:47:23.031161+00:00` (UTC; approximately 12 minutes 44 seconds).
+- Result: `core-passed`; all 39 named checks passed; `gateClosed: false`.
+- Requested drills: held machine-token expiry enabled (`--timed`); global
+  recovery reconciliation not enabled.
+- Runner/fixture release: `hosted-access-v0.1.2`, source commit
+  `e8f74fdd522ab18bd06ffed06073525494a90345`. The runner was updated separately
+  from platform services. The report does not identify the deployed control-plane
+  source revision; this release reference is not a runtime-version assertion.
+- Harness SHA-256:
+  `e57bb05502634e1f40666be57e3224e2bbd0df80391164c19082541e204c5f00`.
+- Fixture image:
+  `docker.io/eseidinger/developer-platform-acceptance-fixture@sha256:e0f18af69dc24e285624c29a2aa0aa676f42b11493cc0e1ade94a52ffaee85e4`.
+- Projects: `ha-c927adee1d50-provider` and `ha-c927adee1d50-consumer`, both
+  revision 1, each with a public API and private worker. Per component: CPU
+  request/limit `50m`/`250m`; memory request/limit `64Mi`/`128Mi`.
+- Private evidence remains on the host at
+  `/opt/developer-platform/.runtime/hosted-access/c927adee1d50/report.json`, with
+  cleanup handles in the adjacent `state.json`. Classification: Internal;
+  preserve the journal under the approved evidence-retention policy. Do not
+  copy the operator session, credentials, or raw identity claims into Git.
+
+### Passed scope
+
+The 39 named assertions cover:
+
+- Digest-pinned readiness of two projects/four components; pending first human
+  login despite platform-admin status; explicit human approval and bounded
+  claim refresh; withheld optional personal attributes; secure browser cookies,
+  CSRF protection, and stable identity after rename.
+- Machine audience and client-scoped groups; missing/invalid/wrong-audience
+  token rejection (`401`); wrong-group/unmatched/segment-prefix rejection
+  (`403`); encoded-slash rejection (`400`); `HEAD`/explicit `OPTIONS`; replacement
+  of forged identity headers and stripping of the bearer token; denial of a
+  valid but unapproved machine.
+- Project-wide service binding visible to the private worker, successful
+  consumer-to-provider public HTTPS through the managed credential, and hashed
+  synthetic cross-project correlation.
+- Provider and consumer direct-backend bypass denial, unrelated-egress denial,
+  and DNS-address-pinned egress. Every negative probe had healthy same-address
+  controls before and after. Both backend probes had zero connections and one
+  active refusal; the unrelated-egress probe had zero connections and two
+  active refusals. No timeout, DNS error, address mismatch, or unexpected error
+  supplied the denial evidence. Probes covered IPv4 only (`ipvSix: false`);
+  this run does not demonstrate IPv6 isolation. The report captured four pinned
+  CIDR entries (two unique addresses), including an IPv6 pin, which is not proof
+  of IPv6 connectivity or enforcement.
+- Separate project PostgreSQL state, preservation of provider revision across
+  restart, and read-back of the durable marker after restart. Write and consumer
+  read both returned `200`, both marker comparisons passed, and post-restart
+  read returned `200`; this validates the chunked fixture-write fix in the
+  deployed path without exposing marker values.
+- Rejection of overlapping policies, restrictive-policy activation and immutable
+  rollback; stable principal during normal/emergency rotation, bounded normal
+  overlap, adoption revoking the old client, and no emergency overlap.
+- Expiry denial of an already issued machine token and revocation denial of an
+  existing human session and an already issued machine token.
+
+| Measurement | Observed seconds |
+|---|---:|
+| Human approval and bounded claim refresh | 241.453 |
+| Normal adoption revokes old client | 0.006 |
+| Emergency no-overlap check | 0.006 |
+| Held machine token until expiry denial | 300.131 |
+| Human revocation with existing session | 2.357 |
+| Machine revocation with issued token | 2.310 |
+
+These are this run's measurements, not latency guarantees. In particular,
+healthy-system revocation results do not prove the dependency-outage bound.
+
+### Cleanup and remaining acceptance
+
+Cleanup reported `completed-data-retained`: the harness completed fixture
+retirement and synthetic identity cleanup while retaining the synthetic
+PostgreSQL databases. No cleanup retry is indicated. Database purge is a
+separate operator decision; do not infer permission to delete retained data.
+
+The report explicitly leaves these nine checks deferred:
+
+- `real-backup-restore`
+- `browser-30-minute-idle-and-8-hour-absolute-expiry`
+- `24-hour-rotation-adoption-timeout`
+- `30/90-day-request-retention`
+- `component-monitoring-and-central-log-retention`
+- `control-plane-outage`
+- `dns-address-change-reapply`
+- `recovery-reconciliation-rehearsal`
+- `external-use-case-suite`
+
+The held-machine-token expiry check is no longer deferred for this run.
+PLAN-009, PLAN-018, PLAN-019, F-10 and the Phase 3 gate remain open; component
+monitoring/centralized log retention also remains PLAN-017 work. Recovery
+reconciliation, even when subsequently exercised, is not a real backup restore.
+Concrete energy declarations, governance records, domain authorization, and
+deterministic energy-workflow outcomes remain externally owned and unverified by
+this neutral suite.
 
 ## Executed local validation — October 2, 2026
 

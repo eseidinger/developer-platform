@@ -73,6 +73,11 @@ It defaults to an offline plan, does not deploy the platform, and requires
 explicit API-origin confirmation for live runs. Prepare the runner environment,
 public digest-pinned neutral fixture, and protected operator session on the
 target using the [acceptance harness procedure](../docs/operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness).
+This suite needs a renewable human platform-administrator session on the target,
+not the basic suite's controller-side test-runner JSON. Runner/fixture-only
+updates can follow the [non-deploying update procedure](../docs/operators/validation/access-and-authorization.md#update-the-runner-without-redeploying-platform-services);
+they do not require the Compose outage described below. EV-45 records a directly
+invoked harness run, not execution of this Ansible wrapper or full gate closure.
 
 Rerunning the playbook reapplies sources and endpoints and reconciles the running
 platform. After validating the transferred Compose configuration and confirming

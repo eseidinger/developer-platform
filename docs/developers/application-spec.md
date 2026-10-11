@@ -1,6 +1,6 @@
 # Application declaration reference
 
-Status: current. Last reviewed October 9, 2026.
+Status: current. Last reviewed October 11, 2026.
 
 This is the developer reference for the JSON body accepted by `PUT
 /projects/{name}` and by:
@@ -94,7 +94,8 @@ developer terms. All examples are JSON because the current CLI accepts JSON inpu
 }
 ```
 
-The example shows all accepted optional fields. It will only be accepted when the
+The example illustrates common optional fields; the tables below list the full
+supported set. It will only be accepted when the
 project quota permits its resources and replicas, and the platform operator has
 allowed the shown outbound CIDR and port. Omit `outbound` unless the operator has
 approved it.
@@ -140,6 +141,26 @@ approved it.
 A public service gets an ingress at
 `https://<component>-<project>.<apps-domain>`. Private services get in-project
 DNS and can be reached by other project workloads through their component name.
+
+Public `v1alpha2` ingress always traverses the platform authentication and
+authorization boundary. Readiness or `exposure: public` does not authorize a
+caller: without an active access policy, public access is denied. A project
+administrator creates groups and a separate `ApplicationAccessPolicy` selecting
+`browser-session` or `bearer-token`, allowed groups, and explicit non-overlapping
+paths/methods. Human access requires approval/group assignment after first login;
+machine access requires provider approval before credential activation. Platform
+roles and CI deployment credentials do not imply application membership.
+
+Use the [hosted application API guide](api.md#hosted-application-access) for the
+separate policy, membership, service-access, and governance resources. Do not put
+OIDC clients, audiences, redirect URIs, group mappings, or credentials into this
+declaration. Anonymous public routes and direct access to the public backend,
+including from other components in the same project, are unsupported. Private
+services retain in-project connectivity. Applications read the
+[trusted principal headers](../architecture/security-and-authorization.md#upstream-identity-transport);
+they need only any finer domain-level authorization. Legacy single-service
+declarations retain their existing routing and must migrate to `v1alpha2` for
+hosted protection.
 
 ### `scheduled` component fields
 
@@ -217,6 +238,11 @@ No other resource type, PostgreSQL profile, or deletion policy is accepted. The
 current profile always provisions the project PostgreSQL database and injects its
 connection values through `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and
 `PGPASSWORD`.
+
+In the initial lab profile, application-to-PostgreSQL traffic is not TLS-protected;
+the cross-project encrypted-channel requirement covers public HTTPS instead.
+See the [generic integration profile](../architecture/application-contract.md#generic-cross-project-integration-profile)
+for this limit and the separate governance/retention responsibilities.
 
 ## Earlier accepted forms
 

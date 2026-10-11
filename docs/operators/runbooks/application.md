@@ -36,14 +36,14 @@ curl --fail-with-body -i -X PUT http://127.0.0.1:8000/projects/hello \
   -H 'Content-Type: application/json' --data-binary @examples/project.json
 OPERATION_ID=69fb09ef-5136-4c8a-8ec1-c57467192b9a
 curl --fail-with-body "http://127.0.0.1:8000/v1/operations/$OPERATION_ID" \
-  -H "Authorization: ******"
+  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"
 ```
 
 Operation state `succeeded` means Kubernetes resources were applied. Its live `readiness` snapshot reports replica counts, desired/Deployment images, active image references and IDs, and a reason such as `ImagePullBackOff`, `Unschedulable`, or `ProgressDeadlineExceeded`; inspect pod events/logs and HTTP behavior as needed. The worker reclaims an interrupted operation after restart and retries idempotent steps. Use the actual saved spec for an existing application; the sample would replace its image and port. [Recovery](../backup-and-recovery.md#reapply-restored-projects) shows how to retrieve and reapply the stored catalog. PUT preserves existing databases, provided the configuration and database credentials remain compatible. Do not delete a database to repair a failed workload.
 
 ## Minimal API deployment demo
 
-Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [human access and authorization validation](../validation/access-and-authorization.md)). `scripts/smoke.py` performs the same flow end to end and is the acceptance check:
+Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [human access and authorization validation](../validation/access-and-authorization.md)). This deliberately uses the legacy flat declaration and its direct sample route, not the hosted-access contract. `scripts/smoke.py` checks this legacy flow; the [neutral hosted-access harness](../validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness) checks protected `v1alpha2` applications.
 
 ```bash
 OP=$(curl -fsS -X PUT http://127.0.0.1:8000/projects/demo \
@@ -55,7 +55,12 @@ for i in $(seq 1 12); do curl -fsS -H "Authorization: Bearer $PLATFORM_ACCESS_TO
 curl -fsS -H 'Host: demo.apps.<apps-domain>' http://127.0.0.1/
 ```
 
-Then restart it with `POST /projects/demo/restart`. To remove a demo project, delete its namespace (`kubectl --kubeconfig .runtime/admin.kubeconfig delete namespace project-demo`), then call `POST /projects/demo/retire` with `{"confirm_name":"demo"}` as `project-admin`; the SQL data and catalog entry are retained.
+Then restart it with `POST /projects/demo/restart`. To retire the disposable demo,
+use `GET /projects/demo/retirement-preview` and submit its exact `scope_token`
+with `confirm_name: demo` to `POST /projects/demo/retire` as an authorized project
+administrator. The platform removes the namespace and queues credential cleanup;
+poll until retirement completes. SQL data and the catalog remain retained. Do
+not manually delete the namespace as the normal retirement procedure.
 
 ## Day-2 application flow
 
@@ -112,15 +117,51 @@ as `backup coverage unverified`; do not perform a destructive database action as
 
 ## Application unhealthy after deployment
 
-Inspect rollout, logs, pod events, image pulls, resource limits, probes, and database connectivity. Compare the desired image/port with your externally retained prior spec and migration records; the platform stores only the latest spec. A manual rollback is another PUT of a known compatible spec, followed by rollout and application verification. It does not roll back database schema changes.
+Inspect rollout, logs, pod events, image pulls, resource limits, probes, and
+database connectivity. The platform retains desired revisions within the
+configured revision-retention limit (default 25). Use
+`GET /projects/{name}/revisions` and compare retained images, components and
+dependency semantics with your application migration records. For an available
+compatible revision, use `POST /projects/{name}/rollback` with `{"revision": N}`
+and an optional current-revision `If-Match`; poll the returned operation and
+verify live readiness and application behavior. Alternatively, apply a complete
+known compatible declaration as a new desired revision. Neither path rolls back
+database contents/migrations or restores historical secret values.
 
-For the default local sample route:
+For the legacy flat local sample route only:
 
 ```bash
 curl --fail-with-body -H 'Host: hello.apps.localhost' http://127.0.0.1/
 ```
 
-Use the configured HTTPS hostname for public applications. The sample only echoes HTTP; acceptance additionally requires an application-specific PostgreSQL write/read with known test data.
+Use the configured HTTPS hostname for public applications. The legacy sample
+only echoes HTTP; acceptance additionally requires an application-specific
+PostgreSQL write/read with known test data. Protected `v1alpha2` routes need the
+hosted policy and approvals below; the legacy route is not evidence of hosted
+authentication or authorization.
+
+## Public access denied while the workload is ready
+
+For `v1alpha2`, public ingress traverses the authorizer and the backend accepts
+only authorizer traffic. First inspect
+`GET /v1/projects/{project}/applications/{application}/access-policy` and its
+operation as an authorized project administrator. Missing/pending/inactive policy
+denies public access; workload readiness does not prove policy activation.
+
+Check the exact path/method and authentication mode. A browser route redirects
+to login and first login can return pending `403` until a provider administrator
+approves groups. A bearer route returns `401` for missing/invalid/expired or
+wrong-audience tokens, and `403` for unapproved principals, missing groups or
+unmatched routes. Invalid path encoding returns `400`; an expired authorization
+snapshot or unavailable boundary dependency can return `503`. Platform roles and
+deployment credentials grant no implicit application membership. For browser
+writes, verify the same HTTPS Origin and platform CSRF cookie/header.
+
+Use the [hosted API guide](../../developers/api.md#hosted-application-access),
+[installation runbook](../identity-and-access.md#hosted-application-access-installation-and-recovery),
+and [security runbook](security.md#hosted-application-revocation-and-rotation).
+Do not bypass the authorizer, forge principal headers, expose the backend, or
+widen NetworkPolicies to make a denied request work.
 
 ## Availability drill
 

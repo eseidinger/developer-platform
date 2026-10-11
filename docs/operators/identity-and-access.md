@@ -118,8 +118,12 @@ from bootstrap alone.
 
 ## Hosted application access installation and recovery
 
-The hosted-access implementation is available in source; deployed acceptance is
-still open. It is not authorization to manage this Platform API. Follow the
+The hosted-access implementation has deployed core evidence: node-01 run
+`c927adee1d50` passed all 39 named checks, including timed token expiry, on
+October 11, 2026 ([EV-45](../maintainers/delivery/backlog.md#verification-register)).
+The [run record](validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026)
+lists the nine deferred checks; full PLAN-009/F-10 acceptance remains open.
+Hosted access is not authorization to manage this Platform API. Follow the
 [hosted application API guide](../developers/api.md#hosted-application-access)
 for groups, enrollment, policy intent, service approvals, and managed-secret
 delivery. There is initially no separate UI or CLI for these resources.
@@ -198,9 +202,14 @@ lifecycle tests. Set `ACCESS_TEST_KEYCLOAK_URL` to a disposable Keycloak started
 with the test bootstrap credentials in the CI workflow, and
 `ACCESS_PROXY_CONFIG_TEST=1` to validate the actual pinned proxy environment.
 Never point these tests at the installed platform realm. CI enables these
-checks automatically. A real neutral-fixture DNS/TLS/network-policy drill and
-timed five-minute outage/revocation drill remain deployment acceptance work;
-local unit and provider tests do not close PLAN-009/F-10.
+checks automatically. Deployed DNS/TLS, IPv4 backend/egress isolation,
+healthy-system revocation, restart persistence and held-token expiry passed in
+EV-45. Control-plane outage/five-minute fail-closed behavior, restored access,
+long timers, retention and monitoring remain separate acceptance work; local
+unit/provider tests and the deployed core result do not close PLAN-009/F-10.
+Use the [harness procedure](validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness)
+and its [private operator-session flow](validation/access-and-authorization.md#obtain-a-private-operator-session-for-the-hosted-access-harness)
+for live checks; never point disposable provider tests at the installed realm.
 
 Local verification recorded October 11, 2026: all 251 platform tests passed with
 isolated PostgreSQL, real Keycloak human/machine flows, and actual pinned proxy
@@ -210,4 +219,5 @@ configuration test skipped, already passed on the host). Backup regression ran
 39 tests (38 passed, one existing optional check skipped); UI type checking and
 all six UI tests passed. Documentation links, Python compilation, Compose
 configuration, shell syntax, and diff whitespace checks passed. The disposable
-services were removed after verification; no live deployment is claimed.
+services were removed after verification; this historical local check did not
+deploy the platform. EV-45 separately records the later deployed core run.

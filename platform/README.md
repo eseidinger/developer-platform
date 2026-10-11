@@ -74,7 +74,10 @@ configured OIDC client; do not put it in `.env`:
 export PLATFORM_ACCESS_TOKEN='…'
 ```
 
-Create the example application:
+Create the legacy flat example application (its route is not protected by the
+new hosted-access capability). For new applications use the
+[`v1alpha2` declaration guide](../docs/developers/application-spec.md) and
+[hosted access policy flow](../docs/developers/api.md#hosted-application-access):
 
 ```bash
 curl --fail-with-body -X PUT http://127.0.0.1:8000/projects/hello \
@@ -144,25 +147,46 @@ resolver supports wildcard localhost names. Public applications use
 
 ## Project specification
 
-`PUT /projects/{name}` accepts a versioned envelope (the preferred format for new integrations) or the flat body below, which remains supported without a sunset date and maps to the same revisions. The envelope has (`apiVersion: platform.example/v1alpha1`, `kind: Application`; see [ApplicationSpec](../docs/architecture/application-contract.md)). The generated API contract is [docs/api/openapi.json](../docs/api/openapi.json); refresh it with `scripts/export_openapi.py` after API changes (a test fails when it is stale).
+`PUT /projects/{name}` accepts `platform.example/v1alpha2` (the preferred
+component-based format), the earlier `v1alpha1` envelope, or the flat legacy body
+below. All use `kind: Application` in envelope form and map to the same revision
+and operation lifecycle. Legacy forms remain supported without a sunset date.
+Use the [application declaration reference](../docs/developers/application-spec.md)
+for field-level syntax and [ApplicationSpec](../docs/architecture/application-contract.md)
+for the ownership boundary. The generated contract is
+[docs/api/openapi.json](../docs/api/openapi.json); verify it with
+`scripts/export_openapi.py --check` after API changes.
+
+The following table describes the flat legacy body only:
 
 | Field | Required | Contract |
 | --- | --- | --- |
 | `name` | Yes | 1–32 lowercase letters, digits, or hyphens; start with a letter and end with a letter or digit. Must match the URL path. |
-| `image` | Yes | Container image reference, 2–512 characters under the current regex. An explicit tag or digest is recommended but not enforced. |
+| `image` | Yes | Public container image reference, 1–512 characters under the current regex. Accepted tags resolve to a registry digest; an explicit digest is recommended for reproducibility. |
 | `port` | No | Container TCP port, 1024–65535; defaults to 8080. |
 | `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
+| `configuration` | No | Map of up to 50 non-secret environment values; reserved/secret-like names, key material and oversized values are rejected. Managed secrets use separate endpoints. |
 | `resources` | No | `{"requests": {"cpu", "memory"}, "limits": {"cpu", "memory"}}`; CPU as `250m` or `0.25`, memory as `Mi`/`Gi`. Omitted values default to requests `100m`/`128Mi` and limits `500m`/`256Mi`. Requests must not exceed limits; maxima are requests 1 CPU/1Gi and limits 2 CPU/2Gi (a rolling update briefly runs two pods within the namespace quota). Invalid values return 422. Spec rejections return 422 with a stable `code`: `unsupported_capability` (a field or value outside the declared capabilities) or `invalid_spec` (anything else malformed). Stored canonically (`250m`, `512Mi`), so equivalent spellings reuse the revision. |
 
-Unknown project request fields are rejected with `422` before catalog or provider side effects. Tags and untagged image references are accepted without digest resolution. Use an immutable digest when reproducibility matters. The [v1alpha1 ApplicationSpec](../docs/architecture/application-contract.md) is a future contract, not an input format for this endpoint.
+Unknown fields are rejected with `422` before catalog or provider side effects.
+Accepted images must be public and from the operator-allowed registries; tags
+are resolved to immutable digests before acceptance and deployment. Pin a registry
+digest explicitly for reproducibility. Image resolution does not prove that the
+container will start or satisfy readiness. Private image pull credentials and
+persistent filesystem/object-storage declarations are unsupported.
 
-The API currently accepts no configuration fields for replicas, resource limits,
-custom environment variables, volumes, image pull secrets, or application commands.
-Use an image that the cluster can pull with its available registry configuration.
-Image validation checks the reference's characters and length, not whether it exists
-or whether the application can run successfully.
+The `v1alpha2` schema supports up to five service/scheduled components, one public
+service, bounded per-component resources, replicas, command/args, configuration,
+HTTP readiness and explicitly approved CIDR/DNS TCP egress. The public route is
+`https://<component>-<project>.<APPS_DOMAIN>` and traverses the hosted-access
+boundary; a separate active policy and approved groups are required. Neither
+readiness nor a Platform API deployment credential grants hosted access. Legacy
+single-service routes keep their existing behavior and must migrate to `v1alpha2`
+for hosted protection. See the [hosted API guide](../docs/developers/api.md#hosted-application-access)
+and [EV-45 core evidence](../docs/operators/validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026);
+the full gate remains open.
 
-For project `hello`, provisioning creates:
+For the flat legacy project `hello`, provisioning creates:
 
 | Resource | Name or behavior |
 | --- | --- |
@@ -214,7 +238,15 @@ workloads. Reapply the saved specifications after bootstrap as described in
 
 ## Automatic availability monitoring
 
-Every project is registered for a root-path HTTP 200 check (`probe_profile: "status"`). Use `probe_profile: "hello-world"` to additionally check the smoke response body. Existing specs default to `status`; include the profile in every full-spec PUT to preserve it. Failed deployments stay monitored; only explicit retirement removes a target. Local `.localhost` installations use HTTP through Caddy; public domains use verified HTTPS from the platform host. See [configuration, limits and validation](../infrastructure/monitoring/README.md).
+Legacy single-service discovery registers a root-path HTTP 200 check
+(`probe_profile: "status"`); `hello-world` additionally checks the smoke response
+body. Failed deployments stay monitored; explicit retirement removes the target.
+Local `.localhost` installations use HTTP through Caddy; public domains use
+verified HTTPS from the platform host. Discovery still uses the legacy project
+hostname: component-aware public-host discovery and centralized workload-log
+retention remain PLAN-017 work. Workload readiness and EV-45 core acceptance do
+not prove those capabilities. See [monitoring configuration and limits](../infrastructure/monitoring/README.md)
+and the [energy enablement plan](../docs/maintainers/delivery/plans/energy-system-integration.md).
 
 ## Application runtime contract
 
@@ -223,6 +255,11 @@ run as UID/GID 10001. The root filesystem is read-only, Linux capabilities are
 dropped, privilege escalation is disabled, and no Kubernetes ServiceAccount token
 is mounted. `/tmp` is writable ephemeral storage with a 64 MiB size limit.
 Store durable application data in PostgreSQL; persistent volume claims are disabled.
+
+The table below describes default legacy single-service settings. `v1alpha2`
+supports the per-component resource, replica, readiness and schedule fields in
+the [application reference](../docs/developers/application-spec.md); namespace
+quotas and aggregate admission still constrain the combined deployment.
 
 | Setting | Value |
 | --- | --- |
@@ -243,11 +280,15 @@ The `database` Secret supplies `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and
 creation, or role creation privileges. Passwords are derived from `DATABASE_KEY`;
 changing that key requires coordinated credential rotation.
 
-Network policy permits traffic between pods in the same namespace, DNS queries to
-cluster DNS, outbound PostgreSQL connections, and inbound Traefik traffic on the
-application port. Other outbound connections, including external APIs, need
-additional administrator-managed policies. New pods may briefly have outbound
-access before network rules converge; this lab is intended for trusted workloads.
+Private services retain in-project connectivity. Default egress permits project
+connectivity, cluster DNS and PostgreSQL; external component egress requires a
+CIDR/DNS-and-TCP-port declaration within the operator allow-list. DNS addresses
+are pinned at apply time and require reapply when they change. A protected
+`v1alpha2` public backend accepts only authorizer traffic, not direct Traefik or
+same-project access. Legacy routes retain direct ingress. New pods may briefly
+have outbound access before network rules converge; this lab is intended for
+trusted workloads. Project credentials may be visible to every component, and
+application-to-PostgreSQL transport is not TLS-protected in the initial profile.
 
 ## API reference
 

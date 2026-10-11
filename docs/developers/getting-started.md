@@ -1,6 +1,6 @@
 # Developer getting started
 
-Status: current. Last reviewed October 9, 2026.
+Status: current. Last reviewed October 11, 2026.
 
 This guide is for a developer deploying a containerized application to an existing
 Developer Platform project. It covers the supported non-interactive workflow:
@@ -19,9 +19,11 @@ You need the following from the platform team:
 - a project name, such as `orders`;
 - the Platform API URL;
 - the OIDC token endpoint, deployment-credential client ID, and one-time client
-  secret; and
-- the public application-domain convention, if it differs from
-  `https://<project>.<apps-domain>`.
+  secret;
+- the public application-domain convention, normally
+  `https://<component>-<project>.<apps-domain>` for `v1alpha2`; and
+- the project administrator responsible for configuring the application's
+  access policy, groups, human approvals, and machine service-access approvals.
 
 The current platform profile accepts images from the configured public registries
 (by default Docker Hub, GitHub Container Registry, and Quay). It does not provide
@@ -110,11 +112,24 @@ five replicas, subject to project policy. Query `GET /v1/capabilities` or consul
 the platform team before relying on optional capacity, egress, configuration, or
 database features.
 
-`status` readiness confirms that the configured port accepts TCP connections.
-Use `hello-world` only for applications that implement the platform's smoke
-response. Custom readiness paths are not supported.
+The named `status` and `hello-world` profiles retain TCP workload readiness.
+Use a custom HTTP readiness path when accepting connections alone does not
+prove initialization, migrations, and dependencies are ready. For example,
+replace the example's `health` object with:
+
+```json
+{"readiness": {"path": "/actuator/health/readiness", "port": 8080}}
+```
+
+Use an endpoint actually implemented by your container. Choose exactly one of
+`profile` or `path`; an HTTP readiness port must be a declared service port and
+defaults to the first declared port if omitted. This probe does not make the
+endpoint anonymously accessible through public ingress.
 
 ## Configure authentication
+
+These credentials authorize deployment to the Platform API, not access to the
+hosted application. They never imply membership in an application group.
 
 Set the credential values in your terminal or CI environment. Do not put a client
 secret, bearer token, or database password in `application.json`, a command-line
@@ -160,11 +175,32 @@ project state through the platform UI or API, merge the intended change, and ret
 The CLI reserves standard output for results; request compact machine output with
 `--output json`.
 
-When the operation is ready, access the public service at the application URL
-provided by the platform team, typically `https://web-orders.<apps-domain>` for a
-public `web` component in the `orders` project. A timeout
-or interrupted wait does not cancel the server-side deployment; retain the printed
-operation ID and inspect it through the platform UI or API.
+A timeout or interrupted wait does not cancel the server-side deployment; retain
+the printed operation ID and inspect it through the platform UI or API.
+
+## Enable hosted application access
+
+A ready workload is not yet an authorized public application. `v1alpha2` public
+routes go through the platform access boundary; a missing, pending, or inactive
+access policy denies access. A project administrator must create application
+groups and a separate `ApplicationAccessPolicy` for the public component using
+the [hosted application API](api.md#hosted-application-access). Do not add identity
+settings to `application.json`.
+
+The policy selects explicit non-overlapping paths/methods and either
+`browser-session` or `bearer-token`. Human first login creates a pending request;
+the provider project administrator assigns application groups before access
+succeeds. A machine caller needs a provider-approved service-access request and
+managed credential, distinct from its CI deployment credential. Declare HTTPS
+egress to the issuer token endpoint and provider host for outbound machine calls.
+No public application route is anonymous in this profile.
+
+After policy activation and the relevant approval, use the public application URL,
+typically `https://web-orders.<apps-domain>`. Applications consume the trusted
+principal/group headers and leave authentication and coarse route authorization
+to the platform; see [identity transport](../architecture/security-and-authorization.md#upstream-identity-transport).
+Browser state changes also require the platform CSRF cookie/header and same HTTPS
+Origin described in the [identity runbook](../operators/identity-and-access.md#hosted-application-access-installation-and-recovery).
 
 ## Next steps
 

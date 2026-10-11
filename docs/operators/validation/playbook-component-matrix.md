@@ -1,6 +1,6 @@
 # Playbook component matrix
 
-Status: current inventory and dependency classification. Last reviewed October 9,
+Status: current inventory and dependency classification. Last reviewed October 11,
 2026.
 
 This page classifies the deployment, administration, acceptance, recovery, and
@@ -8,13 +8,19 @@ failure-drill playbooks by the minimum components they need. It distinguishes a
 playbook's executable assertions from optional notification evidence that an
 operator must confirm separately.
 
-All 30 playbooks listed here passed `ansible-playbook --syntax-check` with their
-corresponding example inventories on October 9, 2026. Syntax validation does not
-execute tasks, connect to remote hosts, or establish live acceptance.
+The October 9, 2026 baseline of 30 playbooks passed `ansible-playbook --syntax-check`
+with their corresponding example inventories. The inventory now also includes
+the hosted-access wrapper below; it was not part of that historical check.
+Syntax validation does not execute tasks, connect to remote hosts, or establish
+live acceptance. The directly invoked hosted-access harness has separately
+recorded live core evidence in EV-45; that is not evidence of executing the
+Ansible wrapper or closing the full gate. The added wrapper separately passed
+syntax checking with `ansible/inventory.example.yml` during the October 11
+documentation consistency update; no playbook tasks were executed.
 
 Inventory files, variable files, and
 `operations/watchdog/tests/compose.watchdog.yaml` are configuration or test
-fixtures, not Ansible playbooks, and are not counted in the 30.
+fixtures, not Ansible playbooks, and are not counted as playbooks.
 
 ## Component definitions
 
@@ -42,6 +48,7 @@ These playbooks require only **P** for their executable assertions.
 | Project administration | [`retire-platform-project.yml`](../../../ansible/retire-platform-project.yml) | Preview and execute explicit project retirement with retained-data evidence |
 | General acceptance | [`test-platform.yml`](../../../ansible/test-platform.yml) | Exercise the core authorized platform lifecycle with short-lived personas |
 | Application contract | [`test-platform-components.yml`](../../../ansible/test-platform-components.yml) | Exercise multi-service, scheduled-component, migration, status, update, rollback, and retirement behavior |
+| Hosted application access | [`test-platform-hosted-access.yml`](../../../ansible/test-platform-hosted-access.yml) | Plan or run the neutral identity/HTTPS/isolation/persistence suite; no platform deployment, explicit live confirmation, and a private target-host human administrator session |
 | CI credentials | [`test-platform-ci-credential.yml`](../../../ansible/test-platform-ci-credential.yml) | Exercise project-scoped machine deployment, denial, revocation, and cleanup |
 | CI credentials | [`verify-platform-test-runner-expiry.yml`](../../../ansible/verify-platform-test-runner-expiry.yml) | Verify the dedicated runner before or after its configured expiry |
 | Capacity | [`test-platform-capacity-admission.yml`](../../../ansible/test-platform-capacity-admission.yml) | Temporarily enable and exercise request-based reserved-capacity admission |
@@ -53,6 +60,18 @@ These playbooks require only **P** for their executable assertions.
 
 `deploy.yml` refuses to overlap active backup or availability drills. That is a
 safety interlock, not a requirement to install **B**, **H**, or **W**.
+
+The hosted-access wrapper defaults to an offline `plan`. A live `run` additionally
+requires a prepared acceptance virtual environment, a public digest-pinned
+fixture, wildcard DNS/HTTPS, operator-approved component egress and a private
+renewable human platform-administrator session on the target. It does not use
+the basic suite's test-runner credential file and does not install those inputs.
+`--timed` tests actual machine-token expiry. Optional global recovery
+reconciliation requires a separately reserved lab with no other project records,
+including retired records; it is not a backup restore. The core suite requires
+only **P**. Real backup/restore needs separate **B** tooling and acceptance.
+See the [harness procedure](access-and-authorization.md#neutral-hosted-application-acceptance-harness)
+and [EV-45 run record](access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026).
 
 `test-platform-failure-signals.yml` verifies local Prometheus alert state and
 platform recovery, but does not prove external notification receipt. Complete

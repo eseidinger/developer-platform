@@ -1,6 +1,6 @@
 # Platform API guide
 
-Status: current. Last reviewed October 9, 2026.
+Status: current. Last reviewed October 11, 2026.
 
 The REST API is the authoritative boundary used by the UI, CLI, CI, and test
 automation. Its machine-readable contract is [OpenAPI](../api/openapi.json); this
@@ -51,6 +51,10 @@ raw Kubernetes or Docker access is never part of the public application contract
 ## Hosted application access
 
 Hosted access is separate from authorization to administer the Platform API.
+`GET /v1/capabilities` advertises it in `hostedApplicationAccess`, including modes,
+group authorization, identity transport, project-wide credential isolation and
+the `v1alpha2` requirement. Public workload readiness does not authorize callers;
+without an active access policy the public route denies access.
 Project administrators manage application groups, access policies, first-login
 requests, memberships, and provider-approved service-access requests under
 `/v1/projects/{project}/`. There is no implicit application membership for a

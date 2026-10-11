@@ -106,6 +106,25 @@ This does not replace the separate backup/recovery procedures. Triggering and
 inspecting encrypted backup storage requires distinct protected credentials and
 is kept in the [backup and recovery](../backup-and-recovery.md) track.
 
+## 4B. Run hosted-application access acceptance
+
+For protected `v1alpha2` public applications, use the
+[neutral hosted-access harness](access-and-authorization.md#neutral-hosted-application-acceptance-harness).
+Prepare the public digest-pinned fixture, target-host runner environment, and a
+fresh [private human administrator session](access-and-authorization.md#obtain-a-private-operator-session-for-the-hosted-access-harness).
+This is not the basic suite's reusable test-runner JSON. Generate an offline plan,
+then explicitly confirm the exact API origin for a live run. Each run needs a new
+run ID. Optional `--timed` proves actual machine-token expiry; do not enable global
+recovery reconciliation on a shared lab.
+
+The harness creates neutral projects and attempts retirement/identity cleanup
+while retaining databases. It does not redeploy the platform or perform a backup
+restore. The Ansible wrapper `ansible/test-platform-hosted-access.yml` defaults
+to an offline plan and consumes already prepared host-side inputs.
+[EV-45](access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026)
+records all 39 live core checks passed with timed expiry, but nine checks remain
+deferred and the full hosted-access/Phase 3 gate remains open.
+
 ## 5. Create a real empty project for later CI deployment
 
 A platform administrator creates the durable scope without submitting an application:
