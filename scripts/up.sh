@@ -73,6 +73,8 @@ echo "Starting fixed-address identity and Platform API services first..."
 docker compose up -d --build --wait --wait-timeout 180 platform-api
 python3 scripts/check-network-addresses.py
 docker compose up -d --build --remove-orphans
+echo "Waiting for the Alloy collector to become ready (up to 120 seconds)..."
+docker compose up -d --no-deps --wait --wait-timeout 120 alloy
 docker build -f platform/Dockerfile.access -t developer-platform-access-authorizer:local platform
 k3d image import developer-platform-access-authorizer:local -c workloads
 python3 scripts/install-application-access.py

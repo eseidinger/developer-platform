@@ -92,6 +92,17 @@ is container-readable under the private `.runtime` directory and mounted only
 into the trusted collector. Revoke by deleting `workload-log-reader-token` and
 rebootstrap. Never share that file or mount it into a workload.
 
+The collector runs as UID `0` (for the existing host Docker-log reader) and GID
+`473`, matching the pinned Alloy image's `473:473`, mode `0770` state directory.
+Its named volume stays mounted at `/var/lib/alloy`; no ownership migration,
+world-writable permissions, extra capabilities or privileged container is needed.
+The root filesystem remains read-only with all capabilities dropped and
+`no-new-privileges`. Changing the pinned image requires rechecking this group and
+the production-volume fixture, not assuming root can bypass permissions.
+Alloy has an internal `/-/ready` health check and bootstrap waits up to 120 seconds
+for it. API/Prometheus readiness alone is not collector readiness; even a healthy
+collector does not prove successful ingestion or elapsed log retention.
+
 Kubernetes operational logs use `job=kubernetes-workloads`, project, default
 environment, application, component, namespace, pod and container labels. Newly
 deployed/restarted workloads carry platform-derived pod annotations for revision
@@ -222,7 +233,10 @@ then removes those containers. It validates production configuration/rules, stat
 content, redirect, timeout, certificate rejection, recovery, target labels and
 live discovery removal. The workload-log fixture uses real pinned Alloy/Loki and
 a TLS-verified fake Kubernetes API to verify discovery/source, safe ingestion,
-scope, structured metadata and Loki restart readback. Both remove their containers,
+scope, structured metadata and Loki restart readback. It reproduces the old
+UID/GID permission failure, then uses production hardening and a fresh named
+state volume at `/var/lib/alloy` to verify collector readiness and restart.
+Both remove their containers (and the workload fixture's exact temporary volume),
 never deploy the platform and send no notifications. Neither proves seven elapsed
 days of retention or real-cluster behavior.
 API lifecycle tests use simulated PostgreSQL/Kubernetes dependencies; they do not
@@ -253,13 +267,21 @@ reactivates it; automatic bulk reapply should skip retired catalog entries.
 
 ## Live acceptance still required
 
+Deployed evidence now exists for component boundary probes, independent
+Kubernetes readiness and immediate provider/consumer central correlation reads:
+operator-provided node-01 run `60c3ca1647b9` passed all 45 assertions with
+`--timed --monitoring` after the collector state-permission repair. See
+[EV-46](../../docs/operators/validation/access-and-authorization.md#executed-hosted-access-monitoring-acceptance-october-11-2026).
+The report says `sevenDayRetention: not-time-verified`; neither post-retirement
+log readback nor elapsed retention/compactor deletion was exercised.
+
 Use the neutral hosted-access harness with `--monitoring` and a newly published
 fixture digest. It verifies component URLs/probes, Kubernetes readiness and safe
 provider/consumer central correlation before retirement. It does not remove the
 full monitoring/retention deferral: record an operational event, confirm readback
 after pod retirement/restart, and verify retention around the seven-day boundary
 including compactor deletion delay. Record collector/backend health and gaps.
-Keep PLAN-017 open until deployed and retention acceptance are recorded.
+Keep PLAN-017 open until the remaining readback and retention acceptance are recorded.
 
 After the backup drills finish, verify the public smoke probe, then temporarily
 scale its deployment to zero and confirm the application alert reaches the

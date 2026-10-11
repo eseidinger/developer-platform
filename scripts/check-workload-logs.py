@@ -7,6 +7,7 @@ pipeline. Configured seven-day retention is not a seven-day elapsed-time drill.
 import http.server
 import json
 import logging
+import shlex
 import socket
 import ssl
 import subprocess
@@ -18,6 +19,8 @@ import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
+
+import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 ALLOY = "grafana/alloy:v1.19.2"
@@ -34,6 +37,38 @@ def free_port():
     with socket.socket() as sock:
         sock.bind(("127.0.0.1", 0))
         return sock.getsockname()[1]
+
+
+def collector_runtime(service, volume):
+    """Use production identity, state mount, hardening and readiness settings."""
+    assert service["read_only"]
+    assert "alloy:/var/lib/alloy" in service["volumes"]
+    args = ["--user", service["user"], "--memory", service["mem_limit"], "--read-only",
+            "-v", volume + ":/var/lib/alloy"]
+    for mount in service["tmpfs"]:
+        args += ["--tmpfs", mount]
+    for capability in service["cap_drop"]:
+        args += ["--cap-drop", capability]
+    for option in service["security_opt"]:
+        args += ["--security-opt", option]
+    health = service["healthcheck"]
+    assert health["test"][0] == "CMD"
+    args += ["--health-cmd", shlex.join(health["test"][1:]).replace("$$", "$"),
+             "--health-interval", health["interval"], "--health-timeout", health["timeout"],
+             "--health-start-period", health["start_period"], "--health-retries", str(health["retries"])]
+    return args
+
+
+def wait_collector(container, timeout=60):
+    deadline = time.monotonic() + timeout
+    while time.monotonic() < deadline:
+        state = json.loads(run("docker", "inspect", "--format", "{{json .State}}", container))
+        if state.get("Health", {}).get("Status") == "healthy":
+            return
+        if not state["Running"] or state.get("Health", {}).get("Status") == "unhealthy":
+            break
+        time.sleep(1)
+    raise AssertionError("Collector failed production readiness check: " + run("docker", "logs", "--tail", "20", container))
 
 
 def pod(namespace, name, component):
@@ -104,6 +139,9 @@ def main():
         raise RuntimeError("Fixture requires the local Linux Docker socket")
     name = "platform-log-test-" + uuid4().hex[:10]
     names = [name + "-loki", name + "-alloy"]
+    state_volume = name + "-alloy-state"
+    service = yaml.safe_load((ROOT / "infrastructure/monitoring/compose.yaml").read_text())["services"]["alloy"]
+    assert service["image"] == ALLOY
     api = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Kubernetes)
     with tempfile.TemporaryDirectory(prefix="platform-workload-logs-") as directory:
         work = Path(directory)
@@ -135,13 +173,28 @@ def main():
                             "http_listen_port: " + str(loki_port) + "\n  grpc_listen_port: " + str(free_port()))
         (work / "loki.yaml").write_text(loki)
         try:
+            # Docker populates a fresh named volume from the pinned image's
+            # 473:473/0770 directory. Reproduce the old UID 0/GID 0 failure.
+            denied = subprocess.run(["docker", "run", "--rm", "--network", "none", "--read-only",
+                "--user", "0", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
+                "-v", state_volume + ":/var/lib/alloy", "--entrypoint", "/usr/bin/bash", ALLOY,
+                "-ec", "test -w /var/lib/alloy"], capture_output=True, text=True)
+            assert denied.returncode == 1, "Old collector identity unexpectedly has state write access"
             run("docker", "run", "--rm", "-v", f"{work}:/work:ro", ALLOY, "validate", "/work/config.alloy")
             run("docker", "run", "-d", "--name", names[0], "--network", "host",
                 "-v", f"{work}:/work:ro", LOKI, "-config.file=/work/loki.yaml")
-            run("docker", "run", "-d", "--name", names[1], "--network", "host", "--user", "0",
-                "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
+            # Keep the production state path and a real named volume; only the
+            # transport port differs in this disposable host-network fixture.
+            runtime = collector_runtime(service, state_volume)
+            runtime = [arg.replace("127.0.0.1/12345", "127.0.0.1/" + str(alloy_port)) for arg in runtime]
+            run("docker", "run", "-d", "--name", names[1], "--network", "host", *runtime,
                 "-v", f"{work}:/work:ro", ALLOY, "run", "/work/config.alloy",
-                "--storage.path=/tmp/alloy", "--server.http.listen-addr=127.0.0.1:" + str(alloy_port))
+                "--storage.path=/var/lib/alloy", "--server.http.listen-addr=127.0.0.1:" + str(alloy_port))
+            wait_collector(names[1])
+            run("docker", "exec", names[1], "/usr/bin/bash", "-ec", "test -d /var/lib/alloy/remotecfg")
+            run("docker", "restart", names[1])
+            wait_collector(names[1])
+            print("PASS production collector identity, persistent state permissions, hardening, readiness and restart")
             def query():
                 params = urllib.parse.urlencode({"query": '{job="kubernetes-workloads"}', "limit": 100})
                 with urllib.request.urlopen(loki_url + "/loki/api/v1/query_range?" + params, timeout=3) as response:
@@ -203,6 +256,8 @@ def main():
         finally:
             for container in reversed(names):
                 subprocess.run(["docker", "rm", "-f", "-v", container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            # Exact UUID-scoped fixture volume only; never remove platform data.
+            subprocess.run(["docker", "volume", "rm", state_volume], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             api.shutdown()
             api.server_close()
 

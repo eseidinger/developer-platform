@@ -31,8 +31,11 @@ Platform API's fixed project selector, never an unfiltered Grafana/Loki link.
 [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md)
 accepts seven-day centralized workload-log retention for the initial
 cross-project integration profile. PLAN-017 now implements attributed workload
-collection and authorized reads; deployed ingestion and elapsed retention remain
-acceptance work. Metrics contain
+collection and authorized reads; deployed neutral probes/readiness and immediate
+central correlation reads passed in
+[EV-46](../operators/validation/access-and-authorization.md#executed-hosted-access-monitoring-acceptance-october-11-2026).
+Post-retirement/restart log readback and elapsed retention remain acceptance
+work. Metrics contain
 only Public or Internal data. Workload logs may contain Internal operational data
 and explicitly approved Confidential correlation values, but no customer
 payloads or Restricted values.

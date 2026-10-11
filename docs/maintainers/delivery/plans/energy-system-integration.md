@@ -128,8 +128,9 @@ and the external configuration contract against the resulting API afterward.
 Source/local evidence does not close PLAN-009. The neutral-fixture DNS/TLS,
 private-backend isolation, expiry and healthy-system revocation checks have now
 passed in [EV-45](../backlog.md#verification-register); dependency-outage and
-restored-access drills remain required. Component monitoring, centralized workload-log retention,
-and the external energy end-to-end gate remain subsequent increments. Operational
+restored-access drills remain required. Component monitoring and immediate
+central log ingestion now have deployed evidence in EV-46 below; elapsed
+workload-log retention and the external energy end-to-end gate remain open. Operational
 setup is in the [hosted-access runbook](../../../operators/identity-and-access.md#hosted-application-access-installation-and-recovery).
 
 Acceptance automation progress (October 11, 2026): the neutral
@@ -162,6 +163,20 @@ request retention, component monitoring/central log retention, control-plane
 outage, DNS-change/reapply, recovery reconciliation and the external suite remain
 deferred. Keep those tasks open; reconcile the external contract against the
 implemented API without adding energy-specific platform behavior.
+
+Deployed monitoring acceptance (October 11, 2026; EV-46): operator-provided
+node-01 run `60c3ca1647b9` passed all 45 core-plus-monitoring checks after the
+collector state-permission fix and confirmed healthy Alloy startup. Both public
+API component probes, independent Kubernetes readiness and project-authorized
+central correlation/revision/operation reads passed. Runner/fixture release
+`hosted-access-v0.2.0` supplies the pinned image; the subsequent collector fix
+does not need another fixture image. The report does not attest the exact
+deployed control-plane tree. Cleanup completed with data retained. See the
+[detailed EV-46 run record](../../../operators/validation/access-and-authorization.md#executed-hosted-access-monitoring-acceptance-october-11-2026).
+The combined monitoring/retention deferral remains: post-retirement/restart log
+readback and seven-day retention/compactor deletion still need evidence.
+`gateClosed: false`, the other deferred checks and the external suite remain
+unchanged; this is no energy-domain acceptance or PLAN-017 completion.
 
 Implement [PLAN-009](../backlog.md#additional-phase-tasks) before the deployed
 connection gate. The capability must support these reusable registration types:
@@ -572,8 +587,11 @@ enforce fixed project selectors and safe response envelopes. Local container
 fixtures and regressions verify source behavior; `--monitoring` adds deployed
 neutral checks. See the
 [implemented contract](../../../../infrastructure/monitoring/README.md).
-PLAN-017 remains open for deployed and elapsed seven-day retention acceptance;
-EV-45 does not retroactively establish these checks.
+EV-46 now establishes deployed neutral provider/consumer boundary probes,
+semantic readiness and immediate central correlation reads after the collector
+permission/readiness repair. PLAN-017 remains open for post-retirement/restart
+log readback and elapsed seven-day retention/compactor acceptance; EV-45 remains
+historical and is not retroactively promoted.
 
 Monitoring discovery must understand the component application schema. For each
 declared public component, publish the actual

@@ -248,8 +248,11 @@ Protected probes check expected access-boundary denial/login without credentials
 Kubernetes readiness is separate. Alloy collects minimized operational envelopes
 from project pods into seven-day configured Loki storage. Authorized
 `GET /projects/{name}/retained-logs` reads them with fixed project scope.
-Deployment and elapsed-retention acceptance remain open; EV-45 does not prove
-this increment. See [monitoring configuration and limits](../infrastructure/monitoring/README.md)
+Deployed component probes/readiness and immediate central correlation reads
+passed in [EV-46](../docs/operators/validation/access-and-authorization.md#executed-hosted-access-monitoring-acceptance-october-11-2026)
+after the collector permission/readiness repair. Post-retirement/restart log
+readback and elapsed-retention acceptance remain open; EV-45 remains historical.
+See [monitoring configuration and limits](../infrastructure/monitoring/README.md)
 and the [energy enablement plan](../docs/maintainers/delivery/plans/energy-system-integration.md).
 
 ## Application runtime contract

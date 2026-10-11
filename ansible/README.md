@@ -27,7 +27,10 @@ network requirements. The playbook does not change the firewall.
 The playbook installs Docker from its official APT repository, verifies downloaded
 kubectl and k3d checksums, copies deployment sources to `/opt/developer-platform`,
 generates secrets on the target, and runs `scripts/up.sh`. It then waits for the
-API dependency-readiness endpoint. The controller's `.env` and `.runtime` are not transferred.
+API dependency-readiness endpoint. Bootstrap also waits for Alloy's internal
+readiness health check; a restarting/unhealthy collector fails deployment rather
+than being masked by API/Prometheus readiness. This does not attest log ingestion
+or seven-day retention. The controller's `.env` and `.runtime` are not transferred.
 Each successful deployment writes `.runtime/installation-record.json` (root-only, no secrets) with the source revision (`+dirty` if the controller checkout has uncommitted changes), host OS, Docker/Compose/k3d/kubectl versions, running Compose image references with IDs, and the non-secret deployment parameters.
 The installation and runtime directories are root-only; `.env` has mode 0600.
 Run manual maintenance commands with sudo from the installation directory.

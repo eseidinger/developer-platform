@@ -148,6 +148,9 @@ with tracing disabled. Keep `.runtime` private and do not share the printed
 approval URL, session file, or tokens. Set the actual HTTPS issuer; for the local
 development CA, also set `SSL_CERT_FILE` to the trusted CA file (the Python
 example does not use `CURL_CA_BUNDLE`). Never disable certificate verification.
+Copy the self-contained example below into the host shell: deployment transfers
+runtime sources, not this `docs/` tree, so do not try to execute or extract it
+from a Markdown file under `/opt/developer-platform`.
 
 ```bash
 cd /opt/developer-platform
@@ -498,6 +501,103 @@ reconciliation, even when subsequently exercised, is not a real backup restore.
 Concrete energy declarations, governance records, domain authorization, and
 deterministic energy-workflow outcomes remain externally owned and unverified by
 this neutral suite.
+
+## Executed hosted-access monitoring acceptance: October 11, 2026
+
+Evidence ID: [EV-46](../../maintainers/delivery/backlog.md#verification-register).
+Source: the operator-provided live node-01 `report.json`, following the
+operator-confirmed deployment and healthy Alloy startup. This records supplied
+evidence, not an independent rerun or full Phase 3/F-10 acceptance. EV-45 remains
+the earlier historical core run.
+
+### Run identity
+
+- Run ID: `60c3ca1647b9`, using the same host, installation, API, application
+  domain and issuer as EV-45.
+- Started: `2026-10-11T19:02:34.656777+00:00`; finished:
+  `2026-10-11T19:14:55.483297+00:00` (UTC; approximately 12 minutes 21 seconds).
+- Result: `core-passed`, all 45 named assertions passed, `gateClosed: false`.
+- Requested drills: `tokenExpiry: true`, `componentMonitoring: true`,
+  `recoveryReconcile: false` (`--timed --monitoring`, without global reconcile).
+- Runner/fixture release: `hosted-access-v0.2.0`, source
+  `b360ddee34444748c95705c597aa7b17491cd05b`. The Alloy UID/GID and readiness fix
+  was implemented and the operator reported redeployment before this run.
+  That fix was not part of the fixture release and requires no new fixture
+  image. The report does not attest the exact deployed control-plane revision
+  or working-tree contents; do not treat the release as that attestation.
+- Harness SHA-256:
+  `baa046e028656dfe9dc45c578390bcd33923e2c25b20dbd84313b2cbc5ab845c`.
+- Fixture image:
+  `docker.io/eseidinger/developer-platform-acceptance-fixture@sha256:5c14c1bedfc653e98f958b88deacc5af488f885a5d9a6d3b96e9325938b3f0ad`.
+- Projects: `ha-60c3ca1647b9-provider` and `ha-60c3ca1647b9-consumer`, each
+  revision 1 with a public API and private worker; CPU request/limit
+  `50m`/`250m`, memory request/limit `64Mi`/`128Mi` per component.
+- Private report:
+  `/opt/developer-platform/.runtime/hosted-access/60c3ca1647b9/report.json`;
+  adjacent `state.json` contains cleanup handles. Classification: Internal;
+  retain under the approved evidence policy. Do not commit sessions, credentials
+  or raw identity claims.
+
+### Deployed monitoring scope and core regression
+
+The 39 core assertions described in EV-45 passed again. Six additional checks
+passed before fixture retirement:
+
+| Named check | UTC observation |
+|---|---|
+| `provider-component-public-boundary-probe` | 19:07:26.310652 |
+| `provider-component-semantic-readiness` | 19:07:26.314516 |
+| `provider-centralized-safe-correlation` | 19:07:28.614805 |
+| `consumer-component-public-boundary-probe` | 19:07:28.617914 |
+| `consumer-component-semantic-readiness` | 19:07:28.620554 |
+| `consumer-centralized-safe-correlation` | 19:07:28.696688 |
+
+For each project, the public probe matched its API component's declared
+`/health/ready` URL with `probe_kind=access-boundary` and successful login/denial
+semantics. Kubernetes ready-pod metrics independently supplied semantic readiness.
+Project-authorized retained-log reads found the expected opaque synthetic
+correlation, revision `1` and populated operation metadata. These reads prove
+safe-envelope retrieval through the API; they do not certify arbitrary raw-log
+storage or customer/domain correlation. The monitoring summary records
+`componentProbes: passed`, `centralIngestion: passed` and
+`sevenDayRetention: not-time-verified`.
+
+Core PostgreSQL write/read and restart read-back returned `200`; marker
+comparisons passed. Backend bypass and unrelated-egress checks had healthy
+same-address controls before and after, with no successful negative connection,
+timeout, DNS error, address mismatch or unexpected error. The tested network
+family was IPv4 only; IPv6 CIDR pins are not IPv6 isolation evidence.
+Measured approval/claim refresh was 241.681 seconds; normal adoption revocation
+0.006 seconds; emergency no-overlap 0.005 seconds; held-token expiry denial
+298.127 seconds; existing-human-session revocation 2.338 seconds and issued
+machine-token revocation 2.240 seconds. These are observations, not guarantees
+or dependency-outage evidence.
+
+### Collector repair, cleanup and remaining acceptance
+
+The preceding run `3c17ed6dcdac` failed with
+`component_retained_correlation_unavailable`; cleanup completed with data retained.
+The operator's collector output showed a restart loop caused by
+`mkdir /var/lib/alloy/remotecfg: permission denied`. The pinned image's state
+directory is `473:473`, mode `0770`; UID `0` with GID `0` and all capabilities
+dropped could not write it. The repair uses `0:473`, retains the named state
+volume and hardening, adds an internal readiness check, and makes bootstrap wait
+for collector health. The operator confirmed healthy Alloy and running Loki
+before the successful rerun. Separate disposable local fixtures reproduced the
+old failure and verified production-volume startup/restart, ingestion and Loki
+restart readback; those local tests are not live retention evidence.
+
+Cleanup for `60c3ca1647b9` reported `completed-data-retained`; no retry is
+indicated. Retained databases must not be purged without a separate decision.
+The same nine deferred checks listed for EV-45 remain deferred, including the
+combined `component-monitoring-and-central-log-retention` entry: deployed probes
+and immediate ingestion now have evidence, but seven elapsed days and compactor
+deletion do not. This run does not query retained logs after workload restart or
+cleanup, exercise collector/backend outages, or verify alert delivery.
+Record post-retirement/restart readback and a seven-day retention-boundary drill
+with collector/backend health, collection gaps and compactor delay before
+closing PLAN-017. PLAN-009, PLAN-018, PLAN-019, F-10 and Phase 3 remain open;
+the externally owned energy suite and configuration contract are unchanged.
 
 ## Executed local validation — October 2, 2026
 

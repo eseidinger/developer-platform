@@ -36,6 +36,22 @@ kubelet-only. Investigate `up{job="alloy"}`, Alloy drop/write counters, collecto
 logs and Loki storage before interpreting missing entries as absence of activity.
 Do not grant project users direct access to shared Loki or Grafana.
 
+[EV-46](validation/access-and-authorization.md#executed-hosted-access-monitoring-acceptance-october-11-2026)
+records deployed component probes/readiness and immediate central correlation
+reads for both neutral projects after the collector repair. It does not establish
+post-retirement/restart log readback, seven elapsed days or compactor deletion;
+PLAN-017 and the combined monitoring/retention gate remain open.
+
+Check `docker compose ps alloy loki` after deployment. Alloy must be healthy,
+not merely created or restarting; bootstrap now waits for its internal readiness
+check. If startup reports `mkdir /var/lib/alloy/remotecfg: permission denied`,
+verify the deployed collector uses `user: "0:473"`: the pinned image's state
+directory is group-writable by GID `473`, while the container drops all
+capabilities. Recreate Alloy from the corrected Compose configuration without
+deleting its named volume or relaxing hardening. Do not share kubeconfig/token
+files when collecting diagnostics. Readiness does not replace safe-log readback
+and elapsed-retention acceptance.
+
 ## Security-event notifications
 
 The API derives bounded Prometheus textfile metrics from `platform_audit.events`
