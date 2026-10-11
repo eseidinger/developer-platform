@@ -21,7 +21,9 @@ import psycopg
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from acceptance import fixture, harness as h
 from app.access_contract import Governance, PolicyCreate
+from app.access_gateway import create_gateway
 from app.spec import ApplicationEnvelopeV1Alpha2
+from test_application_access import POLICY, claims, data
 
 
 RUN = "0123456789ab"
@@ -548,6 +550,57 @@ class HarnessTests(unittest.TestCase):
         with self.assertRaisesRegex(h.DrillError, "unsupported_operator_client"):
             h.OperatorRefresh(Mock(), "unexpected-client")
 
+    def test_persistence_reports_only_safe_status_and_comparison_evidence(self):
+        marker = "durable-" + RUN
+        def response(value):
+            return httpx.Response(200, json={"fixtureVersion": 1, "runId": RUN, "marker": value})
+        for invalid in (httpx.Response(400, json={"code": "invalid_marker"}),
+                        httpx.Response(503, text="private-dependency-detail"),
+                        httpx.Response(200, json=[]), httpx.Response(200, text="not-json"),
+                        response("unexpected-marker"),
+                        httpx.Response(200, json={"fixtureVersion": 1, "runId": "another-run", "marker": marker})):
+            with self.subTest(status=invalid.status_code):
+                journal = h.Journal(self.directory / uuid4().hex, API, RUN)
+                journal.state["marker"] = marker
+                drill = h.Drill(self.args(), journal, Mock(), Mock(), Mock())
+                self.addCleanup(drill.public.close)
+                self.addCleanup(drill.browser.close)
+                with patch.object(drill, "public_call", side_effect=[invalid, response("consumer-" + RUN)]), \
+                     contextlib.redirect_stdout(io.StringIO()), self.assertRaisesRegex(h.DrillError, "separate-project-postgresql-state"):
+                    drill.persistence(Mock(), Mock())
+                check = journal.report["checks"][-1]
+                self.assertEqual(check["writeHttpStatus"], invalid.status_code)
+                self.assertEqual(check["consumerReadHttpStatus"], 200)
+                self.assertFalse(check["writeMarkerMatches"])
+                self.assertTrue(check["consumerMarkerMatches"])
+                self.assertNotIn(marker, json.dumps(check))
+                self.assertNotIn("private-dependency-detail", json.dumps(check))
+                drill.api.request.assert_not_called()
+
+    def test_persistence_validates_isolation_and_restart_readback(self):
+        marker = "durable-" + RUN
+        def response(value):
+            return httpx.Response(200, json={"fixtureVersion": 1, "runId": RUN, "marker": value})
+        for consumer, retained, succeeds in ((marker, marker, False), ("consumer-" + RUN, "initial", False),
+                                            ("consumer-" + RUN, marker, True)):
+            journal = h.Journal(self.directory / uuid4().hex, API, RUN)
+            journal.state.update(marker=marker, providerRevision=1)
+            api = Mock()
+            api.operation.return_value = {"revision": 1}
+            drill = h.Drill(self.args(), journal, api, Mock(), Mock())
+            self.addCleanup(drill.public.close)
+            self.addCleanup(drill.browser.close)
+            with patch.object(drill, "public_call", side_effect=[response(marker), response(consumer), response(retained)]), \
+                 contextlib.redirect_stdout(io.StringIO()):
+                if succeeds:
+                    drill.persistence(Mock(), Mock())
+                else:
+                    with self.assertRaises(h.DrillError):
+                        drill.persistence(Mock(), Mock())
+            self.assertEqual(journal.report["checks"][-1]["result"], "passed" if succeeds else "failed")
+            if consumer != marker:
+                self.assertEqual(journal.report["checks"][-1]["readHttpStatus"], 200)
+
     def test_missing_confirmation_stops_main_before_any_environment_read(self):
         with patch.object(h, "settings") as config, contextlib.redirect_stdout(io.StringIO()) as output:
             code = h.main(["run", "--fixture-image", IMAGE])
@@ -556,7 +609,158 @@ class HarnessTests(unittest.TestCase):
         config.assert_not_called()
 
 
+class FixtureGatewayTests(unittest.IsolatedAsyncioTestCase):
+    async def proxy_round_trip(self):
+        framing = []
+        class ObservedHandler(fixture.Handler):
+            def do_POST(self):
+                framing.append({"chunked": self.headers.get("Transfer-Encoding") == "chunked",
+                                "hasLength": "Content-Length" in self.headers})
+                self.dispatch()
+        server = fixture.ThreadingHTTPServer(("127.0.0.1", 0), ObservedHandler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            async with httpx.AsyncClient(trust_env=False, timeout=5) as backend:
+                gateway = create_gateway(internal_key="i" * 32, session_key="s" * 32, client=backend)
+                snapshot = data()
+                snapshot["policies"][0]["spec"]["backend"] = "http://127.0.0.1:" + str(server.server_port)
+                gateway.state.snapshot.load(snapshot)
+                verifier = Mock()
+                verifier.verify.return_value = claims()
+                gateway.state.verifiers[(snapshot["issuer"], POLICY["spec"]["applicationId"], snapshot["jwksUrl"])] = verifier
+                async with httpx.AsyncClient(transport=httpx.ASGITransport(app=gateway),
+                    base_url="https://" + POLICY["spec"]["host"]) as client:
+                    headers = {"Authorization": "Bearer synthetic-token"}
+                    written = await client.post("/api/state", headers=headers, json={"marker": "durable-" + RUN})
+                    self.assertEqual(written.status_code, 200)
+                    self.assertEqual(written.json()["marker"], "durable-" + RUN)
+                    read = await client.get("/api/state", headers=headers)
+                    self.assertEqual(read.status_code, 200)
+                    self.assertEqual(read.json()["marker"], "durable-" + RUN)
+                    identity = await client.get("/api/identity", headers=headers)
+                    self.assertFalse(identity.json()["authorizationPresent"])
+                    self.assertEqual(identity.json()["principal"]["Kind"], "service")
+            self.assertEqual(framing, [{"chunked": True, "hasLength": False}])
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join(2)
+
+    async def test_actual_proxy_streams_fixture_write_and_readback(self):
+        marker = "provider-" + RUN
+        def state(value=None):
+            nonlocal marker
+            if value is not None:
+                marker = value
+            return marker
+        with patch.dict(os.environ, {"ACCEPTANCE_RUN_ID": RUN}), patch.object(fixture, "state", side_effect=state):
+            await self.proxy_round_trip()
+
+    @unittest.skipUnless(os.environ.get("ACCESS_FIXTURE_TEST_DSN"), "Set ACCESS_FIXTURE_TEST_DSN to disposable PostgreSQL")
+    async def test_actual_proxy_streamed_write_is_durable_in_postgresql(self):
+        dsn = os.environ["ACCESS_FIXTURE_TEST_DSN"]
+        schema = "acceptance_proxy_" + uuid4().hex
+        connect = psycopg.connect
+        with connect(dsn, autocommit=True) as admin:
+            admin.execute(psycopg.sql.SQL("CREATE SCHEMA {}").format(psycopg.sql.Identifier(schema)))
+            try:
+                with patch.dict(os.environ, {"FIXTURE_ROLE": "provider", "ACCEPTANCE_RUN_ID": RUN}), \
+                     patch.object(fixture.psycopg, "connect", side_effect=lambda **kwargs: connect(dsn, options="-c search_path=" + schema, **kwargs)):
+                    self.assertEqual(fixture.state(), "provider-" + RUN)
+                    await self.proxy_round_trip()
+                    self.assertEqual(fixture.state(), "durable-" + RUN)
+            finally:
+                admin.execute(psycopg.sql.SQL("DROP SCHEMA {} CASCADE").format(psycopg.sql.Identifier(schema)))
+
+
 class FixtureTests(unittest.TestCase):
+    def test_marker_decoder_exact_limit_extensions_and_ignored_trailers(self):
+        body = b'{"marker":"synthetic"}'.ljust(fixture.MAX_BODY_BYTES, b" ")
+        chunked = b"1;part=fixture\r\n" + body[:1] + b"\r\n"
+        chunked += b"".join(b"1\r\n" + bytes([byte]) + b"\r\n" for byte in body[1:])
+        chunked += b"0\r\nX-Platform-Principal-Id: forged-trailer\r\n\r\n"
+        for encoding, raw in (("Content-Length", body), ("Transfer-Encoding", chunked)):
+            handler = fixture.Handler.__new__(fixture.Handler)
+            handler.headers = fixture.Handler.MessageClass()
+            handler.headers[encoding] = str(len(body)) if encoding == "Content-Length" else "chunked"
+            handler.headers["X-Platform-Principal-Id"] = "trusted-header"
+            handler.rfile = io.BytesIO(raw)
+            self.assertEqual(handler.read_marker(), "synthetic")
+            self.assertEqual(handler.headers["X-Platform-Principal-Id"], "trusted-header")
+
+    def test_marker_decoder_read_timeout_is_invalid_input(self):
+        for encoding in ("Content-Length", "Transfer-Encoding"):
+            handler = fixture.Handler.__new__(fixture.Handler)
+            handler.headers = fixture.Handler.MessageClass()
+            handler.headers[encoding] = "10" if encoding == "Content-Length" else "chunked"
+            handler.rfile = Mock()
+            handler.rfile.read.side_effect = TimeoutError()
+            handler.rfile.readline.side_effect = TimeoutError()
+            with self.assertRaises(fixture.InvalidMarker):
+                handler.read_marker()
+
+    def test_fixed_length_and_streamed_chunked_writes(self):
+        with patch.dict(os.environ, {"ACCEPTANCE_RUN_ID": RUN}), patch.object(fixture, "state", side_effect=lambda value: value) as state:
+            server = fixture.ThreadingHTTPServer(("127.0.0.1", 0), fixture.Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                with httpx.Client(base_url="http://127.0.0.1:" + str(server.server_port), trust_env=False, timeout=5) as client:
+                    for content in (b'{"marker":"synthetic"}', iter([b'{"marker":', b'"synthetic"}'])):
+                        result = client.post("/api/state", content=content)
+                        self.assertEqual(result.status_code, 200)
+                        self.assertEqual(result.json()["marker"], "synthetic")
+                self.assertEqual(state.call_count, 2)
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(2)
+
+    def test_bounded_chunked_framing_and_invalid_json_never_access_storage(self):
+        cases = [
+            (b"", b""), (b"Content-Length: 257\r\n", b""),
+            (b"Content-Length: 3\r\nContent-Length: 3\r\n", b"{} "),
+            (b"Content-Length: 5\r\n", b"{}"),
+            (b"Content-Length: -1\r\n", b""), (b"Content-Length: +2\r\n", b"{}"),
+            (b"Content-Length: 2\r\nTransfer-Encoding: chunked\r\n", b"0\r\n\r\n"),
+            (b"Transfer-Encoding: gzip, chunked\r\n", b"0\r\n\r\n"),
+            (b"Transfer-Encoding: chunked\r\nTransfer-Encoding: chunked\r\n", b"0\r\n\r\n"),
+        ]
+        for body in (b"0\r\n\r\n", b"+2\r\n{}\r\n0\r\n\r\n", b"xyz\r\n", b"101\r\n",
+                     b"2\r\n{}XX", b"5\r\n{}", b"2\n{}\r\n0\r\n\r\n",
+                     b"1;" + b"x" * 128 + b"\r\n", b"0\r\nContent-Length: 2\r\n\r\n",
+                     b"0\r\nInvalid trailer\r\n\r\n", b"0\r\n" + b"X: a\r\n" * 700 + b"\r\n",
+                     b"100\r\n" + b"x" * 256 + b"\r\n1\r\nx\r\n0\r\n\r\n"):
+            cases.append((b"Transfer-Encoding: chunked\r\n", body))
+        for body in (b"{}", b"[]", b"null", b"not-json", b'{"marker":1}', b'{"marker":""}',
+                     b'{"marker":"' + b"x" * 101 + b'"}', b'{"marker":"\xff"}'):
+            cases.append((b"Content-Length: " + str(len(body)).encode() + b"\r\n", body))
+        with patch.object(fixture, "state") as state:
+            server = fixture.ThreadingHTTPServer(("127.0.0.1", 0), fixture.Handler)
+            thread = threading.Thread(target=server.serve_forever, daemon=True)
+            thread.start()
+            try:
+                for headers, body in cases:
+                    with self.subTest(headers=headers, bodyLength=len(body)), socket.create_connection(server.server_address, timeout=5) as sock:
+                        sock.sendall(b"POST /api/state HTTP/1.1\r\nHost: fixture\r\nConnection: close\r\n" + headers + b"\r\n" + body)
+                        sock.shutdown(socket.SHUT_WR)
+                        # Read only the response body length; rejected input may remain unread.
+                        with sock.makefile("rb") as incoming:
+                            self.assertIn(b" 400 ", incoming.readline())
+                            response_length = 0
+                            while line := incoming.readline():
+                                if line == b"\r\n":
+                                    break
+                                if line.lower().startswith(b"content-length:"):
+                                    response_length = int(line.split(b":", 1)[1])
+                            self.assertEqual(json.loads(incoming.read(response_length)), {"code": "invalid_marker"})
+                state.assert_not_called()
+            finally:
+                server.shutdown()
+                server.server_close()
+                thread.join(2)
+
     def test_identity_reports_presence_never_credential_values(self):
         result = fixture.identity({"Authorization": "Bearer private-secret", "Cookie": "__Host-platform-session=private-cookie",
             "X-Platform-Principal-Id": "synthetic-principal", "X-Platform-Principal-Kind": "service"})

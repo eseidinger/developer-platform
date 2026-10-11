@@ -673,17 +673,32 @@ class Drill:
         self.journal.save()
 
     def persistence(self, machines, other):
+        def state_marker(response):
+            if response.status_code != 200:
+                return None
+            try:
+                body = response.json()
+            except ValueError:
+                return None
+            if not isinstance(body, dict) or body.get("fixtureVersion") != 1 or body.get("runId") != self.run_id:
+                return None
+            value = body.get("marker")
+            return value if isinstance(value, str) and 1 <= len(value) <= 100 else None
+
         marker = self.journal.state["marker"]
         written = self.public_call("/api/state", machines.get(), method="POST", body={"marker": marker})
         isolated = self.public_call("/api/state", other.get(), role="consumer")
-        self.check("separate-project-postgresql-state", written.status_code == 200 and isolated.status_code == 200
-                   and isolated.json()["marker"] != marker)
+        write_matches = state_marker(written) == marker
+        consumer_isolated = state_marker(isolated) == "consumer-" + self.run_id
+        self.check("separate-project-postgresql-state", write_matches and consumer_isolated,
+                   writeHttpStatus=written.status_code, consumerReadHttpStatus=isolated.status_code,
+                   writeMarkerMatches=write_matches, consumerMarkerMatches=consumer_isolated)
         operation = self.api.request("POST", "/projects/" + self.projects["provider"] + "/restart", statuses=(202,))
         restarted = self.api.operation(operation)
         self.check("restart-preserves-provider-revision", restarted["revision"] == self.journal.state["providerRevision"])
         self.kube.call("-n", "project-" + self.projects["provider"], "rollout", "status", "deployment/api", "--timeout=120s", timeout=130)
         read = self.public_call("/api/state", machines.get())
-        self.check("state-retained-after-restart", read.status_code == 200 and read.json()["marker"] == marker)
+        self.check("state-retained-after-restart", state_marker(read) == marker, readHttpStatus=read.status_code)
 
     def policy_checks(self, machines):
         owner = self.owners["provider"]

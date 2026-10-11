@@ -88,6 +88,14 @@ command in its run summary. Copy that reference into the host's shell and use
 `--fixture-image "$HA_IMAGE"` for the plan and run below. No Docker Hub login
 or local fixture build is needed on the platform host for this published image.
 
+Fixture source changes require publishing a new version and using its new
+registry digest; updating the host-side runner alone does not update deployed
+fixture code. The state-write endpoint accepts both fixed-length and streamed
+HTTP/1.1 chunked JSON, with a 256-byte decoded-body limit, bounded framing and
+read timeout. Invalid or ambiguous framing returns `400 invalid_marker` before
+accessing PostgreSQL. Regression tests exercise the real authorizer/proxy's
+chunked forwarding into the HTTP fixture, including durable PostgreSQL read-back.
+
 Before a live run, wildcard application DNS, public HTTPS certificates trusted
 by the host and fixture container, the hosted authorizer/proxy, the provisioner's
 existing client/user-management permissions, and available workload capacity
@@ -193,6 +201,15 @@ values. Treat the evidence as Internal. For `run`, exit zero means the selected 
 and cleanup completed; `result: core-passed` always has `gateClosed: false`.
 Exit nonzero means a failed check, dependency/configuration problem, or incomplete
 cleanup. Review the report before using it as evidence.
+
+The PostgreSQL isolation check records `writeHttpStatus`,
+`consumerReadHttpStatus`, `writeMarkerMatches`, and `consumerMarkerMatches`;
+the restart read-back check records `readHttpStatus`. A pass requires the write
+response to match the durable synthetic marker, the consumer to retain its own
+initial marker, and the provider to return the durable marker after restart.
+Only statuses and comparison booleans are included, not markers or response
+bodies. A `400` write status indicates rejected input/framing, not proof of a
+PostgreSQL provisioning or network failure.
 
 The full gate still needs the explicit deferred checks: a verified backup
 restore, control-plane outage/five-minute fail-closed behavior, long browser and

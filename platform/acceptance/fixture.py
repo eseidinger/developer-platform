@@ -7,6 +7,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.error import HTTPError
 from urllib.parse import urlencode, urlsplit
@@ -16,7 +17,14 @@ import psycopg
 
 
 VERSION = 1
+MAX_BODY_BYTES = 256
+MAX_CHUNK_LINE_BYTES = 128
+MAX_FRAMING_BYTES = 4096
 HEADERS = ("Id", "Kind", "Issuer", "Subject", "Group-Ids", "Client-Id", "Name", "Email")
+
+
+class InvalidMarker(ValueError):
+    """Invalid or oversized synthetic write; never include submitted data."""
 
 
 def identity(headers):
@@ -59,6 +67,10 @@ def probe(correlation=None):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def setup(self):
+        super().setup()
+        self.connection.settimeout(5)
+
     def log_message(self, *args):
         pass  # No request headers, OAuth tokens, query strings, or identity values in logs.
 
@@ -72,6 +84,68 @@ class Handler(BaseHTTPRequestHandler):
         if self.command != "HEAD":
             self.wfile.write(raw)
 
+    def read_marker(self):
+        """Decode a small fixed-length or chunked write without unbounded reads."""
+        def exact(size):
+            value = self.rfile.read(size)
+            if len(value) != size:
+                raise InvalidMarker()
+            return value
+
+        framing = 0
+
+        def line():
+            nonlocal framing
+            value = self.rfile.readline(MAX_CHUNK_LINE_BYTES + 1)
+            framing += len(value)
+            if len(value) > MAX_CHUNK_LINE_BYTES or framing > MAX_FRAMING_BYTES or not value.endswith(b"\r\n"):
+                raise InvalidMarker()
+            return value[:-2]
+
+        try:
+            lengths = self.headers.get_all("Content-Length", [])
+            encodings = self.headers.get_all("Transfer-Encoding", [])
+            if len(lengths) > 1 or len(encodings) > 1 or (lengths and encodings):
+                raise InvalidMarker()
+            if encodings:
+                if encodings[0].strip().lower() != "chunked":
+                    raise InvalidMarker()
+                raw = bytearray()
+                while True:
+                    size_text = line().split(b";", 1)[0]
+                    if not re.fullmatch(rb"[0-9a-fA-F]+", size_text):
+                        raise InvalidMarker()
+                    size = int(size_text, 16)
+                    if size > MAX_BODY_BYTES - len(raw):
+                        raise InvalidMarker()
+                    if size == 0:
+                        while trailer := line():
+                            name, separator, _ = trailer.partition(b":")
+                            if not separator or not re.fullmatch(rb"[!#$%&'*+.^_`|~0-9a-zA-Z-]+", name) \
+                                    or name.lower() in {b"content-length", b"transfer-encoding"}:
+                                raise InvalidMarker()
+                            # Ignore trailers; never merge them into trusted identity headers.
+                        break
+                    raw.extend(exact(size))
+                    if exact(2) != b"\r\n":
+                        raise InvalidMarker()
+            else:
+                if not lengths or not re.fullmatch(r"[0-9]{1,3}", lengths[0]):
+                    raise InvalidMarker()
+                size = int(lengths[0])
+                if not 0 < size <= MAX_BODY_BYTES:
+                    raise InvalidMarker()
+                raw = exact(size)
+            body = json.loads(raw)
+            if not isinstance(body, dict):
+                raise InvalidMarker()
+            value = body.get("marker")
+            if not isinstance(value, str) or not 1 <= len(value) <= 100:
+                raise InvalidMarker()
+            return value
+        except (OSError, ValueError, UnicodeError):
+            raise InvalidMarker() from None
+
     def dispatch(self):
         path = urlsplit(self.path).path
         try:
@@ -83,18 +157,16 @@ class Handler(BaseHTTPRequestHandler):
             elif path == "/api/state":
                 value = None
                 if self.command == "POST":
-                    size = int(self.headers.get("Content-Length", "0"))
-                    if not 0 < size <= 256:
-                        return self.reply(400, {"code": "invalid_marker"})
-                    value = json.loads(self.rfile.read(size))["marker"]
-                    if not isinstance(value, str) or not 1 <= len(value) <= 100:
-                        return self.reply(400, {"code": "invalid_marker"})
+                    value = self.read_marker()
                 body = {"marker": state(value)}
             elif path == "/api/probe":
                 body = probe(self.headers.get("X-Correlation-Id"))
             else:
                 return self.reply(404, {"code": "fixture_route_missing"})
             self.reply(200, {"fixtureVersion": VERSION, "runId": os.environ["ACCEPTANCE_RUN_ID"], **body})
+        except InvalidMarker:
+            self.close_connection = True
+            self.reply(400, {"code": "invalid_marker"})
         except (HTTPError, OSError, psycopg.Error, ValueError, KeyError):
             self.reply(503, {"code": "fixture_dependency_unavailable"})
 
