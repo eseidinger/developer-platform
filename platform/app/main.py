@@ -47,6 +47,7 @@ from .inventory import observe_inventory, observe_cluster_capacity
 from .capacity_admission import assess as assess_capacity, snapshot as capacity_admission_snapshot
 from .rollback import dependency_report
 from .logs import observe_logs
+from .retained_logs import observe_retained_logs
 from .component_status import observe_components
 from .secrets import (SecretsUnavailable, MAX_SECRETS, confirm_secret, observe_secret_activation, read_secret,
                       remove_secret, revert_secret, roll_pods, validate_secret_name, validate_secret_value, write_secret)
@@ -471,7 +472,12 @@ def capabilities(principal: Principal = Depends(current_principal)):
         "modes": ["browser-session", "bearer-token"], "authorization": "anyOfGroups",
         "identityTransport": "X-Platform-Principal-*", "anonymousRoutes": False,
         "maxAuthorizationStalenessSeconds": 300, "credentialIsolation": "project",
-        "requires": "platform.example/v1alpha2"}}
+        "requires": "platform.example/v1alpha2"}, "observability": {
+        "componentAwarePublicProbes": True, "hostedProbeSemantics": "access-boundary",
+        "semanticReadiness": "kubernetes", "retainedLogs": {
+            "endpoint": "/projects/{name}/retained-logs", "requiresPermission": "view",
+            "format": "operational-envelope-v1", "retentionSeconds": 604800,
+            "retentionEvidence": "configured", "arbitraryText": False}}}
 
 
 @app.post("/projects/{name}/deployment-credentials")
@@ -1621,6 +1627,42 @@ def project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
     required_audit(actor, "project.logs.read", "project", name, "succeeded",
                    {"project": name}, {"state": result["state"], "lines": len(result["lines"]),
                     "component": component, "instance": instance, "search": bool(search)})
+    return {"project": name, **result}
+
+
+@app.get("/projects/{name}/retained-logs")
+def retained_project_logs(name: str, tail: int = Query(200, ge=1, le=1000),
+                          since_seconds: int = Query(604800, ge=1, le=604800),
+                          component: Optional[str] = Query(None, pattern=r"^[a-z][a-z0-9-]{0,31}$"),
+                          instance: Optional[str] = Query(None, pattern=r"^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$"),
+                          after: Optional[str] = Query(None, max_length=64),
+                          before: Optional[str] = Query(None, max_length=64),
+                          principal: Principal = Depends(current_principal)):
+    """Read minimized seven-day operational logs, including retired pod instances.
+
+    Central storage is operator-only; this endpoint fixes the project selector
+    after platform authorization. It never accepts arbitrary LogQL.
+    """
+    require_permission(principal, "view", name)
+    actor = actor_for(principal)
+    with connect() as conn:
+        known = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
+    if not known:
+        required_audit(actor, "project.logs.read", "project", name, "rejected",
+                       {"project": name}, {"source": "loki", "reason": "not_found"})
+        raise HTTPException(404, "Unknown project")
+    if known[0] == "empty":
+        raise HTTPException(409, "Project has not been deployed")
+    try:
+        result = observe_retained_logs(name, log, tail, since_seconds, component=component,
+                                       instance=instance, after=after, before=before)
+    except ValueError:
+        required_audit(actor, "project.logs.read", "project", name, "rejected",
+                       {"project": name}, {"source": "loki", "reason": "invalid_log_query"})
+        raise HTTPException(422, "Invalid retained log query") from None
+    required_audit(actor, "project.logs.read", "project", name, "succeeded",
+                   {"project": name}, {"source": "loki", "state": result["state"],
+                                       "lines": len(result["lines"]), "component": component})
     return {"project": name, **result}
 
 

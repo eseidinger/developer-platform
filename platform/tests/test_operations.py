@@ -7,7 +7,21 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.identity import Principal
-from app.operations import process_one
+from app.operations import process_one, _with_telemetry
+
+
+class TelemetryMetadataTests(unittest.TestCase):
+    def test_deployment_and_scheduled_pods_carry_derived_context_without_mutating_inputs(self):
+        for kind in ("Deployment", "CronJob"):
+            template = {"metadata": {"annotations": {"existing": "value"}}, "spec": {}}
+            spec = {"template": template} if kind == "Deployment" else {"jobTemplate": {"spec": {"template": template}}}
+            manifest = {"kind": kind, "spec": spec}
+            marked = _with_telemetry(manifest, 3, "operation-123")
+            pod = marked["spec"]["template"] if kind == "Deployment" else marked["spec"]["jobTemplate"]["spec"]["template"]
+            self.assertEqual(pod["metadata"]["annotations"], {"existing": "value", "platform.example/revision": "3",
+                                                            "platform.example/operation-id": "operation-123"})
+            self.assertEqual(template["metadata"]["annotations"], {"existing": "value"})
+        self.assertEqual(_with_telemetry({"kind": "Service"}, 3, "id"), {"kind": "Service"})
 
 
 class OperationConnection:
@@ -145,7 +159,8 @@ class OperationWorkerTests(OperationWorkerFixture):
             ],
         }
         self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
-        generated = [self.secret(), self.deployment(), {"kind": "CronJob", "metadata": {"name": "worker"}}]
+        generated = [self.secret(), self.deployment(), {"kind": "CronJob", "metadata": {"name": "worker"},
+                     "spec": {"jobTemplate": {"spec": {"template": {"metadata": {}}}}}}]
         with patch("app.operations.component_resources", return_value=generated) as build:
             self.assertTrue(self.run_one())
 
@@ -240,7 +255,7 @@ class OperationWorkerTests(OperationWorkerFixture):
             self.conn, "smoke", "derived-password")
         self.resources.assert_called_once()
         self.assertEqual([call.args[0] for call in self.apply.call_args_list],
-                         [self.secret(), self.deployment()])
+                         [self.secret(), _with_telemetry(self.deployment(), 1, self.conn.operation_id)])
         self.publish_catalog.assert_called_once_with(self.conn)
         self.assertEqual(self.audit_mock.call_args.kwargs["operation_id"], self.conn.operation_id)
 

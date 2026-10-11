@@ -307,6 +307,27 @@ class LifecycleTests(unittest.TestCase):
         actions = [call.args[1] for call in self.mocks[3].call_args_list]
         self.assertIn("project.logs.read", actions)
 
+    def test_retained_logs_require_view_permission_and_never_accept_logql(self):
+        capability = self.client.get("/v1/capabilities", headers=self.headers).json()["observability"]
+        self.assertTrue(capability["componentAwarePublicProbes"])
+        self.assertEqual(capability["retainedLogs"]["retentionSeconds"], 604800)
+        self.assertFalse(capability["retainedLogs"]["arbitraryText"])
+        self.deploy()
+        self.complete_operations()
+        logs = {"state": "no_output", "lines": []}
+        with patch.object(main, "observe_retained_logs", return_value=logs) as observe:
+            response = self.client.get("/projects/smoke/retained-logs?component=api", headers=self.headers)
+            self.assertEqual(response.status_code, 200)
+            observe.assert_called_once_with("smoke", main.log, 200, 604800,
+                                            component="api", instance=None, after=None, before=None)
+            self.assertEqual(self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke"))
+            for query in ("tail=1001", "since_seconds=604801", "component=other%22%7D"):
+                self.assertEqual(self.client.get("/projects/smoke/retained-logs?" + query, headers=self.headers).status_code, 422)
+            self.mocks[4].return_value = False
+            self.assertEqual(self.client.get("/projects/smoke/retained-logs", headers=self.headers).status_code, 403)
+            self.assertEqual(observe.call_count, 1)
+        self.assertIn("project.logs.read", [call.args[1] for call in self.mocks[3].call_args_list])
+
     def test_if_match_makes_updates_conditional_on_the_current_revision(self):
         def put(value=None):
             headers = dict(self.headers, **({"If-Match": value} if value is not None else {}))

@@ -133,7 +133,10 @@ non-overlap, invalid-cron rejection, an isolated component update, revision
 history, and component retirement scope. It deliberately does not trigger or
 inspect backup storage: backup evidence remains a separate operational track.
 It also checks the authorized component-log search and polling-cursor contract;
-Kubernetes log retention remains explicitly best effort.
+That endpoint's Kubernetes log retention remains best effort. PLAN-017 adds a
+separate authorized retained-log endpoint for minimized centralized operational
+events, configured for seven days. Its deployed and elapsed-retention checks
+are separate from this component suite.
 
 `revoke-platform-test-runner.yml` removes exactly one active named runner. Supply
 `platform_api_url` and a fresh human platform-administrator token; the runner JSON

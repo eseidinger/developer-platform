@@ -8,6 +8,15 @@ CONTROLLER_MANIFEST = (Path(__file__).resolve().parents[2]
 
 
 class ProvisionerRbacManifestTests(unittest.TestCase):
+    def test_workload_log_reader_is_separate_and_read_only(self):
+        manifest = (CONTROLLER_MANIFEST.parent / "log-reader.yaml").read_text()
+        self.assertIn("name: workload-log-reader", manifest)
+        self.assertIn("resources: [pods/log]", manifest)
+        self.assertIn("resources: [pods]", manifest)
+        self.assertNotRegex(manifest, r"verbs:.*(create|update|patch|delete|\*)")
+        self.assertNotIn("resources: [secrets]", manifest)
+        self.assertNotIn("resources: [pods/exec]", manifest)
+
     def test_reconciliation_delete_permissions_cover_obsolete_workload_kinds(self):
         for resource in ("services", "deployments", "cronjobs", "networkpolicies", "ingresses"):
             with self.subTest(resource=resource):

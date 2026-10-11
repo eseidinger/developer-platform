@@ -48,7 +48,7 @@ spec:
       containers:
         - name: metrics
           image: registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0
-          args: ["--resources=pods,nodes,namespaces,deployments,replicasets,daemonsets,statefulsets"]
+          args: ["--resources=pods,nodes,namespaces,deployments,replicasets,daemonsets,statefulsets", "--metric-labels-allowlist=pods=[app.kubernetes.io/name,platform.example/component]"]
           ports:
             - containerPort: 8080
           resources:

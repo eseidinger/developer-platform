@@ -242,10 +242,14 @@ Legacy single-service discovery registers a root-path HTTP 200 check
 (`probe_profile: "status"`); `hello-world` additionally checks the smoke response
 body. Failed deployments stay monitored; explicit retirement removes the target.
 Local `.localhost` installations use HTTP through Caddy; public domains use
-verified HTTPS from the platform host. Discovery still uses the legacy project
-hostname: component-aware public-host discovery and centralized workload-log
-retention remain PLAN-017 work. Workload readiness and EV-45 core acceptance do
-not prove those capabilities. See [monitoring configuration and limits](../infrastructure/monitoring/README.md)
+verified HTTPS from the platform host. Component declarations now discover the
+public component hostname/health path and omit private-only applications.
+Protected probes check expected access-boundary denial/login without credentials;
+Kubernetes readiness is separate. Alloy collects minimized operational envelopes
+from project pods into seven-day configured Loki storage. Authorized
+`GET /projects/{name}/retained-logs` reads them with fixed project scope.
+Deployment and elapsed-retention acceptance remain open; EV-45 does not prove
+this increment. See [monitoring configuration and limits](../infrastructure/monitoring/README.md)
 and the [energy enablement plan](../docs/maintainers/delivery/plans/energy-system-integration.md).
 
 ## Application runtime contract

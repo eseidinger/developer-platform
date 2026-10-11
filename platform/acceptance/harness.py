@@ -630,6 +630,43 @@ class Drill:
         self.check("synthetic-cross-project-correlation", probe.json()["provider"]["correlationHash"] == fingerprint(self.run_id))
         return principal
 
+    def monitoring_checks(self):
+        """Read-only deployed assertions, before the fixtures retire.
+
+        Ingestion/restart readback is not proof that seven days have elapsed.
+        """
+        prometheus = origin(self.args.prometheus)
+        def metric(expression):
+            response = self.public.get(prometheus + "/api/v1/query", params={"query": expression})
+            require(response.status_code == 200, "monitoring_query_failed")
+            return response.json()["data"]["result"]
+        for role, project in self.projects.items():
+            expression = 'probe_success{job="applications",project="' + project + '"}'
+            def boundary():
+                rows = metric(expression)
+                return (len(rows) == 1 and rows[0]["value"][1] == "1"
+                        and rows[0]["metric"].get("component") == "api"
+                        and rows[0]["metric"].get("probe_kind") == "access-boundary"
+                        and rows[0]["metric"].get("instance") == self.urls[role] + "/health/ready")
+            wait_for(boundary, "component_public_probe_unavailable", 120)
+            self.check(role + "-component-public-boundary-probe", True)
+            readiness = ('sum(kube_pod_status_ready{namespace="project-' + project + '",condition="true"}'
+                         ' * on(namespace,pod) group_left(label_platform_example_component) '
+                         'kube_pod_labels{namespace="project-' + project + '",label_platform_example_component="api"})')
+            wait_for(lambda: any(float(row["value"][1]) >= 1 for row in metric(readiness)),
+                     "component_semantic_readiness_unavailable", 120)
+            self.check(role + "-component-semantic-readiness", True)
+            def retained():
+                result = self.api.request("GET", "/projects/" + project + "/retained-logs?component=api&since_seconds=600")
+                expected = fingerprint(self.run_id)[:32]
+                return any(json.loads(line["message"]).get("correlationId") == expected
+                           and line.get("revision") == "1" and line.get("operation_id")
+                           for line in result["lines"]) if result["state"] == "ok" else False
+            wait_for(retained, "component_retained_correlation_unavailable", 120)
+            self.check(role + "-centralized-safe-correlation", True)
+        self.journal.report["monitoring"] = {"componentProbes": "passed", "centralIngestion": "passed",
+                                              "sevenDayRetention": "not-time-verified"}
+
     def controlled_network_check(self, name, host, port, probe, control, *, ip_versions):
         body = {"host": host, "port": port, "ipVersions": ip_versions}
         before = control(body)
@@ -827,6 +864,8 @@ class Drill:
                  "reverse_service_activation", 60)
         principal = self.human_checks(human, password)
         self.machine_checks(service, machines, reverse)
+        if self.args.monitoring:
+            self.monitoring_checks()
         self.network_checks()
         self.persistence(machines, reverse)
         self.policy_checks(machines)
@@ -906,12 +945,16 @@ def parser():
     result.add_argument("--kubectl", default="kubectl")
     result.add_argument("--confirm-environment", help="For live commands, repeat the exact API origin")
     result.add_argument("--timed", action="store_true", help="Also hold a machine token until its real expiry")
+    result.add_argument("--monitoring", action="store_true", help="Also verify deployed component probes and safe central log correlation")
+    result.add_argument("--prometheus", default="http://127.0.0.1:9090", help="Operator-only Prometheus origin for --monitoring")
     result.add_argument("--allow-recovery-reconcile", action="store_true", help="GLOBAL reconciliation; isolated empty lab only, NOT a backup restore")
     return result
 
 
 def validate(args):
     args.api = origin(args.api)
+    if args.monitoring:
+        args.prometheus = origin(args.prometheus)
     require(args.command != "cleanup" or args.run_id is not None, "cleanup_requires_run_id")
     args.run_id = args.run_id or uuid4().hex[:12]
     project_names(args.run_id)
@@ -962,7 +1005,8 @@ def main(argv=None):
                 journal.save()
                 raise
             return 0
-        journal.report["requestedDrills"] = {"tokenExpiry": args.timed, "recoveryReconcile": args.allow_recovery_reconcile}
+        journal.report["requestedDrills"] = {"tokenExpiry": args.timed, "recoveryReconcile": args.allow_recovery_reconcile,
+                                             "componentMonitoring": args.monitoring}
         journal.report["harnessSha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
         journal.save()
         error = None

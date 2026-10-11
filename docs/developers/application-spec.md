@@ -175,6 +175,16 @@ hosted protection.
 
 Scheduled components do not accept `ports`, `replicas`, `exposure`, or `health`.
 
+Public monitoring uses the component hostname and declared health path, with no
+target for private-only applications. For protected `v1alpha2` services it checks
+the authentication boundary's expected denial/login response, not backend content;
+Kubernetes readiness is the independent semantic health signal. It never creates
+an anonymous health route or implicitly authorizes a monitoring identity.
+Applications may emit the domain-neutral
+[operational log envelope](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
+for seven-day configured central retention and authorized retained-log reads.
+This does not add a declaration field; normal free-text logs stay kubelet-only.
+
 For an application such as Spring Boot that becomes reachable before its database
 migrations and initialization are complete, use its application readiness endpoint:
 

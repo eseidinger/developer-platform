@@ -38,7 +38,8 @@ echo "Removing Compose services and network..."
 docker compose down "${volumes[@]}"
 python3 - <<'PY'
 from pathlib import Path
-for name in ("admin.kubeconfig", "controller.kubeconfig", "token.json", "k3d.yaml"):
+for name in ("admin.kubeconfig", "controller.kubeconfig", "token.json", "k3d.yaml",
+             "log-reader.kubeconfig", "log-reader-token.json"):
     (Path(".runtime") / name).unlink(missing_ok=True)
 PY
 if (( ${#volumes[@]} )); then

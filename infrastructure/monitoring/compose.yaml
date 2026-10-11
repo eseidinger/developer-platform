@@ -48,12 +48,18 @@ services:
     image: grafana/alloy:v1.19.2
     restart: unless-stopped
     user: "0"
-    command: ["run", "/etc/alloy/config.alloy"]
+    command: ["run", "--storage.path=/var/lib/alloy", "--server.http.listen-addr=0.0.0.0:12345", "/etc/alloy/config.alloy"]
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - ../../.runtime/log-reader.kubeconfig:/run/alloy/log-reader.kubeconfig:ro
+      - alloy:/var/lib/alloy
     networks: [platform]
     mem_limit: 256m
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
   alertmanager:
     image: prom/alertmanager:v0.34.1
     command: ["--config.file=/etc/alertmanager/alertmanager.yaml", "--storage.path=/alertmanager"]

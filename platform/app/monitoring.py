@@ -12,25 +12,52 @@ LOCK_ID = 731904
 PROFILES = ("status", "hello-world")
 
 
+def _target(name, component, domain, health, protected):
+    """Public reachability is distinct from Kubernetes semantic readiness.
+
+    Never put application credentials in discovery or bypass the authorizer.
+    A protected probe expects a denial/login response, not application content.
+    """
+    validate_name(name)
+    if component:
+        validate_name(component)
+    profile = health.get("probe_profile", "status")
+    if profile not in PROFILES:
+        raise ValueError("Unknown probe profile")
+    path = health.get("readiness_path", "/")
+    # A stored declaration must not turn discovery into arbitrary URL/parameter injection.
+    if (not isinstance(path, str) or len(path) > 256
+            or not re.fullmatch(r"/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*", path)
+            or path.startswith("//")):
+        raise ValueError("Invalid readiness path")
+    local = domain == "apps.localhost"
+    host = (component + "-" if component else "") + name + "." + domain
+    url = ("http://" if local else "https://") + host + path
+    return {"targets": ["http://proxy" + path if local else url], "labels": {
+        "project": name, "environment": "default", "application": name,
+        "component": component or "app", "namespace": "project-" + name,
+        "instance": url, "probe_hostname": host,
+        "probe_kind": "access-boundary" if protected else "application-health",
+        "health_profile": "custom" if "readiness_path" in health else profile,
+        "probe_module": ("http_" if local else "https_") +
+                        ("protected" if protected else profile.replace("-", "_")),
+    }}
+
+
 def target_groups(rows, domain):
     if not re.fullmatch(r"[a-zA-Z0-9](?:[a-zA-Z0-9.-]*[a-zA-Z0-9])?", domain):
         raise ValueError("Invalid application domain")
-    local = domain == "apps.localhost"
     groups = []
     for name, spec, status in sorted(rows):
         if status in {"empty", "retired"} or spec is None:
             continue
         validate_name(name)
-        profile = spec.get("probe_profile", "status")
-        if profile not in PROFILES:
-            raise ValueError("Unknown probe profile")
-        host = name + "." + domain
-        url = ("http://" if local else "https://") + host + "/"
-        groups.append({"targets": ["http://proxy/" if local else url], "labels": {
-            "project": name, "application": name, "namespace": "project-" + name,
-            "instance": url, "probe_hostname": host,
-            "probe_module": ("http_" if local else "https_") + profile.replace("-", "_"),
-        }})
+        if spec.get("components") is not None:
+            for component in sorted(spec["components"], key=lambda item: item["name"]):
+                if component["type"] == "service" and component.get("exposure") == "public":
+                    groups.append(_target(name, component["name"], domain, component, True))
+        else:
+            groups.append(_target(name, None, domain, spec, False))
     return groups
 
 

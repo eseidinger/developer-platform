@@ -318,6 +318,17 @@ backup restore, and it cannot establish backup/recovery acceptance. Do not use
 the flag on a shared lab; the inventory check cannot prevent concurrent creation
 of another project, so reserve the lab for the duration of the drill.
 
+`--monitoring` additionally checks neutral component URLs, protected-boundary
+probes, Kubernetes readiness and provider/consumer central correlation through
+authorized retained-log reads. Prometheus defaults to operator-local
+`http://127.0.0.1:9090`; `--prometheus` selects another trusted operator origin.
+Deploy PLAN-017 source first and publish a new fixture digest: the EV-45 fixture
+does not emit operational envelopes. Checks run before retirement without granting
+monitoring application access. The report keeps the monitoring/retention check
+deferred even on success: immediate ingestion does not prove seven elapsed days
+or compactor deletion. EV-45 remains historical evidence, not evidence for this
+new increment.
+
 Normal completion and caught failures attempt fixture retirement and synthetic
 identity cleanup. The harness refuses changed or out-of-scope resources. It
 never purges databases: retained fixture databases require a separate operator
@@ -368,8 +379,10 @@ for `run` or `cleanup`, additionally supply
 `hosted_access_command`, `hosted_access_confirm_environment` equal to
 `hosted_access_api`, and the **target-host path**
 `hosted_access_operator_token_file`. Optional flags are
-`hosted_access_timed` and `hosted_access_allow_recovery_reconcile`, both false
-by default. It does not transfer credentials or install dependencies.
+`hosted_access_timed`, `hosted_access_monitoring`, and
+`hosted_access_allow_recovery_reconcile`, all false by default.
+`hosted_access_prometheus` defaults to target loopback port 9090.
+It does not transfer credentials or install dependencies.
 
 Local verification: the offline/safety/fixture tests pass, the fixture image
 builds, and its non-root/read-only readiness and real PostgreSQL persistence

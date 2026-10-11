@@ -13,11 +13,22 @@ configured receiver; the repository's `local-only` default does not send email.
 
 ## Application contract
 
-Every catalog entry is monitored, including `provisioning` and `failed` entries.
-Only explicit `retired` entries are excluded. Each target has `project`,
-`application`, `namespace`, and URL-valued `instance` labels. Project names are the
-current stable identifiers; the richer project/environment identity model is
-still future work.
+Discovery retains provisioning/failed entries, excluding empty/retired projects.
+Component declarations produce targets only for public services, using
+`<component>-<project>.<apps-domain>` and the declared readiness path (or `/` for
+a profile). Private services and scheduled components have no public target.
+Labels include project/application names, `environment=default`, component,
+namespace, URL-valued instance, health profile and probe kind. Legacy declarations
+retain project-host routing and status/content probes, now honoring custom paths.
+
+Hosted `v1alpha2` probes are `probe_kind=access-boundary`: they expect 302, 401 or
+403, never follow login redirects, reject backend 200 and policy-unavailable 503,
+and validate public TLS. They carry no credentials and create no anonymous route
+or implicit membership. A successful denial proves boundary reachability, **not
+backend readiness or authorized business access**. Kubernetes HTTP readiness and
+the separate `ApplicationComponentNotReady` rule supply semantic workload health;
+kube-state-metrics exports bounded application/component pod labels. Readiness on
+a non-public port is observed by Kubernetes, not an invented public port mapping.
 
 A project PUT accepts optional `probe_profile`:
 
@@ -26,7 +37,8 @@ A project PUT accepts optional `probe_profile`:
   with optional trailing whitespace. The smoke script selects this profile.
 
 The spec cannot supply arbitrary URLs, headers, regexes, or secrets. Additional
-paths/content contracts require a reviewed profile extension. A PUT is a full
+content contracts require a reviewed profile extension. Custom paths are bounded
+ApplicationSpec inputs, not arbitrary destination URLs. A PUT is a full
 specification replacement, so include `probe_profile` on subsequent updates to
 retain a non-default profile. Existing catalog entries without the field use
 `status` automatically; merely deploying this change does not alter their specs.
@@ -61,10 +73,60 @@ publication metrics go in that volume, never API tokens or database credentials.
 The shared rules cover:
 
 - `ApplicationUnavailable`: a failed probe lasting three minutes.
+- `ApplicationComponentNotReady`: an unready nonterminal project pod lasting
+  three minutes, independently of public boundary success.
 - `ApplicationProbeMissing`: a successful scrape with no probe result for three minutes.
 - Existing `ScrapeTargetDown`: failed scrapes, including an unavailable exporter.
 - `ApplicationDiscoveryStale`: missing discovery metrics, a publication timestamp
   older than two minutes, or a textfile collector error, sustained for three minutes.
+
+## Central workload logs and correlation
+
+Alloy discovers project pods and reads logs over the TLS-verified Kubernetes API
+using a dedicated `workload-log-reader` service account. Its cluster-wide
+administrative RBAC allows only pod get/list/watch and pod-log get: no secrets,
+exec, or mutations. Target filters exclude system/access namespaces. It uses
+neither the provisioner credential nor host pod-filesystem mounts. Bootstrap
+creates `.runtime/log-reader.kubeconfig`; like the controller credential its file
+is container-readable under the private `.runtime` directory and mounted only
+into the trusted collector. Revoke by deleting `workload-log-reader-token` and
+rebootstrap. Never share that file or mount it into a workload.
+
+Kubernetes operational logs use `job=kubernetes-workloads`, project, default
+environment, application, component, namespace, pod and container labels. Newly
+deployed/restarted workloads carry platform-derived pod annotations for revision
+and operation ID; Alloy moves those to non-indexed structured metadata. Existing
+pods need an ordinary reapply/restart to obtain that metadata. Prometheus never
+uses operation/correlation IDs as metric labels.
+
+Only this minimized JSON envelope enters centralized workload storage:
+
+```json
+{"event":"request.completed","level":"info","correlationId":"0123456789abcdef0123456789abcdef"}
+```
+
+Events are `application`, `request`, or `job` followed by `.started`, `.ready`,
+`.completed`, or `.failed`. Levels are debug/info/warning/error. Correlation is
+optional/empty or an opaque lowercase UUID/32-hex identifier supplied and
+propagated by applications. It is not a domain identifier interpreted by the
+platform. Owners must classify it as Internal or explicitly approved Confidential;
+do not put customer identifiers or secrets into it. Unknown fields are discarded;
+malformed JSON, free text, invalid envelopes and lines over 4 KB are dropped
+before storage.
+This intentionally does not promise central retention of arbitrary debug logs.
+The existing kubelet log endpoint remains available for best-effort diagnostics
+with best-effort redaction. The collector cannot infer whether an otherwise
+well-shaped application-supplied identifier was classified correctly.
+
+Loki's persistent volume and compactor enforce the configured 168-hour retention.
+Alloy stores file positions in its own persistent volume. Collection/write
+outages may lose logs; neither retention nor a volume is a delivery guarantee.
+Loki/Grafana remain operator-only, with no tenant access to shared queries.
+`GET /projects/{name}/retained-logs` requires the existing project view permission,
+fixes the project/namespace selector server-side, supports bounded time/component/
+pod filters, revalidates returned streams/envelopes, and audits the read. It never
+accepts LogQL or returns raw backend diagnostics. Backend failure is unavailable,
+not an empty-success result; retention state `configured` is not live acceptance.
 
 ## Security-event alerts
 
@@ -150,6 +212,7 @@ Install test dependencies in a virtual environment, then run:
 pip install -r platform/tests/requirements.txt
 python3 -m unittest discover -s platform/tests -v
 python3 scripts/check-monitoring.py
+python3 scripts/check-workload-logs.py
 docker compose config --quiet
 ```
 
@@ -157,7 +220,11 @@ The fixture script requires Linux Docker on the local Unix socket and OpenSSL.
 It starts temporary loopback HTTP/TLS servers, a blackbox exporter and Prometheus,
 then removes those containers. It validates production configuration/rules, status,
 content, redirect, timeout, certificate rejection, recovery, target labels and
-live discovery removal. It never deploys the platform or sends notifications.
+live discovery removal. The workload-log fixture uses real pinned Alloy/Loki and
+a TLS-verified fake Kubernetes API to verify discovery/source, safe ingestion,
+scope, structured metadata and Loki restart readback. Both remove their containers,
+never deploy the platform and send no notifications. Neither proves seven elapsed
+days of retention or real-cluster behavior.
 API lifecycle tests use simulated PostgreSQL/Kubernetes dependencies; they do not
 establish real cluster deletion or notification delivery.
 
@@ -166,11 +233,13 @@ For an existing installation, after other drills finish and with no provisioning
 request in progress, deploy the changed source and recreate the affected services:
 
 ```bash
-docker compose up -d --build --force-recreate platform-api blackbox-exporter prometheus node-exporter
+bash scripts/up.sh
 ```
 
 The exporter has no published host port. In Prometheus at `http://localhost:9090`,
-check Targets and query `probe_success{job="applications"}`. Check
+check Targets and query `probe_success{job="applications"}`. For protected
+components, also inspect Kubernetes readiness; a successful boundary denial is
+not workload health. Check
 `platform_discovery_last_success_timestamp_seconds` and confirm labels identify
 the intended application. Retained discovery volumes rebuild from the current
 catalog at API startup; a fresh empty catalog publishes an empty target list.
@@ -183,6 +252,14 @@ files is needed. A restore rebuilds them against the restored installation's
 reactivates it; automatic bulk reapply should skip retired catalog entries.
 
 ## Live acceptance still required
+
+Use the neutral hosted-access harness with `--monitoring` and a newly published
+fixture digest. It verifies component URLs/probes, Kubernetes readiness and safe
+provider/consumer central correlation before retirement. It does not remove the
+full monitoring/retention deferral: record an operational event, confirm readback
+after pod retirement/restart, and verify retention around the seven-day boundary
+including compactor deletion delay. Record collector/backend health and gaps.
+Keep PLAN-017 open until deployed and retention acceptance are recorded.
 
 After the backup drills finish, verify the public smoke probe, then temporarily
 scale its deployment to zero and confirm the application alert reaches the

@@ -2,6 +2,35 @@ rule_files:
   - ../alerts.yaml
 evaluation_interval: 1m
 tests:
+  - name: protected public boundary up but component readiness fails
+    interval: 1m
+    input_series:
+      - series: 'probe_success{job="applications",project="demo",component="api",probe_kind="access-boundary"}'
+        values: '1+0x5'
+      - series: 'kube_pod_status_ready{namespace="project-demo",pod="api-123",condition="true"}'
+        values: '0 0 0 0 1'
+      - series: 'kube_pod_labels{namespace="project-demo",pod="api-123",label_platform_example_component="api",label_app_kubernetes_io_name="demo"}'
+        values: '1+0x5'
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: ApplicationUnavailable
+        exp_alerts: []
+      - eval_time: 3m
+        alertname: ApplicationComponentNotReady
+        exp_alerts:
+          - exp_labels:
+              namespace: project-demo
+              pod: api-123
+              condition: 'true'
+              label_platform_example_component: api
+              label_app_kubernetes_io_name: demo
+              severity: warning
+            exp_annotations:
+              summary: Application component api is not ready
+              description: Kubernetes readiness is independent of the public authentication-boundary probe.
+      - eval_time: 4m
+        alertname: ApplicationComponentNotReady
+        exp_alerts: []
   - name: sustained application failure and recovery
     interval: 1m
     input_series:

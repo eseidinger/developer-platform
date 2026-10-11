@@ -561,6 +561,20 @@ self-service platform capability.
 
 ### 3. Correct component monitoring and correlation
 
+Source implementation (October 11, 2026): PLAN-017 now derives public component
+targets/declared paths, preserves legacy probes and omits private-only projects.
+Protected probes check the access boundary without credentials; Kubernetes
+readiness supplies semantic workload health. Dedicated read-only Kubernetes log
+collection sends minimized operational envelopes to seven-day configured Loki.
+Derived revision/operation annotations become non-indexed metadata, while opaque
+application correlation remains domain-neutral. Authorized retained-log reads
+enforce fixed project selectors and safe response envelopes. Local container
+fixtures and regressions verify source behavior; `--monitoring` adds deployed
+neutral checks. See the
+[implemented contract](../../../../infrastructure/monitoring/README.md).
+PLAN-017 remains open for deployed and elapsed seven-day retention acceptance;
+EV-45 does not retroactively establish these checks.
+
 Monitoring discovery must understand the component application schema. For each
 declared public component, publish the actual
 `<component>-<project>.<apps-domain>` target and component health profile. Do not

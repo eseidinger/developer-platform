@@ -6,7 +6,11 @@ Status: operational draft based on [ADR-005](../architecture/decisions/ADR-005-o
 
 The [platform runbook](runbooks/platform.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbooks/platform.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../operations/watchdog/README.md) and [deployment playbooks guide](../../operations/watchdog/ansible/README.md).
 
-Prometheus has six configured jobs: itself, node-exporter, kube-state-metrics, blackbox-exporter, Alertmanager and catalog-discovered applications. Alloy collects host Docker JSON logs; explicit k3d application log collection and workload usage metrics remain absent.
+Prometheus scrapes itself, node-exporter, kube-state-metrics, blackbox-exporter,
+Alertmanager, Alloy and catalog-discovered applications. Alloy collects Docker
+logs and minimized project pod operational envelopes through a dedicated
+read-only Kubernetes credential. Central storage is configured for seven days;
+workload usage scrapes and elapsed-retention evidence remain absent.
 
 Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; selected synthetic and scrape-failure FIRING/RESOLVED receipt has operator-reported evidence; application-rule acceptance remains open; notification-delivery-failure injection is an accepted limitation under ADR-011.
 
@@ -21,6 +25,16 @@ The remaining sections describe intended operational coverage, including capabil
 ## Application availability probes
 
 [Application monitoring](../../infrastructure/monitoring/README.md) defines catalog-driven blackbox exporter targets, shared Prometheus rules, Alertmanager delivery, explicit retirement and local verification. The probe runs alongside Prometheus outside k3d. Public domains use HTTPS/status/content checks from the platform host; local `apps.localhost` uses HTTP routing through Caddy. Neither provides an independent outside-network vantage point. Existing external heartbeat/backup channels remain separate. Live deployment and outage/recovery receipt for these application rules remain acceptance work.
+
+For protected component applications, successful `probe_kind=access-boundary`
+means verified routing/TLS with an expected login/denial response, not application
+readiness. Inspect `kube_pod_status_ready` and `ApplicationComponentNotReady`
+separately. There is no monitoring authentication bypass or implicit group grant.
+Use the [central log procedure](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
+and authorized `GET /projects/{name}/retained-logs`; ordinary `/logs` stays
+kubelet-only. Investigate `up{job="alloy"}`, Alloy drop/write counters, collector
+logs and Loki storage before interpreting missing entries as absence of activity.
+Do not grant project users direct access to shared Loki or Grafana.
 
 ## Security-event notifications
 

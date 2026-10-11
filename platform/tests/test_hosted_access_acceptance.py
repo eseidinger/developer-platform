@@ -33,6 +33,56 @@ ISSUER = "https://identity.example.invalid/realms/platform"
 
 
 class HarnessTests(unittest.TestCase):
+    def test_monitoring_flags_validate_origin_without_provisioning(self):
+        args = self.args("plan", "--monitoring", "--prometheus", "http://127.0.0.1:9090")
+        h.validate(args)
+        self.assertTrue(args.monitoring)
+        for url in ("http://public.example.com", "http://127.0.0.1:9090/?token=secret"):
+            args.prometheus = url
+            with self.assertRaises(h.DrillError):
+                h.validate(args)
+
+    def test_fixture_logs_minimized_synthetic_correlation_only(self):
+        with patch.dict(os.environ, {"ACCEPTANCE_RUN_ID": RUN}), contextlib.redirect_stdout(io.StringIO()) as output:
+            fixture.operational_event("request.completed", RUN)
+            fixture.operational_event("request.failed", "token-or-customer-payload")
+            fixture.operational_event("application.started")
+        rows = [json.loads(line) for line in output.getvalue().splitlines()]
+        self.assertEqual(rows[0]["correlationId"], h.fingerprint(RUN)[:32])
+        self.assertEqual(rows[1]["correlationId"], "")
+        self.assertNotIn("token-or-customer-payload", output.getvalue())
+
+    def test_monitoring_drill_is_read_only_and_checks_public_target_and_scoped_correlation(self):
+        journal = self.journal()
+        api = Mock()
+        api.request.return_value = {"state": "ok", "lines": [{"revision": "1", "operation_id": "operation-1",
+            "message": json.dumps({"event": "request.completed", "level": "info", "correlationId": h.fingerprint(RUN)[:32]})}]}
+        drill = h.Drill(self.args("--monitoring"), journal, api, Mock(), Mock())
+        self.addCleanup(drill.public.close)
+        self.addCleanup(drill.browser.close)
+        def response(url, params):
+            expression = params["query"]
+            if expression.startswith("sum("):
+                rows = [{"value": [0, "1"]}]
+            else:
+                role = next(role for role, project in drill.projects.items() if project in expression)
+                rows = [{"value": [0, "1"], "metric": {"component": "api", "probe_kind": "access-boundary",
+                          "instance": drill.urls[role] + "/health/ready"}}]
+            result = Mock(status_code=200)
+            result.json.return_value = {"data": {"result": rows}}
+            return result
+        def wait(check, code, seconds):
+            h.require(check(), code)
+        with patch.object(drill.public, "get", side_effect=response), patch.object(h, "wait_for", side_effect=wait):
+            drill.monitoring_checks()
+            self.assertEqual(len(journal.report["checks"]), 6)
+            self.assertEqual(journal.report["monitoring"]["sevenDayRetention"], "not-time-verified")
+            api.request.return_value["lines"][0]["message"] = '{"correlationId":"wrong"}'
+            with self.assertRaisesRegex(h.DrillError, "component_retained_correlation_unavailable"):
+                drill.monitoring_checks()
+        self.assertTrue(all(call.args[0] == "GET" for call in api.request.call_args_list))
+        self.assertTrue(all("/retained-logs?component=api" in call.args[1] for call in api.request.call_args_list))
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

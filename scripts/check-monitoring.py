@@ -27,8 +27,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/slow":
             time.sleep(6)
-        code = 500 if self.path == "/error" else 302 if self.path == "/redirect" else 200
-        if self.headers.get("Host") != "smoke.apps.localhost":
+        code = {"/error": 500, "/redirect": 302, "/health/ready": 403,
+                "/machine": 401, "/unavailable": 503}.get(self.path, 200)
+        if self.headers.get("Host") not in {"smoke.apps.localhost", "api-provider.apps.localhost"}:
             code = 400
         self.send_response(code)
         if code == 302:
@@ -98,6 +99,9 @@ def main():
                 ("/error", "http_status", 0), ("/redirect", "http_status", 0),
                 ("/slow", "http_status", 0), ("/ok", "https_status", 0),
                 ("/ok", "http_hello_world", 1),
+                ("/health/ready", "http_protected", 1), ("/machine", "http_protected", 1),
+                ("/redirect", "http_protected", 1), ("/unavailable", "http_protected", 0),
+                ("/ok", "http_protected", 0),
             ]
             for path, module, expected in cases:
                 query = urllib.parse.urlencode({"target": f"http://127.0.0.1:{server.server_port}{path}",
@@ -118,10 +122,13 @@ def main():
             groups = target_groups([
                 ("smoke", {"probe_profile": "hello-world"}, "applied"),
                 ("broken", {}, "failed"),
+                ("provider", {"components": [
+                    {"name": "api", "type": "service", "exposure": "public", "readiness_path": "/health/ready"},
+                    {"name": "worker", "type": "service"}]}, "applied"),
             ], "apps.localhost")
             for group in groups:
                 group["targets"] = [f"http://127.0.0.1:{server.server_port}/" +
-                                    ("ok" if group["labels"]["project"] == "smoke" else "error")]
+                                    ({"smoke": "ok", "provider": "health/ready"}.get(group["labels"]["project"], "error"))]
             atomic_write(temp / "discovery/applications.json", json.dumps(groups))
             configuration = (temp / "prometheus.yml").read_text()
             configuration = configuration.replace("scrape_interval: 30s", "scrape_interval: 1s\n  scrape_timeout: 1s")
@@ -150,16 +157,19 @@ def main():
                         pass
                     time.sleep(0.2)
                 raise AssertionError("Prometheus discovery did not converge: " + run("docker", "logs", prometheus_name))
-            wait_for(lambda: len(query('probe_success{job="applications"}')) == 2)
+            wait_for(lambda: len(query('probe_success{job="applications"}')) == 3)
             values = {r["metric"]["application"]: r["value"][1]
                       for r in query('probe_success{job="applications"}')}
-            assert values == {"smoke": "1", "broken": "0"}, values
+            assert values == {"smoke": "1", "broken": "0", "provider": "1"}, values
+            provider, = query('probe_success{job="applications",project="provider"}')
+            assert provider["metric"]["component"] == "api" and provider["metric"]["probe_kind"] == "access-boundary"
+            assert provider["metric"]["instance"] == "http://api-provider.apps.localhost/health/ready"
             print("PASS generated targets, hostname routing, module selection and application labels")
             atomic_write(temp / "discovery/applications.json", json.dumps([
                 group for group in groups if group["labels"]["application"] != "smoke"]))
-            wait_for(lambda: len(query('probe_success{job="applications"}')) == 1)
+            wait_for(lambda: len(query('probe_success{job="applications"}')) == 2)
             remaining = query('probe_success{job="applications"}')
-            assert remaining[0]["metric"]["application"] == "broken"
+            assert {row["metric"]["application"] for row in remaining} == {"broken", "provider"}
             print("PASS discovery removes retired target without restarting Prometheus; failed target remains")
 
         finally:

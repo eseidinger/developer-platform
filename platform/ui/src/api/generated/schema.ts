@@ -637,6 +637,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{name}/retained-logs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Retained Project Logs
+         * @description Read minimized seven-day operational logs, including retired pod instances.
+         *
+         *     Central storage is operator-only; this endpoint fixes the project selector
+         *     after platform authorization. It never accepts arbitrary LogQL.
+         */
+        get: operations["retained_project_logs_projects__name__retained_logs_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{name}/retire": {
         parameters: {
             query?: never;
@@ -3056,6 +3079,44 @@ export interface operations {
     restart_projects__name__restart_post: {
         parameters: {
             query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retained_project_logs_projects__name__retained_logs_get: {
+        parameters: {
+            query?: {
+                tail?: number;
+                since_seconds?: number;
+                component?: string | null;
+                instance?: string | null;
+                after?: string | null;
+                before?: string | null;
+            };
             header?: never;
             path: {
                 name: string;

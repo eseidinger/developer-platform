@@ -11,6 +11,7 @@ python3 scripts/check-network-addresses.py
 eval "$(python3 scripts/env.py)"
 umask 077
 mkdir -p .runtime
+chmod 700 .runtime
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 docker compose up -d --wait --wait-timeout 120 postgres
 python3 scripts/cluster_config.py > .runtime/k3d.yaml
@@ -44,6 +45,7 @@ echo "Waiting for Kubernetes nodes to become Ready (up to 180 seconds)..."
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
 kubectl apply -f infrastructure/kubernetes/controller.yaml
 kubectl apply -f infrastructure/kubernetes/metrics.yaml
+kubectl apply -f infrastructure/kubernetes/log-reader.yaml
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret provisioner-token -o json > .runtime/token.json
   if python3 scripts/kubeconfig.py; then break; fi
@@ -53,6 +55,16 @@ test -s .runtime/controller.kubeconfig
 # Container UID 10001 needs read access; .runtime remains private to the host user.
 chmod 644 .runtime/controller.kubeconfig
 rm -f .runtime/token.json
+for attempt in $(seq 1 30); do
+  kubectl -n platform-system get secret workload-log-reader-token -o json > .runtime/log-reader-token.json
+  if python3 scripts/kubeconfig.py --log-reader; then break; fi
+  sleep 2
+done
+test -s .runtime/log-reader.kubeconfig
+# Bind mounts require container-readable files; the parent remains host-private.
+# Alloy is a trusted operator collector; do not mount the provisioner credential.
+chmod 644 .runtime/log-reader.kubeconfig
+rm -f .runtime/log-reader-token.json
 # Claim the fixed identity/API addresses before monitoring and edge containers
 # can receive them from Docker's dynamic allocator. This starts only the API's
 # required dependencies (PostgreSQL and the two identity initializers).

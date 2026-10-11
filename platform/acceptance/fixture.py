@@ -23,6 +23,12 @@ MAX_FRAMING_BYTES = 4096
 HEADERS = ("Id", "Kind", "Issuer", "Subject", "Group-Ids", "Client-Id", "Name", "Email")
 
 
+def operational_event(event, correlation=None):
+    # Only the fixture's accepted synthetic correlation is eligible for logs.
+    safe = hashlib.sha256(correlation.encode()).hexdigest()[:32] if correlation and correlation == os.environ.get("ACCEPTANCE_RUN_ID") else ""
+    print(json.dumps({"event": event, "level": "info", "correlationId": safe}), flush=True)
+
+
 class InvalidMarker(ValueError):
     """Invalid or oversized synthetic write; never include submitted data."""
 
@@ -75,6 +81,8 @@ class Handler(BaseHTTPRequestHandler):
         pass  # No request headers, OAuth tokens, query strings, or identity values in logs.
 
     def reply(self, code, body):
+        operational_event("request.completed" if code < 400 else "request.failed",
+                          self.headers.get("X-Correlation-Id"))
         raw = json.dumps(body).encode()
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
@@ -180,6 +188,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--worker", action="store_true", help="Private service using the same readiness/state contract")
     parser.parse_args()
+    operational_event("application.started")
     ThreadingHTTPServer(("0.0.0.0", 8080), Handler).serve_forever()
 
 

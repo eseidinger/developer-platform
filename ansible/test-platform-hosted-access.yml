@@ -10,6 +10,8 @@
     hosted_access_api: http://127.0.0.1:8000
     hosted_access_issuer: https://identity.example.invalid/realms/platform
     hosted_access_timed: false
+    hosted_access_monitoring: false
+    hosted_access_prometheus: http://127.0.0.1:9090
     hosted_access_allow_recovery_reconcile: false
   tasks:
     - name: Require exact scope and separate permission for live commands
@@ -34,6 +36,7 @@
             + (['--operator-token-file', hosted_access_operator_token_file,
                 '--confirm-environment', hosted_access_confirm_environment] if hosted_access_command != 'plan' else [])
             + (['--timed'] if hosted_access_timed | bool else [])
+            + (['--monitoring', '--prometheus', hosted_access_prometheus] if hosted_access_monitoring | bool else [])
             + (['--allow-recovery-reconcile'] if hosted_access_allow_recovery_reconcile | bool else []) }}
         chdir: "{{ hosted_access_install_dir }}"
       changed_when: hosted_access_command != 'plan'

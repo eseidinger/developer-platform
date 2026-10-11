@@ -24,6 +24,15 @@ The discovery volume is disposable derived state and contains no credentials; th
 
 ## Evidence and evolution
 
+PLAN-017 evolution (October 11, 2026): legacy status/content probes retain their
+behavior; component declarations use public component hostnames and declared
+health paths, omit private-only/empty projects, and add component/environment
+labels. Hosted routes are probed without credentials for expected login/denial;
+Kubernetes readiness is the separate semantic health signal. No implicit
+application grant or public health bypass is introduced. See the monitoring
+README for the implemented contract. This source update supplies no deployed or
+elapsed-retention evidence and does not change the historical evidence below.
+
 Source and local validation: [monitoring publisher](../../../platform/app/monitoring.py), [probe/rule configuration and procedures](../../../infrastructure/monitoring/README.md), [lifecycle fixtures](../../../platform/tests/test_monitoring_lifecycle.py). OPS-007-T01 and DEV-011-T01 remain open for live evidence and the full lifecycle.
 
 Extend profiles deliberately when applications need different health paths; revisit identity labels when environments/components exist. An outside-network check is separate evidence. This creates no additional watchdog observer and preserves ADR-011's accepted monitoring boundary.

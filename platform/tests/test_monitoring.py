@@ -11,6 +11,47 @@ from app.monitoring import atomic_write, publish_catalog, reconcile, target_grou
 
 
 class DiscoveryTests(unittest.TestCase):
+    def test_components_use_public_hostname_and_health_without_private_targets(self):
+        spec = {"components": [
+            {"name": "worker", "type": "service", "ports": [{"port": 8080}]},
+            {"name": "batch", "type": "scheduled"},
+            {"name": "api", "type": "service", "exposure": "public",
+             "readiness_path": "/health/ready", "readiness_port": 9090},
+        ]}
+        group, = target_groups([("provider", spec, "failed")], "apps.example.com")
+        self.assertEqual(group["targets"], ["https://api-provider.apps.example.com/health/ready"])
+        self.assertEqual(group["labels"]["component"], "api")
+        self.assertEqual(group["labels"]["environment"], "default")
+        self.assertEqual(group["labels"]["probe_module"], "https_protected")
+        self.assertEqual(group["labels"]["health_profile"], "custom")
+        self.assertEqual(group["labels"]["probe_kind"], "access-boundary")
+        self.assertNotIn(":9090", group["targets"][0])
+        spec["components"].pop()
+        self.assertEqual(target_groups([("provider", spec, "applied")], "apps.example.com"), [])
+
+    def test_local_components_keep_custom_path_and_never_legacy_host(self):
+        spec = {"components": [{"name": "api", "type": "service", "exposure": "public",
+                                "readiness_path": "/ready"}]}
+        group, = target_groups([("smoke", spec, "applied")], "apps.localhost")
+        self.assertEqual(group["targets"], ["http://proxy/ready"])
+        self.assertEqual(group["labels"]["probe_hostname"], "api-smoke.apps.localhost")
+        self.assertEqual(group["labels"]["probe_module"], "http_protected")
+        self.assertEqual(target_groups([("smoke", spec, "retired")], "apps.localhost"), [])
+
+    def test_legacy_custom_readiness_and_component_profile(self):
+        group, = target_groups([("smoke", {"readiness_path": "/ready"}, "applied")], "apps.example.com")
+        self.assertEqual(group["targets"], ["https://smoke.apps.example.com/ready"])
+        spec = {"components": [{"name": "api", "type": "service", "exposure": "public",
+                                "probe_profile": "hello-world"}]}
+        group, = target_groups([("smoke", spec, "applied")], "apps.example.com")
+        self.assertEqual(group["labels"]["health_profile"], "hello-world")
+        self.assertEqual(group["labels"]["probe_module"], "https_protected")
+
+    def test_custom_paths_cannot_change_destination(self):
+        for path in ("//evil.example/path", "https://evil.example", "/ready?token=secret", "/ready\n", "/" * 257):
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                target_groups([("smoke", {"readiness_path": path}, "applied")], "apps.example.com")
+
     def test_active_and_failed_targets_retained_retired_removed(self):
         rows = [(name, {}, status) for name, status in
                 [("ready", "applied"), ("broken", "failed"), ("new", "provisioning"), ("old", "retired")]]

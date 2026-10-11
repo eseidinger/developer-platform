@@ -33,6 +33,20 @@ def _with_restart_marker(manifest: dict[str, Any], marker: str) -> dict[str, Any
     return marked
 
 
+def _with_telemetry(manifest, revision, operation_id):
+    """Derived operation context, not application input or indexed metric labels."""
+    if manifest["kind"] not in {"Deployment", "CronJob"}:
+        return manifest
+    marked = copy.deepcopy(manifest)
+    spec = marked["spec"]
+    if manifest["kind"] == "CronJob":
+        spec = spec["jobTemplate"]["spec"]
+    annotations = spec["template"].setdefault("metadata", {}).setdefault("annotations", {})
+    annotations.update({"platform.example/revision": str(revision),
+                        "platform.example/operation-id": str(operation_id)})
+    return marked
+
+
 def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int,
                    error_code: str, audit_result: str, mark_project_failed: bool,
                    log: logging.Logger, trace: dict[str, Any] | None = None) -> None:
@@ -158,6 +172,7 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
                 manifests = [_with_restart_marker(m, str(latest[0])) if m["kind"] == "Deployment" else m
                              for m in manifests]
         for manifest in manifests:
+            manifest = _with_telemetry(manifest, revision, operation_id)
             step = f"apply:{manifest['kind']}"
             apply(manifest)
     except Exception as exc:

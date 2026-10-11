@@ -48,6 +48,27 @@ semantics. Interactive documentation is available at `/docs` and the live schema
 at `/openapi.json`. Diagnostic and operator endpoints remain authorization-scoped;
 raw Kubernetes or Docker access is never part of the public application contract.
 
+### Retained operational logs
+
+`GET /projects/{name}/retained-logs` requires project `view` authority, like the
+existing kubelet `/logs` endpoint. It reads minimized centralized events including
+retired pod instances. Filters: `component`, `instance` (pod), `tail` (1–1000),
+`since_seconds` (1–604800), `after` and `before` (timezone-aware ISO timestamp or
+nanosecond cursor). `next_cursor` is a nanosecond timestamp; `after` excludes that
+timestamp. Retrieve events sharing a timestamp together with a sufficient tail;
+this is not lossless streaming. Historical component names remain queryable.
+Arbitrary LogQL, backend URLs and raw payload search are not supported.
+
+Responses distinguish `ok`, `no_output`, and `unavailable`; unavailable storage
+never becomes empty success. Entries contain timestamp, pod/container/component,
+validated revision/operation metadata and event/level/opaque correlation.
+`retention.source=loki`, `seconds=604800` and `state=configured` describe
+configuration, not a certified retention drill. Only the
+[operational envelope](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
+is centralized; ordinary application text remains kubelet best effort.
+`GET /v1/capabilities` advertises these supported contracts in `observability`;
+it does not attest collector health or elapsed retention in the current environment.
+
 ## Hosted application access
 
 Hosted access is separate from authorization to administer the Platform API.

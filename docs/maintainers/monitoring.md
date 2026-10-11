@@ -10,6 +10,7 @@ Run the local configuration and generator checks from the repository root:
 
 ```bash
 python3 scripts/check-monitoring.py
+python3 scripts/check-workload-logs.py
 ```
 
 The source-adjacent [application monitoring README](../../infrastructure/monitoring/README.md)

@@ -28,3 +28,18 @@ modules:
       <<: *status
       fail_if_not_ssl: true
       fail_if_body_not_matches_regexp: ['^hello-world\s*$']
+  # Hosted routes stay protected. Never follow the browser redirect, accept a
+  # backend 200, or treat policy-unavailable 503 as a healthy access boundary.
+  http_protected:
+    prober: http
+    timeout: 5s
+    http:
+      <<: *status
+      valid_status_codes: [302, 401, 403]
+  https_protected:
+    prober: http
+    timeout: 5s
+    http:
+      <<: *status
+      valid_status_codes: [302, 401, 403]
+      fail_if_not_ssl: true

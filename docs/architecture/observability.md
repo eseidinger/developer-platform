@@ -13,20 +13,26 @@ Status: implemented lab signals plus target coverage. Source configuration is no
 |---|---|---|
 | Host | node-exporter → Prometheus | No measured project/shared-service capacity breakdown |
 | Kubernetes object state | kube-state-metrics via private NodePort 30090 → Prometheus | No pod/container CPU or memory usage scrape |
-| Application availability | Catalog → file discovery → blackbox exporter → Prometheus | Root-path status/content from the platform host, not an independent external network |
+| Application availability | Component-aware catalog → blackbox → Prometheus; Kubernetes readiness → kube-state-metrics | Protected public probes check the access boundary, not backend health; no independent external vantage point |
 | Monitoring components | Prometheus and blackbox-exporter self-scrapes | Does not prove email delivery |
-| Logs | Alloy reads host Docker JSON log files → Loki | No explicit k3d application log collection or project/environment attribution |
+| Logs | Alloy reads Docker files and project pod logs through a dedicated read-only Kubernetes credential → Loki | Workload centralization keeps only minimized operational envelopes; shared backends are operator-only |
 | Views | Grafana Prometheus/Loki data sources | No provisioned dashboards or scoped developer views |
 | Alerts | Scrape failure, low disk, unavailable replicas, application failure/missing result/stale discovery → Alertmanager | Default receiver sends nothing; SMTP requires separate configuration |
 | Host health | systemd sender checks API SQL/Kubernetes access and Prometheus readiness → external watchdog | Does not directly inspect Docker, all nodes/workloads, Grafana, Loki or Alertmanager |
 | Backup freshness | Optional scheduled runner → separately authenticated external backup channel | Independent of heartbeat; shares watchdog hosting/mail |
 
-Prometheus retains seven days or 4 GB, whichever limit is reached first; Loki has seven-day retention configured. Alloy's host file collector depends on Docker JSON log files and does not collect pod logs inside k3d explicitly. Loki has authentication disabled. Access to shared backends is administrative, with no platform-enforced tenant filters.
+Prometheus retains seven days or 4 GB, whichever limit is reached first; Loki has
+seven-day compactor retention and persistent storage configured. Alloy explicitly
+collects attributed project pod logs over the verified Kubernetes API. Loki has
+authentication disabled and no published host port; shared-backend access is
+administrative. Project users read centralized logs only through the authorized
+Platform API's fixed project selector, never an unfiltered Grafana/Loki link.
 
 [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md)
 accepts seven-day centralized workload-log retention for the initial
-cross-project integration profile. That target is not met until PLAN-017 adds
-attributed Kubernetes workload collection and authorized access. Metrics contain
+cross-project integration profile. PLAN-017 now implements attributed workload
+collection and authorized reads; deployed ingestion and elapsed retention remain
+acceptance work. Metrics contain
 only Public or Internal data. Workload logs may contain Internal operational data
 and explicitly approved Confidential correlation values, but no customer
 payloads or Restricted values.
@@ -39,11 +45,20 @@ Central storage and alerting are outside k3d but share its host failure domain. 
 
 ## Target coverage and project views
 
-PostgreSQL exporter metrics, application request/error/latency signals, workload resource usage, attributed Kubernetes logs and traces remain future work. Proposed OpenTelemetry/Tempo integration is not installed. Durable jobs/revisions must exist before exposing their telemetry.
+PostgreSQL exporter metrics, application request/error/latency metrics, workload
+resource usage scrapes and traces remain future work. Attributed centralized
+operational logs are implemented. Proposed OpenTelemetry/Tempo is not installed.
 
 Operators should see host, Docker, cluster, database, certificates, storage, jobs and monitoring. Developers should see only authorized applications and logs/health/metrics. Shared dashboard links cannot enforce this boundary. Introduce server-side authorization before exposing those views.
 
-Target telemetry uses stable project, environment and application IDs plus deployment revision, operation ID, and infrastructure resource IDs. Propagate correlation context across API handling, durable operation execution, and infrastructure calls inside the Python application. The API exposes health, error, latency, dependency, saturation, and operation-age signals; dashboards distinguish request, policy/coordination, and infrastructure-execution failures. Current probe labels use project/application name, namespace and URL; there are no environment/revision/operation IDs. Avoid unbounded request or operation IDs in metric labels; use structured logs or trace context for them.
+Probe labels use project/application names, default environment, component,
+namespace and URL. Platform-derived revision/operation pod annotations become
+non-indexed log metadata. Application-supplied opaque correlation keys live only
+in the minimized operational JSON envelope, not metric or stream-index labels.
+Unknown fields/free text are not centrally retained; arbitrary log content remains
+kubelet-only. Owners supply and classify correlation, without exposing domain
+payloads, customer details or credentials. See the
+[implemented envelope and limits](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation).
 
 ## Status and operational evidence
 
