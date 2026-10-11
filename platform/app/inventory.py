@@ -93,6 +93,8 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
         pods = _items(runtime, "v1", "Pod", namespace)
         services = _items(runtime, "v1", "Service", namespace)
         ingresses = _items(runtime, "networking.k8s.io/v1", "Ingress", namespace)
+        shared = _items(runtime, "networking.k8s.io/v1", "Ingress", "platform-access")
+        ingresses += [i for i in shared if _get(_get(_get(i, "metadata", {}), "labels", {}), "platform.example/project") == project]
         quotas = _items(runtime, "v1", "ResourceQuota", namespace)
         limits = _items(runtime, "v1", "LimitRange", namespace)
     except Exception as exc:

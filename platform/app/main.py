@@ -6,6 +6,7 @@ import os
 import threading
 import csv
 import io
+import sys
 from datetime import datetime, timedelta, timezone
 from typing import Literal, Optional, Union
 from contextlib import asynccontextmanager
@@ -56,6 +57,8 @@ from .deployment_credentials import initialize as initialize_deployment_credenti
 from .deployment_credentials import public_record as public_credential_record
 from .keycloak_credentials import ProviderError as CredentialProviderError
 from .keycloak_credentials import create_client as create_credential_client, delete_client as delete_credential_client
+from . import access_store
+from .access_worker import loop as application_access_loop
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -88,6 +91,7 @@ async def lifespan(app):
         initialize_audit(conn)
         initialize_authorization(conn)
         initialize_deployment_credentials(conn)
+        access_store.initialize(conn)
         bootstrap = bootstrap_platform_admin(conn, verifier.issuer)
     if bootstrap:
         required_audit(Actor("bootstrap", bootstrap.audit_id), "membership.bootstrap", "platform-grant",
@@ -120,6 +124,9 @@ async def lifespan(app):
         args=(stop, connect, delete_credential_client, best_effort_audit, log), daemon=True,
     )
     credential_cleanup_worker.start()
+    access_worker = threading.Thread(target=application_access_loop,
+                                    args=(stop, sys.modules[__name__]), daemon=True)
+    access_worker.start()
     try:
         yield
     finally:
@@ -129,6 +136,7 @@ async def lifespan(app):
         operation_worker.join(timeout=6)
         drift_worker.join(timeout=6)
         credential_cleanup_worker.join(timeout=6)
+        access_worker.join(timeout=6)
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
@@ -459,7 +467,11 @@ def create_empty_project(body: EmptyProjectCreate, principal: Principal = Depend
 @app.get("/v1/capabilities")
 def capabilities(principal: Principal = Depends(current_principal)):
     """Declare what a deployment spec may request in each environment."""
-    return {**CAPABILITIES, "imageRegistries": sorted(allowed_registries())}
+    return {**CAPABILITIES, "imageRegistries": sorted(allowed_registries()), "hostedApplicationAccess": {
+        "modes": ["browser-session", "bearer-token"], "authorization": "anyOfGroups",
+        "identityTransport": "X-Platform-Principal-*", "anonymousRoutes": False,
+        "maxAuthorizationStalenessSeconds": 300, "credentialIsolation": "project",
+        "requires": "platform.example/v1alpha2"}}
 
 
 @app.post("/projects/{name}/deployment-credentials")
@@ -1867,6 +1879,10 @@ def drop_project_database_and_role(conn, name: str) -> None:
 
 def delete_project_catalog(conn, name: str) -> None:
     """Delete the complete project-owned catalog in foreign-key order."""
+    conn.execute("DELETE FROM hosted_access_idempotency WHERE project=%s", (name,))
+    conn.execute("""DELETE FROM hosted_access_operations WHERE resource_id IN (
+        SELECT id FROM hosted_access_resources WHERE project=%s)""", (name,))
+    conn.execute("DELETE FROM hosted_access_resources WHERE project=%s", (name,))
     conn.execute("DELETE FROM data_service_recovery_requests WHERE project=%s", (name,))
     conn.execute("DELETE FROM deployment_credentials WHERE project=%s", (name,))
     conn.execute("DELETE FROM platform_grants WHERE scope_kind='project' AND scope_id=%s", (name,))
@@ -1951,6 +1967,9 @@ def purge_project(name: str, confirmation: ProjectPurge, principal: Principal = 
                 raise HTTPException(409, "Wait for all deployment credentials to be revoked before purging")
             required_audit(actor, "project.purge.requested", "project", name, "succeeded",
                            {"scope": "platform", "project": name}, {"audit_records_retained": True})
+            for resource in access_store.listing(conn):
+                if (resource["project"] == name or resource["spec"].get("providerProject") == name) and resource["kind"] in {"group", "policy", "membership", "service-access"} and resource["state"] != "revoked":
+                    raise HTTPException(409, "Wait for hosted application-access cleanup before purging")
             drop_project_database_and_role(conn, name)
             with conn.transaction():
                 delete_project_catalog(conn, name)
@@ -2052,6 +2071,8 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                     except ApiException as exc:
                         if exc.status != 404:
                             raise
+                    with access_store.locked(conn):
+                        access_store.retire(conn, name, principal)
                     required_audit(actor, "project.retire.requested", "project", name, "succeeded",
                                    {"project": name}, {"revision": scope["revision"]})
                 if namespace_exists(name):
@@ -2061,6 +2082,8 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                 else:
                     with conn.transaction():
                         conn.execute("UPDATE projects SET status='retired',updated_at=now() WHERE name=%s", (name,))
+                        conn.execute("SELECT pg_advisory_xact_lock(%s)", (access_store.LOCK,))
+                        access_store.retire(conn, name, principal)
                         # Retiring a project ends access immediately. Provider-client deletion is retried by the
                         # existing fail-closed credential cleanup worker; credentials are never silently retained active.
                         conn.execute("DELETE FROM platform_grants WHERE scope_kind='project' AND scope_id=%s", (name,))
@@ -2220,3 +2243,7 @@ def allow_certificate(domain: str = Query(max_length=253)):
                     and host == f"{component.get('name')}-{name}"):
                 return {"allowed": True}
     raise HTTPException(403)
+
+
+from .access_api import install as install_application_access_api
+install_application_access_api(app, sys.modules[__name__])

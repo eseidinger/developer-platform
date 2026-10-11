@@ -47,7 +47,9 @@ class Catalog:
 
     def execute(self, query, params=()):
         self.events.append(query)
-        if query.startswith("INSERT INTO projects"):
+        if "FROM hosted_access_resources" in query:
+            self.result = []
+        elif query.startswith("INSERT INTO projects"):
             if "NULL, 'empty'" in query:
                 name = params[0]
                 self.rows[name] = (None, "empty")

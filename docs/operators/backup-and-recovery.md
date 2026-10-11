@@ -87,6 +87,14 @@ The implemented bundle, verification, retention and notification boundaries are 
 
 ## Set up encrypted off-host storage
 
+Hosted-access catalogs in newer bundles are quarantined by the isolated restore
+script before services start. A human platform administrator must explicitly
+run the [hosted-access recovery flow](identity-and-access.md#hosted-application-access-installation-and-recovery)
+to invalidate browser sessions, rotate uncertain service credentials, and
+reconcile approved membership outward before application routes activate.
+This safeguard does not establish the full deployed hosted-access recovery
+gate; that remains PLAN-019 acceptance work.
+
 Use the [backup repository playbook](../../operations/backup/README.md#encrypted-s3-backup-repository-setup)
 to install restic, configure private S3 credentials and a separately recoverable
 repository password, and explicitly initialize a new repository when needed.

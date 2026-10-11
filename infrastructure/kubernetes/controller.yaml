@@ -19,7 +19,7 @@ rules:
     resources: [namespaces, secrets, services, resourcequotas, limitranges]
     verbs: [get, list, create, patch, update]
   - apiGroups: [""]
-    resources: [services]
+    resources: [services, secrets]
     verbs: [delete]
   # RBAC cannot scope delete by name; the admission policy below limits it to managed project namespaces.
   - apiGroups: [""]

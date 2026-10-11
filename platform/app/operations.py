@@ -108,6 +108,17 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         step = "manifests"
         spec = desired[1]
         if spec.get("components") is not None:
+            if remove and operation_kind == "deploy":
+                # Remove pre-capability direct routes before publishing protected routes.
+                # A missing historical route is an idempotent no-op, not a deployment failure.
+                for component in spec["components"]:
+                    if component.get("exposure") == "public":
+                        try:
+                            remove({"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
+                                    "metadata": {"name": component["name"] + "-public", "namespace": "project-" + project}})
+                        except Exception as exc:
+                            if getattr(exc, "status", None) != 404:
+                                raise
             manifests = component_resources(project, spec["components"], os.environ["POSTGRES_IP"], password,
                                             spec.get("configuration"), os.environ["APPS_DOMAIN"])
         else:

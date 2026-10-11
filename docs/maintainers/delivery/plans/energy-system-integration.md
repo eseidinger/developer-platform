@@ -113,6 +113,23 @@ deployed resource and retention behavior in the external acceptance suite.
 
 ### 2. Deliver hosted-application identity
 
+Source implementation progress (October 11, 2026): the generic access-resource
+API, authoritative PostgreSQL catalog and durable reconciliation, human approval,
+provider-approved machine credentials, immutable policy revisions, normalized
+headers, private backend policies, replicated authorizer, per-application proxy,
+rotation, revocation, and recovery quarantine are implemented. Local regression,
+isolated PostgreSQL lifecycle, real Keycloak PKCE/client-credentials, and pinned
+proxy configuration tests establish source-level behavior. The running platform
+has not been changed and the energy configuration contract remains untouched.
+
+Implement and verify the platform first; reconcile application-owned declarations
+and the external configuration contract against the resulting API afterward.
+Source/local evidence does not close PLAN-009: the deployed neutral-fixture
+DNS/TLS/private-backend drill, timed revocation/outage bound, and restored-access
+drill remain required. Component monitoring, centralized workload-log retention,
+and the external energy end-to-end gate remain subsequent increments. Operational
+setup is in the [hosted-access runbook](../../../operators/identity-and-access.md#hosted-application-access-installation-and-recovery).
+
 Implement [PLAN-009](../backlog.md#additional-phase-tasks) before the deployed
 connection gate. The capability must support these reusable registration types:
 
@@ -168,7 +185,11 @@ deny unmatched routes. Authorization uses non-empty `anyOfGroups` only. The
 initial profile supports neither anonymous routes nor a general
 `session-or-bearer` route.
 
-The initial provider-neutral resource shape is:
+The following YAML shows the conceptual provider-neutral resource shape. The
+implemented REST API accepts the JSON specification directly at the
+project/application-scoped endpoint, not this illustrative Kubernetes-style
+envelope; see the [API guide](../../../developers/api.md#hosted-application-access).
+The initial resource shape is:
 
 ```yaml
 apiVersion: platform.example/v1alpha1
@@ -259,8 +280,11 @@ POST /v1/projects/{provider}/service-access-requests/{id}/approve
 POST /v1/projects/{provider}/service-access-requests/{id}/reject
 ```
 
-Exact response envelopes are finalized with OpenAPI implementation, but these
-resources, ownership boundaries, concurrency, and lifecycle semantics are fixed.
+The implemented response envelope and operation polling are specified in
+[OpenAPI](../../../api/openapi.json) and the
+[API guide](../../../developers/api.md#hosted-application-access). Access resources
+have stable IDs, quoted version ETags, and status URLs; clients do not submit
+Keycloak resource identifiers or receive credential values.
 
 PostgreSQL is authoritative. A grant becomes effective only after Keycloak
 provisioning succeeds. A revocation becomes locally ineffective immediately,

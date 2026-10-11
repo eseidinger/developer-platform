@@ -493,6 +493,31 @@ the single shared Docker host suitable for hostile tenants.
 
 ## Revocation and rotation
 
+The generic hosted-access reference implementation is now in
+`platform/app/access_*`: PostgreSQL resources and durable operations,
+Keycloak projection, per-policy OAuth2 Proxy, and the shared replicated request
+boundary. See the [API guide](../developers/api.md#hosted-application-access)
+for exact resource bodies and the
+[installation/recovery runbook](../operators/identity-and-access.md#hosted-application-access-installation-and-recovery)
+for operational safeguards. This is source/local-test evidence, not deployed
+PLAN-009 acceptance. The existing legacy single-service route is not migrated
+implicitly; hosted protection requires `v1alpha2`.
+
+The boundary handles browser callback/start/logout itself. A browser policy
+includes a `GET` entry route; state-changing requests additionally require a
+same-origin request and the readable platform CSRF cookie value in
+`X-Platform-CSRF-Token`. The identity token and access token remain at the
+boundary. Both authentication paths strip authorization and caller-supplied
+identity headers before forwarding; application responses cannot overwrite
+platform authentication cookies. Subject identity comes from OIDC `sub`, not
+an email claim. Optional display name/email release remains separately governed.
+
+The supported isolated restore workflow quarantines the restored access
+catalog before starting application access. Explicit operator reconciliation
+rotates uncertain machine credentials and browser session epochs before the
+flag is cleared. Authorizers fail closed during this process and policies become
+active only after provider preparation and ready-replica acknowledgement.
+
 | Target | Immediate platform effect |
 |---|---|
 | Project/platform grant | Next request by the identity is denied |

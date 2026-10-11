@@ -139,13 +139,17 @@ class WorkloadContract(unittest.TestCase):
         self.assertEqual(template(before, "web"), template(after, "web"))
         self.assertNotEqual(template(before, "api"), template(after, "api"))
 
-    def test_public_component_creates_only_its_route_and_traefik_policy_rule(self):
+    def test_public_component_routes_through_authorizer_and_has_private_backend(self):
         docs = component_resources("shop", [{"name": "api", "type": "service", "resolved_image": "x@sha256:a",
             "ports": [{"name": "http", "port": 8080}], "exposure": "public"}], "172.30.80.10", "secret", domain="apps.test")
         ingress = next(d for d in docs if d["kind"] == "Ingress")
         self.assertEqual(ingress["spec"]["rules"][0]["host"], "api-shop.apps.test")
         policy = next(d for d in docs if d["kind"] == "NetworkPolicy")
-        self.assertEqual(policy["spec"]["ingress"][1]["ports"][0]["port"], 8080)
+        self.assertEqual(ingress["metadata"]["namespace"], "platform-access")
+        self.assertEqual(ingress["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["name"], "authorizer")
+        self.assertEqual(policy["spec"]["podSelector"]["matchExpressions"][0]["values"], ["api"])
+        protected = next(d for d in docs if d["kind"] == "NetworkPolicy" and d["metadata"]["name"] == "api-access")
+        self.assertEqual(protected["spec"]["ingress"][0]["ports"][0]["port"], 8080)
 
     def test_approved_component_egress_is_scoped_to_its_pods(self):
         docs = component_resources("shop", [{"name": "api", "type": "service", "resolved_image": "x@sha256:a",

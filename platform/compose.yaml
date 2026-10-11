@@ -11,6 +11,8 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-https://${IDENTITY_DOMAIN:-identity.localhost}/realms/platform}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-platform-api}
       OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/platform/protocol/openid-connect/certs}
+      APPLICATION_ACCESS_JWKS_URL: http://${KEYCLOAK_IP:-172.30.80.12}:8080/realms/platform/protocol/openid-connect/certs
+      APPLICATION_IDENTITY_INTERNAL_URL: http://${KEYCLOAK_IP:-172.30.80.12}:8080
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_PROVISIONER_CLIENT_ID: platform-credential-provisioner
       KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}
@@ -31,7 +33,9 @@ services:
     volumes:
       - monitoring_discovery:/var/lib/platform-monitoring
       - ../.runtime/controller.kubeconfig:/run/platform/kubeconfig:ro
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${PLATFORM_API_IP:-172.30.80.11}
     depends_on:
       postgres:
         condition: service_healthy

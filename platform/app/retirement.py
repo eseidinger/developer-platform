@@ -38,7 +38,9 @@ def removal_scope(name: str, revision: int, spec: dict, domain: str) -> dict:
     return {
         "project": name,
         "revision": revision,
-        "removes": [{"kind": m["kind"], "name": m["metadata"]["name"]} for m in manifests]
+        "removes": [{"kind": m["kind"], "name": m["metadata"]["name"],
+                     **({"namespace": m["metadata"]["namespace"]} if m["metadata"].get("namespace") == "platform-access" else {})}
+                    for m in manifests]
                    + [{"kind": "Secret", "name": SECRET_NAME}, {"kind": "Secret", "name": PREVIOUS_SECRET_NAME}],
         "route": routes[0] if len(routes) == 1 else None,
         "routes": routes,

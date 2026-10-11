@@ -41,7 +41,9 @@ services:
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
     volumes:
       - ./realm-platform.json:/opt/keycloak/data/import/realm-platform.json:ro
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${KEYCLOAK_IP:-172.30.80.12}
     depends_on:
       keycloak-db-init:
         condition: service_completed_successfully
@@ -89,7 +91,7 @@ services:
         service_user_id="$$(/opt/keycloak/bin/kcadm.sh get "clients/$$provisioner_id/service-account-user" -r platform --fields id \
           | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')"
         /opt/keycloak/bin/kcadm.sh add-roles -r platform --uid "$$service_user_id" \
-          --cclientid realm-management --rolename manage-clients
+          --cclientid realm-management --rolename manage-clients --rolename manage-users --rolename view-users
     environment:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run scripts/init.py}
       KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}

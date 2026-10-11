@@ -218,10 +218,8 @@ def component_resources(name, components, database_ip, password, configuration=N
                     "ports": [{"name": port["name"], "port": port["port"], "targetPort": port["name"]}
                               for port in ports]}))
             if component.get("exposure") == "public":
-                manifests.append(obj("networking.k8s.io/v1", "Ingress", component["name"] + "-public", spec={
-                    "ingressClassName": "traefik", "rules": [{"host": component["name"] + "-" + name + "." + domain,
-                    "http": {"paths": [{"path": "/", "pathType": "Prefix", "backend": {
-                        "service": {"name": component["name"], "port": {"number": ports[0]["port"]}}}}]}}]}))
+                from .access_runtime import protected_ingress
+                manifests.append(protected_ingress(component["name"] + "-" + name + "." + domain, name))
         else:
             manifests.append(obj("batch/v1", "CronJob", component["name"], spec={
                 "schedule": component["schedule"], "timeZone": component.get("time_zone", "UTC"),
@@ -241,4 +239,5 @@ def component_resources(name, components, database_ip, password, configuration=N
                               "ports": [{"protocol": "TCP", "port": item["port"]}]} for cidr in cidrs)
             manifests.append(obj("networking.k8s.io/v1", "NetworkPolicy", component["name"] + "-egress", spec={
                 "podSelector": {"matchLabels": component_labels}, "policyTypes": ["Egress"], "egress": rules}))
-    return manifests
+    from .access_runtime import protect_components
+    return protect_components(manifests, name, components)

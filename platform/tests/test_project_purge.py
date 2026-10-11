@@ -24,6 +24,7 @@ class Connection:
 
     def execute(self, statement, *args):
         self.executed.append((str(statement), args))
+        return Result()
 
     def transaction(self):
         return self

@@ -71,6 +71,19 @@ def check_import_errors(stderr):
         raise RuntimeError('Unexpected SQL restore diagnostics; inspect private SQL logs')
 
 
+def quarantine_hosted_access(compose):
+    """A restored authorization catalog must not activate routes before explicit reconciliation."""
+    statement = b"""DO $$ BEGIN
+        IF to_regclass('public.hosted_access_metadata') IS NOT NULL THEN
+            INSERT INTO hosted_access_metadata(key,value) VALUES ('recovery-required','true')
+                ON CONFLICT(key) DO UPDATE SET value='true';
+            UPDATE hosted_access_metadata SET value=(value::text::bigint+1)::text::jsonb WHERE key='generation';
+        END IF;
+    END $$;"""
+    run(compose + ['exec', '-T', 'postgres', 'psql', '-X', '-v', 'ON_ERROR_STOP=1',
+                   '-U', 'postgres', '-d', 'platform'], ROOT, data=statement)
+
+
 def recover(bundle, projects):
     verify(bundle)
     if ROOT.exists():
@@ -135,6 +148,7 @@ https://*.apps.localhost {
                 proc.kill()
                 proc.wait()
     check_import_errors((logs / 'restore.stderr').read_text())
+    quarantine_hosted_access(compose)
     run(compose + ['create', 'proxy', 'grafana'], ROOT, timeout=900)
     for volume, filename in [('caddy_data', 'proxy-data.tar.gz'), ('caddy_config', 'proxy-config.tar.gz'),
                               ('grafana', 'grafana-grafana.tar.gz')]:

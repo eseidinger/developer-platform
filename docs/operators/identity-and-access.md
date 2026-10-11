@@ -115,3 +115,92 @@ administrator-reference identifier (not the raw subject), successful readiness
 result, and redacted authorization/audit evidence in the delivery backlog. Continue with the role,
 revocation, audit-export, and security-alert checks; do not mark Phase 1B closed
 from bootstrap alone.
+
+## Hosted application access installation and recovery
+
+The hosted-access implementation is available in source; deployed acceptance is
+still open. It is not authorization to manage this Platform API. Follow the
+[hosted application API guide](../developers/api.md#hosted-application-access)
+for groups, enrollment, policy intent, service approvals, and managed-secret
+delivery. There is initially no separate UI or CLI for these resources.
+
+The supported `scripts/up.sh` installation now builds and imports the authorizer
+image, installs two authorizer replicas in `platform-access`, and applies their
+restricted network policies. `PLATFORM_API_IP` and `KEYCLOAK_IP` default to
+`172.30.80.11` and `172.30.80.12`; reserve those addresses in the platform Docker
+network. The bootstrap sends derived internal and session keys straight to
+Kubernetes Secret input, never to a manifest file. Keep `DATABASE_KEY` and the
+encrypted backup containing it protected; changing that key changes derived
+credentials. OAuth2 Proxy is digest-pinned to the tested 7.15.1 image. Browser
+proxy configuration is generated per policy, not supplied by applications.
+
+Keycloak remains one `platform` realm. The trusted credential provisioner now
+needs `manage-clients`, `manage-users`, and `view-users` to project application
+clients and memberships. It is infrastructure authority, not an application
+credential. New browser clients include Keycloak's `basic` subject mapper in
+addition to the minimal profile/email scopes; an email address is not the
+authentication key or a membership approval.
+
+A `v1alpha2` public ingress routes to the shared boundary, never directly to its
+backend. The public pod accepts traffic only from authorizer pods. Missing,
+pending, staging, and expired policies deny access. Reapplying a component
+deployment removes historical `<component>-public` direct ingress routes.
+Legacy single-service declarations retain their existing routing behavior;
+they must migrate to `v1alpha2` before using hosted access. Do not claim they are
+protected by this new capability. Keep the edge HTTPS-only externally.
+
+For browser state changes, frontend code copies the readable
+`__Host-platform-csrf` cookie into `X-Platform-CSRF-Token` and sends the exact
+same HTTPS Origin. The session and signed activity cookies are HTTP-only.
+Deleting the activity cookie cannot extend the eight-hour absolute session or
+30-minute idle limit. Application responses cannot replace boundary cookies.
+Group changes use a two-second catalog poll, four-minute browser claim refresh,
+and five-minute token/snapshot maximum. An unavailable dependency never extends
+the original snapshot deadline. Policies stage non-authorizing, await the
+browser proxy and acknowledgements from every ready authorizer replica, then
+activate; this initial conservative strategy can briefly deny all application
+traffic during a policy update.
+
+The isolated restore script sets a durable `recovery-required` flag before
+starting services. Hosted routes remain denied until an authenticated human
+platform administrator invokes `POST /operator/application-access/recover`.
+This invalidates browser sessions, rotates potentially restored active or
+provisioning machine credentials, and reconciles approved catalog membership
+outward. Pending/rejected requests receive no grant. Poll the returned
+`operationIds`, and confirm authorizer readiness before admitting traffic.
+For a manual database restore, keep the application edge closed, apply the same
+recovery quarantine, invoke recovery, and restart the authorizer deployment to
+discard snapshots from the newer pre-restore generation. Never restore the
+database underneath authorizers while leaving public application traffic open.
+
+Retirement immediately excludes the project and its cross-project service
+bindings from snapshots and queues provider cleanup. This also removes
+application-owned ingress/proxy objects from the shared namespace; it never
+deletes `platform-access` itself. Missing retired project namespaces do not
+block client cleanup. Permanent project purge waits for hosted-access cleanup,
+as well as deployment-credential cleanup, before deleting the catalog.
+
+Verification uses synthetic identities and isolated databases only:
+
+```bash
+.venv/bin/python -m unittest discover -s platform/tests -v
+```
+
+Set `ACCESS_TEST_DSN` to an isolated PostgreSQL instance to enable durable
+lifecycle tests. Set `ACCESS_TEST_KEYCLOAK_URL` to a disposable Keycloak started
+with the test bootstrap credentials in the CI workflow, and
+`ACCESS_PROXY_CONFIG_TEST=1` to validate the actual pinned proxy environment.
+Never point these tests at the installed platform realm. CI enables these
+checks automatically. A real neutral-fixture DNS/TLS/network-policy drill and
+timed five-minute outage/revocation drill remain deployment acceptance work;
+local unit and provider tests do not close PLAN-009/F-10.
+
+Local verification recorded October 11, 2026: all 251 platform tests passed with
+isolated PostgreSQL, real Keycloak human/machine flows, and actual pinned proxy
+configuration validation enabled. The non-root/read-only authorizer image built
+and ran 27 hosted-access tests (26 passed; only the Docker-within-container proxy
+configuration test skipped, already passed on the host). Backup regression ran
+39 tests (38 passed, one existing optional check skipped); UI type checking and
+all six UI tests passed. Documentation links, Python compilation, Compose
+configuration, shell syntax, and diff whitespace checks passed. The disposable
+services were removed after verification; no live deployment is claimed.

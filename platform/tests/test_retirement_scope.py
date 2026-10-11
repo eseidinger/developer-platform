@@ -4,6 +4,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.retirement import removal_scope, scope_token
+from app.access_runtime import ingress_name
 
 
 class RetirementScopeTests(unittest.TestCase):
@@ -17,7 +18,7 @@ class RetirementScopeTests(unittest.TestCase):
         scope = removal_scope("shop", 4, spec, "apps.localhost")
         self.assertIn({"kind": "Deployment", "name": "api"}, scope["removes"])
         self.assertIn({"kind": "Service", "name": "api"}, scope["removes"])
-        self.assertIn({"kind": "Ingress", "name": "api-public"}, scope["removes"])
+        self.assertIn({"kind": "Ingress", "name": ingress_name("api-shop.apps.localhost"), "namespace": "platform-access"}, scope["removes"])
         self.assertIn({"kind": "CronJob", "name": "worker"}, scope["removes"])
         self.assertEqual(scope["routes"], ["api-shop.apps.localhost"])
         self.assertEqual(scope["route"], "api-shop.apps.localhost")

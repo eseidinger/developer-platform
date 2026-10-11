@@ -13,6 +13,15 @@ spec.loader.exec_module(restore)
 
 
 class RestoreRecoveryTests(unittest.TestCase):
+    def test_restored_access_is_quarantined_before_services_start(self):
+        with patch.object(restore, 'run') as run:
+            restore.quarantine_hosted_access(['docker', 'compose'])
+        args = run.call_args
+        self.assertIn('platform', args.args[0])
+        self.assertIn('ON_ERROR_STOP=1', args.args[0])
+        self.assertIn(b"recovery-required", args.kwargs['data'])
+        self.assertIn(b"to_regclass", args.kwargs['data'])  # Older bundles without hosted access remain supported.
+
     def test_only_known_bootstrap_duplicates_are_accepted(self):
         restore.check_import_errors('ERROR:  role "postgres" already exists\nERROR:  database "platform" already exists\n')
         restore.check_import_errors('')

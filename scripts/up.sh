@@ -53,4 +53,7 @@ test -s .runtime/controller.kubeconfig
 chmod 644 .runtime/controller.kubeconfig
 rm -f .runtime/token.json
 docker compose up -d --build --remove-orphans
+docker build -f platform/Dockerfile.access -t developer-platform-access-authorizer:local platform
+k3d image import developer-platform-access-authorizer:local -c workloads
+python3 scripts/install-application-access.py
 echo "Platform API: http://127.0.0.1:8000/docs"
