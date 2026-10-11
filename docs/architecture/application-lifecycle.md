@@ -45,7 +45,7 @@ There is no direct Docker application-workload adapter. Docker remains the host 
 
 ## State and lifecycle
 
-The application persists stable project/application IDs, immutable desired revisions, operations, grants, credentials, audit records, and retirement inventories in platform-owned PostgreSQL state. Hosted application databases remain logically separate. Persistent data defaults to retention when workload resources are removed; permanent deletion requires an explicit authorized decision.
+The application persists stable project/application IDs, immutable desired revisions, operations, grants, credentials, audit records, and retirement inventories in platform-owned PostgreSQL state. Hosted application databases remain logically separate. Persistent data defaults to retention when workload resources are removed; permanent deletion requires an explicit authorized decision. Applications own row-level domain retention. The platform owns whole-database, backup, log, metric, revision, audit, credential, and release-evidence retention under [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md).
 
 An accepted operation means the desired state was recorded, not that the workload is healthy. Operation results and live runtime observations remain distinct. Drift is reported rather than silently repaired unless a future policy explicitly enables reconciliation.
 

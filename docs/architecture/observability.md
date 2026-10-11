@@ -23,6 +23,14 @@ Status: implemented lab signals plus target coverage. Source configuration is no
 
 Prometheus retains seven days or 4 GB, whichever limit is reached first; Loki has seven-day retention configured. Alloy's host file collector depends on Docker JSON log files and does not collect pod logs inside k3d explicitly. Loki has authentication disabled. Access to shared backends is administrative, with no platform-enforced tenant filters.
 
+[ADR-020](decisions/ADR-020-generic-hosted-application-integration.md)
+accepts seven-day centralized workload-log retention for the initial
+cross-project integration profile. That target is not met until PLAN-017 adds
+attributed Kubernetes workload collection and authorized access. Metrics contain
+only Public or Internal data. Workload logs may contain Internal operational data
+and explicitly approved Confidential correlation values, but no customer
+payloads or Restricted values.
+
 Central storage and alerting are outside k3d but share its host failure domain. The external PHP/MySQL watchdog is independently hosted. Its optional fixed HTTPS GET checks status codes, not the application content contract. The systemd component sends heartbeats only on successful readiness checks; it is not a local notification service.
 
 [ADR-014](decisions/ADR-014-catalog-availability-monitoring.md) records catalog membership, bounded profiles, monitoring-only reconciliation and retirement semantics. [Application monitoring](../../infrastructure/monitoring/README.md) supplies configuration and verification procedures. Discovery retains failed applications and excludes only explicitly retired catalog entries. The thread does not repair workloads.

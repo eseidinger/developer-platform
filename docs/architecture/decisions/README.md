@@ -28,6 +28,7 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 | [017](ADR-017-phase-1a-retention-evidence-scope.md) | Omit long-horizon retention evidence from Phase 1A | Accepted October 1, 2026 |
 | [018](ADR-018-revocable-ci-deployment-credentials.md) | Revocable OIDC machine credentials for CI deployment | Requirement and Phase 2B placement accepted October 4, 2026; implementation proposed |
 | [019](ADR-019-react-ui-technology-stack.md) | React UI technology stack | Accepted October 6, 2026; application implementation planned |
+| [020](ADR-020-generic-hosted-application-integration.md) | Generic hosted-application integration, group authorization, retention, and classification boundary | Accepted October 11, 2026; implementation and operational acceptance open |
 
 ADRs 012–015 record choices observable in source as of September 27, 2026. **Implemented** describes what the code does; it does not imply owner approval of these new records, acceptance of the future design, or completed operational validation. Alternatives describe tradeoffs, not a reconstructed history of owner decisions.
 

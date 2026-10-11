@@ -78,7 +78,7 @@ The ServiceAccount token is a sensitive, long-lived infrastructure credential. R
 
 ## Networking
 
-Ingress reaches pods only through Traefik. NetworkPolicies allow same-namespace traffic, DNS, and PostgreSQL at the configured fixed Docker-network IP; other egress is denied after policy convergence. New pods can briefly have egress before kube-router rules apply. Compose DNS does not resolve from pods, so PostgreSQL uses a fixed private IP. PostgreSQL TLS is not configured.
+Ingress reaches pods only through Traefik. NetworkPolicies allow same-namespace traffic, DNS, and PostgreSQL at the configured fixed Docker-network IP; other egress is denied after policy convergence. New pods can briefly have egress before kube-router rules apply. Compose DNS does not resolve from pods, so PostgreSQL uses a fixed private IP. PostgreSQL TLS is not configured. [ADR-020](../architecture/decisions/ADR-020-generic-hosted-application-integration.md) accepts that transport as outside the first-release cross-project encrypted-channel requirement; operators must not describe the profile as encrypting all application traffic.
 
 ## Metrics and capacity
 

@@ -44,6 +44,69 @@ field must not silently acquire a different meaning.
 10. Provider portability is a contract constraint, not a requirement to operate a
     second provider.
 
+## Generic cross-project integration profile
+
+The initial hosted-application integration profile permits one public component
+per project. Cross-project calls use public HTTPS and caller-declared DNS/443
+egress; DNS addresses are fixed when the deployment is applied and require an
+explicit reapply when they change. Browser and confidential service identities
+are separate resources and cannot be created or authorized by an application
+declaration. A separate `ApplicationAccessPolicy` selects `browser-session` or
+`bearer-token`, allowed project-scoped application groups, and explicit
+non-overlapping route/method matches on the public component. The platform
+derives the standard browser callback, OIDC client, machine audience, session
+behavior, group-claim mapping, and credential lifecycle. Applications do not
+submit redirect URIs, audiences, OAuth scopes, identity-provider group paths, or
+proxy configuration in the initial profile.
+
+The reference profile uses one identity realm per platform environment, with
+separate application clients and audiences rather than application-specific
+realms. Humans use first-login enrollment: authentication creates a pending
+access request with no authority, and a provider project administrator assigns
+application groups before access succeeds. Machine principals are
+pre-authorized: the provider approves a service-access request and its groups
+before the consumer credential becomes usable. Platform and project roles do
+not imply application-group membership.
+
+The Keycloak reference adapter maps each stable application-group ID to an
+application-client role and emits relevant roles in a client-scoped `groups`
+claim. One platform-managed OAuth2 Proxy configuration per public application
+handles browser OIDC; a shared replicated authorizer handles route policy,
+machine tokens, first-login recording, revocation overrides, and normalized
+headers. These are provider details rather than application inputs.
+
+The initial policy language allows only non-empty `anyOfGroups` on exact or
+segment-aware prefix matches with explicit methods. Overlaps and ambiguous paths
+are rejected, unmatched routes are denied, and every public application route
+requires `browser-session` or `bearer-token`; anonymous routes are unsupported.
+Policies use immutable atomically activated revisions. Authorization snapshots,
+machine tokens, and browser claim refresh are bounded to five minutes and fail
+closed after expiry. [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md)
+defines request retention, session lifetime, credential rotation, and recovery
+reconciliation.
+
+On each admitted request, the platform boundary supplies the normalized caller
+and stable group IDs through reserved `X-Platform-Principal-*` headers.
+Application middleware reads that context; it does not parse platform sessions
+or bearer tokens. The platform has already performed coarse route
+authorization. Applications own only finer object-, row-, or domain-level
+decisions that cannot be represented by the route policy. Display name is
+released only by explicit policy opt-in; email additionally requires classified
+personal-data handling. Neither is an authorization key.
+
+PostgreSQL remains a per-project retained resource, but its traffic is outside
+the initial encrypted-channel requirement and is not TLS-protected. Application
+secrets are project-scoped and may be visible to every component in the project.
+These are explicit first-release limits, not application-specific behavior.
+
+Applications own domain data, fine-grained domain authorization, and row-level
+retention. The platform owns application-group lifecycle, coarse route
+authorization, infrastructure retention, and handling boundaries. Projects
+declare classification as governance metadata separate from desired deployment
+state. [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md)
+defines the accepted authentication, authorization, retention, and Public,
+Internal, Confidential, and Restricted handling rules.
+
 ## Validation and authorization
 
 The API validates schema, names, images, ports, resources, schedules, probes,

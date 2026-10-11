@@ -12,21 +12,24 @@ uses the React stack selected in
 [UI implementation plan](ui.md). CLI delivery follows the
 [CLI implementation plan](cli.md).
 
-The [energy-system integration plan](energy-system-integration.md) is the first
-Phase 3 delivery slice. Complete its application identity, component monitoring,
-authenticated routing, durability, and recovery gates before starting new Phase 3
-breadth beyond work already in progress. Existing portal and CLI work may continue
-only where it directly enables or verifies that slice.
+The [energy-system use-case enablement plan](energy-system-integration.md) is the
+first Phase 3 delivery slice. It delivers generic application identity, component
+monitoring, authenticated routing, durability, and recovery capabilities, then
+uses separately owned energy-system evidence to verify the use case. Complete
+those gates before starting new Phase 3 breadth beyond work already in progress.
+Existing portal and CLI work may continue only where it directly enables or
+verifies that slice.
 
 ## Priority sequence
 
-1. Freeze the energy deployment, identity, connectivity, persistence/TLS, limits,
-   and retention decisions (`PLAN-016`).
+1. Freeze the generic deployment, identity, connectivity, persistence/TLS,
+   limits, retention, and application/platform ownership contracts (`PLAN-016`).
 2. Deliver hosted-application OIDC and application/platform permission separation
    (`PLAN-009`).
 3. Correct component-aware monitoring and define safe cross-application correlation
    (`PLAN-017`).
-4. Pass the deployed ODIP/VEF authenticated-route and denial gate (`PLAN-018`).
+4. Pass the platform's neutral-fixture authenticated-route and denial gate and
+   record the separately owned energy-system suite result (`PLAN-018`).
 5. Pass restart and application-level backup/restore reproduction (`PLAN-019`).
 6. Resume the broader portal/template journey and human database access
    (`PLAN-006` through `PLAN-008`).
@@ -37,7 +40,13 @@ only where it directly enables or verifies that slice.
 - Provide a CLI over the same versioned public contracts, with understandable errors
   and progress, following the [CLI implementation plan](cli.md).
 - Create a web-application/PostgreSQL template, preferably as one deployable artifact.
-- Extend the accepted ADR-004 boundary by automating OIDC clients and controlled redirect URIs for hosted applications while preserving the separation between platform and application permissions. F-10 remains a Phase 3 requirement; deferring it requires an explicit scope amendment.
+- Extend the accepted ADR-004 boundary with platform-managed application groups
+  and access policies using `browser-session` and `bearer-token` modes. Derive
+  hosted-application OIDC clients, browser callback URIs, machine audiences, and
+  client-scoped group claims from stable platform resources. Humans use
+  first-login approval and machines use pre-authorization; platform roles never
+  imply application-group membership. F-10 remains a Phase 3 requirement;
+  deferring it requires an explicit scope amendment.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
 - Make ownership, roles, and the distinction between application and platform permissions visible.
 - Build the self-service journey on the multi-service and scheduled-component contract accepted in Phase 2A; do not create a portal-only component model.
@@ -46,10 +55,12 @@ Entry requires the Phase 1, Phase 2A, Phase 2B, and Phase 2C backlog gates, incl
 
 ## Acceptance
 
-The priority energy slice first satisfies the exit criteria in the
-[energy-system integration plan](energy-system-integration.md). This establishes
-hosted-application identity and a real multi-project consumer/producer journey
-before the general self-service demonstration.
+The priority use-case enablement slice first satisfies the exit criteria in the
+[energy-system use-case enablement plan](energy-system-integration.md). This
+establishes generic hosted-application identity and a real multi-project
+consumer/producer journey before the general self-service demonstration. The
+concrete energy-system declarations and business assertions remain outside the
+platform repository.
 
 A developer creates a sample application, deploys it, and locates an intentionally introduced failure using operation status, health, and logs. Disallowed actions remain blocked server-side even when UI checks are bypassed.
 

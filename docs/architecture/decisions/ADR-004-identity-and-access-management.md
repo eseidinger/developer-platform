@@ -8,9 +8,9 @@ The platform, applications, CI, and database access need identities. Sharing a l
 
 ## Decision
 
-Use standards-based OIDC as the platform identity boundary. Platform APIs depend on a generic OIDC contract; Keycloak is the supported reference deployment for the existing lab. The reference deployment uses one shared realm, with separate clients for each application or technical purpose. This selects Keycloak for the supported profile without coupling public API contracts or authorization data to Keycloak-specific APIs.
+Use standards-based OIDC as the platform identity boundary. Platform APIs depend on a generic OIDC contract; Keycloak is the supported reference deployment for the existing lab. The reference deployment uses one shared realm per platform environment, with separate clients for each application or technical purpose and no application-specific realms. This selects Keycloak for the supported profile without coupling public API contracts or authorization data to Keycloak-specific APIs.
 
-OIDC proves principal identity. Platform-owned data remains authoritative for authorization: the platform stores project/environment memberships and role bindings instead of encoding them as identity-provider realm roles. The single Python/FastAPI platform service owns these facts in its PostgreSQL state through the current delivery phases. Any optional Phase 5 catalog extraction requires a reconciled, single-writer cutover that preserves principal and scope associations.
+OIDC proves principal identity. Platform-owned data remains authoritative for authorization: the platform stores project/environment memberships and role bindings instead of encoding them as identity-provider realm roles. The single Python/FastAPI platform service owns these facts in its PostgreSQL state through the current delivery phases. Any optional Phase 5 catalog extraction requires a reconciled, single-writer cutover that preserves principal and scope associations. Phase 3 also introduces platform-owned, project-scoped hosted-application groups. Those groups are reconciled to client-scoped identity-provider claims for request enforcement; they do not become realm-wide platform roles and do not change the authority of the platform grant catalog.
 
 Identify a principal by the stable OIDC issuer and subject pair. Usernames, email addresses and display names are attributes, not authorization keys. Each API validates token signature, issuer, audience and validity before consulting the authoritative platform grant on every request. Removing a grant must therefore deny the next request; project permission is not retained merely because an access token remains valid.
 
@@ -29,7 +29,7 @@ Human CLI clients use Authorization Code with PKCE or Device Authorization; they
 
 The legacy shared `PLATFORM_TOKEN` is not accepted for ordinary developer project operations after the Phase 1B cutover. Any temporary bootstrap or break-glass path is operator-only, disabled by default after bootstrap, secret-protected and audited; it is never a developer fallback.
 
-Hosted applications use OIDC authentication and their own business authorization by default. Automated hosted-application client provisioning, redirect-URI management, portal login, human database identity and additional organization experience remain Phase 3 work.
+Hosted applications use platform-managed OIDC authentication and coarse route authorization through project-scoped application groups. Applications retain fine-grained object and domain authorization when needed. Automated hosted-application client provisioning, redirect-URI management, application-group lifecycle, first-login approval, portal login, human database identity and additional organization experience remain Phase 3 work. [ADR-020](ADR-020-generic-hosted-application-integration.md) defines that hosted-application boundary.
 
 ## Alternatives
 
@@ -43,9 +43,9 @@ The Python baseline needs an OIDC adapter and platform-owned grant repository be
 
 ## Validation
 
-Reject invalid signature, issuer, audience and expired/not-yet-valid tokens. Prove foreign-project access and unauthorized grant changes fail. Revoke a membership and prove the next request is denied and audited even when the previously issued access token has not expired. Verify collection results include only authorized projects and apply the same checks to logs, metrics, secrets and jobs as those surfaces are introduced.
+Reject invalid signature, issuer, audience and expired/not-yet-valid tokens. Prove foreign-project access and unauthorized grant changes fail. Revoke a platform project membership and prove the next Platform API request is denied and audited even when the previously issued access token has not expired. Hosted-application group revocation follows the separately bounded claim/session refresh policy in ADR-020. Verify collection results include only authorized projects and apply the same checks to logs, metrics, secrets and jobs as those surfaces are introduced.
 
-Prove `viewer` cannot mutate, `developer` cannot retire projects or manage grants, `project-admin` cannot cross project boundaries, and only `platform-admin` can administer all project grants. Verify application roles cannot create platform permissions, platform roles do not grant hosted-application business access, service identities cannot impersonate people, and no audit or export contains a bearer token or secret claim.
+Prove `viewer` cannot mutate, `developer` cannot retire projects or manage grants, `project-admin` cannot cross project boundaries, and only `platform-admin` can administer all project grants. Verify application groups cannot create platform permissions, platform roles do not grant application-group membership, service identities cannot impersonate people, and no audit or export contains a bearer token or secret claim.
 
 Source now contains the provider-neutral JWT verifier, platform-owned grant tables and checks, Keycloak 26.4.1 reference Compose profile, one-time bootstrap grant, and redacted audit hooks. Record the exact deployed provider version, realm/client configuration, redirect URIs, key-rotation behavior, backup coverage and controlled lab acceptance evidence before closing Phase 1B. This source update does not complete OPS-001, OPS-002 or OPS-004.
 

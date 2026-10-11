@@ -201,6 +201,12 @@ Names use `[A-Za-z_][A-Za-z0-9_]{0,62}` and must not start with `PG`,
 no NUL byte or key material. Names that look like passwords, tokens, API keys, or
 other secrets are rejected; use the platform secrets API or UI for secret values.
 
+Application secrets are project-scoped in the current profile and may be mounted
+into every service and scheduled component in that project. Do not use the
+project secret mechanism when a credential requires component-level isolation;
+that capability is not supported. Classification is project governance metadata,
+not part of this deployment declaration.
+
 `spec.resources`, if declared, may contain one object only:
 
 ```json
