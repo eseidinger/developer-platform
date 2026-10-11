@@ -825,7 +825,7 @@ def list_test_identities(test_run_id: str | None = Query(None, max_length=64),
                 (SELECT role FROM platform_grants g
                  WHERE g.issuer=deployment_credentials.issuer
                    AND g.subject=deployment_credentials.subject LIMIT 1)
-            FROM deployment_credentials WHERE kind='test-persona' AND (%s IS NULL OR test_run_id=%s)
+            FROM deployment_credentials WHERE kind='test-persona' AND (%s::text IS NULL OR test_run_id=%s)
             ORDER BY created_at, credential_id""", (test_run_id, test_run_id)).fetchall()
     required_audit(actor_for(principal), "test-identity.list", "test-run", test_run_id, "succeeded",
                    {"scope": "platform"}, {"count": len(rows)})

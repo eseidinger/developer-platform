@@ -128,6 +128,23 @@ class PlatformAutomationApiTests(unittest.TestCase):
                     main.require_human_platform_admin(machine)
         self.assertEqual(raised.exception.status_code, 403)
 
+    def test_test_identity_listing_types_optional_run_filter(self):
+        for run_id in (None, "run-1"):
+            with self.subTest(run_id=run_id):
+                conn = AutomationConnection()
+                with patch.object(main, "require_test_identity_manager") as authorize, \
+                     patch.object(main, "required_audit") as audit, \
+                     patch.object(main, "connect", return_value=conn):
+                    response = main.list_test_identities(run_id, self.human)
+                self.assertEqual(response, {"credentials": []})
+                authorize.assert_called_once_with(self.human)
+                query, params = conn.statements[0]
+                self.assertIn("(%s::text IS NULL OR test_run_id=%s)", query)
+                self.assertEqual(params, (run_id, run_id))
+                self.assertIn("kind='test-persona'", query)
+                audit.assert_called_once_with(main.actor_for(self.human), "test-identity.list", "test-run",
+                                              run_id, "succeeded", {"scope": "platform"}, {"count": 0})
+
 
 if __name__ == "__main__":
     unittest.main()

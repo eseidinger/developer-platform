@@ -65,6 +65,43 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
         with psycopg.connect(self.dsn, autocommit=True) as conn:
             conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(sql.Identifier(self.schema)))
 
+    async def test_test_identity_listing_filters_runs_and_keeps_revoked_cleanup_handles(self):
+        with self.connect() as conn:
+            authorization.grant(conn, self.actor, "platform", None, "platform-admin")
+            for name, kind, run_id, status in (
+                ("reader", "test-persona", "run-1", "active"),
+                ("retired-reader", "test-persona", "run-1", "revoked"),
+                ("other-reader", "test-persona", "run-2", "active"),
+                ("runner", "test-runner", None, "active"),
+            ):
+                conn.execute("""INSERT INTO deployment_credentials(
+                    name, kind, project, issuer, subject, provider_client_id, provider_resource_id,
+                    status, created_by_issuer, created_by_subject, expires_at, test_run_id)
+                    VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,now()+interval '2 hours',%s)""",
+                    (name, kind, "provider" if kind == "test-persona" else None,
+                     self.actor.issuer, name, "client-" + name, "provider-" + name,
+                     status, self.actor.issuer, self.actor.subject, run_id))
+                if kind == "test-persona" and status == "active":
+                    authorization.grant(conn, Principal(self.actor.issuer, name), "project", "provider", "viewer")
+        for run_id, expected in (("run-1", {"reader", "retired-reader"}),
+                                 ("run-2", {"other-reader"}), ("missing-run", set()),
+                                 (None, {"reader", "retired-reader", "other-reader"})):
+            with self.subTest(run_id=run_id):
+                response = await self.client.get("/platform/test-identities",
+                    params={"test_run_id": run_id} if run_id is not None else {})
+                self.assertEqual(response.status_code, 200)
+                records = response.json()["credentials"]
+                self.assertEqual({r["name"] for r in records}, expected)
+                for record in records:
+                    self.assertEqual(record["kind"], "test-persona")
+                    self.assertEqual(record["status"], "revoked" if record["name"] == "retired-reader" else "active")
+                    self.assertEqual(record["role"], None if record["status"] == "revoked" else "viewer")
+                    self.assertNotIn("client_secret", record)
+                    self.assertNotIn("provider_client_id", record)
+        self.active_actor = self.consumer
+        denied = await self.client.get("/platform/test-identities", params={"test_run_id": "run-1"})
+        self.assertEqual(denied.status_code, 403)
+
     async def group(self):
         response = await self.client.post("/v1/projects/provider/application-groups", json={"name": "readers", "displayName": "Readers"},
                                           headers={"Idempotency-Key": "readers-1"})
