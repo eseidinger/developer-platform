@@ -20,7 +20,7 @@ redacted HTTP results as evidence.
 ## Neutral hosted-application acceptance harness
 
 Source status (October 11, 2026): the harness is implemented and tested locally;
-the deployed hosted-access gate has **not** been executed or closed. Run it only
+the deployed hosted-access gate has **not** passed or closed. Run it only
 after the [hosted-access installation](../identity-and-access.md#hosted-application-access-installation-and-recovery)
 is deployed. It does not deploy, upgrade, or reset the platform.
 
@@ -94,7 +94,9 @@ existing client/user-management permissions, and available workload capacity
 must be ready. Approve the provider and issuer's apply-time IP addresses on TCP
 443 through the normal operator egress configuration. The harness neither
 widens that allow-list nor disables TLS checks. Supply a resolvable unrelated
-host outside those permitted addresses for the negative egress assertion.
+host outside those permitted addresses for the negative egress assertion. Its TCP
+443 endpoint must be reachable from the platform host in the fixture Pods' IP
+families so that the harness can establish an outside-policy positive control.
 The operator needs access to the host's private `.env`, `kubectl`, and
 `.runtime/admin.kubeconfig`. Override `--kubectl` or `--settings` if necessary.
 
@@ -143,7 +145,17 @@ unapproved/wrong-group, ambiguous/unmatched path and forged-header denials;
 private-backend bypass and unrelated-egress denial; retained, project-isolated
 PostgreSQL state after restart; policy activation/rollback; normal and emergency
 rotation; and denial of already issued tokens/sessions after revocation.
-DNS/network errors do not count as a successful isolation check.
+Network isolation checks require successful TCP controls to the same resolved
+addresses immediately before and after each negative probe. Backend controls
+run from the existing authorizer; the unrelated-egress control runs from the
+platform host. The harness does not create a probe Pod or change network policies.
+Timeouts and active connection refusals can count as denial only with these
+controls. DNS failures, address changes, unexpected network errors, unavailable
+controls, or any successful negative connection fail the check. Probes cover the
+ready source Pods' configured IPv4/IPv6 families; absence of IPv6 routing on an
+IPv4-only cluster is not treated as isolation evidence. Reports contain only
+outcome counts, family flags, and control-success flags for these probes, never
+raw exception text or response bodies.
 
 `--timed` additionally holds a real machine token until expiry (up to five
 minutes). `--allow-recovery-reconcile` separately authorizes the **global**

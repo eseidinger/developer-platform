@@ -16,6 +16,7 @@ import re
 import secrets
 import stat
 import subprocess
+import sys
 import time
 from datetime import datetime, timezone
 from html.parser import HTMLParser
@@ -330,23 +331,66 @@ class Kube:
                            "--", "python", "-c", script, data=json.dumps(body), timeout=45)
         return json.loads(result)
 
+    def authorizer_probe(self, body):
+        # Read-only TCP control from the existing, policy-authorized backend caller.
+        result = self.call("-n", "platform-access", "exec", "-i", "deploy/authorizer",
+                           "--", "python", "-c", NETWORK_PROBE, data=json.dumps(body), timeout=45)
+        return json.loads(result)
 
-NETWORK_PROBE = """import json,socket,sys
+    def pod_ip_versions(self, project, component):
+        pods = json.loads(self.call("-n", "project-" + project, "get", "pods",
+            "-l", "platform.example/component=" + component, "-o", "json"))["items"]
+        live = [p for p in pods if not p["metadata"].get("deletionTimestamp") and any(
+            c.get("type") == "Ready" and c.get("status") == "True" for c in p.get("status", {}).get("conditions", []))]
+        versions = {ipaddress.ip_address(ip["ip"]).version for p in live
+                    for ip in p.get("status", {}).get("podIPs", [])}
+        require(bool(versions), "fixture_network_families_unavailable")
+        return sorted(versions)
+
+
+NETWORK_PROBE = """import ipaddress,json,socket,sys
 p=json.load(sys.stdin)
-addresses=socket.getaddrinfo(p['host'],p['port'],type=socket.SOCK_STREAM)
-results=[]
-for family,kind,proto,_,address in addresses:
+r={'resolved':False,'addresses':[],'connected':0,'refused':0,'timedOut':0,
+   'unexpectedErrors':0,'dnsError':False,'addressMismatch':False}
+try:
+    addresses=socket.getaddrinfo(p['host'],p['port'],type=socket.SOCK_STREAM)
+except OSError:
+    r['dnsError']=True;print(json.dumps(r));sys.exit(0)
+addresses=list({(family,kind,proto,address) for family,kind,proto,_,address in addresses
+                if ipaddress.ip_address(address[0]).version in p['ipVersions']})
+r['addresses']=sorted({str(ipaddress.ip_address(address[0])) for _,_,_,address in addresses})
+r['resolved']=bool(addresses)
+if 'expectedAddresses' in p and r['addresses']!=sorted(p['expectedAddresses']):
+    r['addressMismatch']=True;print(json.dumps(r));sys.exit(0)
+for family,kind,proto,address in addresses:
     sock=socket.socket(family,kind,proto);sock.settimeout(2)
     try:
-        sock.connect(address);results.append(True)
+        sock.connect(address);r['connected']+=1
     except TimeoutError:
-        results.append(False)
+        r['timedOut']+=1
+    except ConnectionRefusedError:
+        r['refused']+=1
     except OSError:
-        print(json.dumps({'resolved':True,'blocked':False,'unexpectedNetworkError':True}));sys.exit(0)
+        r['unexpectedErrors']+=1
     finally:
         sock.close()
-print(json.dumps({'resolved':bool(addresses),'blocked':bool(results) and not any(results)}))
+print(json.dumps(r))
 """
+
+
+def host_network_probe(body):
+    """Outside-policy reachability control; no HTTP headers or credentials are used."""
+    result = subprocess.run([sys.executable, "-c", NETWORK_PROBE], input=json.dumps(body),
+                            text=True, capture_output=True, timeout=45)
+    require(result.returncode == 0, "host_network_probe_failed")
+    return json.loads(result.stdout)
+
+
+def network_control_ready(result):
+    return (result.get("resolved") is True and bool(result.get("addresses"))
+            and not result.get("dnsError") and not result.get("addressMismatch")
+            and result.get("connected") == len(result["addresses"])
+            and all(result.get(k) == 0 for k in ("refused", "timedOut", "unexpectedErrors")))
 
 
 class MachineTokens(Tokens):
@@ -586,14 +630,41 @@ class Drill:
         self.check("synthetic-cross-project-correlation", probe.json()["provider"]["correlationHash"] == fingerprint(self.run_id))
         return principal
 
+    def controlled_network_check(self, name, host, port, probe, control, *, ip_versions):
+        body = {"host": host, "port": port, "ipVersions": ip_versions}
+        before = control(body)
+        before_ready = network_control_ready(before)
+        # Never accept refusal (or timeout) against an unavailable target.
+        result = {"resolved": False, "connected": 0, "refused": 0, "timedOut": 0,
+                  "unexpectedErrors": 0, "dnsError": False, "addressMismatch": False}
+        after = dict(result)
+        after_ready = False
+        if before_ready:
+            pinned = {**body, "expectedAddresses": before["addresses"]}
+            result = probe(pinned)
+            after = control(pinned)
+            after_ready = network_control_ready(after) and after.get("addresses") == before["addresses"]
+        denied = (before_ready and after_ready and result.get("resolved") is True
+                  and result.get("addresses") == before["addresses"]
+                  and not result.get("dnsError") and not result.get("addressMismatch")
+                  and result.get("connected") == 0 and result.get("unexpectedErrors") == 0
+                  and result.get("refused", 0) + result.get("timedOut", 0) == len(before["addresses"]))
+        fields = ("resolved", "connected", "refused", "timedOut", "unexpectedErrors", "dnsError", "addressMismatch")
+        measurements = {k: result[k] for k in fields}
+        for prefix, outcome in (("controlBefore", before), ("controlAfter", after)):
+            measurements.update({prefix + k[0].upper() + k[1:]: outcome.get(k, result[k]) for k in fields})
+        self.check(name, denied, controlBefore=before_ready, controlAfter=after_ready,
+                   ipvFour=4 in ip_versions, ipvSix=6 in ip_versions, **measurements)
+
     def network_checks(self):
         backend = "api.project-" + self.projects["provider"] + ".svc.cluster.local"
         for role in ("provider", "consumer"):
-            result = self.kube.exec_json(self.projects[role], "worker", NETWORK_PROBE, {"host": backend, "port": 8080})
-            self.check(role + "-direct-backend-bypass-denied", result.get("resolved") and result.get("blocked"))
-        result = self.kube.exec_json(self.projects["consumer"], "api", NETWORK_PROBE,
-                                     {"host": self.args.unrelated_host, "port": 443})
-        self.check("unrelated-egress-denied", result.get("resolved") and result.get("blocked"))
+            self.controlled_network_check(role + "-direct-backend-bypass-denied", backend, 8080,
+                lambda body: self.kube.exec_json(self.projects[role], "worker", NETWORK_PROBE, body),
+                self.kube.authorizer_probe, ip_versions=self.kube.pod_ip_versions(self.projects[role], "worker"))
+        self.controlled_network_check("unrelated-egress-denied", self.args.unrelated_host, 443,
+            lambda body: self.kube.exec_json(self.projects["consumer"], "api", NETWORK_PROBE, body),
+            host_network_probe, ip_versions=self.kube.pod_ip_versions(self.projects["consumer"], "api"))
         policy = self.kube.obj("networkpolicy", "api-egress", "project-" + self.projects["consumer"])
         destinations = [peer["ipBlock"]["cidr"] for rule in policy["spec"]["egress"] for peer in rule.get("to", []) if "ipBlock" in peer]
         self.check("dns-egress-pinned-to-host-addresses", bool(destinations) and all(ipaddress.ip_network(c).prefixlen

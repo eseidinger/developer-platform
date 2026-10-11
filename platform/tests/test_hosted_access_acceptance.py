@@ -3,6 +3,7 @@ import contextlib
 import io
 import json
 import os
+import socket
 from pathlib import Path
 import stat
 import sys
@@ -351,19 +352,195 @@ class HarnessTests(unittest.TestCase):
         machines.get.assert_called_once()
         drill.public_call.assert_called_once_with("/api/identity", token)
 
-    def test_connection_refusal_does_not_count_as_network_isolation(self):
-        import socket
-        for failure, expected in ((TimeoutError(), True), (ConnectionRefusedError(), False)):
-            sock = Mock()
+    def network_result(self, **changes):
+        return {"resolved": True, "addresses": ["192.0.2.1"], "connected": 0,
+                "refused": 0, "timedOut": 0, "unexpectedErrors": 0,
+                "dnsError": False, "addressMismatch": False, **changes}
+
+    def controlled_network_check(self, result, *, before=None, after=None):
+        journal = h.Journal(self.directory / uuid4().hex, API, RUN)
+        drill = h.Drill(self.args(), journal, Mock(), Mock(), Mock())
+        self.addCleanup(drill.public.close)
+        self.addCleanup(drill.browser.close)
+        control = Mock(side_effect=[before if before is not None else self.network_result(connected=1),
+                                    after if after is not None else self.network_result(connected=1)])
+        probe = Mock(return_value=result)
+        error = None
+        with contextlib.redirect_stdout(io.StringIO()):
+            try:
+                drill.controlled_network_check("controlled-denial", "example.invalid", 443,
+                                               probe, control, ip_versions=[4])
+            except h.DrillError as exc:
+                error = str(exc)
+        return journal.report["checks"][-1], error, probe, control
+
+    def test_refusal_and_timeout_need_healthy_same_address_controls(self):
+        for outcome in ("refused", "timedOut"):
+            with self.subTest(outcome=outcome):
+                result = self.network_result(**{outcome: 1})
+                self.assertFalse(h.network_control_ready(result))  # Alone, not proof of enforcement.
+                check, error, probe, control = self.controlled_network_check(result)
+                self.assertIsNone(error)
+                self.assertEqual(check["result"], "passed")
+                self.assertEqual(check[outcome], 1)
+                self.assertTrue(check["controlBefore"] and check["controlAfter"])
+                self.assertEqual(check["controlBeforeConnected"], 1)
+                self.assertEqual(check["controlAfterConnected"], 1)
+                self.assertTrue(check["ipvFour"])
+                self.assertFalse(check["ipvSix"])
+                pinned = {"host": "example.invalid", "port": 443, "ipVersions": [4], "expectedAddresses": ["192.0.2.1"]}
+                probe.assert_called_once_with(pinned)
+                self.assertEqual(control.call_args_list[1].args, (pinned,))
+                self.assertNotIn("192.0.2.1", json.dumps(check))
+
+    def test_unavailable_control_or_changed_dns_cannot_pass_isolation(self):
+        for failure in (self.network_result(refused=1), self.network_result(timedOut=1),
+                        self.network_result(resolved=False, addresses=[], dnsError=True),
+                        self.network_result(connected=1, addresses=["192.0.2.2"]),
+                        self.network_result(addressMismatch=True)):
+            with self.subTest(failure=failure):
+                check, error, probe, _ = self.controlled_network_check(self.network_result(refused=1), after=failure)
+                self.assertEqual(error, "controlled-denial")
+                self.assertEqual(check["result"], "failed")
+                self.assertFalse(check["controlAfter"])
+                probe.assert_called_once()
+        check, error, probe, control = self.controlled_network_check(
+            self.network_result(refused=1), before=self.network_result(refused=1))
+        self.assertEqual(error, "controlled-denial")
+        self.assertFalse(check["controlBefore"])
+        self.assertEqual(check["controlBeforeRefused"], 1)
+        probe.assert_not_called()
+        self.assertEqual(control.call_count, 1)
+
+    def test_success_dns_error_unexpected_error_or_partial_denial_cannot_pass(self):
+        for result in (self.network_result(connected=1), self.network_result(unexpectedErrors=1),
+                       self.network_result(resolved=False, addresses=[], dnsError=True),
+                       self.network_result(addressMismatch=True), self.network_result(),
+                       self.network_result(refused=1, connected=1),
+                       self.network_result(refused=1, addresses=["192.0.2.2"])):
+            with self.subTest(result=result):
+                check, error, _, _ = self.controlled_network_check(result)
+                self.assertEqual(error, "controlled-denial")
+                self.assertEqual(check["result"], "failed")
+
+    def test_every_controlled_address_must_be_denied(self):
+        addresses = ["192.0.2.1", "192.0.2.2"]
+        positive = self.network_result(addresses=addresses, connected=2)
+        for counts, passes in (({"refused": 2}, True), ({"refused": 1, "timedOut": 1}, True),
+                               ({"refused": 1, "connected": 1}, False), ({"refused": 1}, False)):
+            with self.subTest(counts=counts):
+                check, error, _, _ = self.controlled_network_check(
+                    self.network_result(addresses=addresses, **counts), before=positive, after=positive)
+                self.assertEqual(check["result"], "passed" if passes else "failed")
+                self.assertEqual(error, None if passes else "controlled-denial")
+
+    def probe_result(self, failures, *, answers=None, body=None, dns_failure=None):
+        answers = answers if answers is not None else [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.1", 443))]
+        sockets = [Mock() for _ in failures]
+        for sock, failure in zip(sockets, failures):
             sock.connect.side_effect = failure
-            with patch("socket.getaddrinfo", return_value=[(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.1", 443))]), \
-                 patch("socket.socket", return_value=sock), patch("sys.stdin", io.StringIO('{"host":"example.invalid","port":443}')), \
-                 contextlib.redirect_stdout(io.StringIO()) as output:
-                try:
-                    exec(h.NETWORK_PROBE, {})
-                except SystemExit:
-                    pass
-            self.assertEqual(json.loads(output.getvalue())["blocked"], expected)
+        with patch("socket.getaddrinfo", return_value=answers, side_effect=dns_failure), \
+             patch("socket.socket", side_effect=sockets) as create_socket, \
+             patch("sys.stdin", io.StringIO(json.dumps(body or {"host": "example.invalid", "port": 443, "ipVersions": [4]}))), \
+             contextlib.redirect_stdout(io.StringIO()) as output:
+            try:
+                exec(h.NETWORK_PROBE, {})
+            except SystemExit:
+                pass
+        self.assertNotIn("private-secret", output.getvalue())
+        for sock in sockets:
+            sock.close.assert_called_once()
+        return json.loads(output.getvalue()), create_socket
+
+    def test_probe_classifies_connect_timeout_refusal_and_other_errors(self):
+        for failure, field in ((None, "connected"), (TimeoutError(), "timedOut"),
+                               (ConnectionRefusedError(), "refused"), (OSError("private-secret"), "unexpectedErrors")):
+            with self.subTest(field=field):
+                result, _ = self.probe_result([failure])
+                self.assertEqual(result, self.network_result(**{field: 1}))
+
+    def test_probe_dns_failure_and_address_change_do_not_attempt_connect(self):
+        result, create = self.probe_result([], dns_failure=socket.gaierror("private-secret"))
+        self.assertFalse(result["resolved"])
+        self.assertTrue(result["dnsError"])
+        create.assert_not_called()
+        result, create = self.probe_result([], body={"host": "example.invalid", "port": 443,
+                                                   "ipVersions": [4], "expectedAddresses": ["192.0.2.2"]})
+        self.assertTrue(result["addressMismatch"])
+        create.assert_not_called()
+
+    def test_probe_deduplicates_answers_and_checks_all_supported_families(self):
+        ipv_four = (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("192.0.2.1", 443))
+        ipv_six = (socket.AF_INET6, socket.SOCK_STREAM, 6, "", ("2001:db8::1", 443, 0, 0))
+        for versions in ([4], [4, 6]):
+            result, create = self.probe_result([ConnectionRefusedError()] * len(versions),
+                answers=[ipv_four, ipv_four, ipv_six], body={"host": "example.invalid", "port": 443, "ipVersions": versions})
+            self.assertEqual(create.call_count, len(versions))
+            self.assertEqual(result["refused"], len(versions))
+            self.assertEqual(result["addresses"], ["192.0.2.1"] + (["2001:db8::1"] if 6 in versions else []))
+
+    def test_probe_records_mixed_address_outcomes_without_hiding_connect(self):
+        answers = [(socket.AF_INET, socket.SOCK_STREAM, 6, "", (ip, 443)) for ip in ("192.0.2.1", "192.0.2.2")]
+        result, _ = self.probe_result([ConnectionRefusedError(), None], answers=answers)
+        self.assertEqual(result["connected"], 1)
+        self.assertEqual(result["refused"], 1)
+        check, error, _, _ = self.controlled_network_check(result)
+        self.assertEqual(error, "controlled-denial")
+        self.assertEqual(check["connected"], 1)
+
+    def test_host_control_uses_real_disposable_loopback_listener(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            listener.listen(4)
+            body = {"host": "127.0.0.1", "port": listener.getsockname()[1], "ipVersions": [4]}
+            result = h.host_network_probe(body)
+            self.assertTrue(h.network_control_ready(result))
+            self.assertEqual(result["addresses"], ["127.0.0.1"])
+        # Bind but don't listen: the same probe must not call refusal a healthy control.
+        with socket.socket() as unavailable:
+            unavailable.bind(("127.0.0.1", 0))
+            result = h.host_network_probe({**body, "port": unavailable.getsockname()[1]})
+            self.assertEqual(result["refused"], 1)
+            self.assertFalse(h.network_control_ready(result))
+
+    def test_kubernetes_controls_use_authorizer_and_ready_fixture_pod_families(self):
+        kube = h.Kube("kubectl")
+        body = {"host": "fixture.invalid", "port": 8080, "ipVersions": [4]}
+        with patch.object(kube, "call", return_value=json.dumps(self.network_result(connected=1))) as call:
+            self.assertTrue(h.network_control_ready(kube.authorizer_probe(body)))
+        call.assert_called_once_with("-n", "platform-access", "exec", "-i", "deploy/authorizer",
+            "--", "python", "-c", h.NETWORK_PROBE, data=json.dumps(body), timeout=45)
+        ready = {"metadata": {}, "status": {"conditions": [{"type": "Ready", "status": "True"}],
+                                             "podIPs": [{"ip": "192.0.2.1"}, {"ip": "2001:db8::1"}]}}
+        deleting = {"metadata": {"deletionTimestamp": "now"}, "status": ready["status"]}
+        with patch.object(kube, "call", return_value=json.dumps({"items": [ready, deleting]})) as call:
+            self.assertEqual(kube.pod_ip_versions(h.project_names(RUN)["consumer"], "api"), [4, 6])
+        call.assert_called_once_with("-n", "project-" + h.project_names(RUN)["consumer"], "get", "pods",
+                                    "-l", "platform.example/component=api", "-o", "json")
+        with patch.object(kube, "call", return_value=json.dumps({"items": [deleting]})), \
+             self.assertRaisesRegex(h.DrillError, "fixture_network_families_unavailable"):
+            kube.pod_ip_versions(h.project_names(RUN)["consumer"], "api")
+
+    def test_network_checks_wire_backend_controls_to_authorizer_and_egress_to_host(self):
+        journal = self.journal()
+        kube = Mock()
+        kube.pod_ip_versions.return_value = [4]
+        kube.authorizer_probe.return_value = self.network_result(connected=1)
+        kube.exec_json.return_value = self.network_result(refused=1)
+        kube.obj.return_value = {"spec": {"egress": [{"to": [{"ipBlock": {"cidr": "192.0.2.10/32"}}]}]}}
+        drill = h.Drill(self.args(), journal, Mock(), Mock(), kube)
+        self.addCleanup(drill.public.close)
+        self.addCleanup(drill.browser.close)
+        with patch.object(h, "host_network_probe", return_value=self.network_result(connected=1)) as host, \
+             contextlib.redirect_stdout(io.StringIO()):
+            drill.network_checks()
+        self.assertEqual(kube.authorizer_probe.call_count, 4)
+        self.assertEqual(host.call_count, 2)
+        self.assertEqual([(c.args[0], c.args[1]) for c in kube.exec_json.call_args_list],
+                         [(drill.projects["provider"], "worker"), (drill.projects["consumer"], "worker"),
+                          (drill.projects["consumer"], "api")])
+        self.assertTrue(all(check["result"] == "passed" for check in journal.report["checks"]))
+        self.assertNotIn("192.0.2.1", json.dumps(journal.report["checks"]))
 
     def test_operator_session_supports_only_existing_public_clients(self):
         for client_id in ("platform-cli", "platform-portal"):
