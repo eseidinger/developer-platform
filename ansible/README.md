@@ -67,6 +67,13 @@ For an existing host with Docker, prefer `platform_install_docker: false` to
 avoid changing its package source. Conflicting distribution Docker packages are
 not automatically removed. The existing engine must provide Compose >= 2.20.3.
 
+Hosted-application acceptance has a separate
+[`test-platform-hosted-access.yml`](test-platform-hosted-access.yml) wrapper.
+It defaults to an offline plan, does not deploy the platform, and requires
+explicit API-origin confirmation for live runs. Prepare the runner environment,
+public digest-pinned neutral fixture, and protected operator session on the
+target using the [acceptance harness procedure](../docs/operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness).
+
 Rerunning the playbook reapplies sources and endpoints and reconciles the running
 platform. After validating the transferred Compose configuration and confirming
 that no backup or availability drill is active, deployment performs a controlled

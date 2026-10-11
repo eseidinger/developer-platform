@@ -130,6 +130,19 @@ drill remain required. Component monitoring, centralized workload-log retention,
 and the external energy end-to-end gate remain subsequent increments. Operational
 setup is in the [hosted-access runbook](../../../operators/identity-and-access.md#hosted-application-access-installation-and-recovery).
 
+Acceptance automation progress (October 11, 2026): the neutral
+`scripts/check-hosted-access.py` harness now provides an offline plan, explicitly
+confirmed live core checks, optional held-token expiry and isolated recovery
+reconciliation, safe private evidence, and resumable scope-checked cleanup.
+Provider/consumer fixtures use one public component and a private worker, only
+synthetic PostgreSQL state, and no domain-specific application authorization.
+The fixture image and local regression/persistence checks pass. The running
+platform and external configuration contract remain unchanged. Follow the
+[harness procedure](../../../operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness)
+to prepare the public digest-pinned image and run the deployed checks next.
+Reports distinguish core success from deferred checks; reconciliation is not a
+real backup restore. PLAN-009/PLAN-018/PLAN-019 remain open.
+
 Implement [PLAN-009](../backlog.md#additional-phase-tasks) before the deployed
 connection gate. The capability must support these reusable registration types:
 

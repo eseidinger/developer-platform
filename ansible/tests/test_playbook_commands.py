@@ -62,6 +62,17 @@ class PlaybookCommandTests(unittest.TestCase):
         self.assertEqual(variables["platform_allowed_egress_cidrs"], "")
         self.assertEqual(variables["platform_allowed_egress_ports"], "")
 
+    def test_hosted_access_defaults_to_plan_and_passes_no_secret_values(self):
+        source = (ANSIBLE_DIR / "test-platform-hosted-access.yml").read_text()
+        playbook = yaml.safe_load(source)[0]
+        self.assertEqual(playbook["vars"]["hosted_access_command"], "plan")
+        self.assertFalse(playbook["vars"]["hosted_access_allow_recovery_reconcile"])
+        self.assertIn("hosted_access_confirm_environment", source)
+        self.assertIn("--operator-token-file", source)
+        self.assertNotIn("client_secret", source)
+        self.assertNotIn("--volumes", source)
+        self.assertTrue(playbook["tasks"][1]["no_log"])
+
 
 if __name__ == "__main__":
     unittest.main()

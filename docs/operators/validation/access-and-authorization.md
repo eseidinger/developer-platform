@@ -17,6 +17,152 @@ It is useful for the project/grant/revocation and restricted-inspection portions
 of this runbook; create the separate Keycloak test users first and retain only
 redacted HTTP results as evidence.
 
+## Neutral hosted-application acceptance harness
+
+Source status (October 11, 2026): the harness is implemented and tested locally;
+the deployed hosted-access gate has **not** been executed or closed. Run it only
+after the [hosted-access installation](../identity-and-access.md#hosted-application-access-installation-and-recovery)
+is deployed. It does not deploy, upgrade, or reset the platform.
+
+The entry point is `scripts/check-hosted-access.py`. It uses two uniquely named
+projects, `ha-<12-hex-run-id>-provider` and `ha-<run-id>-consumer`, each with one
+public API, one private worker, and its own PostgreSQL database. The neutral
+fixture deliberately has no application authorization and contains only synthetic
+markers. Never use its image with real application data.
+
+### Prepare the runner and fixture
+
+Create a runner environment on the platform host (Python 3.12 or newer):
+
+```bash
+python3 -m venv .runtime/acceptance-venv
+.runtime/acceptance-venv/bin/pip install -r platform/acceptance/requirements.txt
+docker build -f platform/acceptance/Dockerfile.fixture \
+  -t <your-public-registry>/hosted-access-fixture:<version> platform/acceptance
+```
+
+Publishing is a separate operator action, not part of the harness. Publish the
+fixture to an approved **public** registry and obtain its immutable registry
+digest. Supply `<registry>/hosted-access-fixture@sha256:<64-hex-digest>` below;
+a local image ID or a mutable tag is insufficient. The fixture is non-root and
+works with a read-only root filesystem.
+
+Before a live run, wildcard application DNS, public HTTPS certificates trusted
+by the host and fixture container, the hosted authorizer/proxy, the provisioner's
+existing client/user-management permissions, and available workload capacity
+must be ready. Approve the provider and issuer's apply-time IP addresses on TCP
+443 through the normal operator egress configuration. The harness neither
+widens that allow-list nor disables TLS checks. Supply a resolvable unrelated
+host outside those permitted addresses for the negative egress assertion.
+The operator needs access to the host's private `.env`, `kubectl`, and
+`.runtime/admin.kubeconfig`. Override `--kubectl` or `--settings` if necessary.
+
+Use the Device Authorization/PKCE procedure below to authenticate an existing
+**human platform administrator**. Save its token response privately as a mode
+`0600` JSON session file containing exactly `access_token`, `refresh_token`, and
+`client_id` (normally `platform-cli`). Do not supply passwords, bearer tokens,
+refresh tokens, or client secrets as command arguments. The harness renews the
+operator session in memory; it never writes renewed credentials to the journal.
+Obtain a fresh session for crash recovery if the original session is no longer
+usable. The existing operator account and its grants are not changed.
+
+### Plan, execute, and clean up
+
+An offline plan performs no network calls or writes:
+
+```bash
+.runtime/acceptance-venv/bin/python scripts/check-hosted-access.py plan \
+  --run-id 0123456789ab \
+  --fixture-image '<public-registry>/hosted-access-fixture@sha256:<digest>' \
+  --apps-domain apps.example.org \
+  --issuer https://identity.example.org/realms/platform
+```
+
+Choose a fresh run ID for each live run. Repeat the API origin exactly as the
+explicit environment confirmation:
+
+```bash
+.runtime/acceptance-venv/bin/python scripts/check-hosted-access.py run \
+  --api http://127.0.0.1:8000 \
+  --confirm-environment http://127.0.0.1:8000 \
+  --run-id 0123456789ab \
+  --fixture-image '<public-registry>/hosted-access-fixture@sha256:<digest>' \
+  --apps-domain apps.example.org \
+  --operator-token-file .runtime/operator-session.json \
+  --unrelated-host example.com
+```
+
+The core run verifies digest-pinned ready deployments; synthetic classification
+and retention records; pending human first login, explicit provider approval,
+group headers, bounded claim refresh, cookie/CSRF handling and stable identity;
+provider-approved service credentials and client-scoped groups/audience; allowed
+public HTTPS consumer-to-provider traffic and hashed synthetic correlation;
+project-wide credential visibility in the private worker; missing/invalid/wrong-audience,
+unapproved/wrong-group, ambiguous/unmatched path and forged-header denials;
+private-backend bypass and unrelated-egress denial; retained, project-isolated
+PostgreSQL state after restart; policy activation/rollback; normal and emergency
+rotation; and denial of already issued tokens/sessions after revocation.
+DNS/network errors do not count as a successful isolation check.
+
+`--timed` additionally holds a real machine token until expiry (up to five
+minutes). `--allow-recovery-reconcile` separately authorizes the **global**
+catalog-to-identity-provider reconciliation endpoint, so it requires an isolated
+lab with no other project records, including retired records. It verifies stable
+principals and state, invalidated browser sessions and old machine credentials,
+and replacement credentials. This is a reconciliation rehearsal, **not** a
+backup restore, and it cannot establish backup/recovery acceptance. Do not use
+the flag on a shared lab; the inventory check cannot prevent concurrent creation
+of another project, so reserve the lab for the duration of the drill.
+
+Normal completion and caught failures attempt fixture retirement and synthetic
+identity cleanup. The harness refuses changed or out-of-scope resources. It
+never purges databases: retained fixture databases require a separate operator
+decision. It creates a temporary synthetic human administrator solely to prove
+that platform administration gives no implicit application membership; cleanup
+removes that grant and account. Abrupt termination or unavailable dependencies
+can leave resources or cleanup pending. Keep the private journal and retry:
+
+```bash
+.runtime/acceptance-venv/bin/python scripts/check-hosted-access.py cleanup \
+  --api http://127.0.0.1:8000 \
+  --confirm-environment http://127.0.0.1:8000 \
+  --run-id 0123456789ab \
+  --operator-token-file .runtime/operator-session.json
+```
+
+The default output directory is `.runtime/hosted-access/<run-id>` (mode `0700`).
+Its `state.json` contains cleanup handles but no credentials. Its mode-`0600`
+`report.json` contains named assertions, safe timings/statuses, fixture image,
+deployment revisions/operation IDs, resource bounds, harness source hash,
+synthetic project/route references, and pinned egress
+CIDRs; it contains no raw identity claims, cookies, passwords, tokens, or secret
+values. Treat the evidence as Internal. For `run`, exit zero means the selected core checks
+and cleanup completed; `result: core-passed` always has `gateClosed: false`.
+Exit nonzero means a failed check, dependency/configuration problem, or incomplete
+cleanup. Review the report before using it as evidence.
+
+The full gate still needs the explicit deferred checks: a verified backup
+restore, control-plane outage/five-minute fail-closed behavior, long browser and
+rotation timers, request retention, component monitoring/centralized log
+retention, DNS-address-change/reapply behavior, and the separately owned versioned energy-system suite. Skipped
+optional drills are also recorded as deferred, never as passed.
+
+For remote execution, `ansible/test-platform-hosted-access.yml` defaults to
+`plan` and uses the prepared runner environment above. Supply
+`hosted_access_run_id`, `hosted_access_fixture_image`, and
+`hosted_access_apps_domain`, plus `hosted_access_issuer` for the offline plan;
+for `run` or `cleanup`, additionally supply
+`hosted_access_command`, `hosted_access_confirm_environment` equal to
+`hosted_access_api`, and the **target-host path**
+`hosted_access_operator_token_file`. Optional flags are
+`hosted_access_timed` and `hosted_access_allow_recovery_reconcile`, both false
+by default. It does not transfer credentials or install dependencies.
+
+Local verification: the offline/safety/fixture tests pass, the fixture image
+builds, and its non-root/read-only readiness and real PostgreSQL persistence
+checks pass against disposable containers. These checks do not contact the
+running platform or substitute for the live acceptance run.
+
 ## Executed local validation — October 2, 2026
 
 The following controlled checks completed on the local lab. They are local

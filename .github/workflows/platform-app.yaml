@@ -16,6 +16,7 @@ jobs:
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
       ACCESS_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
+      ACCESS_FIXTURE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
@@ -23,7 +24,13 @@ jobs:
           python-version: "3.12"
       - run: pip install -r platform/tests/requirements.txt
       - run: python3 -m unittest discover -s platform/tests -v
-      - run: python3 -m compileall -q platform/app
+      - run: python3 -m compileall -q platform/app platform/acceptance scripts/check-hosted-access.py
+      - name: Verify offline acceptance plan
+        run: >-
+          python3 scripts/check-hosted-access.py plan --run-id 0123456789ab
+          --fixture-image ghcr.io/example/fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - name: Build neutral acceptance fixture
+        run: docker build -f platform/acceptance/Dockerfile.fixture -t acceptance-fixture:test platform/acceptance
       - name: Start isolated identity provider
         run: >-
           docker run --rm -d --name access-test-keycloak
