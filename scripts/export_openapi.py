@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "platform"))
+sys.path.insert(0, str(root / "platform" / "app" / "src"))
 from app.main import app  # noqa: E402
 
 target = root / "docs" / "api" / "openapi.json"

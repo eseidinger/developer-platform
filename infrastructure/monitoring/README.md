@@ -220,8 +220,8 @@ planned deletion preview, audit history, durable cleanup jobs, or database purge
 Install test dependencies in a virtual environment, then run:
 
 ```bash
-pip install -r platform/tests/requirements.txt
-python3 -m unittest discover -s platform/tests -v
+uv sync --project platform/app
+uv run --project platform/app python -m unittest discover -s platform/app/tests -v
 python3 scripts/check-monitoring.py
 python3 scripts/check-workload-logs.py
 docker compose config --quiet

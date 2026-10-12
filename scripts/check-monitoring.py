@@ -117,7 +117,7 @@ def main():
             print("PASS untrusted TLS certificate rejected")
             # Use the actual discovery generator and relabel configuration in a real Prometheus.
             import sys
-            sys.path.insert(0, str(ROOT / "platform"))
+            sys.path.insert(0, str(ROOT / "platform" / "app" / "src"))
             from app.monitoring import atomic_write, target_groups
             groups = target_groups([
                 ("smoke", {"probe_profile": "hello-world"}, "applied"),

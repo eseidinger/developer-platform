@@ -4,7 +4,7 @@ Status: the selected architecture through Phase 4 is one Python/FastAPI Platform
 
 ## Application boundary
 
-The [Python API](../../platform/app/main.py) is the single public and operational application. Logical responsibilities remain separated in code so they can be tested and evolved without creating distributed services:
+The [Python API](../../platform/app/src/app/main.py) is the single public and operational application. Logical responsibilities remain separated in code so they can be tested and evolved without creating distributed services:
 
 | Responsibility | Ownership in the Python application |
 |---|---|

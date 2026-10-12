@@ -494,7 +494,7 @@ the single shared Docker host suitable for hostile tenants.
 ## Revocation and rotation
 
 The generic hosted-access reference implementation is now in
-`platform/app/access_*`: PostgreSQL resources and durable operations,
+`platform/app/src/app/access_*`: PostgreSQL resources and durable operations,
 Keycloak projection, per-policy OAuth2 Proxy, and the shared replicated request
 boundary. See the [API guide](../developers/api.md#hosted-application-access)
 for exact resource bodies and the

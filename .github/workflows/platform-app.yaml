@@ -22,12 +22,13 @@ jobs:
       - uses: actions/setup-python@v7.0.0
         with:
           python-version: "3.12"
-      - run: pip install -r platform/tests/requirements.txt
-      - run: python3 -m unittest discover -s platform/tests -v
-      - run: python3 -m compileall -q platform/app platform/acceptance scripts/check-hosted-access.py
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: uv run --project platform/app python -m unittest discover -s platform/app/tests -v
+      - run: uv run --project platform/app python -m compileall -q platform/app/src/app platform/acceptance scripts/check-hosted-access.py
       - name: Verify offline acceptance plan
         run: >-
-          python3 scripts/check-hosted-access.py plan --run-id 0123456789ab
+          uv run --project platform/app python scripts/check-hosted-access.py plan --run-id 0123456789ab
           --fixture-image ghcr.io/example/fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       - name: Build neutral acceptance fixture
         run: docker build -f platform/acceptance/Dockerfile.fixture -t acceptance-fixture:test platform/acceptance
@@ -51,7 +52,7 @@ jobs:
         env:
           ACCESS_TEST_KEYCLOAK_URL: http://127.0.0.1:18080
           ACCESS_PROXY_CONFIG_TEST: "1"
-        run: python3 -m unittest discover -s platform/tests -p test_application_access_keycloak.py -v
+        run: uv run --project platform/app python -m unittest discover -s platform/app/tests -p test_application_access_keycloak.py -v
       - name: Remove disposable identity provider
         if: always()
         run: docker stop access-test-keycloak || true

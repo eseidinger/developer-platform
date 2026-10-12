@@ -1,4 +1,7 @@
 __pycache__
 *.pyc
+.venv
+app/tests
+app/.venv
 ui/node_modules
 ui/dist

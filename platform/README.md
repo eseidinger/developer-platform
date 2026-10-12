@@ -423,18 +423,18 @@ kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello logs deployment/
 
 ## Develop and validate
 
-[app/main.py](app/main.py) implements request validation, authentication, database
-provisioning, and request-driven Kubernetes apply. [app/manifests.py](app/manifests.py)
-defines the workload resources and can be tested without a live cluster. [app/monitoring.py](app/monitoring.py) rebuilds catalog-derived probe discovery. The implemented boundaries are recorded in [ADRs 012–015](../docs/architecture/decisions/README.md).
-[requirements.txt](requirements.txt) pins direct Python dependencies, while
-[Dockerfile](Dockerfile) defines the Python 3.14.7 API runtime.
+[app/src/app/main.py](app/src/app/main.py) implements request validation, authentication, database
+provisioning, and request-driven Kubernetes apply. [app/src/app/manifests.py](app/src/app/manifests.py)
+defines the workload resources and can be tested without a live cluster. [app/src/app/monitoring.py](app/src/app/monitoring.py) rebuilds catalog-derived probe discovery. The implemented boundaries are recorded in [ADRs 012–015](../docs/architecture/decisions/README.md).
+[app/pyproject.toml](app/pyproject.toml) and [app/uv.lock](app/uv.lock) define the locked Python
+dependencies, while [Dockerfile](Dockerfile) defines the Python 3.14.7 API runtime.
 
 From the repository root:
 
 ```bash
-python3 -m pip install -r platform/requirements-dev.txt
-python3 -m unittest discover -s platform/tests -v
-python3 -m compileall -q platform scripts
+uv sync --project platform/app
+uv run --project platform/app python -m unittest discover -s platform/app/tests -v
+uv run --project platform/app python -m compileall -q platform/app/src/app scripts
 bash -n scripts/up.sh scripts/down.sh
 docker compose config --quiet
 ```

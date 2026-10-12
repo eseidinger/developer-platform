@@ -228,7 +228,7 @@ def main():
                     assert metadata["operation_id"] == OPERATION and metadata["revision"] == "1"
             print("PASS production Kubernetes discovery/source, component labels, safe envelope, correlation and non-indexed operation metadata")
             import sys
-            sys.path.insert(0, str(ROOT / "platform"))
+            sys.path.insert(0, str(ROOT / "platform" / "app" / "src"))
             from app.retained_logs import observe_retained_logs
             previous_url = os.environ.get("LOKI_URL")
             os.environ["LOKI_URL"] = loki_url

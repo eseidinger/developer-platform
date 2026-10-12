@@ -4,7 +4,7 @@ Status: selected single-host hybrid topology with one Python/FastAPI Platform AP
 
 ## Implemented platform
 
-The [FastAPI service](../../platform/app/main.py) authenticates human and machine callers, owns projects and grants, accepts declarative application specifications, persists desired revisions and operations, provisions PostgreSQL bindings, applies Kubernetes resources, and exposes runtime status and diagnostics. Its in-process worker recovers queued or interrupted work after restart.
+The [FastAPI service](../../platform/app/src/app/main.py) authenticates human and machine callers, owns projects and grants, accepts declarative application specifications, persists desired revisions and operations, provisions PostgreSQL bindings, applies Kubernetes resources, and exposes runtime status and diagnostics. Its in-process worker recovers queued or interrupted work after restart.
 
 Docker runs the platform API, Keycloak, PostgreSQL, edge, monitoring, and k3d containers. Docker is host infrastructure, not an application workload provider. Kubernetes/k3d is the only supported application compute environment.
 

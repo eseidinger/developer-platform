@@ -13,7 +13,7 @@ import sys
 from env import settings
 
 root = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(root / "platform"))
+sys.path.insert(0, str(root / "platform" / "app" / "src"))
 from app.access_provider import derived_secret
 from app.access_runtime import shared_manifests
 

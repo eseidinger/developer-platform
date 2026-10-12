@@ -16,7 +16,7 @@ Prepare DNS, an Ubuntu 22.04+ host, SSH access, Python 3, systemd, and the capac
 ```bash
 python3 -m pip install 'ansible-core>=2.16'
 cp ansible/inventory.example.yml ansible/inventory.yml
-# Set host, SSH user, platform/app/identity domains, TLS email and edge bind address.
+# Set host, SSH user, platform/application/identity domains, TLS email and edge bind address.
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --ask-become-pass
 ```
 

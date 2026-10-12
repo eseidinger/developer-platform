@@ -16,9 +16,9 @@ configuration and validation. The durable design is described in
 Minimum local validation for API changes:
 
 ```bash
-python3 -m pip install -r platform/requirements-dev.txt
-python3 -m unittest discover -s platform/tests -v
-python3 -m compileall -q platform scripts operations
+uv sync --project platform/app
+uv run --project platform/app python -m unittest discover -s platform/app/tests -v
+uv run --project platform/app python -m compileall -q platform/app/src/app scripts operations
 ```
 
 Regenerate and check `docs/api/openapi.json` whenever the public schema changes.

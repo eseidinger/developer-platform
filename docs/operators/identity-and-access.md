@@ -195,7 +195,7 @@ as well as deployment-credential cleanup, before deleting the catalog.
 Verification uses synthetic identities and isolated databases only:
 
 ```bash
-.venv/bin/python -m unittest discover -s platform/tests -v
+uv run --project platform/app python -m unittest discover -s platform/app/tests -v
 ```
 
 Set `ACCESS_TEST_DSN` to an isolated PostgreSQL instance to enable durable

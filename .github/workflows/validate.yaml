@@ -10,12 +10,14 @@ jobs:
           python-version: "3.12"
       - run: python3 scripts/init.py
       - run: docker compose config --quiet
-      - run: pip install -r platform/requirements.txt 'ansible-core>=2.16,<2.22'
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: uv pip install --system 'ansible-core>=2.16,<2.22'
       - run: python3 -m unittest discover -s ansible/tests -v
       - run: python3 -m unittest discover -s operations/backup/tests -v
       - run: python3 -m unittest discover -s operations/heartbeat/tests -v
-      - run: python3 scripts/check-monitoring.py
-      - run: python3 scripts/check-workload-logs.py
+      - run: uv run --project platform/app python scripts/check-monitoring.py
+      - run: uv run --project platform/app python scripts/check-workload-logs.py
       - run: python3 scripts/check-doc-links.py
       - run: python3 -m compileall -q scripts operations
       - run: bash -n scripts/up.sh scripts/down.sh
@@ -27,7 +29,6 @@ jobs:
             esac
             ansible-playbook -i ansible/inventory.example.yml "$playbook" --syntax-check
           done
-      - run: find operations platform/tests -name '*.php' -print0 | xargs -0 -n1 php -l
       - run: php operations/watchdog/tests/watchdog.php
       - run: php operations/watchdog/tests/backup.php
       - run: php -d curl.cainfo="$RUNNER_TEMP/watchdog-smtp-cert.pem" -d sendmail_path=/bin/true operations/watchdog/tests/watchdog-mail.php

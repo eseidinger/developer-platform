@@ -7,8 +7,9 @@ on:
     paths:
       - .github/workflows/hosted-access-fixture.yaml
       - platform/acceptance/**
-      - platform/tests/test_hosted_access_acceptance.py
-      - platform/requirements*.txt
+      - platform/app/tests/test_hosted_access_acceptance.py
+      - platform/app/pyproject.toml
+      - platform/app/uv.lock
       - scripts/check-hosted-access.py
       - scripts/hosted-access-release.py
       - ansible/tests/test_hosted_access_workflow.py
@@ -39,15 +40,13 @@ jobs:
       ACCESS_FIXTURE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v7.0.1
-      - uses: actions/setup-python@v7.0.0
-        with:
-          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
       - name: Install test dependencies
-        run: pip install -r platform/tests/requirements.txt
+        run: uv sync --project platform/app --locked
       - name: Validate release metadata and workflow safety
         run: python3 -m unittest discover -s ansible/tests -p test_hosted_access_workflow.py -v
       - name: Test harness safety and real fixture PostgreSQL persistence
-        run: python3 -m unittest discover -s platform/tests -p test_hosted_access_acceptance.py -v
+        run: uv run --project platform/app python -m unittest discover -s platform/app/tests -p test_hosted_access_acceptance.py -v
       - name: Build fixture for runtime smoke test
         run: >-
           docker build -f platform/acceptance/Dockerfile.fixture

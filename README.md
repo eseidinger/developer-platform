@@ -72,13 +72,13 @@ implementation references. User and operator workflows are canonical under
 
 ```bash
 docker compose config --quiet
-python3 -m pip install -r platform/requirements-dev.txt
-python3 -m unittest discover -s platform/tests -v
+uv sync --project platform/app
+uv run --project platform/app python -m unittest discover -s platform/app/tests -v
 python3 -m unittest discover -s ansible/tests -v
 python3 scripts/check-monitoring.py
 python3 scripts/check-doc-links.py
 python3 -m unittest discover -s operations/backup/tests -v
-python3 -m compileall -q platform scripts operations
+uv run --project platform/app python -m compileall -q platform/app/src/app scripts operations
 bash -n scripts/up.sh scripts/down.sh
 ```
 

@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "developer-platform-api"
+version = "0.1.0"
+description = "Developer Platform control-plane API and hosted-access gateway"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.141.1",
+  "httpx2==2.13.1",
+  "kubernetes==36.0.3",
+  "psycopg[binary]==3.3.6",
+  "PyJWT[crypto]==2.15.1",
+  "uvicorn==0.53.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
