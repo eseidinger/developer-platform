@@ -1,11 +1,13 @@
 # Platform UI implementation plan
 
-Status: in progress as of October 7, 2026. Foundation, the authentication boundary,
+Status: in progress as of October 12, 2026. Foundation, the authentication boundary,
 the project workspace, and the core developer lifecycle are implemented in source:
 project creation, deployment and operation polling, diagnostics, logs, configuration,
 secrets, restart, rollback, retirement, recovery requests, and deployment
 credentials. Project-grant management is also implemented; operator workflows and
-delivery hardening remain planned. This plan implements the React stack selected
+delivery hardening remain planned. Hosted-application access definition and
+approval (PLAN-020, increment 4a) is the next implementation step. This plan
+implements the React stack selected
 in [ADR-019](../../../architecture/decisions/ADR-019-react-ui-technology-stack.md) for the Phase 3
 Platform Control Plane portal. It does not change the hosted-application packaging
 choice in [ADR-007](../../../architecture/decisions/ADR-007-ui-api-deployment.md).
@@ -21,9 +23,10 @@ introduced failure from resources, usage, revisions, and logs.
 The portal also provides project-administrator and platform-operator surfaces when
 the API authorizes them. It never grants access itself, retrieves unredacted secret
 values, talks directly to Kubernetes or PostgreSQL, or substitutes UI checks for
-server-side authorization. CLI delivery, the hosted web/PostgreSQL application
-template, human database tunneling, and hosted-application OIDC automation remain
-separate Phase 3 work packages.
+server-side authorization. Hosted-access screens consume the generic APIs delivered
+by PLAN-009; identity-provider automation and its full acceptance remain in that
+work package. CLI delivery, the hosted web/PostgreSQL application template, and
+human database tunneling remain separate Phase 3 work packages.
 
 Entry into full acceptance remains gated by the Phase 2 API gates described in
 [Phase 3](phase-3-developer-experience.md). UI foundation work can proceed against
@@ -176,6 +179,135 @@ that hidden or disabled controls provide no authorization boundary. One-time val
 are absent from subsequent responses, browser storage, logs, screenshots, and test
 artifacts.
 
+### 4a. Deliver hosted application access: next step (PLAN-020)
+
+Priority recorded October 12, 2026: implement this increment next using the
+existing PLAN-009 APIs and generated OpenAPI types. It directly enables the
+priority hosted-application use case and precedes new operator/general portal
+breadth. Remaining PLAN-009/017/018/019 acceptance stays open; UI delivery does
+not close those gates. Prerequisites are the existing project/authentication
+workspace, Phase 2C, and the implemented hosted-access contract, not full
+PLAN-009 acceptance. Assign a delivery owner before implementation.
+
+The user journey is defined in the
+[UI guide](../../../developers/ui.md#planned-next-step-define-and-approve-application-access).
+Implement project-scoped **Application access** navigation with an overview,
+**Governance**, **Groups**, **Policy**, **Human requests**, **Memberships**, and
+**Service access**. Provider service requests appear as an incoming view and
+consumer requests as an outgoing view. Keep platform/project grants and CI
+deployment credentials in their existing areas.
+
+Deliver in this order:
+
+1. **API adapter and overview.** Add typed hosted-access queries, response-envelope
+   validation, resource-version handling, scoped query keys, mutations, and polling
+   under `features/access`. Read `/v1/capabilities` and the current declaration to
+   explain supported modes, the `v1alpha2` requirement, the sole public component,
+   and public URL. Present readiness independently of policy activation. Show
+   missing governance/policy as setup states only for the documented resource
+   absence; preserve denied and unavailable errors. Use server-returned authority
+   for available actions and retain server checks for every request.
+2. **Governance and groups.** Build forms for all current governance fields and
+   group name/display name. Group selectors submit stable IDs. Show referenced-group
+   deletion conflicts rather than cascading removals. Do not add group rename/edit
+   actions without a supporting API. Default identity-attribute release to off;
+   email opt-in requires the saved personal-data governance record.
+3. **Policy editor and activation.** Provide a structured route editor and a
+   review of component, paths/methods, authentication modes, and allowed groups.
+   Validate canonical exact/prefix paths, reserved protocol paths, unique rule
+   names, method choices, overlap, non-empty `anyOfGroups`, and the browser `GET`
+   entry requirement. Explain asset coverage, `HEAD` following `GET`, explicit
+   `OPTIONS`, and default denial. Submit a complete policy without OIDC/provider
+   settings, poll its durable operation, and reload authoritative active state.
+   Expose revision history, previous-revision rollback, and authorized failed-operation
+   retry. Disable conflicting policy mutations during provisioning.
+4. **Human approval and membership management.** List/filter pending and historical
+   requests; review stable identity, application, expiry, and API-returned attributes.
+   Select groups with no default assignment and preview the current routes they
+   allow before approval. Support rejection, cancellation, explicit reopening,
+   adding groups to approved requests, and individual membership revocation.
+   Human approval may return no operation ID: refresh/poll memberships until active
+   instead of assuming approval completes provisioning. Display failed grants and
+   revocation-pending cleanup, with the five-minute staleness bound. Explain how the
+   person refreshes their application session. Realm-user creation stays outside
+   this portal increment.
+5. **Service request and provider approval.** Let a consumer submit name, provider
+   project, application, and explicit project-wide credential acknowledgement.
+   Let the provider review the consumer and select only its own groups accepted by
+   target bearer-token routes. Support approve/reject, consumer cancellation,
+   provisioning/status views for both owners, and revocation by either owner.
+   Show only active response metadata: provider URL, audience, secret prefix and
+   derived variable names. Add HTTPS-egress instructions; service credentials
+   remain in managed project secrets. Support normal/emergency rotation and
+   explicit adoption confirmation without fetching or displaying secret values.
+6. **Verification and documentation.** Run the UI checks and browser acceptance
+   below, record dated source/local/deployed evidence under PLAN-020, and update the
+   guide from planned to available only for verified delivered screens.
+
+#### API mapping
+
+All project-relative paths below are under `/v1/projects/{project}`. Provider
+and consumer operations use their respective project scope. Use the exact
+[OpenAPI](../../../api/openapi.json) body, response, and header contracts.
+
+| Screen/action | Existing API |
+|---|---|
+| Capability discovery | `GET /v1/capabilities` |
+| Governance read/save | `GET/PUT /governance` |
+| Groups list/create/delete | `GET/POST /application-groups`; `DELETE /application-groups/{id}` |
+| Policy read/save | `GET/PUT /applications/{application}/access-policy` |
+| Policy revisions/rollback | `GET .../access-policy/revisions`; `POST .../access-policy/rollback` |
+| Human request list/filter | `GET /application-access-requests?state=pending` |
+| Human approve/reject/cancel/reopen/add groups | `POST /application-access-requests/{id}/{approve,reject,cancel,reopen,groups}` |
+| Membership list/revoke | `GET /application-group-memberships`; `DELETE /application-group-memberships/{id}` |
+| Service list/create/revoke | `GET/POST /service-access-requests`; `DELETE /service-access-requests/{id}` |
+| Service approve/reject/cancel/rotate/confirm | `POST /service-access-requests/{id}/{approve,reject,cancel,rotate,confirm}` |
+| Durable operation/read/retry | `GET /v1/access-operations/{id}`; `POST /v1/access-operations/{id}/retry` |
+
+Retain the quoted `ETag`, or construct it from a listed resource's `version`, and
+send the current `If-Match` for updates and transitions. Preserve the form draft
+on `412`/`428`, reload and show current state for review, then require a fresh
+submission; do not overwrite automatically. Present `409` state/reference conflicts
+and `422` validation separately. Group/service creates use an `Idempotency-Key`
+retained for retries of the same intent; changed content gets a new key. Poll
+`status_url` when returned and refresh resource/membership state on completion;
+stop on terminal state, denied access, navigation, or timeout. Never render a
+grant active optimistically or cache service secrets.
+
+#### Acceptance gate
+
+- A provider project administrator configures governance, groups and disjoint
+  browser/machine rules entirely through the portal and observes active policy.
+- A human completes first login and remains denied/pending; portal approval with
+  an allowed group becomes active, refreshed application access succeeds, and
+  membership revocation denies access within five minutes. Rejection, explicit
+  reopening, expired requests, and an authenticated wrong-group denial are covered.
+- A consumer administrator requests service access without self-assigned groups;
+  provider approval provisions it, the consumer sees safe binding metadata, and
+  a neutral workload calls the allowed bearer route. An unapproved request and
+  wrong-group token remain denied. Rotation, adoption and owner-scoped revocation
+  are exercised without exposing tokens/secrets in portal artifacts.
+- Viewer/developer controls match API-permitted reads; approval and mutation
+  controls follow the exact endpoint permissions: provider configuration, human
+  approvals/memberships and provider service approval require `grant`; consumer
+  service creation/cancellation/rotation/adoption/revocation require `change`.
+  An application-administrator membership confers no portal authority. Test direct
+  unauthorized and cross-project API attempts,
+  and prove platform/project administrators still need explicit application grants.
+- Concurrent policy edits and approvals preserve drafts and require reload/review;
+  double submission is safe. Provider failure, pending provisioning, unavailable
+  lists, and retry remain distinguishable from success or empty results.
+- Keyboard navigation, focus, labels and state announcements work for every form,
+  group selector, request table and confirmation at narrow and regular widths.
+  Static/contract/component/browser checks pass, and deployed evidence records
+  policy, request, membership and operation IDs plus audit events without secrets.
+
+Gate: the definition → pending human login → administrator approval → admitted
+application request journey and the consumer request → provider approval → admitted
+machine request journey pass through these UI screens against the deployed API.
+Local fixtures establish source behavior only; existing API acceptance and screenshots
+do not establish PLAN-020 completion.
+
 ### 5. Add operator workflows and harden delivery
 
 - Add separately routed operator views for capacity, redacted audit events, project
@@ -202,8 +334,9 @@ deployed, version-compatible Platform API, with accessibility and rollback evide
 - Operation polling stops on terminal state, loss of authorization, unmount, or a
   documented timeout. Background tabs use a reduced cadence.
 - HTTP status is preserved. `401` initiates re-authentication only when appropriate;
-  `403` remains a denial; `409` is a conflict workflow; `422` is validation or
-  capability feedback; `429` respects backoff; provider unavailability stays
+  `403` remains a denial; `409` is a conflict workflow; `412`/`428` require resource
+  reload and review; `422` is validation or capability feedback; `429` respects
+  backoff; provider unavailability stays
   distinguishable from empty data.
 - Optimistic rendering is limited to easily reversible presentation changes. Platform
   lifecycle mutations display server-confirmed state.

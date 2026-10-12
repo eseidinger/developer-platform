@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Status: current/next/later roadmap as of October 9, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
+Status: current/next/later roadmap as of October 12, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
 
 | Phase | State | User outcome | Acceptance gate |
 |---|---|---|---|
@@ -13,6 +13,13 @@ Status: current/next/later roadmap as of October 9, 2026. No calendar deadlines 
 The [amended delivery gates](../maintainers/delivery/README.md#backlog-delivery-commitments) order Phase 1 as operational protection, accountable access/security alerts, then durable lifecycle. Phase 2A implements the prioritized multi-service/scheduled-component vertical slice. Phase 2B adds revocable CI deployment credentials. Phase 2C completes diagnostics, policies, recovery, and project retirement on the existing Kubernetes infrastructure and single Python API. Optional Phase 5 contains the former service-split and second-provider work. All 20 [backlog stories](../maintainers/delivery/backlog.md) remain traceable.
 
 Phase 1 is the MVP (minimum viable product), comprising all three gates 1A–1C. MVP is not a separate delivery stage.
+
+The next Phase 3 implementation step is
+[hosted-application access in the UI](../maintainers/delivery/plans/ui.md#4a-deliver-hosted-application-access-next-step-plan-020)
+(PLAN-020): define application groups and access policies, approve first-login
+requests, and request/approve machine access. These screens use existing APIs;
+remaining identity, monitoring, integration, and recovery acceptance gates stay
+open. Broader portal/operator additions follow this increment.
 
 Phase 1 already includes a minimal API/CLI. Phase 2A evolves it for named and scheduled components, Phase 2B enables non-interactive CI deployment, and Phase 2C completes the broader lifecycle in the same Python API.
 

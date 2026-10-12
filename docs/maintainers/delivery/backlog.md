@@ -34,6 +34,14 @@ Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. D
 
 Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Reassess the documented recovery procedure when recovery scope changes; [ADR-016](../../architecture/decisions/ADR-016-phase-1a-recovery-scope.md) excludes isolated recovery exercises from the current Phase 1A gate. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
+**Next implementation step, October 12, 2026:** Owner-requested **PLAN-020** adds
+portal screens to define hosted-application access and approve human and machine
+requests over the implemented PLAN-009 APIs. Deliver
+[UI increment 4a](plans/ui.md#4a-deliver-hosted-application-access-next-step-plan-020)
+next, before new general portal/operator breadth. It enables the existing priority
+slice; remaining PLAN-009/017/018/019 acceptance is still required and is not
+closed or deferred by this ordering update.
+
 ## Accepted lab validation approach
 
 **Owner decisions, October 1, 2026:** [ADR-016](../../architecture/decisions/ADR-016-phase-1a-recovery-scope.md) omits new fresh-installation restore drills, backup/key failure exercises, and recurring full-restoration scheduling from Phase 1A. Previous isolated recovery results remain historical evidence. OPS-006-T03 is deferred and does not block the 1A gate. [ADR-017](../../architecture/decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits elapsed-time proof of the full 14/8/6 retention horizon; it does not change the configured policy or claim that its complete retention history has been demonstrated. The next failed-backup notification exercise should use the existing installation with a bounded fault and recovery steps, preserving real backup data and verified-success history.
@@ -85,7 +93,7 @@ This index lists execution tasks, not story completion promises. Task details an
 | 2A | DEV-001-T01, DEV-001-T02, DEV-001-T03, DEV-006-T02, DEV-011-T02 |
 | 2B | DEV-012-T01, DEV-012-T02, DEV-012-T03 |
 | 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003 |
-| 3 | PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019, then PLAN-006, PLAN-007, PLAN-008 |
+| 3 | PLAN-020 next over implemented PLAN-009 APIs; remaining PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019 gates, then PLAN-006, PLAN-007, PLAN-008 |
 | 4.1 | PLAN-010 |
 | 4.2 | PLAN-011 |
 | 4.3 | PLAN-012 |
@@ -875,6 +883,35 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Partial durability evidence (October 11, 2026; EV-45):** The neutral provider's durable marker survived rolling restart, its revision stayed at 1, and the consumer retained separate PostgreSQL state; write/read statuses were `200`. This is application-path restart persistence, not backup restoration or recovered access bindings. Real backup restore, recovery reconciliation and the versioned external energy restart/restore result remain deferred; PLAN-019 remains open.
 
+- [ ] **PLAN-020 · 3 (next UI step)** — Deliver project-scoped hosted-application
+  access definition and approval through the portal. Include governance, group
+  creation, structured browser/bearer route policies and activation/revisions,
+  first-login request review/approval/rejection/reopening, membership changes and
+  revocation, consumer service requests, provider group approval, managed-secret
+  metadata, credential rotation/adoption, and owner-scoped service revocation.
+  Follow [UI increment 4a](plans/ui.md#4a-deliver-hosted-application-access-next-step-plan-020)
+  and the [planned user journey](../../developers/ui.md#planned-next-step-define-and-approve-application-access).
+  Prerequisites: Phase 2C; existing portal authentication/project workspace;
+  implemented PLAN-009 APIs and generated OpenAPI contract. Full PLAN-009
+  acceptance is not a prerequisite for this UI increment. Owner: UI/API work
+  package; assign a named delivery owner before implementation.
+
+  **Acceptance:** Configure and activate the policy in the portal; observe human
+  pending denial, approve explicit groups, prove admitted access after membership
+  activation/session refresh, and revoke within the five-minute bound. Request
+  machine access as the consumer, approve target bearer groups as the provider,
+  observe active managed binding and successful allowed calls, and exercise
+  rotation/adoption/revocation. Prove wrong-group, unauthorized and cross-project
+  denial with direct API attempts, version-conflict handling, safe failure/pending
+  states, accessible controls, and no secret/token exposure. Record dated local
+  and deployed browser/audit evidence; broader PLAN-009 acceptance remains separate.
+
+  **Definition (October 12, 2026):** Workflow and delivery scope documented at the
+  owner's request. Source absent for hosted-access screens: current portal project
+  and platform grants manage control-plane permissions, not application membership.
+  Hosted-access API/types exist. Local and operational UI acceptance are unverified;
+  this planning update supplies no implementation or acceptance evidence.
+
 - [ ] **PLAN-010 · 4.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 3 gate; scoped data/audit evidence.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No AI layer or authorized context/tools; ADR-008 accepts product focus only, not its implementation.
@@ -980,7 +1017,7 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | F-07 / UC-05 (optional Phase 5) | PLAN-002/004; additional data-store labs remain unscheduled |
 | F-08 | PLAN-001/002, OPS-005-T01/02; PLAN-004 only if optional provider work is activated |
 | F-09 / UC-03 | PLAN-008 |
-| F-10 | PLAN-006/007/009 |
+| F-10 | PLAN-006/007/009/020 |
 | F-11 / UC-06 | PLAN-010/011/012 |
 | F-12 / UC-06 | PLAN-013/014 |
 | F-13 / UC-07 | DEV-001-T01/02/03, DEV-006-T02, DEV-011-T02 |

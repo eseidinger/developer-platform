@@ -1,6 +1,6 @@
 # Delivery status and plans
 
-Status: current delivery index as of October 10, 2026. Future phases are proposals
+Status: current delivery index as of October 12, 2026. Future phases are proposals
 without confirmed dates.
 
 ## Architectural evolution
@@ -30,6 +30,13 @@ without confirmed dates.
 The [delivery backlog](backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A passed its deployed acceptance suite on October 4 under its recorded owner-accepted deferrals for database-row preservation, backup inventory, and representative capacity measurement. Phase 2B is accepted under its recorded deferrals for expiry, controlled identity-provider outage, and deployed backup coverage. Phase 2C is complete with the protected live-drill evidence and accepted single-lab limits recorded in the backlog. Phase 3 and later gates remain open. The [energy-system use-case enablement plan](plans/energy-system-integration.md) is the immediate Phase 3 priority; its generic decision, identity, monitoring, deployed-connection, and recovery tasks precede new general portal, template, or human-database breadth. Concrete energy-system declarations and domain assertions remain externally owned. The current delivery architecture remains the existing Kubernetes provider and one Python/FastAPI API application. Consult task notes and the verification register for revisions, environments and limits.
 
 ## Work sequence and gates
+
+The next implementation step is **PLAN-020**, the
+[hosted-application access UI](plans/ui.md#4a-deliver-hosted-application-access-next-step-plan-020):
+define groups and route policies, approve first-login requests, and request/approve
+service access using existing generic APIs. This directly enables the Phase 3
+priority slice. Outstanding identity, monitoring, integration, and recovery
+acceptance remains open; broader portal/operator work follows this increment.
 
 ```mermaid
 flowchart LR
@@ -129,6 +136,7 @@ Generic hosted-application OIDC is immediate Phase 3 priority work because the e
 | Topic | Next step | Gate |
 |---|---|---|
 | Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
+| Hosted-application access UI | Deliver PLAN-020 next: project access-policy/group configuration, human approvals and membership revocation, consumer/provider service approvals and managed binding status | Phase 3 next implementation |
 | Multi-service scheduled application | Record EV-38 and retain the deferred capacity, database-row, and backup-inventory checks for a later production-like validation | Phase 2A accepted |
 | CI deployment credentials | Retain the deferred expiry, controlled identity-provider outage, and backup-coverage checks for a later production-like validation | Phase 2B accepted |
 | Energy-system use-case enablement | Execute PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 in order; implement and test generic identity, public HTTPS, persistence/TLS, monitoring, and recovery capabilities, then record the separately owned use-case result before closing the deployed gate | Phase 3 priority |
