@@ -108,6 +108,64 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 201, response.text)
         return response.json()
 
+    async def test_access_context_reports_authority_and_eligibility_without_identity_or_secrets(self):
+        response = await self.client.get("/v1/projects/provider/application-access-context")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertEqual(response.json()["permissions"], {"manage": True, "consume": True})
+        self.assertEqual(response.json()["url"], "https://api-provider.apps.test")
+        self.assertNotIn("subject", response.text)
+        viewer = Principal(self.actor.issuer, "viewer")
+        developer = Principal(self.actor.issuer, "developer")
+        with self.connect() as conn:
+            authorization.grant(conn, viewer, "project", "provider", "viewer")
+            authorization.grant(conn, developer, "project", "provider", "developer")
+        for who, permissions in ((viewer, {"manage": False, "consume": False}),
+                                 (developer, {"manage": False, "consume": True})):
+            self.active_actor = who
+            result = await self.client.get("/v1/projects/provider/application-access-context")
+            self.assertEqual(result.json()["permissions"], permissions)
+            denied = await self.client.get("/v1/projects/consumer/application-access-context")
+            self.assertEqual(denied.status_code, 403)
+            denied = await self.client.get("/v1/projects/provider/application-access-requests")
+            self.assertEqual(denied.status_code, 403)
+        self.active_actor = self.actor
+        with self.connect() as conn:
+            conn.execute("UPDATE projects SET status='retired' WHERE name='provider'")
+        retired = await self.client.get("/v1/projects/provider/application-access-context")
+        self.assertFalse(retired.json()["eligible"])
+        self.assertEqual(retired.json()["permissions"], {"manage": False, "consume": False})
+
+    async def test_operations_are_scoped_bounded_redacted_and_retry_authority_is_server_owned(self):
+        with self.connect() as conn, store.locked(conn):
+            private = store.create(conn, "membership", "provider", "private-member",
+                                   {"principalId": "MUST-NOT-DISCLOSE", "groupId": "g", "policyId": "p"}, "provisioning")
+            store.enqueue(conn, private, "membership.grant", self.actor)
+            shared = store.create(conn, "service-access", "consumer", "shared",
+                                  {"providerProject": "provider", "clientSecret": "MUST-NOT-DISCLOSE"}, "failed")
+            oid = store.enqueue(conn, shared, "service.provision", self.actor)
+            conn.execute("UPDATE hosted_access_operations SET state='failed', error_code='authorization_revoked' WHERE id=%s", (oid,))
+            unrelated = store.create(conn, "policy", "consumer", "unrelated", {}, "active")
+            store.enqueue(conn, unrelated, "policy.apply", self.consumer)
+        provider = await self.client.get("/v1/projects/provider/application-access-operations")
+        self.assertEqual(provider.status_code, 200)
+        self.assertEqual(provider.json()["limit"], 100)
+        self.assertEqual({o["resourceId"] for o in provider.json()["items"]}, {private["id"], shared["id"]})
+        self.assertTrue(next(o for o in provider.json()["items"] if o["id"] == oid)["canRetry"])
+        self.assertNotIn("MUST-NOT-DISCLOSE", provider.text)
+        self.active_actor = self.consumer
+        consumer = await self.client.get("/v1/projects/consumer/application-access-operations")
+        self.assertEqual({o["resourceId"] for o in consumer.json()["items"]}, {shared["id"], unrelated["id"]})
+        self.assertFalse(next(o for o in consumer.json()["items"] if o["id"] == oid)["canRetry"])
+        viewer = Principal(self.actor.issuer, "viewer")
+        with self.connect() as conn:
+            authorization.grant(conn, viewer, "project", "provider", "viewer")
+        self.active_actor = viewer
+        result = await self.client.get("/v1/projects/provider/application-access-operations")
+        self.assertEqual({o["resourceId"] for o in result.json()["items"]}, {shared["id"]})
+        self.assertFalse(result.json()["items"][0]["canRetry"])
+        self.assertEqual((await self.client.get("/v1/projects/consumer/application-access-operations")).status_code, 403)
+
     async def policy(self):
         group = await self.group()
         body = {k: copy.deepcopy(POLICY["spec"][k]) for k in ("component", "defaultDecision", "identityAttributes", "routes")}

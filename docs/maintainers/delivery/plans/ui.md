@@ -4,9 +4,9 @@ Status: in progress as of October 12, 2026. Foundation, the authentication bound
 the project workspace, and the core developer lifecycle are implemented in source:
 project creation, deployment and operation polling, diagnostics, logs, configuration,
 secrets, restart, rollback, retirement, recovery requests, and deployment
-credentials. Project-grant management is also implemented; operator workflows and
-delivery hardening remain planned. Hosted-application access definition and
-approval (PLAN-020, increment 4a) is the next implementation step. This plan
+credentials. Project-grant management and hosted-application access definition and
+approval (PLAN-020, increment 4a) are implemented in source. Deployed PLAN-020
+acceptance, operator workflows, and delivery hardening remain open. This plan
 implements the React stack selected
 in [ADR-019](../../../architecture/decisions/ADR-019-react-ui-technology-stack.md) for the Phase 3
 Platform Control Plane portal. It does not change the hosted-application packaging
@@ -179,18 +179,17 @@ that hidden or disabled controls provide no authorization boundary. One-time val
 are absent from subsequent responses, browser storage, logs, screenshots, and test
 artifacts.
 
-### 4a. Deliver hosted application access: next step (PLAN-020)
+### 4a. Deliver hosted application access (PLAN-020)
 
-Priority recorded October 12, 2026: implement this increment next using the
-existing PLAN-009 APIs and generated OpenAPI types. It directly enables the
-priority hosted-application use case and precedes new operator/general portal
-breadth. Remaining PLAN-009/017/018/019 acceptance stays open; UI delivery does
-not close those gates. Prerequisites are the existing project/authentication
-workspace, Phase 2C, and the implemented hosted-access contract, not full
-PLAN-009 acceptance. Assign a delivery owner before implementation.
+Source implementation recorded October 12, 2026: this increment uses the
+PLAN-009 APIs and generated OpenAPI types. It directly enables the priority
+hosted-application use case. Deployed portal journeys and PLAN-009/017/018/019
+acceptance stay open. Prerequisites were the project/authentication workspace,
+Phase 2C, and the implemented hosted-access contract. Assign a named delivery
+owner for operational acceptance.
 
 The user journey is defined in the
-[UI guide](../../../developers/ui.md#planned-next-step-define-and-approve-application-access).
+[UI guide](../../../developers/ui.md#define-and-approve-application-access).
 Implement project-scoped **Application access** navigation with an overview,
 **Governance**, **Groups**, **Policy**, **Human requests**, **Memberships**, and
 **Service access**. Provider service requests appear as an incoming view and
@@ -253,6 +252,8 @@ and consumer operations use their respective project scope. Use the exact
 | Screen/action | Existing API |
 |---|---|
 | Capability discovery | `GET /v1/capabilities` |
+| Project eligibility, public component/URL, action permissions | `GET /application-access-context` |
+| Scoped recent operations and retry authority | `GET /application-access-operations` |
 | Governance read/save | `GET/PUT /governance` |
 | Groups list/create/delete | `GET/POST /application-groups`; `DELETE /application-groups/{id}` |
 | Policy read/save | `GET/PUT /applications/{application}/access-policy` |

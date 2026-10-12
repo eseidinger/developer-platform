@@ -93,6 +93,7 @@ function ProjectWorkspace() {
           </div>
           <div className="flex flex-wrap gap-2"><Button variant="outline" onClick={() => void refreshProject()} disabled={isRefreshing}>{isRefreshing ? 'Refreshing…' : 'Refresh'}</Button>{projectStatus === 'retired' ? <PurgeProjectDialog name={name} /> : <RetireProjectDialog name={name} />}</div>
         </div>
+        <Link className="inline-block rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted" to={`/projects/${name}/application-access`}>Application access</Link>
       </div>
 
       {status !== 'authenticated' && <p className="text-sm text-muted-foreground">Sign in to view this project.</p>}

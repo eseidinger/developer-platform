@@ -39,6 +39,61 @@ def install(app, control):
             row["kind"], row["id"], "succeeded", {"project": row["project"]},
             {"state": row["state"], "version": row["version"]})
 
+    @app.get("/v1/projects/{project}/application-access-context")
+    def access_context(project: str, principal: Principal = caller):
+        """Describe hosted-access eligibility and the caller's current platform authority."""
+        from .authorization import is_allowed
+        control.require_permission(principal, "view", project)
+        with control.connect() as conn:
+            found = conn.execute("SELECT status, spec FROM projects WHERE name=%s", (project,)).fetchone()
+            if not found:
+                raise HTTPException(404, "Unknown project")
+            status, spec = found
+            components = (spec or {}).get("components")
+            public = [c for c in components or [] if c.get("type") == "service" and c.get("exposure") == "public"]
+            reason = ("Project is retired" if status == "retired" else
+                      "Deploy a v1alpha2 application before configuring access" if components is None else
+                      "Application access requires one public service" if len(public) != 1 else None)
+            eligible = reason is None
+            component = public[0]["name"] if eligible else None
+            result = {"project": project, "application": project, "status": status,
+                "eligible": eligible, "reason": reason, "component": component,
+                "url": "https://" + component + "-" + project + "." + os.environ["APPS_DOMAIN"] if component else None,
+                "permissions": {"manage": status != "retired" and is_allowed(conn, principal, "grant", project),
+                                "consume": status != "retired" and is_allowed(conn, principal, "change", project)}}
+        control.required_audit(control.actor_for(principal), "application-access.context.read", "project", project,
+                               "succeeded", {"project": project}, {"eligible": eligible})
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
+
+    @app.get("/v1/projects/{project}/application-access-operations")
+    def access_operations(project: str, principal: Principal = caller):
+        """Bounded, secret-free operations visible in the caller's provider/consumer scope."""
+        from .authorization import is_allowed
+        control.require_permission(principal, "view", project)
+        with control.connect() as conn:
+            if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (project,)).fetchone():
+                raise HTTPException(404, "Unknown project")
+            manage = is_allowed(conn, principal, "grant", project)
+            visible = {r["id"]: r for r in store.listing(conn) if
+                (r["project"] == project and (manage or r["kind"] not in {"membership", "human-request"})) or
+                (r["kind"] == "service-access" and r["spec"]["providerProject"] == project)}
+            rows = conn.execute("""SELECT id, resource_id, action, state, attempts, error_code, created_at, updated_at
+                FROM hosted_access_operations WHERE resource_id=ANY(%s)
+                ORDER BY updated_at DESC, id DESC LIMIT 100""", (list(visible),)).fetchall()
+            items = []
+            for oid, rid, action, state, attempts, error, created, updated in rows:
+                resource = visible[rid]
+                authority_project = resource["spec"].get("providerProject", resource["project"]) if action == "service.provision" else resource["project"]
+                permission = "change" if action == "service.rotate" else "grant"
+                items.append({"id": str(oid), "resourceId": rid, "resourceVersion": resource["version"],
+                    "action": action, "state": state, "attempts": attempts, "errorCode": error,
+                    "createdAt": created.isoformat(), "updatedAt": updated.isoformat(),
+                    "canRetry": state == "failed" and resource["state"] == "failed" and
+                                is_allowed(conn, principal, permission, authority_project)})
+        control.required_audit(control.actor_for(principal), "application-access.operations.read", "project", project,
+                               "succeeded", {"project": project}, {"count": len(items)})
+        return JSONResponse({"items": items, "limit": 100}, headers={"Cache-Control": "no-store"})
+
     @app.post("/v1/projects/{project}/application-groups", status_code=202)
     def create_group(project: str, body: GroupCreate, principal: Principal = caller,
                      idempotency_key: str = Header(alias="Idempotency-Key")):

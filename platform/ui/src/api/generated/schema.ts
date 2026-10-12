@@ -916,6 +916,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects/{project}/application-access-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Access Context
+         * @description Describe hosted-access eligibility and the caller's current platform authority.
+         */
+        get: operations["access_context_v1_projects__project__application_access_context_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/projects/{project}/application-access-operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Access Operations
+         * @description Bounded, secret-free operations visible in the caller's provider/consumer scope.
+         */
+        get: operations["access_operations_v1_projects__project__application_access_operations_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects/{project}/application-access-requests": {
         parameters: {
             query?: never;
@@ -3554,6 +3594,68 @@ export interface operations {
             header?: never;
             path: {
                 operation_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    access_context_v1_projects__project__application_access_context_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    access_operations_v1_projects__project__application_access_operations_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
             };
             cookie?: never;
         };

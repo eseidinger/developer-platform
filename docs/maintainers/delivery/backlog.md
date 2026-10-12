@@ -34,13 +34,12 @@ Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. D
 
 Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Reassess the documented recovery procedure when recovery scope changes; [ADR-016](../../architecture/decisions/ADR-016-phase-1a-recovery-scope.md) excludes isolated recovery exercises from the current Phase 1A gate. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
-**Next implementation step, October 12, 2026:** Owner-requested **PLAN-020** adds
-portal screens to define hosted-application access and approve human and machine
-requests over the implemented PLAN-009 APIs. Deliver
-[UI increment 4a](plans/ui.md#4a-deliver-hosted-application-access-next-step-plan-020)
-next, before new general portal/operator breadth. It enables the existing priority
-slice; remaining PLAN-009/017/018/019 acceptance is still required and is not
-closed or deferred by this ordering update.
+**Current portal increment, October 12, 2026:** Owner-requested **PLAN-020** has
+source screens for hosted-application access definition and human/machine
+approvals over the implemented PLAN-009 APIs. Finish the deployed acceptance in
+[UI increment 4a](plans/ui.md#4a-deliver-hosted-application-access-plan-020)
+before new general portal/operator breadth. Remaining PLAN-009/017/018/019
+acceptance stays open.
 
 ## Accepted lab validation approach
 
@@ -93,7 +92,7 @@ This index lists execution tasks, not story completion promises. Task details an
 | 2A | DEV-001-T01, DEV-001-T02, DEV-001-T03, DEV-006-T02, DEV-011-T02 |
 | 2B | DEV-012-T01, DEV-012-T02, DEV-012-T03 |
 | 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003 |
-| 3 | PLAN-020 next over implemented PLAN-009 APIs; remaining PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019 gates, then PLAN-006, PLAN-007, PLAN-008 |
+| 3 | PLAN-020 source implemented, deployed portal acceptance open; remaining PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019 gates, then PLAN-006, PLAN-007, PLAN-008 |
 | 4.1 | PLAN-010 |
 | 4.2 | PLAN-011 |
 | 4.3 | PLAN-012 |
@@ -883,14 +882,14 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Partial durability evidence (October 11, 2026; EV-45):** The neutral provider's durable marker survived rolling restart, its revision stayed at 1, and the consumer retained separate PostgreSQL state; write/read statuses were `200`. This is application-path restart persistence, not backup restoration or recovered access bindings. Real backup restore, recovery reconciliation and the versioned external energy restart/restore result remain deferred; PLAN-019 remains open.
 
-- [ ] **PLAN-020 · 3 (next UI step)** — Deliver project-scoped hosted-application
+- [ ] **PLAN-020 · 3 (portal acceptance open)** — Deliver project-scoped hosted-application
   access definition and approval through the portal. Include governance, group
   creation, structured browser/bearer route policies and activation/revisions,
   first-login request review/approval/rejection/reopening, membership changes and
   revocation, consumer service requests, provider group approval, managed-secret
   metadata, credential rotation/adoption, and owner-scoped service revocation.
-  Follow [UI increment 4a](plans/ui.md#4a-deliver-hosted-application-access-next-step-plan-020)
-  and the [planned user journey](../../developers/ui.md#planned-next-step-define-and-approve-application-access).
+  Follow [UI increment 4a](plans/ui.md#4a-deliver-hosted-application-access-plan-020)
+  and the [user journey](../../developers/ui.md#define-and-approve-application-access).
   Prerequisites: Phase 2C; existing portal authentication/project workspace;
   implemented PLAN-009 APIs and generated OpenAPI contract. Full PLAN-009
   acceptance is not a prerequisite for this UI increment. Owner: UI/API work
@@ -911,6 +910,17 @@ These tasks make the existing phase work executable without inventing new DEV/OP
   and platform grants manage control-plane permissions, not application membership.
   Hosted-access API/types exist. Local and operational UI acceptance are unverified;
   this planning update supplies no implementation or acceptance evidence.
+
+  **Source and local progress (October 12, 2026; working tree after `cf3697d`):**
+  Project-scoped portal screens now cover governance, groups, structured policy
+  review/save/history/rollback, human requests and memberships, provider/consumer
+  service access and credential lifecycle metadata. The API adds scoped context
+  and bounded operation-list reads; its PostgreSQL authorization/redaction tests
+  pass. UI validation covers generated contract parity, lint, types, 31 unit
+  tests, production build, and 10 fixture-backed Chromium browser journeys.
+  Browser fixtures use simulated API/OIDC state and do not prove deployed identity,
+  policy enforcement, managed-secret delivery, or application calls. Operational
+  PLAN-020 acceptance remains unverified and this task stays open.
 
 - [ ] **PLAN-010 · 4.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 3 gate; scoped data/audit evidence.
 

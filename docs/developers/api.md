@@ -1,6 +1,6 @@
 # Platform API guide
 
-Status: current. Last reviewed October 11, 2026.
+Status: current. Last reviewed October 12, 2026.
 
 The REST API is the authoritative boundary used by the UI, CLI, CI, and test
 automation. Its machine-readable contract is [OpenAPI](../api/openapi.json); this
@@ -82,6 +82,16 @@ requests, memberships, and provider-approved service-access requests under
 platform or project administrator. The initial implementation supports a
 `v1alpha2` application with one public component; its application name is the
 project name in the default environment.
+
+The portal's overview reads `GET /v1/projects/{project}/application-access-context`.
+It returns the public component and URL, eligibility/reason, and server-derived
+`manage` and `consume` permissions for that project. The companion
+`GET /v1/projects/{project}/application-access-operations` returns at most 100
+recent scoped operation summaries, including operations on incoming provider
+service requests, with an authorized `canRetry` flag. Both endpoints require
+project `view`, return no credentials, and set `Cache-Control: no-store`. A
+retired or legacy/private-only project reports why access configuration is not
+eligible; callers must still handle `403` and dependency failures distinctly.
 
 Create a group with `POST /v1/projects/{project}/application-groups`, a JSON body
 such as `{"name":"readers","displayName":"Readers"}`, and an

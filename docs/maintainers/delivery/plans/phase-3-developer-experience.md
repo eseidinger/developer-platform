@@ -22,12 +22,12 @@ verifies that slice.
 
 ## Priority sequence
 
-**Next implementation step (October 12, 2026): PLAN-020.** Add the project
-**Application access** UI for governance, groups, policy definition/activation,
-human request approval and memberships, and consumer/provider service approval.
-Use the implemented PLAN-009 contract and existing portal workspace; follow
-[UI increment 4a](ui.md#4a-deliver-hosted-application-access-next-step-plan-020)
-and the [planned user workflow](../../../developers/ui.md#planned-next-step-define-and-approve-application-access).
+**Current portal increment (October 12, 2026): PLAN-020.** The project
+**Application access** UI is implemented in source for governance, groups, policy
+definition/activation, human requests/memberships, and consumer/provider service
+approval. Deployed portal acceptance remains open. Follow
+[UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)
+and the [user workflow](../../../developers/ui.md#define-and-approve-application-access).
 This is a direct enablement of the priority slice and precedes new general
 portal/operator breadth. It does not certify or defer the outstanding identity,
 monitoring, integration, and recovery acceptance in the sequence below.
@@ -59,7 +59,7 @@ monitoring, integration, and recovery acceptance in the sequence below.
   deferring it requires an explicit scope amendment.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
 - Make ownership, roles, and the distinction between application and platform permissions visible.
-- Deliver PLAN-020 access-definition and approval screens over the hosted-access
+- Accept deployed PLAN-020 access-definition and approval screens over the hosted-access
   API. Show pending/approved requests separately from effective memberships and
   active policies; platform roles and CI credentials confer no application groups.
 - Build the self-service journey on the multi-service and scheduled-component contract accepted in Phase 2A; do not create a portal-only component model.

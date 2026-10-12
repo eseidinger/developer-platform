@@ -2,10 +2,12 @@
 
 Status: partially implemented. Last reviewed October 12, 2026.
 
-The Platform Control Plane portal is served under `/portal/` on the Platform API
+The Platform Control Plane portal is served at `/` on the Platform API
 origin. It uses OIDC Authorization Code with PKCE and calls the same API as the
 CLI. The project workspace has lifecycle, diagnostics, project-grant, and
-deployment-credential screens in source. Implementation and acceptance evidence
+deployment-credential screens in source. Project-scoped application-access screens
+are also implemented in source at `/projects/{name}/application-access`.
+Implementation and acceptance evidence
 are tracked in the [delivery backlog](../maintainers/delivery/backlog.md).
 
 The UI may explain or hide actions based on the current role, but the Platform API
@@ -17,12 +19,13 @@ Until a workflow is available in the portal, use the [CLI](cli.md) or
 [API](api.md). For UI source, commands, and tests, see the
 [UI maintainer guide](../maintainers/ui.md).
 
-## Planned next step: define and approve application access
+## Define and approve application access
 
-This workflow is specified for the next UI increment, **PLAN-020**. The screens
-below are planned; hosted-access administration currently uses the
-[API](api.md#hosted-application-access). Delivery and acceptance follow
-[UI increment 4a](../maintainers/delivery/plans/ui.md#4a-deliver-hosted-application-access-next-step-plan-020).
+The **PLAN-020** screens below are implemented in source and exercised with local
+browser fixtures. The deployed first-login and service-access journeys remain
+unverified; use the [API](api.md#hosted-application-access) where the deployed
+portal has not yet been updated. Operational acceptance follows
+[UI increment 4a](../maintainers/delivery/plans/ui.md#4a-deliver-hosted-application-access-plan-020).
 
 Open a project and select **Application access**. Keep this area separate from
 **Project access** and **Deployment credentials**: permission to deploy or

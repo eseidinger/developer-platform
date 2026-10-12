@@ -4237,6 +4237,92 @@
         "summary": "Operation Status"
       }
     },
+    "/v1/projects/{project}/application-access-context": {
+      "get": {
+        "description": "Describe hosted-access eligibility and the caller's current platform authority.",
+        "operationId": "access_context_v1_projects__project__application_access_context_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Access Context"
+      }
+    },
+    "/v1/projects/{project}/application-access-operations": {
+      "get": {
+        "description": "Bounded, secret-free operations visible in the caller's provider/consumer scope.",
+        "operationId": "access_operations_v1_projects__project__application_access_operations_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Access Operations"
+      }
+    },
     "/v1/projects/{project}/application-access-requests": {
       "get": {
         "operationId": "requests_v1_projects__project__application_access_requests_get",
