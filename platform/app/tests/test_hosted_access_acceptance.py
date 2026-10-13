@@ -18,7 +18,7 @@ import httpx2 as httpx
 import jwt
 import psycopg
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from acceptance import fixture, harness as h
 from app.access_contract import Governance, PolicyCreate
 from app.access_gateway import create_gateway
