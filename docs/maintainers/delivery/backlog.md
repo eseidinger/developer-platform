@@ -26,7 +26,7 @@ do not imply high availability or isolation suitable for hostile tenants.
 
 Each task belongs to exactly one phase or sub-gate; story IDs remain the overall acceptance gates. `DEV/OPS-xxx-Tnn` tasks inherit the story owner role in the [plan](README.md#backlog-delivery-commitments). `PLAN-nnn` tasks cover existing phase scope outside the original stories and take their owner from the phase work package. Assign named owners before work starts. IDs are permanent; moving a task changes its phase field, not its ID.
 
-Top-level task checkboxes remain open where full acceptance is outstanding. Checked progress criteria below record narrower verified outcomes; they do not close the parent task or phase. Task evidence below distinguishes partial or absent source implementation, verified local checks, and operational acceptance. Close a task only after its listed outcome is verified and record date, revision, environment, results and limitations beside it. Link shared checks by evidence ID. Update implementation findings here when code changes; other documents link here rather than maintain a separate status assessment. Close a story only when every original acceptance criterion passes. A Phase 3 design decision does not close deferred implementation tasks.
+Top-level task checkboxes remain open where full acceptance is outstanding. Checked progress criteria below record narrower verified outcomes; they do not close the parent task or phase. Task evidence below distinguishes partial or absent source implementation, verified local checks, and operational acceptance. Close a task only after its listed outcome is verified, or record an explicit owner-directed acceptance exception that names every unverified outcome; record date, revision, environment, results and limitations beside it. Link shared checks by evidence ID. Update implementation findings here when code changes; other documents link here rather than maintain a separate status assessment. Close a story only when every original acceptance criterion passes. A Phase 3 design decision does not close deferred implementation tasks.
 
 Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Phase 2A is the prioritized multi-service/scheduled-component increment; Phase 2B adds CI deployment credentials; the remaining current-platform work is Phase 2C. Within Phase 3, the [energy-system use-case enablement slice](plans/energy-system-integration.md) is the immediate priority and precedes new general portal, template, or human-database breadth. It delivers only generic platform capabilities; concrete application declarations and domain acceptance remain externally owned. Optional Phase 5 is unscheduled and does not gate Phases 2 through 4. Deferred tasks have no scheduled phase. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
 
@@ -34,12 +34,12 @@ Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. D
 
 Phase 1A runs within the existing administrator-operated boundary; secrets and operational credentials remain protected. Phase 1B establishes individual authorization/audit before expanded self-service. From Phase 1B onward, every task introducing an endpoint, data surface or persisted state must include scoped authorization/revocation, secret redaction and audit checks and update backup coverage. Reassess the documented recovery procedure when recovery scope changes; [ADR-016](../../architecture/decisions/ADR-016-phase-1a-recovery-scope.md) excludes isolated recovery exercises from the current Phase 1A gate. These are part of that task's completion, not an unbounded extra phase. Release OPS-004-T01 with OPS-001-T01; later endpoints reuse the same boundary.
 
-**Current portal increment, October 12, 2026:** Owner-requested **PLAN-020** has
-source screens for hosted-application access definition and human/machine
-approvals over the implemented PLAN-009 APIs. Finish the deployed acceptance in
-[UI increment 4a](plans/ui.md#4a-deliver-hosted-application-access-plan-020)
-before new general portal/operator breadth. Remaining PLAN-009/017/018/019
-acceptance stays open.
+**Portal increment, October 13, 2026:** Owner-requested **PLAN-020** is accepted
+for lab sequencing under the owner-directed exception recorded in its task note.
+The owner observed the deployed application-access screens and an active policy,
+but waived the deployed browser, approval, service-access, denial, and audit
+journeys. This does not establish their behavior or close the remaining
+PLAN-009/017/018/019 acceptance.
 
 ## Accepted lab validation approach
 
@@ -92,7 +92,7 @@ This index lists execution tasks, not story completion promises. Task details an
 | 2A | DEV-001-T01, DEV-001-T02, DEV-001-T03, DEV-006-T02, DEV-011-T02 |
 | 2B | DEV-012-T01, DEV-012-T02, DEV-012-T03 |
 | 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003 |
-| 3 | PLAN-020 source implemented, deployed portal acceptance open; remaining PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019 gates, then PLAN-006, PLAN-007, PLAN-008 |
+| 3 | PLAN-020 owner-accepted for lab sequencing with unverified deployed journeys; remaining PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019 gates, then PLAN-006, PLAN-007, PLAN-008 |
 | 4.1 | PLAN-010 |
 | 4.2 | PLAN-011 |
 | 4.3 | PLAN-012 |
@@ -909,7 +909,7 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Partial durability evidence (October 11, 2026; EV-45):** The neutral provider's durable marker survived rolling restart, its revision stayed at 1, and the consumer retained separate PostgreSQL state; write/read statuses were `200`. This is application-path restart persistence, not backup restoration or recovered access bindings. Real backup restore, recovery reconciliation and the versioned external energy restart/restore result remain deferred; PLAN-019 remains open.
 
-- [ ] **PLAN-020 · 3 (portal acceptance open)** — Deliver project-scoped hosted-application
+- [x] **PLAN-020 · 3 (owner-accepted exception; deployed journeys unverified)** — Deliver project-scoped hosted-application
   access definition and approval through the portal. Include governance, group
   creation, structured browser/bearer route policies and activation/revisions,
   first-login request review/approval/rejection/reopening, membership changes and
@@ -946,8 +946,25 @@ These tasks make the existing phase work executable without inventing new DEV/OP
   pass. UI validation covers generated contract parity, lint, types, 31 unit
   tests, production build, and 10 fixture-backed Chromium browser journeys.
   Browser fixtures use simulated API/OIDC state and do not prove deployed identity,
-  policy enforcement, managed-secret delivery, or application calls. Operational
-  PLAN-020 acceptance remains unverified and this task stays open.
+  policy enforcement, managed-secret delivery, or application calls.
+
+  **Owner-directed acceptance exception (October 13, 2026):** The owner asked to
+  accept this portal increment without running every journey. The owner reports
+  that the deployed Application access screens, project overview information,
+  and an active policy are visible. The installation record reports source
+  revision `cf3697de4418f57eb8fdd0118341582fbfcd1b18+dirty`; the committed
+  base predates the PLAN-020 implementation commit `08533f6`, and the dirty
+  source changes were not captured, so the exact deployed portal tree is not
+  attested. No deployed browser/audit report was supplied. Policy creation and
+  activation through the portal; first-login pending denial, approval, admitted
+  access and revocation; consumer/provider service approval, binding, calls,
+  rotation and revocation; role/cross-project denials; conflict/failure handling;
+  accessibility; and secret-artifact checks remain unverified through this UI.
+  The task is closed for lab sequencing by owner direction, not by a passed
+  deployed acceptance journey. Revisit these checks before making a
+  production-like portal claim. PLAN-009/017/018/019, F-10, PLAN-006, and the
+  Phase 3 gate remain open; EV-45/46 establish API and neutral-fixture behavior,
+  not this portal journey.
 
 - [ ] **PLAN-010 · 4.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 3 gate; scoped data/audit evidence.
 

@@ -32,10 +32,10 @@ The [delivery backlog](backlog.md#evidence-conventions) is the source of truth f
 ## Work sequence and gates
 
 **PLAN-020**, the [hosted-application access UI](plans/ui.md#4a-deliver-hosted-application-access-plan-020),
-is implemented in source for groups and route policies, first-login approvals,
-and provider/consumer service access. Deployed portal acceptance is the next
-step. Outstanding identity, monitoring, integration, and recovery acceptance
-remains open; broader portal/operator work follows this increment.
+is accepted for lab sequencing under an [owner-directed exception](backlog.md#additional-phase-tasks).
+The deployed screens and active policy were observed; the deployed approval,
+service-access, denial, and audit journeys were waived and remain unverified.
+Identity, monitoring, integration, and recovery acceptance remain open.
 
 ```mermaid
 flowchart LR
@@ -135,7 +135,7 @@ Generic hosted-application OIDC is immediate Phase 3 priority work because the e
 | Topic | Next step | Gate |
 |---|---|---|
 | Operational state and acceptance | Use the inspected source baseline in the [backlog evidence](backlog.md#evidence-conventions); inventory live resources and record acceptance exercises | Phase 1 |
-| Hosted-application access UI | Accept deployed PLAN-020: project access-policy/group configuration, human approvals and membership revocation, consumer/provider service approvals and managed binding status | Phase 3 source implemented; portal acceptance open |
+| Hosted-application access UI | Revisit waived deployed PLAN-020 journeys before a production-like portal claim | Owner-accepted for lab sequencing; deployed workflows unverified |
 | Multi-service scheduled application | Record EV-38 and retain the deferred capacity, database-row, and backup-inventory checks for a later production-like validation | Phase 2A accepted |
 | CI deployment credentials | Retain the deferred expiry, controlled identity-provider outage, and backup-coverage checks for a later production-like validation | Phase 2B accepted |
 | Energy-system use-case enablement | Execute PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 in order; implement and test generic identity, public HTTPS, persistence/TLS, monitoring, and recovery capabilities, then record the separately owned use-case result before closing the deployed gate | Phase 3 priority |

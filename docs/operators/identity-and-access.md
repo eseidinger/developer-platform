@@ -127,7 +127,8 @@ Hosted access is not authorization to manage this Platform API. Follow the
 [hosted application API guide](../developers/api.md#hosted-application-access)
 for groups, enrollment, policy intent, service approvals, and managed-secret
 delivery. Project-scoped application-access screens are implemented in portal
-source, but their deployed approval journey has not yet been accepted (PLAN-020).
+source and owner-accepted for lab sequencing (PLAN-020). Their deployed approval
+and service-access journeys remain unverified under the recorded exception.
 
 The supported `scripts/up.sh` installation now builds and imports the authorizer
 image, installs two authorizer replicas in `platform-access`, and applies their

@@ -22,14 +22,14 @@ verifies that slice.
 
 ## Priority sequence
 
-**Current portal increment (October 12, 2026): PLAN-020.** The project
+**Portal increment (October 13, 2026): PLAN-020.** The project
 **Application access** UI is implemented in source for governance, groups, policy
 definition/activation, human requests/memberships, and consumer/provider service
-approval. Deployed portal acceptance remains open. Follow
+approval. The owner accepted it for lab sequencing without deployed journey
+checks; those outcomes remain unverified. Follow
 [UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)
 and the [user workflow](../../../developers/ui.md#define-and-approve-application-access).
-This is a direct enablement of the priority slice and precedes new general
-portal/operator breadth. It does not certify or defer the outstanding identity,
+This is a direct enablement of the priority slice. It does not certify the outstanding identity,
 monitoring, integration, and recovery acceptance in the sequence below.
 
 1. Freeze the generic deployment, identity, connectivity, persistence/TLS,

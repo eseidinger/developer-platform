@@ -12,9 +12,9 @@ Only unfinished, owned implementation plans belong here:
 - [UI implementation](ui.md)
 
 **PLAN-020** [UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)
-has source implementation for hosted-application access definition and
-human/service approvals. Deployed portal acceptance and remaining priority-slice
-gates stay open.
+is owner-accepted for lab sequencing under the exception recorded in the
+[backlog](../backlog.md#additional-phase-tasks). Deployed portal journeys remain
+unverified; the remaining priority-slice gates stay open.
 
 **PLAN-006 CLI source, October 13, 2026:** The [CLI administration plan](cli.md#project-administration-coverage)
 now has source commands for every non-health public API operation, including

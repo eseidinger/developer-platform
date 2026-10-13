@@ -1,6 +1,6 @@
 # UI guide
 
-Status: partially implemented. Last reviewed October 12, 2026.
+Status: partially implemented. Last reviewed October 13, 2026.
 
 The Platform Control Plane portal is served at `/` on the Platform API
 origin. It uses OIDC Authorization Code with PKCE and calls the same API as the
@@ -21,10 +21,12 @@ Until a workflow is available in the portal, use the [CLI](cli.md) or
 
 ## Define and approve application access
 
-The **PLAN-020** screens below are implemented in source and exercised with local
-browser fixtures. The deployed first-login and service-access journeys remain
-unverified; use the [API](api.md#hosted-application-access) where the deployed
-portal has not yet been updated. Operational acceptance follows
+The **PLAN-020** screens below are implemented in source, exercised with local
+browser fixtures, and reported visible on the deployed portal with an active
+policy. The owner accepted this increment for lab sequencing without deployed
+first-login and service-access journey checks. Their behavior through the portal
+remains unverified; the supported [API](api.md#hosted-application-access) remains
+available. The exception and original acceptance criteria are recorded in
 [UI increment 4a](../maintainers/delivery/plans/ui.md#4a-deliver-hosted-application-access-plan-020).
 
 Open a project and select **Application access**. Keep this area separate from

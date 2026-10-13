@@ -1,12 +1,13 @@
 # Platform UI implementation plan
 
-Status: in progress as of October 12, 2026. Foundation, the authentication boundary,
+Status: in progress as of October 13, 2026. Foundation, the authentication boundary,
 the project workspace, and the core developer lifecycle are implemented in source:
 project creation, deployment and operation polling, diagnostics, logs, configuration,
 secrets, restart, rollback, retirement, recovery requests, and deployment
 credentials. Project-grant management and hosted-application access definition and
-approval (PLAN-020, increment 4a) are implemented in source. Deployed PLAN-020
-acceptance, operator workflows, and delivery hardening remain open. This plan
+approval (PLAN-020, increment 4a) are implemented in source. PLAN-020 is
+owner-accepted for lab sequencing with deployed journeys unverified; operator
+workflows and delivery hardening remain open. This plan
 implements the React stack selected
 in [ADR-019](../../../architecture/decisions/ADR-019-react-ui-technology-stack.md) for the Phase 3
 Platform Control Plane portal. It does not change the hosted-application packaging
@@ -183,10 +184,11 @@ artifacts.
 
 Source implementation recorded October 12, 2026: this increment uses the
 PLAN-009 APIs and generated OpenAPI types. It directly enables the priority
-hosted-application use case. Deployed portal journeys and PLAN-009/017/018/019
-acceptance stay open. Prerequisites were the project/authentication workspace,
+hosted-application use case. The owner accepted PLAN-020 for lab sequencing on
+October 13 without deployed portal journeys; PLAN-009/017/018/019 acceptance
+stays open. Prerequisites were the project/authentication workspace,
 Phase 2C, and the implemented hosted-access contract. Assign a named delivery
-owner for operational acceptance.
+owner before any follow-up operational acceptance.
 
 The user journey is defined in the
 [UI guide](../../../developers/ui.md#define-and-approve-application-access).
@@ -307,7 +309,9 @@ Gate: the definition → pending human login → administrator approval → admi
 application request journey and the consumer request → provider approval → admitted
 machine request journey pass through these UI screens against the deployed API.
 Local fixtures establish source behavior only; existing API acceptance and screenshots
-do not establish PLAN-020 completion.
+do not establish a passed deployed PLAN-020 journey. The owner-directed exception
+closes this increment for lab sequencing without those checks; see the
+[backlog task note](../backlog.md#additional-phase-tasks) for the unverified outcomes.
 
 ### 5. Add operator workflows and harden delivery
 
