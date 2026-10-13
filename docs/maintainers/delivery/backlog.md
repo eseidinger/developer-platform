@@ -824,11 +824,38 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26; moved October 4, 2026):** At this baseline the decision was open and local implementation-language parity/migration acceptance was unverified. The Python application is now the selected architecture through Phase 4. ADR-006 retains the former target roles only as an optional Phase 5 candidate; that documentation decision supplies no implementation, migration, or acceptance evidence.
 
-- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned Python Platform API for ownership/roles, applications, deployments, redacted config, logs and operations; diagnose an injected failure and prove bypassed UI checks still fail server-side. Prerequisites: Phase 2C gate.
+- [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned Python Platform API for ownership/roles, applications, deployments, redacted config, logs and operations; extend the CLI to every public project administration operation, including hosted application access and governance; diagnose an injected failure and prove bypassed client checks still fail server-side. Prerequisites: Phase 2C gate; hosted-access commands require the PLAN-009 public API.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. REST/curl and interactive API docs are not a domain CLI or self-service portal; no UI/API compatibility journey exists.
 
   **Progress (October 6, 2026):** [ADR-019](../../architecture/decisions/ADR-019-react-ui-technology-stack.md) selects the React UI stack, and the [UI implementation plan](plans/ui.md) defines gated foundation, authentication, read-only diagnosis, lifecycle, administration and operator increments. Foundation increment 0 is implemented in source under `platform/ui`: the Vite demonstration is replaced by a routed shell and query provider; shadcn source is under `src`; strict type-aware linting, OpenAPI type generation, a typed API-client boundary, Vitest, and a Playwright smoke configuration are present. The first authentication source increment selects `oidc-client-ts` and wires provider-neutral OIDC Authorization Code with PKCE from `/portal/config`, in-memory user/token state, callback handling, local session clearing, and API bearer injection. An initial authenticated project list uses the typed client, validates the currently `unknown` `/projects` response at the UI boundary, and renders project name/status with loading, empty, error, and refresh states. `npm run check` and the self-contained Playwright browser smoke test pass locally. No live Keycloak login, deployed API feature view, or portal acceptance journey has run. This is partial PLAN-006 source and local-check evidence only; CLI work remains separate within this task.
+
+  **CLI scope update (October 13, 2026):** The package under `platform/cli` already
+  implements environment authentication, `auth status`, and `deploy apply` with
+  optimistic revision updates and bounded operation/readiness watching. The
+  [expanded CLI plan](plans/cli.md#project-administration-coverage) maps every
+  current public project API family to commands and defines a checked coverage
+  registry. Human login and shared command infrastructure precede the first
+  administration slice: application groups/policies, human requests/memberships,
+  governance, access operations, and full consumer/provider service lifecycle,
+  including a same-project worker calling its application's public service.
+  Remaining increments cover diagnosis, configuration/secrets, recovery requests,
+  lifecycle, grants, CI credentials, and explicitly privileged operator actions.
+  Require exact ETags, idempotent creates, distinct deployment/access operation
+  watching, project-wide managed-secret semantics, explicit credential adoption,
+  and a role/denial acceptance matrix. This is a planning update; administration
+  commands and their deployed acceptance remain open under PLAN-006.
+
+  **CLI source progress (October 13, 2026):** The CLI now implements named
+  non-secret profiles, OIDC device login with keyring-backed refresh, preserved
+  environment deployment authentication, and domain commands for all 81
+  non-health public API methods. The packaged contract check reports 81 covered,
+  two health endpoints excluded, and no missing or extra commands. Local CLI
+  tests cover the existing deployment invocation, profile/session boundaries,
+  a same-project service request and approval with durable operation watching,
+  stale ETag denial, and unauthorized administration. The Python test suite and
+  wheel build pass locally. No live Keycloak login, deployed CLI administration,
+  role/denial matrix, or injected-failure journey ran; PLAN-006 stays open.
 
 - [ ] **PLAN-007 · 3** — Deliver the web/PostgreSQL template and reproducible create/deploy/diagnose journey; verify UI/API compatibility and document the role matrix. Prerequisites: PLAN-006.
 

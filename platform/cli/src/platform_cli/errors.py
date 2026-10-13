@@ -25,9 +25,9 @@ def exit_code_for_status(status_code: int) -> int:
         return 4
     if status_code == 404:
         return 5
-    if status_code == 409:
+    if status_code in {409, 412}:
         return 6
-    if status_code in {400, 422}:
+    if status_code in {400, 422, 428}:
         return 7
     if status_code == 429 or status_code >= 500:
         return 8

@@ -28,22 +28,34 @@ class RuntimeConfig:
     ca_bundle: str | None
     access_token_auth: AccessTokenAuth | None
     deployment_credential_auth: DeploymentCredentialAuth | None
+    profile_name: str | None = None
+    profile: object | None = None
+    insecure: bool = False
 
 
-def runtime_config(environment: dict[str, str] | None = None) -> RuntimeConfig:
+def runtime_config(environment: dict[str, str] | None = None, *, profile_name: str | None = None,
+                   api_url_override: str | None = None, insecure: bool = False) -> RuntimeConfig:
     """Read the non-persistent command configuration from an environment mapping."""
     env = os.environ if environment is None else environment
-    api_url = env.get("PLATFORM_API_URL", "").rstrip("/")
+    from .profiles import ProfileStore, validate_url
+    environment_auth = bool(env.get("PLATFORM_ACCESS_TOKEN") or env.get("PLATFORM_TOKEN_ENDPOINT")
+                            or env.get("PLATFORM_CLIENT_ID") or env.get("PLATFORM_CLIENT_SECRET"))
+    selected, profile = (None, None) if not profile_name and env.get("PLATFORM_API_URL") and environment_auth \
+        else ProfileStore().selected(profile_name)
+    api_url = (api_url_override or env.get("PLATFORM_API_URL") or (profile.api_url if profile else "")).rstrip("/")
     if not api_url:
         raise ConfigurationError("PLATFORM_API_URL is required")
+    validate_url(api_url)
+    ca_bundle = env.get("PLATFORM_CA_BUNDLE") or (profile.ca_bundle if profile else None)
 
     token = env.get("PLATFORM_ACCESS_TOKEN")
     if token:
         return RuntimeConfig(
             api_url=api_url,
-            ca_bundle=env.get("PLATFORM_CA_BUNDLE") or None,
+            ca_bundle=ca_bundle,
             access_token_auth=AccessTokenAuth(token),
             deployment_credential_auth=None,
+            profile_name=selected, profile=profile, insecure=insecure,
         )
 
     credential_values = {
@@ -65,9 +77,10 @@ def runtime_config(environment: dict[str, str] | None = None) -> RuntimeConfig:
         )
     return RuntimeConfig(
         api_url=api_url,
-        ca_bundle=env.get("PLATFORM_CA_BUNDLE") or None,
+        ca_bundle=ca_bundle,
         access_token_auth=None,
         deployment_credential_auth=credential,
+        profile_name=selected, profile=profile, insecure=insecure,
     )
 
 
@@ -76,6 +89,8 @@ def authentication_source(config: RuntimeConfig) -> str:
         return "access-token-environment"
     if config.deployment_credential_auth is not None:
         return "deployment-credential-environment"
+    if config.profile is not None:
+        return "human-profile-session"
     raise ConfigurationError(
         "set PLATFORM_ACCESS_TOKEN or PLATFORM_TOKEN_ENDPOINT, PLATFORM_CLIENT_ID, and PLATFORM_CLIENT_SECRET"
     )

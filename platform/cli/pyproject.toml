@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "developer-platform-cli"
-version = "0.1.0"
+version = "0.2.0"
 description = "Command-line client for the Developer Platform API"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -13,6 +13,8 @@ dependencies = [
   "pydantic>=2.10,<3",
   "rich>=13.9,<14",
   "typer>=0.15,<1",
+  "platformdirs>=4,<5",
+  "keyring>=25,<26",
 ]
 
 [project.optional-dependencies]

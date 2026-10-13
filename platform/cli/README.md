@@ -4,9 +4,9 @@ This source-adjacent README provides the minimal development example. The
 canonical user documentation is the [CLI guide](../../docs/developers/cli.md);
 implementation ownership is in the [maintainer guide](../../docs/maintainers/cli.md).
 
-`devplat` is the command-line client for the Developer Platform API. Its first
-supported workflow is CI-style deployment using a project-scoped deployment
-credential supplied only through environment variables.
+`devplat` is the command-line client for the Developer Platform API. It supports
+CI deployments and project administration, including hosted application access.
+Use `devplat --help` and `devplat access --help` to inspect commands.
 
 Install an editable development copy:
 
@@ -27,4 +27,7 @@ devplat deploy apply --project hello --file examples/project.json --wait
 
 `PLATFORM_ACCESS_TOKEN` may be used instead of the deployment-credential variables
 for a short-lived, externally obtained token. The CLI never persists either form of
-authentication material.
+authentication material. Deployment credentials authorize deployment and observation
+only; access administration requires a human project-administrator login or an
+externally supplied administrator token. See the [CLI guide](../../docs/developers/cli.md)
+for profiles, login, access commands, and versioned updates.

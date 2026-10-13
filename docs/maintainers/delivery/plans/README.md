@@ -8,13 +8,20 @@ Only unfinished, owned implementation plans belong here:
 - [Generic use-case enablement increment](use-case-enablement-increment.md)
 - [Phase 3 developer experience](phase-3-developer-experience.md)
 - [Phase 4 AI operations](phase-4-ai-operations.md)
-- [CLI implementation](cli.md)
+- [CLI implementation and complete project administration](cli.md)
 - [UI implementation](ui.md)
 
 **PLAN-020** [UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)
 has source implementation for hosted-application access definition and
 human/service approvals. Deployed portal acceptance and remaining priority-slice
 gates stay open.
+
+**PLAN-006 CLI source, October 13, 2026:** The [CLI administration plan](cli.md#project-administration-coverage)
+now has source commands for every non-health public API operation, including
+same-project worker access, human approvals, service credential lifecycle, and
+governance. Profile and human device login support are implemented. Local tests,
+contract parity, and wheel packaging pass; deployed and role-matrix acceptance
+remain open.
 
 When a plan is complete, promote durable behavior to current documentation and
 move the plan to `../history/` with its final evidence links.
