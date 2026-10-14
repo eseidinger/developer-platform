@@ -82,6 +82,17 @@ class PlaybookCommandTests(unittest.TestCase):
         self.assertNotIn("--volumes", source)
         self.assertTrue(playbook["tasks"][1]["no_log"])
 
+    def test_human_database_access_defaults_to_offline_plan(self):
+        source = (ANSIBLE_DIR / "test-platform-human-database-access.yml").read_text()
+        playbook = yaml.safe_load(source)[0]
+        self.assertEqual(playbook["vars"]["human_database_command"], "plan")
+        self.assertIn("human_database_confirm_environment", source)
+        self.assertIn("--operator-token-file", source)
+        self.assertIn("--known-hosts-file", source)
+        self.assertNotIn("client_secret", source)
+        self.assertNotIn("--volumes", source)
+        self.assertTrue(playbook["tasks"][1]["no_log"])
+
 
 if __name__ == "__main__":
     unittest.main()

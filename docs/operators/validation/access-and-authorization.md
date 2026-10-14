@@ -17,6 +17,69 @@ It is useful for the project/grant/revocation and restricted-inspection portions
 of this runbook; create the separate Keycloak test users first and retain only
 redacted HTTP results as evidence.
 
+## Human PostgreSQL access acceptance playbook
+
+The opt-in [`test-platform-human-database-access.yml`](../../../ansible/test-platform-human-database-access.yml)
+wrapper automates the Phase 3A.7 core tunnel and SQL checks. It does **not**
+deploy the platform, install the bastion, publish the neutral fixture, or close
+the full acceptance gate. Its default `plan` validates the run scope without
+contacting the platform API. A live `run` creates two private, run-scoped fixture
+projects (`hd-<run-id>-a` and `hd-<run-id>-b`) with separate managed databases.
+Their data and projects are retained for explicit owner-reviewed retirement;
+the runner revokes its temporary human grant and test persona. Never run it
+against real application data.
+
+First deploy the platform and the restricted bastion using
+[`install-human-database-access.yml`](../../../ansible/install-human-database-access.yml).
+Install or update the host-side runner environment from
+`platform/acceptance/requirements.txt` as in [Prepare the runner and fixture](#prepare-the-runner-and-fixture).
+Transfer `scripts/check-human-database-access.py`,
+`platform/acceptance/human_database.py`, and updated requirements to the target
+through the same reviewed runner-only update process used for hosted access;
+the Ansible acceptance wrapper does not transfer code. Publish the neutral
+fixture to an approved public registry and use its immutable digest, not a tag.
+
+Prepare a mode `0600` renewable human platform-administrator session file on
+the target with the [operator-session procedure](#obtain-a-private-operator-session-for-the-hosted-access-harness).
+Independently verify the dedicated bastion's Ed25519 host key and place its
+`[127.0.0.1]:2222` entry in a root-readable mode `0600` known-hosts file on
+the target. Do not generate the trust file from an unverified first connection.
+For a non-default private bastion address or port, use the matching host/port
+variables; keep the bastion behind the approved management firewall. The
+runner requires local root access to verify the installed `sshd` restrictions.
+
+From the controller checkout, use a fresh 12-character lowercase hexadecimal
+run ID and the exact API origin (normally the host-local loopback API):
+
+```bash
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-human-database-access.yml \
+  -e human_database_run_id=0123456789ab \
+  -e human_database_fixture_image=docker.io/example/neutral-fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+
+ansible-playbook -i ansible/inventory.yml ansible/test-platform-human-database-access.yml \
+  -e human_database_command=run \
+  -e human_database_run_id=0123456789ab \
+  -e human_database_fixture_image=docker.io/example/neutral-fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  -e human_database_operator_token_file=/opt/developer-platform/.runtime/operator-session.json \
+  -e human_database_known_hosts_file=/opt/developer-platform/.runtime/db-known-hosts \
+  -e human_database_confirm_environment=http://127.0.0.1:8000
+```
+
+Replace the example digest and run ID; reuse an ID only for inspecting its
+report, never for another run. The wrapper hides invocation output because
+Ansible log output is not a secret store. The root-only report is at
+`/opt/developer-platform/.runtime/human-database-access/<run-id>/report.json`.
+It records check names and safe results, no SQL password, SSH private key, or
+test-persona secret. Review it privately and record the deployed API/bastion
+revisions, fixture digest, and any failed check in the Phase 3A.7 evidence.
+`core-passed` means only the automated subset passed. Browser storage, remote
+firewall reachability, and log/screenshot/evidence redaction still need manual
+review. A failed run may leave its projects or a pending test-persona revoke;
+inspect the report and the run-scoped API records, retry cleanup through the
+documented operator API, and retire/purge only the verified fixture projects
+under the normal project-retirement procedure. Do not delete their databases
+directly.
+
 ## Neutral hosted-application acceptance harness
 
 Validation status (October 11, 2026): the deployed neutral-fixture core suite,

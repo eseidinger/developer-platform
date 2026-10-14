@@ -891,6 +891,23 @@ These tasks make the existing phase work executable without inventing new DEV/OP
   denial, credential distinctness in a live database, audit export, or existing
   session termination; all remain Phase 3A.7 acceptance work.
 
+  **Portal source update (October 14, 2026):** The project workspace now has
+  administrator grant/list/revoke controls and a named-human panel for SSH key
+  replacement and one-time SQL password rotation. The password is held only in
+  the open dialog, not a query cache; local UI tests cover permission/empty
+  states, grant/revoke actions, key replacement, and password dismissal. This
+  adds no deployed acceptance evidence.
+
+  **Acceptance automation source (October 14, 2026):** The opt-in
+  `ansible/test-platform-human-database-access.yml` wrapper defaults to an
+  offline plan. Its live runner is designed to exercise a pinned neutral
+  fixture, two isolated PostgreSQL databases, restricted SSH tunneling,
+  machine-grant denial, named human read-only SQL, foreign-project denial,
+  revocation of existing/new sessions and key access, and redacted audit
+  events. Local tests and playbook syntax are the only evidence so far; no
+  deployed run, browser inspection, remote firewall test, or full Phase 3A.7
+  acceptance is claimed.
+
 - [ ] **PLAN-009 · 3 (energy priority 2)** — Automate generic hosted-application authentication and coarse route authorization against the accepted provider-neutral OIDC boundary; demonstrate platform/application role separation and no implicit platform-admin access. The first accepted modes are `browser-session` and `bearer-token` on explicit non-overlapping route/method rules protected by project-scoped application groups. The platform derives browser clients and callbacks from public-component routing and derives confidential service clients and audiences from stable service-access targets. Applications do not supply redirect URIs, audiences, OAuth scopes, session settings, identity-provider group paths, or proxy flags in the initial profile. Humans use first-login requests with no default group; machines require provider approval and group assignment before credential activation. Include controlled project-wide secret binding, audited group/membership lifecycle, rotation, revocation, retirement cleanup, and recovery coverage. F-10 acceptance is required for Phase 3 completion. Prerequisites: Phase 2C gate; ADR-004 acceptance; PLAN-016 identity decision.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No OIDC provider/client automation or platform/application role-separation flow exists. ADR-004 was proposed at this baseline.

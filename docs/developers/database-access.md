@@ -9,7 +9,11 @@ and an SSH public key. The grant is scoped to the project, audited, and may be
 revoked without rotating the application's password. Only `ssh-ed25519` public
 keys are supported; submit the two fields before any comment.
 
-Use a human CLI session, with automation environment credentials cleared:
+The same grant, revocation, SSH-key replacement, and one-time password actions
+are also available in the project's **Human database access** portal section.
+
+For terminal workflows, use a human CLI session with automation environment
+credentials cleared:
 
 ```bash
 ssh-keygen -t ed25519 -f ~/.ssh/devplat-db

@@ -1,2 +1,3 @@
 httpx2==2.13.1
 PyJWT==2.15.1
+psycopg[binary]==3.3.6

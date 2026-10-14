@@ -1,10 +1,11 @@
 # Platform UI implementation plan
 
-Status: in progress as of October 13, 2026. Foundation, the authentication boundary,
+Status: in progress as of October 14, 2026. Foundation, the authentication boundary,
 the project workspace, and the core developer lifecycle are implemented in source:
 project creation, deployment and operation polling, diagnostics, logs, configuration,
 secrets, restart, rollback, retirement, recovery requests, and deployment
-credentials. Project-grant management and hosted-application access definition and
+credentials. Project-grant and human database-access controls, including
+one-time SQL password reveal, are implemented in source. Hosted-application access definition and
 approval (PLAN-020, increment 4a) are implemented in source. PLAN-020 is
 owner-accepted for lab sequencing with deployed journeys unverified; operator
 workflows and delivery hardening remain open. This plan

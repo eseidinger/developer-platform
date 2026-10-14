@@ -1,11 +1,11 @@
 # UI guide
 
-Status: partially implemented. Last reviewed October 13, 2026.
+Status: partially implemented. Last reviewed October 14, 2026.
 
 The Platform Control Plane portal is served at `/` on the Platform API
 origin. It uses OIDC Authorization Code with PKCE and calls the same API as the
-CLI. The project workspace has lifecycle, diagnostics, project-grant, and
-deployment-credential screens in source. Project-scoped application-access screens
+CLI. The project workspace has lifecycle, diagnostics, project-grant, human
+database access, and deployment-credential screens in source. Project-scoped application-access screens
 are also implemented in source at `/projects/{name}/application-access`.
 Implementation and acceptance evidence
 are tracked in the [delivery backlog](../maintainers/delivery/backlog.md).
@@ -18,6 +18,28 @@ browser storage.
 Until a workflow is available in the portal, use the [CLI](cli.md) or
 [API](api.md). For UI source, commands, and tests, see the
 [UI maintainer guide](../maintainers/ui.md).
+
+## Manage human database access
+
+Open a project and find **Human database access**. Project administrators can
+list active and revoked grants, add a named human using the exact OIDC issuer,
+subject, and bare `ssh-ed25519` public key, and confirm revocation. A revoked
+SQL role is disabled and its active PostgreSQL sessions are terminated. The
+administrator never sees that person's SQL password.
+
+The named human sees their own database name, SQL username, SSH account, and
+key fingerprint. They can replace their SSH public key or rotate their SQL
+password. A new password is displayed once in a dialog and discarded when the
+dialog closes; save it in a protected password manager. Password rotation
+affects new connections, not existing sessions. The tunnel host, port, and
+verified SSH host key come from the operator, not the portal. See the
+[database access guide](database-access.md) for connection instructions.
+
+Unauthorized administrator controls are hidden on API `403`; no personal grant
+is shown as a separate `404` empty state. Other API failures remain visible.
+All authorization and audit decisions remain server-side. These controls have
+local UI tests but no deployed role, tunnel, or revocation acceptance yet;
+those checks belong to Phase 3A.
 
 ## Define and approve application access
 

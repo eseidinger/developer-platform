@@ -91,6 +91,15 @@ updates can follow the [non-deploying update procedure](../docs/operators/valida
 they do not require the Compose outage described below. EV-45 records a directly
 invoked harness run, not execution of this Ansible wrapper or full gate closure.
 
+Human PostgreSQL access has a separate
+[`test-platform-human-database-access.yml`](test-platform-human-database-access.yml)
+acceptance wrapper. Its default `plan` is offline. A live `run` requires an
+explicit API-origin confirmation, a renewable human platform-administrator
+session, a verified bastion host key, and a public digest-pinned neutral
+fixture. It creates two uniquely named fixture projects, tests the tunnel and
+SQL authorization/revocation, then retains the projects for explicit review
+and retirement. See the [human database acceptance procedure](../docs/operators/validation/access-and-authorization.md#human-postgresql-access-acceptance-playbook).
+
 Rerunning the playbook reapplies sources and endpoints and reconciles the running
 platform. After validating the transferred Compose configuration and confirming
 that no backup or availability drill is active, deployment performs a controlled
