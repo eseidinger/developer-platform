@@ -438,11 +438,14 @@ It is a reachability control, not a substitute for SQL authorization.
 
 ### Current limits and lifecycle implications
 
-The current per-project role owns its database, so it has broader schema power
-than a future least-privilege runtime role would. Separate runtime,
-migration/owner, and human database roles are intentionally not implemented;
-there is also no platform endpoint for interactive human SQL access. A database,
-role, and catalog entry are retained on project retirement rather than deleted.
+The current per-project workload role owns its database, so it has broader
+schema power than a future least-privilege runtime role would. A separate
+read-only human role and restricted SSH forwarding path are implemented in
+source; [human database access](../developers/database-access.md) describes the
+grant and revocation model. Deployed isolation and session-revocation checks
+remain Phase 3A work. A distinct migration/owner role is not implemented.
+Project retirement retains the database and workload role, but disables human
+database logins; permanent purge removes those human roles.
 
 Passwords are deterministic while `DATABASE_KEY` remains unchanged. Changing
 only that key and redeploying changes the Kubernetes Secret but does **not**

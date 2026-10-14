@@ -182,3 +182,26 @@ def test_public_contract_has_a_domain_command_for_every_operation():
     paths = {(method.upper(), path) for path, operations in source["paths"].items()
              for method in operations if method.upper() in {"GET", "POST", "PUT", "PATCH", "DELETE"}}
     assert paths == {(item.method, item.path) for item in COMMANDS} | EXCLUSIONS.keys()
+
+
+def test_human_database_grant_and_one_time_credential(monkeypatch, tmp_path):
+    grant_file = tmp_path / "grant.json"
+    grant_file.write_text(json.dumps({"issuer": "https://identity.example", "subject": "human",
+                                      "public_key": "ssh-ed25519 key"}))
+
+    def handler(request):
+        assert request.url.path in {"/projects/orders/database-access/grants",
+                                    "/projects/orders/database-access/me/credential"}
+        if request.method == "POST" and request.url.path.endswith("/grants"):
+            assert json.loads(request.content)["subject"] == "human"
+            return httpx.Response(201, json={"username": "human_123", "active": True})
+        return httpx.Response(200, json={"username": "human_123", "password": "one-time-secret"})
+
+    runner = _cli(monkeypatch, tmp_path, handler)
+    created = runner.invoke(app, ["database-access", "grants", "create", "--project", "orders",
+                                  "--file", str(grant_file), "--output", "json"])
+    assert created.exit_code == 0, created.output
+    issued = runner.invoke(app, ["database-access", "credential", "issue", "--project", "orders",
+                                 "--output", "json"])
+    assert issued.exit_code == 0, issued.output
+    assert json.loads(issued.stdout)["password"] == "one-time-secret"

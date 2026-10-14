@@ -1,6 +1,6 @@
 # ADR-013 – Deterministic Project Credentials and Retained SQL Data
 
-Recorded: September 27, 2026. Status: **Implemented baseline; owner acceptance of this record not recorded**. ADR-003's proposed separation of runtime, owner/migration and human identities remains outstanding.
+Recorded: September 27, 2026. Status: **Implemented baseline; owner acceptance of this record not recorded**. ADR-003's proposed runtime/owner separation remains outstanding; separate read-only human identity is implemented in source but not deployed-accepted.
 
 ## Context
 
@@ -10,7 +10,7 @@ Repeat PUT and cluster recreation must reconnect workloads to an existing databa
 
 For a project, the database and login name are `project_` plus the project name with hyphens replaced by underscores. The password is the hexadecimal HMAC-SHA256 of the project name under `DATABASE_KEY`. The API creates a missing login with NOSUPERUSER/NOCREATEDB/NOCREATEROLE, creates a missing database owned by it, and revokes PUBLIC database privileges. Existing role passwords are left unchanged.
 
-The generated `database` Kubernetes Secret supplies `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` and `PGPASSWORD`. PostgreSQL lives outside k3d with a persistent Compose volume. Workload retirement retains database, login and catalog; there is no API data-purge operation. The same login owns the database and runs application SQL; separate migration and human identities do not exist.
+The generated `database` Kubernetes Secret supplies `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER` and `PGPASSWORD`. PostgreSQL lives outside k3d with a persistent Compose volume. Workload retirement retains database, workload login and catalog; operator-controlled permanent purge is a separate lifecycle action. The same workload login owns the database and runs application SQL; no separate migration role exists. Distinct read-only human roles and a controlled tunnel are implemented in source, with deployed acceptance pending.
 
 ## Alternatives and consequences
 
@@ -24,4 +24,4 @@ Changing only `DATABASE_KEY` and repeating PUT rewrites Kubernetes credentials b
 
 Source: [password/database provisioning](../../../platform/app/src/app/main.py), [Secret generation](../../../platform/app/src/app/manifests.py), [PostgreSQL placement](../../../persistence/compose.yaml). [Backup and recovery](../../operators/backup-and-recovery.md) covers preservation of the original configuration; [the runbook](../../operators/runbooks/security.md#compromised-credential-or-access-revocation) covers current rotation constraints.
 
-DEV-003-T02, DEV-010-T01 and PLAN-008 remain open for versioned rotation/adoption and separated identities. Validate live role/Secret rotation and denied foreign database access before claiming those outcomes. Revisit before individual human database access or important application data relies on this baseline.
+DEV-003-T02 and DEV-010-T01 remain open for versioned workload rotation/adoption and owner separation. PLAN-008 remains open for deployed human-role, tunnel, foreign-project denial, and revocation acceptance. Validate live role/Secret rotation and denied foreign database access before claiming those outcomes.

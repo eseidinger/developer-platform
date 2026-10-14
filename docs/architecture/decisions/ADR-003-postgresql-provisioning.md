@@ -1,7 +1,7 @@
 # ADR-003 – Shared PostgreSQL Service with Separate Identities
 
 Created: September 25, 2026. Status: **Proposed**.
-Source inspection confirms [database/login provisioning and credential derivation](../../../platform/app/src/app/main.py) and [Kubernetes Secret bindings](../../../platform/app/src/app/manifests.py). The runtime login currently owns its database; separate migration/owner and human identities remain proposed. See the [backlog evidence](../../maintainers/delivery/backlog.md#evidence-conventions) for local verification and outstanding live isolation, rotation, and restore acceptance. This source evidence does not accept the proposed decision.
+Source inspection confirms [database/login provisioning and credential derivation](../../../platform/app/src/app/main.py) and [Kubernetes Secret bindings](../../../platform/app/src/app/manifests.py). The runtime login currently owns its database; distinct migration/owner identity remains proposed. A separate read-only human identity and restricted tunnel are implemented in source, but live isolation, rotation, and restore acceptance remain outstanding. See the [backlog evidence](../../maintainers/delivery/backlog.md#evidence-conventions). This partial source evidence does not accept the full proposed decision.
 
 ## Context
 

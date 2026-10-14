@@ -25,6 +25,8 @@ Start with [Deploy your first application](getting-started.md). Then use:
 - [Application declaration reference](application-spec.md)
 - [API guide](api.md)
 - [CI deployment](ci-deployment.md)
+- [Web/PostgreSQL starter](../../examples/web-postgres/README.md)
+- [Human database access](database-access.md)
 - [Troubleshooting](troubleshooting.md)
 
 ## Important boundaries

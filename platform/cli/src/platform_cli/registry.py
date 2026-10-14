@@ -69,6 +69,12 @@ for action, method in (("set", "PUT"), ("delete", "DELETE")):
 add("credentials create", "POST", P + "/deployment-credentials", "Create a CI credential; return its secret once.", body="credential", fields=("name", "expires_in_days"), credential=True)
 add("credentials rotate", "POST", P + "/deployment-credentials/{credential_id}/rotate", "Rotate a CI credential with bounded overlap.", body="credential", fields=("expires_in_days", "overlap_hours"), credential=True)
 add("credentials revoke", "DELETE", P + "/deployment-credentials/{credential_id}", "Revoke a CI credential.", destructive=True)
+add("database-access grants list", "GET", P + "/database-access/grants", "List named human database grants.")
+add("database-access grants create", "POST", P + "/database-access/grants", "Grant a human read-only database access using a JSON file.", body="file")
+add("database-access grants revoke", "DELETE", P + "/database-access/grants", "Revoke a human database grant and terminate its sessions.", body="grant", fields=("issuer", "subject"), destructive=True)
+add("database-access me", "GET", P + "/database-access/me", "Inspect your database tunnel identity.")
+add("database-access key replace", "PUT", P + "/database-access/me/key", "Replace your SSH public key using a JSON file.", body="file")
+add("database-access credential issue", "POST", P + "/database-access/me/credential", "Rotate and reveal your database password once.", credential=True)
 
 for command, suffix, description, query, resource in (
     ("access context", "application-access-context", "Inspect access eligibility and permissions.", (), False),

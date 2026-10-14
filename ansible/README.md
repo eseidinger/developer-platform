@@ -44,6 +44,15 @@ K3S image, prepare the target `.env` using `scripts/init.py` and edit it before 
 first deployment. Existing clusters are not automatically upgraded by bootstrap.
 Back up `.env`, especially `DATABASE_KEY`, as described in [operations](../docs/operators/backup-and-recovery.md).
 
+Human PostgreSQL access is a separate opt-in installation. After the API and
+generated `DATABASE_BASTION_TOKEN` are deployed, run
+`ansible-playbook -i inventory.yml ansible/install-human-database-access.yml`.
+The dedicated SSH daemon binds to loopback by default. Set
+`platform_database_bastion_bind_ip` to a protected management-interface IPv4
+address and firewall port `platform_database_bastion_port` only when remote
+developer access is intended. Verify the host key and the deployed tunnel with
+the [human database access guide](../docs/developers/database-access.md).
+
 Useful inventory overrides:
 
 | Variable | Default | Purpose |

@@ -60,6 +60,7 @@ from .keycloak_credentials import ProviderError as CredentialProviderError
 from .keycloak_credentials import create_client as create_credential_client, delete_client as delete_credential_client
 from . import access_store
 from .access_worker import loop as application_access_loop
+from . import human_database_access
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -68,6 +69,12 @@ verifier = None
 
 def connect():
     return psycopg.connect(host=os.environ["POSTGRES_HOST"], dbname="platform",
+        user="postgres", password=os.environ["POSTGRES_PASSWORD"],
+        connect_timeout=5, autocommit=True)
+
+
+def connect_project_database(name: str):
+    return psycopg.connect(host=os.environ["POSTGRES_HOST"], dbname=project_database_name(name),
         user="postgres", password=os.environ["POSTGRES_PASSWORD"],
         connect_timeout=5, autocommit=True)
 
@@ -92,6 +99,7 @@ async def lifespan(app):
         initialize_audit(conn)
         initialize_authorization(conn)
         initialize_deployment_credentials(conn)
+        human_database_access.initialize(conn)
         access_store.initialize(conn)
         bootstrap = bootstrap_platform_admin(conn, verifier.issuer)
     if bootstrap:
@@ -348,6 +356,34 @@ class DataServiceRecoveryRequest(BaseModel):
 class DataServiceRecoveryReview(BaseModel):
     model_config = ConfigDict(extra="forbid")
     status: Literal["acknowledged", "resolved"]
+
+
+class HumanDatabaseGrant(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    issuer: str = Field(min_length=1, max_length=2048)
+    subject: str = Field(min_length=1, max_length=1024)
+    public_key: str = Field(min_length=1, max_length=256)
+
+    @field_validator("public_key")
+    @classmethod
+    def valid_public_key(cls, value: str) -> str:
+        return human_database_access.parse_public_key(value)[0]
+
+
+class HumanDatabaseKey(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    public_key: str = Field(min_length=1, max_length=256)
+
+    @field_validator("public_key")
+    @classmethod
+    def valid_public_key(cls, value: str) -> str:
+        return human_database_access.parse_public_key(value)[0]
+
+
+class HumanDatabaseReference(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    issuer: str = Field(min_length=1, max_length=2048)
+    subject: str = Field(min_length=1, max_length=1024)
 
 
 class DeploymentCredentialCreate(BaseModel):
@@ -1505,6 +1541,164 @@ def _recovery_record(row):
             "reviewed_at": row[4].isoformat() if row[4] else None}
 
 
+def _database_access_record(row):
+    return {"project": row[0], "issuer": row[1], "subject": row[2],
+            "username": row[3], "key_fingerprint": row[4], "active": row[5],
+            "created_at": row[6].isoformat(), "updated_at": row[7].isoformat()}
+
+
+def require_human_database_principal(principal: Principal, project: str) -> None:
+    with connect() as conn:
+        machine = access_scope(conn, principal)
+    if machine is not None:
+        required_audit(actor_for(principal), "authorization", "project", project, "denied",
+                       {"project": project}, {"permission": "human-database-access"})
+        raise HTTPException(403, "A human identity is required")
+
+
+@app.get("/projects/{name}/database-access/grants")
+def list_human_database_grants(name: str, principal: Principal = Depends(current_principal)):
+    require_permission(principal, "grant", name)
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+            raise HTTPException(404, "Unknown project")
+        rows = conn.execute("""SELECT project, issuer, subject, role_name, fingerprint, active, created_at, updated_at
+            FROM human_database_access WHERE project=%s ORDER BY issuer, subject""", (name,)).fetchall()
+    required_audit(actor_for(principal), "database-access.list", "project", name, "succeeded",
+                   {"project": name}, {"count": len(rows)})
+    return {"project": name, "grants": [_database_access_record(row) for row in rows]}
+
+
+@app.post("/projects/{name}/database-access/grants", status_code=201)
+def grant_human_database_access(name: str, body: HumanDatabaseGrant,
+                                principal: Principal = Depends(current_principal)):
+    require_permission(principal, "grant", name)
+    require_human_database_principal(principal, name)
+    actor = actor_for(principal)
+    key, fingerprint = human_database_access.parse_public_key(body.public_key)
+    role = human_database_access.role_name(name, body.issuer, body.subject)
+    database = project_database_name(name)
+    with connect() as conn:
+        project = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
+        if project is None:
+            raise HTTPException(404, "Unknown project")
+        if project[0] in ("empty", "retired", "retiring"):
+            raise HTTPException(409, "Project database is not active")
+        if not conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (database,)).fetchone():
+            raise HTTPException(409, "Project database is unavailable")
+        if conn.execute("""SELECT 1 FROM human_database_access WHERE project=%s AND issuer=%s
+            AND subject=%s AND active""", (name, body.issuer, body.subject)).fetchone():
+            raise HTTPException(409, "Human database access already exists")
+        try:
+            # The initial password is deliberately discarded. Only the named human can
+            # obtain a usable one-time password through the self-service endpoint.
+            human_database_access.prepare_role(conn, role, human_database_access.new_password())
+            with connect_project_database(name) as project_conn:
+                human_database_access.grant_read_only(project_conn, database, database, role)
+            row = conn.execute("""INSERT INTO human_database_access
+                (project, issuer, subject, role_name, public_key, fingerprint, active)
+                VALUES (%s,%s,%s,%s,%s,%s,true)
+                ON CONFLICT(project, issuer, subject) DO UPDATE SET
+                    public_key=excluded.public_key, fingerprint=excluded.fingerprint,
+                    active=true, updated_at=now()
+                RETURNING project, issuer, subject, role_name, fingerprint, active, created_at, updated_at""",
+                (name, body.issuer, body.subject, role, key, fingerprint)).fetchone()
+        except psycopg.Error as exc:
+            log.error("Human database grant failed project=%s error_type=%s", name, type(exc).__name__)
+            raise HTTPException(503, "Database access could not be prepared") from None
+    required_audit(actor, "database-access.grant", "principal", body.issuer + "|" + body.subject,
+                   "succeeded", {"project": name}, {"username": role})
+    return _database_access_record(row)
+
+
+@app.get("/projects/{name}/database-access/me")
+def my_human_database_access(name: str, principal: Principal = Depends(current_principal)):
+    require_human_database_principal(principal, name)
+    with connect() as conn:
+        row = conn.execute("""SELECT project, issuer, subject, role_name, fingerprint, active, created_at, updated_at
+            FROM human_database_access WHERE project=%s AND issuer=%s AND subject=%s AND active""",
+            (name, principal.issuer, principal.subject)).fetchone()
+    if row is None:
+        raise HTTPException(404, "No active human database grant")
+    required_audit(actor_for(principal), "database-access.inspect", "project", name, "succeeded",
+                   {"project": name})
+    return {**_database_access_record(row), "database": project_database_name(name),
+            "ssh_user": "platform-db"}
+
+
+@app.put("/projects/{name}/database-access/me/key")
+def update_my_human_database_key(name: str, body: HumanDatabaseKey,
+                                 principal: Principal = Depends(current_principal)):
+    require_human_database_principal(principal, name)
+    key, fingerprint = human_database_access.parse_public_key(body.public_key)
+    with connect() as conn:
+        row = conn.execute("""UPDATE human_database_access SET public_key=%s, fingerprint=%s, updated_at=now()
+            WHERE project=%s AND issuer=%s AND subject=%s AND active
+            RETURNING project, issuer, subject, role_name, fingerprint, active, created_at, updated_at""",
+            (key, fingerprint, name, principal.issuer, principal.subject)).fetchone()
+    if row is None:
+        raise HTTPException(404, "No active human database grant")
+    required_audit(actor_for(principal), "database-access.key.replace", "project", name, "succeeded",
+                   {"project": name}, {"key_fingerprint": fingerprint})
+    return _database_access_record(row)
+
+
+@app.post("/projects/{name}/database-access/me/credential")
+def issue_my_human_database_credential(name: str, principal: Principal = Depends(current_principal)):
+    require_human_database_principal(principal, name)
+    with connect() as conn:
+        row = conn.execute("""SELECT role_name FROM human_database_access
+            WHERE project=%s AND issuer=%s AND subject=%s AND active""",
+            (name, principal.issuer, principal.subject)).fetchone()
+        if row is None:
+            raise HTTPException(404, "No active human database grant")
+        password = human_database_access.new_password()
+        human_database_access.prepare_role(conn, row[0], password)
+    required_audit(actor_for(principal), "database-access.credential.rotate", "project", name,
+                   "succeeded", {"project": name}, {"username": row[0]})
+    return JSONResponse({"project": name, "database": project_database_name(name),
+                         "username": row[0], "password": password},
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.delete("/projects/{name}/database-access/grants")
+def revoke_human_database_access(name: str, reference: HumanDatabaseReference,
+                                 principal: Principal = Depends(current_principal)):
+    require_permission(principal, "grant", name)
+    require_human_database_principal(principal, name)
+    with connect() as conn:
+        row = conn.execute("""UPDATE human_database_access SET active=false, updated_at=now()
+            WHERE project=%s AND issuer=%s AND subject=%s RETURNING role_name""",
+            (name, reference.issuer, reference.subject)).fetchone()
+        if row is None:
+            raise HTTPException(404, "Unknown active human database grant")
+        try:
+            human_database_access.deny_role(conn, row[0])
+        except psycopg.Error as exc:
+            log.error("Human database revocation incomplete project=%s error_type=%s", name, type(exc).__name__)
+            raise HTTPException(503, "Database access revocation is incomplete; retry") from None
+    required_audit(actor_for(principal), "database-access.revoke", "principal",
+                   reference.issuer + "|" + reference.subject, "succeeded",
+                   {"project": name}, {"username": row[0]})
+    return {"project": name, "revoked": True}
+
+
+@app.get("/internal/database-access/authorized-key", include_in_schema=False)
+def lookup_human_database_key(fingerprint: str, x_database_bastion_token: str | None = Header(default=None)):
+    token = os.environ.get("DATABASE_BASTION_TOKEN", "")
+    if len(token) < 32 or not x_database_bastion_token or not hmac.compare_digest(token, x_database_bastion_token):
+        raise HTTPException(404, "Not found")
+    destination = os.environ.get("POSTGRES_IP", "172.30.80.10") + ":5432"
+    with connect() as conn:
+        record = human_database_access.authorized_key(conn, fingerprint, destination)
+    if record is None:
+        raise HTTPException(404, "Not found")
+    key, project, issuer, subject = record
+    required_audit(Actor("ssh-key", fingerprint), "database-access.tunnel.authorize", "principal",
+                   issuer + "|" + subject, "succeeded", {"project": project})
+    return PlainTextResponse(key + "\n", headers={"Cache-Control": "no-store"})
+
+
 @app.get("/projects/{name}/data-services")
 def data_services(name: str, principal: Principal = Depends(current_principal)):
     """Report managed-database availability and the latest recovery outcome."""
@@ -1914,9 +2108,15 @@ def current_purge_scope(conn, name: str):
 def drop_project_database_and_role(conn, name: str) -> None:
     """Drop only the deterministic SQL resources after a verified purge confirmation."""
     database = project_database_name(name)
+    human_roles = [row[0] for row in conn.execute(
+        "SELECT role_name FROM human_database_access WHERE project=%s", (name,)).fetchall()]
+    for role in human_roles:
+        human_database_access.deny_role(conn, role)
     conn.execute("""SELECT pg_terminate_backend(pid) FROM pg_stat_activity
         WHERE datname=%s AND pid <> pg_backend_pid()""", (database,))
     conn.execute(sql.SQL("DROP DATABASE IF EXISTS {}").format(sql.Identifier(database)))
+    for role in human_roles:
+        conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(role)))
     conn.execute(sql.SQL("DROP ROLE IF EXISTS {}").format(sql.Identifier(database)))
 
 
@@ -1927,6 +2127,7 @@ def delete_project_catalog(conn, name: str) -> None:
         SELECT id FROM hosted_access_resources WHERE project=%s)""", (name,))
     conn.execute("DELETE FROM hosted_access_resources WHERE project=%s", (name,))
     conn.execute("DELETE FROM data_service_recovery_requests WHERE project=%s", (name,))
+    conn.execute("DELETE FROM human_database_access WHERE project=%s", (name,))
     conn.execute("DELETE FROM deployment_credentials WHERE project=%s", (name,))
     conn.execute("DELETE FROM platform_grants WHERE scope_kind='project' AND scope_id=%s", (name,))
     conn.execute("""DELETE FROM application_operations WHERE application_id IN (
@@ -2130,6 +2331,11 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                         # Retiring a project ends access immediately. Provider-client deletion is retried by the
                         # existing fail-closed credential cleanup worker; credentials are never silently retained active.
                         conn.execute("DELETE FROM platform_grants WHERE scope_kind='project' AND scope_id=%s", (name,))
+                        human_roles = conn.execute(
+                            "UPDATE human_database_access SET active=false, updated_at=now() "
+                            "WHERE project=%s RETURNING role_name", (name,)).fetchall()
+                        for (human_role,) in human_roles:
+                            human_database_access.deny_role(conn, human_role)
                         conn.execute("""UPDATE deployment_credentials SET status='revocation_pending'
                             WHERE project=%s AND status NOT IN ('revoked', 'revocation_pending')""", (name,))
                         if scope is not None:

@@ -16,10 +16,10 @@ The [energy-system use-case enablement plan](energy-system-integration.md) is th
 first Phase 3 delivery slice. Its remaining work is now organized as
 [Phase 3A priority-slice completion](phase-3a-priority-leftovers.md): generic
 application identity, component monitoring, authenticated routing, durability,
-recovery, and separately owned energy-system evidence. Complete Phase 3A before
-starting new Phase 3 breadth beyond work already in progress.
-Existing portal and CLI work may continue only where it directly enables or
-verifies that slice.
+recovery, separately owned energy-system evidence, and all deployed Phase 3
+acceptance. Phase 3 implements the source capabilities; Phase 3A is the sole
+acceptance/evidence gate. Portal, CLI, template, and human-database source work
+may proceed independently of the 3A evidence sequence.
 
 ## Priority sequence
 
@@ -33,10 +33,10 @@ and the [user workflow](../../../developers/ui.md#define-and-approve-application
 This is a direct enablement of the priority slice. It does not certify the outstanding identity,
 monitoring, integration, and recovery acceptance in the sequence below.
 
-1. Complete [Phase 3A](phase-3a-priority-leftovers.md): `PLAN-016` → `PLAN-009`
-   → `PLAN-017` → `PLAN-018` → `PLAN-019`.
-2. Resume the broader portal/template journey and human database access
+1. Implement the broader portal/template journey and human database access
    (`PLAN-006` through `PLAN-008`).
+2. Complete [Phase 3A](phase-3a-priority-leftovers.md), which owns all deployed
+   acceptance for `PLAN-006` through `PLAN-020` and the priority slice.
 
 ## Work packages
 
@@ -60,18 +60,13 @@ monitoring, integration, and recovery acceptance in the sequence below.
 
 Entry requires the Phase 1, Phase 2A, Phase 2B, and Phase 2C backlog gates, including usable authorized diagnostics, recovery, retirement, and CI-credential APIs. Portal completion cannot substitute for those API acceptance results.
 
-## Acceptance
+## Acceptance ownership
 
-The priority use-case enablement slice first satisfies the exit criteria in the
-[energy-system use-case enablement plan](energy-system-integration.md). This
-establishes generic hosted-application identity and a real multi-project
-consumer/producer journey before the general self-service demonstration. The
-concrete energy-system declarations and business assertions remain outside the
-platform repository.
-
-A developer creates a sample application, deploys it, and locates an intentionally introduced failure using operation status, health, and logs. Disallowed actions remain blocked server-side even when UI checks are bypassed.
-
-A database user uses credentials distinct from the application. Revoking a grant prevents new access; existing sessions terminate according to the defined session policy. An application OIDC client does not create platform administrator permissions.
+All source, local, and deployed acceptance is planned and recorded in
+[Phase 3A](phase-3a-priority-leftovers.md). It first verifies the priority
+use-case slice, then the portal/CLI/template/human-database journeys. Concrete
+energy-system declarations and business assertions remain outside the platform
+repository.
 
 ## Outcome
 

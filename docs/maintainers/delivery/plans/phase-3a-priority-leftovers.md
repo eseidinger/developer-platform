@@ -1,9 +1,10 @@
 # Phase 3A — Priority Slice Completion
 
 Status: active execution phase. This plan collects the remaining work in
-`PLAN-016`, `PLAN-009`, `PLAN-017`, `PLAN-018`, and `PLAN-019`, plus the
-deferred deployed portal acceptance for owner-accepted `PLAN-020`. It does not
-replace their acceptance criteria or create a new task ID. The
+`PLAN-016`, `PLAN-009`, `PLAN-017`, `PLAN-018`, `PLAN-019`, `PLAN-006`,
+`PLAN-007`, and `PLAN-008`, plus the deferred deployed portal acceptance for
+owner-accepted `PLAN-020`. It does not replace their acceptance criteria or
+create a new task ID. The
 [delivery backlog](../backlog.md) remains the authoritative task and evidence
 register.
 
@@ -23,11 +24,11 @@ Entry: Phase 2C is accepted and the decisions in
 are accepted.
 
 Exit: every acceptance criterion for `PLAN-016`, `PLAN-009`, `PLAN-017`,
-`PLAN-018`, and `PLAN-019`, and the deferred deployed portal journeys in
-`PLAN-020`, has dated source, local, and deployed evidence (or a new explicit
-owner-directed exception). The generic and externally owned versioned results
-are recorded together. Only then may new general Phase 3 breadth (`PLAN-006`
-through `PLAN-008`) start.
+`PLAN-018`, `PLAN-019`, `PLAN-006`, `PLAN-007`, and `PLAN-008`, and the
+deferred deployed portal journeys in `PLAN-020`, has dated source, local, and
+deployed evidence (or a new explicit owner-directed exception). The generic and
+externally owned versioned results are recorded together. Only then may Phase 3
+be closed.
 
 Existing EV-45 and EV-46 are partial evidence, not phase exit: they do not
 prove the outage/recovery, elapsed-retention, IPv6, changed-DNS, or external
@@ -161,6 +162,31 @@ journeys above, identify the deployed portal/API revisions, and distinguish UI
 behavior from the server-side access enforcement already established by the
 generic harness.
 
+### 3A.7 — Accept general self-service delivery (`PLAN-006`–`PLAN-008`)
+
+Source implementation for the portal/CLI, reusable web/PostgreSQL template, and
+human database access belongs to Phase 3. This package owns all deployed
+acceptance for those capabilities.
+
+1. Run the documented role matrix through both portal and CLI: human OIDC login,
+   deployment-credential automation, authorized discovery and diagnosis,
+   configuration/secret lifecycle, recovery request, rollback/restart,
+   retirement, grants, and credential lifecycle. Prove every disallowed action
+   remains denied by a direct Platform API request.
+2. Create, deploy, diagnose, update, and retire the reusable web/PostgreSQL
+   template using the same versioned application declaration from portal and
+   CLI. Record API, template/image, and client versions plus the injected-failure
+   result.
+3. Exercise human database access with distinct human and workload credentials:
+   authorized tunnel establishment, foreign-project denial, audited creation/use/
+   revocation, and termination of new and existing sessions according to the
+   published policy. Confirm no tunnel secret or database password appears in
+   client storage, output, logs, audit exports, screenshots, or evidence.
+
+**Exit evidence:** repeatable deployed portal, CLI, template, and human-database
+journeys pass against the exact recorded revisions. This evidence, rather than a
+source build or UI fixture, closes `PLAN-006`–`PLAN-008`.
+
 ## Evidence and handoff rules
 
 - Record each package in the backlog verification register with date,
@@ -178,12 +204,14 @@ generic harness.
 ## Dependencies
 
 `PLAN-016` → `PLAN-009` → `PLAN-017` → `PLAN-018` → `PLAN-019`, with portal
-acceptance package 3A.6 run after the identity/access API is available and before
-Phase 3A exit.
+acceptance package 3A.6 run after the identity/access API is available. Package
+3A.7 runs after the Phase 3 source capabilities are ready; both packages are
+required before Phase 3A and Phase 3 exit.
 
 `PLAN-018` requires the implemented and accepted identity, contract, and
 monitoring outcomes. `PLAN-019` requires the completed deployed integration
-gate. `PLAN-006` through `PLAN-008` remain blocked on Phase 3A exit.
+gate. Source implementation for `PLAN-006` through `PLAN-008` may proceed in
+Phase 3; their acceptance is exclusively package 3A.7 work.
 
 Foundations: [energy-system priority plan](energy-system-integration.md),
 [generic use-case enablement increment](use-case-enablement-increment.md),

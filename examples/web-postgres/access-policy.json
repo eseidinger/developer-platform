@@ -1,0 +1,13 @@
+{
+  "component": "web",
+  "defaultDecision": "deny",
+  "identityAttributes": {"displayName": true, "email": false},
+  "routes": [
+    {
+      "name": "interactive",
+      "match": {"pathPrefix": "/", "methods": ["GET"]},
+      "authentication": {"mode": "browser-session"},
+      "authorization": {"anyOfGroups": ["readers"]}
+    }
+  ]
+}

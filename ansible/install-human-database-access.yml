@@ -1,0 +1,167 @@
+---
+- name: Install the restricted human database SSH tunnel
+  hosts: developer_platform
+  become: true
+  gather_facts: true
+  vars:
+    database_bastion_bind_ip: "{{ platform_database_bastion_bind_ip | default('127.0.0.1') }}"
+    database_bastion_port: "{{ platform_database_bastion_port | default(2222) | int }}"
+    database_install_dir: "{{ platform_install_dir | default('/opt/developer-platform') }}"
+
+  tasks:
+    - name: Validate the deliberately selected listener
+      ansible.builtin.assert:
+        that:
+          - database_bastion_bind_ip is match('^[0-9.]+$')
+          - database_bastion_bind_ip != '0.0.0.0'
+          - database_bastion_port | int >= 1024
+          - database_bastion_port | int <= 65535
+        fail_msg: Set a specific IPv4 bind address and unprivileged port for the database bastion.
+
+    - name: Install OpenSSH server and Python
+      ansible.builtin.apt:
+        name: [openssh-server, python3]
+        state: present
+
+    - name: Read the installed platform configuration
+      ansible.builtin.slurp:
+        src: "{{ database_install_dir }}/.env"
+      register: database_environment
+      no_log: true
+
+    - name: Extract the bastion token and private database address
+      ansible.builtin.set_fact:
+        database_bastion_token: "{{ (database_environment.content | b64decode | regex_search('(?m)^DATABASE_BASTION_TOKEN=([A-Fa-f0-9]{64})$', '\\1')) | first | default('') }}"
+        database_postgres_ip: "{{ (database_environment.content | b64decode | regex_search('(?m)^POSTGRES_IP=([0-9.]+)$', '\\1')) | first | default('') }}"
+      no_log: true
+
+    - name: Require generated token and fixed PostgreSQL address
+      ansible.builtin.assert:
+        that:
+          - database_bastion_token is match('^[A-Fa-f0-9]{64}$')
+          - database_postgres_ip is match('^[0-9.]+$')
+          - database_postgres_ip != '0.0.0.0'
+        fail_msg: Run scripts/init.py on the installation and set POSTGRES_IP before installing database access.
+      no_log: true
+
+    - name: Create noninteractive forwarding account
+      ansible.builtin.user:
+        name: platform-db
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+        # A leading ! locks the entire SSH account (including public keys).
+        # Password authentication is disabled in this daemon; *NP* is an
+        # impossible password hash without marking the account locked.
+        password: '*NP*'
+
+    - name: Create key lookup account
+      ansible.builtin.user:
+        name: platform-db-keylookup
+        system: true
+        shell: /usr/sbin/nologin
+        create_home: false
+        password_lock: true
+
+    - name: Create private token directory
+      ansible.builtin.file:
+        path: /etc/developer-platform
+        state: directory
+        owner: root
+        group: platform-db-keylookup
+        mode: '0750'
+
+    - name: Install lookup token
+      ansible.builtin.copy:
+        dest: /etc/developer-platform/db-bastion-token
+        content: "{{ database_bastion_token }}\n"
+        owner: root
+        group: platform-db-keylookup
+        mode: '0440'
+      no_log: true
+
+    - name: Create helper directory
+      ansible.builtin.file:
+        path: /usr/local/libexec
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install fail-closed authorized-key lookup
+      ansible.builtin.copy:
+        src: ../scripts/db_authorized_key.py
+        dest: /usr/local/libexec/platform-db-authorized-key
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Install isolated SSH daemon configuration
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config_platform_db
+        owner: root
+        group: root
+        mode: '0600'
+        content: |
+          Port {{ database_bastion_port }}
+          ListenAddress {{ database_bastion_bind_ip }}
+          HostKey /etc/ssh/ssh_host_ed25519_key
+          PidFile /run/sshd-platform-db.pid
+          LogLevel VERBOSE
+          UsePAM no
+          PermitRootLogin no
+          AllowUsers platform-db
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+          PubkeyAuthentication yes
+          AuthorizedKeysFile none
+          AuthorizedKeysCommand /usr/local/libexec/platform-db-authorized-key %f
+          AuthorizedKeysCommandUser platform-db-keylookup
+          AllowTcpForwarding local
+          PermitOpen {{ database_postgres_ip }}:5432
+          PermitListen none
+          AllowStreamLocalForwarding no
+          AllowAgentForwarding no
+          X11Forwarding no
+          PermitTunnel no
+          PermitTTY no
+          PermitUserEnvironment no
+          MaxSessions 0
+      notify: Restart database bastion
+
+    - name: Install dedicated SSH service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/platform-db-bastion.service
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Restricted Developer Platform database SSH tunnel
+          After=network-online.target
+          Wants=network-online.target
+
+          [Service]
+          Type=simple
+          ExecStartPre=/usr/bin/install -d -m 0755 /run/sshd
+          ExecStartPre=/usr/sbin/sshd -t -f /etc/ssh/sshd_config_platform_db
+          ExecStart=/usr/sbin/sshd -D -e -f /etc/ssh/sshd_config_platform_db
+          Restart=on-failure
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart database bastion
+
+    - name: Enable the dedicated bastion
+      ansible.builtin.systemd_service:
+        name: platform-db-bastion.service
+        enabled: true
+        state: started
+        daemon_reload: true
+
+  handlers:
+    - name: Restart database bastion
+      ansible.builtin.systemd_service:
+        name: platform-db-bastion.service
+        state: restarted
+        daemon_reload: true

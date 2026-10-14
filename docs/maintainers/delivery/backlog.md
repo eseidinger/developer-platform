@@ -92,8 +92,8 @@ This index lists execution tasks, not story completion promises. Task details an
 | 2A | DEV-001-T01, DEV-001-T02, DEV-001-T03, DEV-006-T02, DEV-011-T02 |
 | 2B | DEV-012-T01, DEV-012-T02, DEV-012-T03 |
 | 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003 |
-| 3A | PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019 and the deferred deployed PLAN-020 portal acceptance in the [priority-slice completion sequence](plans/phase-3a-priority-leftovers.md); PLAN-020 remains owner-accepted for lab sequencing until that evidence is recorded |
-| 3 (after 3A) | PLAN-006, PLAN-007, PLAN-008 |
+| 3 | Source implementation for PLAN-006, PLAN-007, PLAN-008; all acceptance belongs to [Phase 3A](plans/phase-3a-priority-leftovers.md) |
+| 3A | Acceptance for PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019, PLAN-006, PLAN-007, PLAN-008, and the deferred deployed PLAN-020 portal journeys in the [priority-slice completion sequence](plans/phase-3a-priority-leftovers.md); PLAN-020 remains owner-accepted for lab sequencing until that evidence is recorded |
 | 4.1 | PLAN-010 |
 | 4.2 | PLAN-011 |
 | 4.3 | PLAN-012 |
@@ -858,13 +858,38 @@ These tasks make the existing phase work executable without inventing new DEV/OP
   wheel build pass locally. No live Keycloak login, deployed CLI administration,
   role/denial matrix, or injected-failure journey ran; PLAN-006 stays open.
 
+  **Source update (October 14, 2026):** The CLI registry and packaged contract
+  now cover all 87 public non-health methods, including human database grant,
+  key, and credential operations; two health methods remain intentionally
+  excluded. The CLI test suite and portal `npm run check` pass locally. No
+  deployed browser, CLI, direct-API denial, or injected-failure acceptance is
+  claimed; those checks are Phase 3A.7 work.
+
 - [ ] **PLAN-007 · 3** — Deliver the web/PostgreSQL template and reproducible create/deploy/diagnose journey; verify UI/API compatibility and document the role matrix. Prerequisites: PLAN-006.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. The sample project JSON/http-echo demonstrates provisioning only, not a combined UI/API template or application/database journey (ADR-007).
 
+  **Source update (October 14, 2026):** `examples/web-postgres` now includes a
+  public OCI image source, digest-pinned `v1alpha2` declaration renderer, managed
+  PostgreSQL counter and readiness path, separate browser access-policy example,
+  role matrix, and reproducible create/deploy/diagnose/recover instructions.
+  Local tests validate the rendered declaration and policy against the current
+  schemas; no image was published or deployed, and the Phase 3A.7 UI/API journey
+  and injected-failure acceptance remain open.
+
 - [ ] **PLAN-008 · 3** — Deliver separate authorized/audited human database identity and controlled tunnel; test foreign-project denial, credentials distinct from application credentials, and revocation of new/existing sessions per policy. Prerequisites: Phase 2C gate; accepted IAM design.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. Runtime logins own their database; no separate human identity, controlled tunnel, grant audit or session revocation workflow exists (F-09/UC-03).
+
+  **Source update (October 14, 2026):** A named `(issuer, subject)` grant now
+  creates a distinct read-only SQL role, authenticated self-service key and
+  one-time password rotation, audited admin grant/revocation, active-backend
+  termination, retirement/purge cleanup, and a restricted OpenSSH forwarding
+  service with fail-closed dynamic key lookup. Unit tests cover key validation,
+  role separation, machine denial, and revocation calls; Ansible syntax passes.
+  This does not establish deployed tunnel reachability, foreign-project SQL
+  denial, credential distinctness in a live database, audit export, or existing
+  session termination; all remain Phase 3A.7 acceptance work.
 
 - [ ] **PLAN-009 · 3 (energy priority 2)** — Automate generic hosted-application authentication and coarse route authorization against the accepted provider-neutral OIDC boundary; demonstrate platform/application role separation and no implicit platform-admin access. The first accepted modes are `browser-session` and `bearer-token` on explicit non-overlapping route/method rules protected by project-scoped application groups. The platform derives browser clients and callbacks from public-component routing and derives confidential service clients and audiences from stable service-access targets. Applications do not supply redirect URIs, audiences, OAuth scopes, session settings, identity-provider group paths, or proxy flags in the initial profile. Humans use first-login requests with no default group; machines require provider approval and group assignment before credential activation. Include controlled project-wide secret binding, audited group/membership lifecycle, rotation, revocation, retirement cleanup, and recovery coverage. F-10 acceptance is required for Phase 3 completion. Prerequisites: Phase 2C gate; ADR-004 acceptance; PLAN-016 identity decision.
 

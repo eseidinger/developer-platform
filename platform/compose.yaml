@@ -6,6 +6,7 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
       DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
+      DATABASE_BASTION_TOKEN: ${DATABASE_BASTION_TOKEN:?Run scripts/init.py}
       PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
       PLATFORM_AUDIT_READER_PASSWORD: ${PLATFORM_AUDIT_READER_PASSWORD:?Add the generated value from .env.example to .env}
       OIDC_ISSUER: ${OIDC_ISSUER:-https://${IDENTITY_DOMAIN:-identity.localhost}/realms/platform}
