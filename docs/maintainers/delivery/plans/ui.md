@@ -124,9 +124,9 @@ redaction tests pass.
 - The authorized project list and workspace provide revision history, deployment
   operation state and readiness, inventory, resource usage, bounded searchable logs,
   configuration and secret metadata, data-service status, and credential metadata.
-- Component-specific filters, pause/resume, safe log download, URL-persisted
-  workspace filters, and a dedicated component-status presentation remain follow-up
-  work.
+- Component-specific log filters and URL-persisted log filters are implemented.
+  Pause/resume, safe log download, and a dedicated component-status presentation
+  remain follow-up work.
 - Represent desired state, apply outcome, and live readiness separately. Do not turn
   missing metrics into zero or unavailable provider data into an empty result.
 - Keep selected tabs and useful filters in the URL so diagnosis links are shareable

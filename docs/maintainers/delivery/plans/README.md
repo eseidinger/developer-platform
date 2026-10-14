@@ -4,6 +4,7 @@ Status: planned work index.
 
 Only unfinished, owned implementation plans belong here:
 
+- [Phase 3A priority-slice completion](phase-3a-priority-leftovers.md)
 - [Energy-system use-case enablement priority](energy-system-integration.md)
 - [Generic use-case enablement increment](use-case-enablement-increment.md)
 - [Phase 3 developer experience](phase-3-developer-experience.md)

@@ -213,8 +213,29 @@ async function getResourceInventory(name: string) {
   return { state: record.state, reason: record.reason, deployments }
 }
 
-async function getProjectLogs(name: string, tail: number, search: string, after?: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', { params: { path: { name }, query: { tail, ...(search ? { search } : {}), ...(after ? { after } : {}) } } })
+type ProjectLogFilters = {
+  tail: number
+  search?: string
+  component?: string
+  instance?: string
+  sinceSeconds?: number
+  after?: string
+}
+
+async function getProjectLogs(name: string, filters: ProjectLogFilters) {
+  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', {
+    params: {
+      path: { name },
+      query: {
+        tail: filters.tail,
+        ...(filters.search ? { search: filters.search } : {}),
+        ...(filters.component ? { component: filters.component } : {}),
+        ...(filters.instance ? { instance: filters.instance } : {}),
+        ...(filters.sinceSeconds ? { since_seconds: filters.sinceSeconds } : {}),
+        ...(filters.after ? { after: filters.after } : {}),
+      },
+    },
+  })
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
   if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.lines) || typeof record.truncated !== 'boolean' || (record.next_cursor !== null && typeof record.next_cursor !== 'string')) throw new Error('The platform returned invalid project logs.')

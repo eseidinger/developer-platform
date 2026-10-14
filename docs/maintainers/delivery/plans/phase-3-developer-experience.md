@@ -13,10 +13,11 @@ uses the React stack selected in
 [CLI implementation plan](cli.md).
 
 The [energy-system use-case enablement plan](energy-system-integration.md) is the
-first Phase 3 delivery slice. It delivers generic application identity, component
-monitoring, authenticated routing, durability, and recovery capabilities, then
-uses separately owned energy-system evidence to verify the use case. Complete
-those gates before starting new Phase 3 breadth beyond work already in progress.
+first Phase 3 delivery slice. Its remaining work is now organized as
+[Phase 3A priority-slice completion](phase-3a-priority-leftovers.md): generic
+application identity, component monitoring, authenticated routing, durability,
+recovery, and separately owned energy-system evidence. Complete Phase 3A before
+starting new Phase 3 breadth beyond work already in progress.
 Existing portal and CLI work may continue only where it directly enables or
 verifies that slice.
 
@@ -32,16 +33,9 @@ and the [user workflow](../../../developers/ui.md#define-and-approve-application
 This is a direct enablement of the priority slice. It does not certify the outstanding identity,
 monitoring, integration, and recovery acceptance in the sequence below.
 
-1. Freeze the generic deployment, identity, connectivity, persistence/TLS,
-   limits, retention, and application/platform ownership contracts (`PLAN-016`).
-2. Deliver hosted-application OIDC and application/platform permission separation
-   (`PLAN-009`).
-3. Correct component-aware monitoring and define safe cross-application correlation
-   (`PLAN-017`).
-4. Pass the platform's neutral-fixture authenticated-route and denial gate and
-   record the separately owned energy-system suite result (`PLAN-018`).
-5. Pass restart and application-level backup/restore reproduction (`PLAN-019`).
-6. Resume the broader portal/template journey and human database access
+1. Complete [Phase 3A](phase-3a-priority-leftovers.md): `PLAN-016` → `PLAN-009`
+   → `PLAN-017` → `PLAN-018` → `PLAN-019`.
+2. Resume the broader portal/template journey and human database access
    (`PLAN-006` through `PLAN-008`).
 
 ## Work packages
