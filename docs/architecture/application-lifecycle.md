@@ -1,6 +1,6 @@
 # Application lifecycle
 
-Status: the selected architecture through Phase 4 is one Python/FastAPI Platform API application. It owns platform metadata, grants, desired revisions, operations, policy, runtime observation, and infrastructure execution. Project workloads run only on the existing Kubernetes/k3d infrastructure. A second compute adapter or deployable service extraction is optional Phase 5 work.
+Status: the selected architecture through Phase 5 is one Python/FastAPI Platform API application. It owns platform metadata, grants, desired revisions, operations, policy, runtime observation, and infrastructure execution. Project workloads run only on the existing Kubernetes/k3d infrastructure. A second compute adapter or deployable service extraction is optional Phase 6 work.
 
 ## Application boundary
 
@@ -51,6 +51,6 @@ An accepted operation means the desired state was recorded, not that the workloa
 
 See the [current provisioning sequence](diagrams/provisioning.md), [ApplicationSpec](application-contract.md), [security model](../maintainers/delivery/history/security-design.md), and [Phase 2C capability plan](../maintainers/delivery/history/phase-2c-platform-capabilities.md).
 
-## Optional Phase 5
+## Optional Phase 6
 
-If a concrete need is recorded, [optional Phase 5](evolution.md) may add a direct Docker workload adapter or extract one or more deployable services. Neither package is part of the current architecture, and neither gates Phases 2 through 4. Any activated package requires contract parity, state migration, authorization, audit, backup/restore, operational evidence, and rollback before replacing an existing path.
+If a concrete need is recorded, [optional Phase 6](evolution.md) may add a direct Docker workload adapter or extract one or more deployable services. Neither package is part of the current architecture, and neither gates Phases 2 through 5. Any activated package requires contract parity, state migration, authorization, audit, backup/restore, operational evidence, and rollback before replacing an existing path.

@@ -28,7 +28,7 @@ Each task belongs to exactly one phase or sub-gate; story IDs remain the overall
 
 Top-level task checkboxes remain open where full acceptance is outstanding. Checked progress criteria below record narrower verified outcomes; they do not close the parent task or phase. Task evidence below distinguishes partial or absent source implementation, verified local checks, and operational acceptance. Close a task only after its listed outcome is verified, or record an explicit owner-directed acceptance exception that names every unverified outcome; record date, revision, environment, results and limitations beside it. Link shared checks by evidence ID. Update implementation findings here when code changes; other documents link here rather than maintain a separate status assessment. Close a story only when every original acceptance criterion passes. A Phase 3 design decision does not close deferred implementation tasks.
 
-Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Phase 2A is the prioritized multi-service/scheduled-component increment; Phase 2B adds CI deployment credentials; the remaining current-platform work is Phase 2C. Within Phase 3, the [energy-system use-case enablement slice](plans/energy-system-integration.md) is the immediate priority and precedes new general portal, template, or human-database breadth. It delivers only generic platform capabilities; concrete application declarations and domain acceptance remain externally owned. Optional Phase 5 is unscheduled and does not gate Phases 2 through 4. Deferred tasks have no scheduled phase. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
+Phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3/3A → 4.1–4.2 → 5.1–5.5**. Dependencies below supplement these gates and identify ordering within a phase; they do not authorize skipping earlier gates. Phase 2A is the prioritized multi-service/scheduled-component increment; Phase 2B adds CI deployment credentials; the remaining current-platform work is Phase 2C. Within Phase 3, the [energy-system use-case enablement slice](plans/energy-system-integration.md) is the immediate priority and precedes new general portal, template, or human-database breadth. It delivers only generic platform capabilities; concrete application declarations and domain acceptance remain externally owned. Phase 4 adds tracing and Grafana dashboards before Phase 5 AI operations. Optional Phase 6 architecture expansion is unscheduled and does not gate these phases. Deferred tasks have no scheduled phase. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
 
 **Gate status, October 14, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is complete under its recorded owner-directed alert-delivery exception. Phase 1C is complete as of October 3, 2026: all ten tasks are checked with live evidence (EV-30 to EV-37), and the unit-tested-only items and the not-yet-run access/audit drill are recorded owner-accepted limits in the Phase 1C audit below. Phase 2A passed its deployed component acceptance suite on node-01 (EV-38 and EV-39); database-row preservation, backup-inventory, and representative capacity measurements are owner-accepted deferred checks. Phase 2B is accepted under its owner-directed acceptance exception: its basic deployed automation suite passed, while the expiry, controlled identity-provider-outage, and deployed backup-coverage checks are deferred. **Phase 2C is complete:** protected live drills passed for components, retirement, PostgreSQL recovery, data-aware rollback, capacity admission, egress policy, and failure signals; the owner confirmed notification receipt (EV-39 to EV-44). Remaining single-lab constraints are accepted limitations, not unverified acceptance blockers. **Phase 3A is open:** it is the dedicated completion phase for the remaining PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 work, in that order, as defined by the [Phase 3A completion plan](plans/phase-3a-priority-leftovers.md).
 
@@ -94,13 +94,15 @@ This index lists execution tasks, not story completion promises. Task details an
 | 2C | DEV-004-T02, DEV-005-T02, DEV-007-T02, DEV-008-T01, DEV-009-T01, DEV-010-T02, OPS-003-T02, OPS-005-T01, OPS-005-T02, OPS-007-T02, OPS-008-T01, OPS-008-T02, PLAN-002, PLAN-003 |
 | 3 | Source implementation for PLAN-006, PLAN-007, PLAN-008; all acceptance belongs to [Phase 3A](plans/phase-3a-priority-leftovers.md) |
 | 3A | Acceptance for PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019, PLAN-006, PLAN-007, PLAN-008, and the deferred deployed PLAN-020 portal journeys in the [priority-slice completion sequence](plans/phase-3a-priority-leftovers.md); PLAN-020 remains owner-accepted for lab sequencing until that evidence is recorded |
-| 4.1 | PLAN-010 |
-| 4.2 | PLAN-011 |
-| 4.3 | PLAN-012 |
-| 4.4 | PLAN-013 |
-| 4.5 | PLAN-014 |
-| 4 (after 4.5) | PLAN-015 |
-| Optional 5 | PLAN-004, PLAN-005 |
+| 4.1 | PLAN-021: tracing |
+| 4.2 | PLAN-022: Grafana dashboards |
+| 5.1 | PLAN-010 |
+| 5.2 | PLAN-011 |
+| 5.3 | PLAN-012 |
+| 5.4 | PLAN-013 |
+| 5.5 | PLAN-014 |
+| 5 (after 5.5) | PLAN-015 |
+| Optional 6 | PLAN-004, PLAN-005 |
 | Deferred | DEV-002-T02, DEV-003-T03, DEV-008-T02, DEV-009-T02 |
 
 ### Phase 1C story-task audit (October 3, 2026)
@@ -817,13 +819,13 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Task evidence (B-2026-09-26):** Source partial; local workflow acceptance unverified. A global advisory lock serializes cooperating API requests but supplies no expected-revision conflict check. Updates overwrite the only spec; stale clients can replace intent. Persistent idempotency keys, revision history, per-step recovery and drift reconciliation are absent.
 
-- [ ] **PLAN-004 · Optional 5** — If a recorded need activates the package, add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: completed current-platform lifecycle; explicit owner scope decision.
+- [ ] **PLAN-004 · Optional 6** — If a recorded need activates the package, add the Docker adapter and shared provider contract tests; deploy/update/observe/remove the same spec on Kubernetes and Docker, including partial failure and capability rejection; publish tested profile differences. Prerequisites: completed current-platform lifecycle; explicit owner scope decision.
 
   **Task evidence (B-2026-09-26; moved October 4, 2026):** Source absent; local acceptance unverified. Docker hosts shared services but is not a direct application compute provider. No portable provider contract or reproducible provider comparison harness exists (F-07/UC-05). This is expected while the package remains optional and inactive.
 
-- [ ] **PLAN-005 · Optional 5** — If a recorded need activates the package, extract only the justified deployable responsibilities using versioned contracts, state reconciliation, single-writer cutovers, backup/restore, parity, and rollback. The candidate split remains Kotlin catalog, Quarkus control plane, and Python workers. Prove cross-service authorization, audit correlation, interruption/idempotency, and stable-ID reconciliation before retiring any FastAPI path. Prerequisites: completed current-platform lifecycle; explicit owner scope decision; code/effort analysis before contract stabilization.
+- [ ] **PLAN-005 · Optional 6** — If a recorded need activates the package, extract only the justified deployable responsibilities using versioned contracts, state reconciliation, single-writer cutovers, backup/restore, parity, and rollback. The candidate split remains Kotlin catalog, Quarkus control plane, and Python workers. Prove cross-service authorization, audit correlation, interruption/idempotency, and stable-ID reconciliation before retiring any FastAPI path. Prerequisites: completed current-platform lifecycle; explicit owner scope decision; code/effort analysis before contract stabilization.
 
-  **Task evidence (B-2026-09-26; moved October 4, 2026):** At this baseline the decision was open and local implementation-language parity/migration acceptance was unverified. The Python application is now the selected architecture through Phase 4. ADR-006 retains the former target roles only as an optional Phase 5 candidate; that documentation decision supplies no implementation, migration, or acceptance evidence.
+  **Task evidence (B-2026-09-26; moved October 4, 2026):** At this baseline the decision was open and local implementation-language parity/migration acceptance was unverified. The Python application remains the selected architecture through the current delivery phases. ADR-006 retains the former target roles only as an optional expansion candidate; that documentation decision supplies no implementation, migration, or acceptance evidence. The candidate is now scheduled as optional Phase 6.
 
 - [ ] **PLAN-006 · 3** — Deliver portal and CLI using the versioned Python Platform API for ownership/roles, applications, deployments, redacted config, logs and operations; extend the CLI to every public project administration operation, including hosted application access and governance; diagnose an injected failure and prove bypassed client checks still fail server-side. Prerequisites: Phase 2C gate; hosted-access commands require the PLAN-009 public API.
 
@@ -1009,29 +1011,37 @@ These tasks make the existing phase work executable without inventing new DEV/OP
   Phase 3 gate remain open; EV-45/46 establish API and neutral-fixture behavior,
   not this portal journey.
 
-- [ ] **PLAN-010 · 4.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 3 gate; scoped data/audit evidence.
+- [ ] **PLAN-010 · 5.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 4 gate; scoped data/audit evidence.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No AI layer or authorized context/tools; ADR-008 accepts product focus only, not its implementation.
 
-- [ ] **PLAN-011 · 4.2** — Correlate incident logs, metrics and history with timestamps/comparison windows; distinguish observations/hypotheses and explicitly report missing evidence. Prerequisites: PLAN-010; DEV-004-T02; DEV-005-T02; DEV-007-T02.
+- [ ] **PLAN-011 · 5.2** — Correlate incident logs, metrics, authorized traces and history with timestamps/comparison windows; distinguish observations/hypotheses and explicitly report missing evidence. Prerequisites: PLAN-010; PLAN-021; DEV-004-T02; DEV-005-T02; DEV-007-T02.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No AI incident correlation; underlying scoped telemetry and deployment history are also incomplete (UC-06).
 
-- [ ] **PLAN-012 · 4.3** — Implement read-only investigation with tool budgets/errors; evaluate bad database host, pool exhaustion, resource pressure and insufficient evidence for diagnosis, abstention, unnecessary calls and time/cost; test injection and secret/project boundaries. Prerequisites: PLAN-011.
+- [ ] **PLAN-012 · 5.3** — Implement read-only investigation with tool budgets/errors; evaluate bad database host, pool exhaustion, resource pressure and insufficient evidence for diagnosis, abstention, unnecessary calls and time/cost; test injection and secret/project boundaries. Prerequisites: PLAN-011.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No investigation tool loop, incident corpus evaluation or AI boundary tests.
 
-- [ ] **PLAN-013 · 4.4** — Generate a reviewable configuration/deployment diff bound to target and revision, with supporting evidence and a rollback plan; do not execute it at this stage. Prerequisites: PLAN-012.
+- [ ] **PLAN-013 · 5.4** — Generate a reviewable configuration/deployment diff bound to target and revision, with supporting evidence and a rollback plan; do not execute it at this stage. Prerequisites: PLAN-012.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No evidence-linked AI diff/approval-plan flow.
 
-- [ ] **PLAN-014 · 4.5** — Apply only an exactly approved diff through authorized Platform API calls; reject stale approvals, audit execution and verify observed health/metrics. Demonstrate regression, investigation, approval and recovery in test resources. Prerequisites: PLAN-013; DEV-007-T02; OPS-001-T01.
+- [ ] **PLAN-014 · 5.5** — Apply only an exactly approved diff through authorized Platform API calls; reject stale approvals, audit execution and verify observed health/metrics. Demonstrate regression, investigation, approval and recovery in test resources. Prerequisites: PLAN-013; DEV-007-T02; OPS-001-T01.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No revision-bound AI approvals, execution integration or observed-recovery demonstration (F-12).
 
-- [ ] **PLAN-015 · 4 (after 4.5)** — Demonstrate development assistance grounded in authorized docs, ADRs, contracts and repository context: template selection, change impact or review with runtime evidence; retain source references and project/secret boundaries. Prerequisites: PLAN-014.
+- [ ] **PLAN-015 · 5 (after 5.5)** — Demonstrate development assistance grounded in authorized docs, ADRs, contracts and repository context: template selection, change impact or review with runtime evidence; retain source references and project/secret boundaries. Prerequisites: PLAN-014.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No development assistant using project docs/contracts/repository/runtime context.
+
+- [ ] **PLAN-021 · 4.1** — Instrument the current API and durable worker with bounded OpenTelemetry traces and operator-only collection/storage. Correlate requests, authorization outcomes, operations, retries and provider calls without secret or personal values; prove scoped access, collection failure isolation, resource limits, and deployed trace readback. Prerequisites: Phase 3/3A gate; PLAN-017 monitoring acceptance; recorded backend, sampling, retention and recovery decisions. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md).
+
+  **Planning baseline (October 14, 2026):** Prometheus, Loki, Alloy and Grafana exist, but there is no trace backend or instrumented end-to-end operation path. No source, local or deployed tracing acceptance is claimed.
+
+- [ ] **PLAN-022 · 4.2** — Provision versioned, operator-only Grafana dashboards for platform health/delivery, workloads/capacity, and telemetry/security. Validate panel queries, meaningful missing-data states, safe trace/log links, restart/reconciliation, failure diagnosis, redaction and deployed evidence. Prerequisites: PLAN-021 and existing scoped metrics/logs. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md).
+
+  **Planning baseline (October 14, 2026):** Grafana data sources are provisioned but dashboards are not. No dashboard implementation or deployed acceptance is claimed.
 
 
 ## Shared implementation baseline
@@ -1111,7 +1121,7 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | F-04 | PLAN-001/003, DEV-006-T01, DEV-007-T01/02 |
 | F-05 / UC-02 / UC-04 | PLAN-001, DEV-007-T02, DEV-011-T01, OPS-008-T01/02 |
 | F-06 / UC-02 | DEV-004-T01/02, DEV-005-T01/02, DEV-006-T01, DEV-007-T02 |
-| F-07 / UC-05 (optional Phase 5) | PLAN-002/004; additional data-store labs remain unscheduled |
+| F-07 / UC-05 (optional Phase 6) | PLAN-002/004; additional data-store labs remain unscheduled |
 | F-08 | PLAN-001/002, OPS-005-T01/02; PLAN-004 only if optional provider work is activated |
 | F-09 / UC-03 | PLAN-008 |
 | F-10 | PLAN-006/007/009/020 |
@@ -1127,5 +1137,6 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | N-06 | OPS-007-T01/02 |
 | N-07 | OPS-003-T01/02, OPS-005-T01/02 |
 | N-08 | OPS-001-T01/02, DEV-012-T02/03, and audit checks on every later mutation/access change |
+| N-09 | PLAN-021/022 |
 
 The phase task index remains authoritative for scheduling, including deferred component-specific extensions. Requirement or story closure needs all applicable criteria, not just the foundation tasks listed here.

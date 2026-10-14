@@ -1,6 +1,6 @@
 # ADR-006 – Polyglot Service Responsibilities
 
-Created: September 25, 2026. Accepted as target direction: October 1, 2026. Scope amended: October 4, 2026. Status: **Deferred to optional Phase 5; one Python/FastAPI application is the selected current architecture**.
+Created: September 25, 2026. Accepted as target direction: October 1, 2026. Scope amended: October 4, 2026; phase number updated October 14, 2026. Status: **Deferred to optional Phase 6; one Python/FastAPI application is the selected current architecture**.
 
 ## Context
 
@@ -19,9 +19,9 @@ Earlier planning proposed separate technology homes for business metadata, runti
 
 ## Amended decision
 
-Keep application metadata, grants, deployment intent, operations, policy, runtime observation, and infrastructure execution in one Python/FastAPI application through Phases 2 to 4. Preserve logical module boundaries and durable operation semantics inside the codebase, but do not create separately deployed catalog, control-plane, or worker services in the current scope.
+Keep application metadata, grants, deployment intent, operations, policy, runtime observation, and infrastructure execution in one Python/FastAPI application through Phases 2 to 5. Preserve logical module boundaries and durable operation semantics inside the codebase, but do not create separately deployed catalog, control-plane, or worker services in the current scope.
 
-If a recorded operational or product need activates optional Phase 5, the following allocation remains a candidate rather than a required end state:
+If a recorded operational or product need activates optional Phase 6, the following allocation remains a candidate rather than a required end state:
 
 - **Kotlin + Spring Boot Application Catalog:** authoritative application identity, owners, repositories, environments, dependencies, grants, and intended resource relationships.
 - **Java + Quarkus Platform API / Control Plane:** authoritative desired deployment revisions, policy and capability validation, operation lifecycle, provider assignments, runtime status, and platform events.
@@ -33,9 +33,9 @@ Services exchange stable identifiers, versioned desired specifications, job enve
 
 ## Optional transition constraints
 
-Preserve the working Python platform unless an explicit Phase 5 scope decision identifies a justified extraction. Any selected extraction is not a big-bang rewrite: establish the relevant contract first, then migrate ownership with versioned data migration, reconciliation, rollback, and credential separation.
+Preserve the working Python platform unless an explicit Phase 6 scope decision identifies a justified extraction. Any selected extraction is not a big-bang rewrite: establish the relevant contract first, then migrate ownership with versioned data migration, reconciliation, rollback, and credential separation.
 
-Before moving traffic in an activated Phase 5 extraction, verify API behavior, authorization at every new service boundary, operation resumption, metadata and operation migration, audit correlation, observability, backup/restore coverage, and rollback. Run a single writer for each authoritative record during transition and avoid indefinite dual writes. Until then, the FastAPI application remains the permanent current path and new code respects internal ownership seams without introducing remote-service contracts.
+Before moving traffic in an activated Phase 6 extraction, verify API behavior, authorization at every new service boundary, operation resumption, metadata and operation migration, audit correlation, observability, backup/restore coverage, and rollback. Run a single writer for each authoritative record during transition and avoid indefinite dual writes. Until then, the FastAPI application remains the permanent current path and new code respects internal ownership seams without introducing remote-service contracts.
 
 Implementation language does not change ApplicationSpec. A mixed-language architecture is justified only if independently deploying a responsibility delivers measurable value greater than its operational and distributed-system cost.
 
@@ -43,6 +43,6 @@ Implementation language does not change ApplicationSpec. A mixed-language archit
 
 The current platform retains a single deployment, process-level calls, one operational lifecycle, and the existing Python implementation. It must maintain explicit internal responsibility boundaries through modules, state ownership, tests, and versioned public contracts.
 
-Activating the optional split would add deployments, versioned inter-service contracts, failure modes, service identities, tracing, and operational cost. Those costs require separate acceptance and cannot be justified by technology variety alone.
+Activating the optional split would add deployments, versioned inter-service contracts, failure modes, service identities, cross-service trace propagation, and operational cost. Those costs require separate acceptance and cannot be justified by technology variety alone.
 
-The [technology roles reference](../../maintainers/delivery/history/technology-roles.md) records the current Python responsibility model and the optional candidate allocation. Any extraction is planned only through [optional Phase 5](../evolution.md). The earlier acceptance of a target split does not authorize implementation in the current phases.
+The [technology roles reference](../../maintainers/delivery/history/technology-roles.md) records the current Python responsibility model and the optional candidate allocation. Any extraction is planned only through [optional Phase 6](../evolution.md). The earlier acceptance of a target split does not authorize implementation in the current phases.

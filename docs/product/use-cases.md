@@ -36,13 +36,13 @@ Acceptance: databases are retained by default; permanently deleting data require
 
 ## UC-05 – Compare technical alternatives
 
-As an architect, I may run the same workload on two compute providers or against two data stores when an explicit experiment is approved. Input data, versions, configuration, measurement duration, and evaluation method are fixed. Evaluate latency, throughput, resource consumption, and operational effort. A lab result supports an ADR; it does not automatically enable a new default service. A second compute provider belongs to optional Phase 5 and is not a current platform acceptance criterion.
+As an architect, I may run the same workload on two compute providers or against two data stores when an explicit experiment is approved. Input data, versions, configuration, measurement duration, and evaluation method are fixed. Evaluate latency, throughput, resource consumption, and operational effort. A lab result supports an ADR; it does not automatically enable a new default service. A second compute provider belongs to optional Phase 6 and is not a current platform acceptance criterion.
 
 ## UC-06 – Support development and incident analysis with AI
 
 As a developer, I want to understand why an application has become slower since its last deployment. The assistant correlates the deployment diff, logs, metrics, and dependencies, identifies observations, and formulates a testable hypothesis.
 
-A proposed change includes a concrete diff. Only after approval and renewed authorization does the Platform API execute it. The same boundaries apply to a later development assistant using documentation, ADRs, and API contracts as context. See [Phase 4](../maintainers/delivery/plans/phase-4-ai-operations.md).
+A proposed change includes a concrete diff. Only after approval and renewed authorization does the Platform API execute it. The same boundaries apply to a later development assistant using documentation, ADRs, and API contracts as context. See [Phase 5](../maintainers/delivery/plans/phase-5-ai-operations.md).
 
 ## UC-07 – Deploy cooperating services with a scheduled component
 

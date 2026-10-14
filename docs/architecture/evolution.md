@@ -1,6 +1,6 @@
 # Architecture evolution
 
-Status: optional and unscheduled. It does not gate Phases 2 through 4.
+Status: optional Phase 6 and unscheduled. It does not gate Phases 2 through 5.
 
 ## Entry decision
 
@@ -20,6 +20,6 @@ Each extraction requires a versioned contract, separate credentials and state ow
 
 ## Acceptance
 
-The activated package resolves its recorded entry need and demonstrates that its operational and migration cost is justified. Contract tests cover success, denial, conflict, interruption, duplicate delivery, partial failure, recovery, and redaction. Existing Phase 2 through 4 workflows continue to pass without client contract changes.
+The activated package resolves its recorded entry need and demonstrates that its operational and migration cost is justified. Contract tests cover success, denial, conflict, interruption, duplicate delivery, partial failure, recovery, and redaction. Existing Phase 2 through 5 workflows continue to pass without client contract changes.
 
 If neither package is activated, the supported architecture remains the single Python API and Kubernetes/k3d provider.

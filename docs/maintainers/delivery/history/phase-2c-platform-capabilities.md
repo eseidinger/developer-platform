@@ -38,4 +38,4 @@ Provider failures remain traceable and recoverable by observing existing resourc
 
 ## Outcome
 
-A complete platform lifecycle on the selected infrastructure, delivered and operated as one Python API application. Additional compute providers and deployable service extraction are explicitly outside Phase 2C; see [optional Phase 5](../../../architecture/evolution.md).
+A complete platform lifecycle on the selected infrastructure, delivered and operated as one Python API application. Additional compute providers and deployable service extraction are explicitly outside Phase 2C; see [optional Phase 6](../../../architecture/evolution.md).

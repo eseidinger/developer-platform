@@ -24,4 +24,4 @@ Tool access, retrieval, and telemetry must respect project boundaries. Minimize 
 
 Use an incident corpus with expected causes and explicitly unknown cases. Test cross-project access, secret leakage, prompt injection, and unapproved writes. Measure value through diagnosis quality and safe execution.
 
-Details: [Phase 4](../../maintainers/delivery/plans/phase-4-ai-operations.md), [Security](../../maintainers/delivery/history/security-design.md).
+Details: [Phase 5](../../maintainers/delivery/plans/phase-5-ai-operations.md), [Security](../../maintainers/delivery/history/security-design.md).

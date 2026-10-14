@@ -8,7 +8,7 @@ Execution tracking: [DEV-001-T01 through DEV-001-T03, DEV-006-T02, and DEV-011-T
 
 Deploy one application as a set of named, cooperating components. At least two components run as long-lived services and one component is started by a recurring schedule. The components share the project boundary, can use stable internal service names, and can be updated and observed independently.
 
-This gate is delivered on the selected Kubernetes provider. The public contract remains free of Kubernetes-specific client fields. Docker workload parity is not part of current acceptance and is available only as an optional Phase 5 expansion.
+This gate is delivered on the selected Kubernetes provider. The public contract remains free of Kubernetes-specific client fields. Docker workload parity is not part of current acceptance and is available only as an optional Phase 6 expansion.
 
 ## Initial contract
 
@@ -108,4 +108,4 @@ Acceptance requires evidence that:
 - second-level schedules, non-UTC timezones, overlapping scheduled runs, and catch-up of every missed run;
 - automatic retries beyond the provider's explicitly documented initial policy;
 - autoscaling, multi-cluster placement, and high availability; and
-- Docker execution of scheduled components, which is optional Phase 5 portability work.
+- Docker execution of scheduled components, which is optional Phase 6 portability work.

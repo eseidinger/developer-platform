@@ -29,7 +29,7 @@ path is the Platform API and CLI.
 | Software architect | Evaluate implementation options through reproducible labs |
 | Tech lead | Understand project ownership, dependencies, and standards |
 
-The platform also serves as a cohesive reference and portfolio project. Its current architecture deliberately uses one Python/FastAPI application for the Platform API and the existing Kubernetes/k3d workload infrastructure. A Kotlin/Spring catalog, Java/Quarkus control plane, separately deployed Python workers, or a direct Docker workload adapter are optional Phase 5 studies, not current acceptance requirements. Technology variety is not a success criterion.
+The platform also serves as a cohesive reference and portfolio project. Its current architecture deliberately uses one Python/FastAPI application for the Platform API and the existing Kubernetes/k3d workload infrastructure. A Kotlin/Spring catalog, Java/Quarkus control plane, separately deployed Python workers, or a direct Docker workload adapter are optional Phase 6 studies, not current acceptance requirements. Technology variety is not a success criterion.
 
 ## Product boundaries
 
@@ -41,4 +41,4 @@ AI supports development, delivery, and operations. Its initial value is explaini
 
 ## Success
 
-Success is demonstrated through the [vertical slice](use-cases.md) and [verifiable requirements](requirements.md): deploy an application, preserve its data, detect failures, apply a change, and remove resources deliberately. The public contract remains free of Kubernetes-specific client fields. If optional Phase 5 adds a second compute provider, it must use that same contract. Measure time to the first healthy application and recovery time; binding targets remain open.
+Success is demonstrated through the [vertical slice](use-cases.md) and [verifiable requirements](requirements.md): deploy an application, preserve its data, detect failures, apply a change, and remove resources deliberately. The public contract remains free of Kubernetes-specific client fields. If optional Phase 6 adds a second compute provider, it must use that same contract. Measure time to the first healthy application and recovery time; binding targets remain open.

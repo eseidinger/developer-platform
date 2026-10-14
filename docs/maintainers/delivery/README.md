@@ -21,9 +21,10 @@ without confirmed dates.
 | October 4, 2026 | Multi-service application with a cron-triggered component prioritized | F-13 and UC-07 added; versioned contract, migration, internal discovery, scheduled-run status, and Kubernetes acceptance are the next Phase 2A increment |
 | October 4, 2026 | Revocable CI deployment credentials prioritized after multi-service support | F-14, UC-08, and ADR-018 added; scoped OIDC machine credentials and immediate platform revocation form Phase 2B; former Phase 2B work moves to 2C |
 | October 4, 2026 | Empty-project and machine-driven platform acceptance added to Phase 2B | F-15 and UC-09 add human-bootstrapped test-runner credentials, temporary role personas, and first deployment by CI after empty-project creation |
-| October 4, 2026 | Current runtime architecture retained | Phase 2C remains on the existing Kubernetes infrastructure and single Python/FastAPI application; a Docker compute adapter and polyglot service split move to optional Phase 5 |
+| October 4, 2026 | Current runtime architecture retained | Phase 2C remains on the existing Kubernetes infrastructure and single Python/FastAPI application; a Docker compute adapter and polyglot service split are optional future work (now Phase 6) |
 | October 6, 2026 | React UI stack selected for the Phase 3 portal | React, TypeScript and Vite with typed OpenAPI access, TanStack Query, React Router, shadcn/Base UI, Tailwind, forms/validation, and browser/component tests replace the open Angular candidate |
 | October 10, 2026 | Generic capabilities required by the energy-system use case made the Phase 3 priority slice | Application-owned declarations consume generic hosted-application OIDC, authenticated HTTPS egress, component monitoring, restart, and recovery; the platform contains no ODIP/VEF-specific profiles or behavior |
+| October 14, 2026 | Tracing and dashboards inserted before AI operations | Phase 4 adds bounded tracing and provisioned operator Grafana dashboards; AI operations moves to Phase 5 and optional architecture expansion to Phase 6 |
 
 ## Implementation status
 
@@ -45,8 +46,9 @@ flowchart LR
     P2B --> P2C["2C Platform Capabilities"]
     P2C --> P3E["3A Priority-Slice Completion"]
     P3E --> P3["3 Remaining Developer Experience"]
-    P3 --> P4["4 AI Operations / Development"]
-    P4 -. "optional" .-> P5["5 Architecture Expansion"]
+    P3 --> P4["4 Tracing and Grafana Dashboards"]
+    P4 --> P5["5 AI Operations / Development"]
+    P5 -. "optional" .-> P6["6 Architecture Expansion"]
     P1 --> Evidence["Measurements and Operational Evidence"]
     P2A --> Evidence
     P2B --> Evidence
@@ -55,6 +57,7 @@ flowchart LR
     P3 --> Evidence
     P4 --> Evidence
     P5 --> Evidence
+    P6 --> Evidence
 ```
 
 | Phase | Entry condition | Outcome / dependency |
@@ -65,8 +68,9 @@ flowchart LR
 | [2C](history/phase-2c-platform-capabilities.md) | Accepted Phase 2A and 2B vertical slices | Diagnostics, policy, scaling, connectivity, recovery, and retirement on the current Kubernetes provider and single Python API |
 | [3A priority completion](plans/phase-3a-priority-leftovers.md) | Reliable lifecycle, authorization, and stable public contracts from Phase 2C | Complete the remaining PLAN-016/009/017/018/019 contract, identity, monitoring, integration, and recovery acceptance with neutral fixtures and the separately owned energy-system suite |
 | [3 remainder](plans/phase-3-developer-experience.md) | Accepted Phase 3A priority completion | Portal, templates, human database access, and the broader self-service journey through the Python Platform API |
-| [4](plans/phase-4-ai-operations.md) | Access-controlled data and deployment history | Python-based evidence assistance and controlled actions through the Platform API |
-| [5](../../architecture/evolution.md) | Optional owner decision after Phase 4; demonstrated need for another compute provider or service boundary | Optional Docker compute adapter and/or polyglot service extraction, each gated by parity, migration, rollback, and operational evidence |
+| [4](plans/phase-4-tracing-and-dashboards.md) | Accepted Phase 3/3A gate and scoped telemetry | Bounded operation tracing and versioned, operator-only Grafana dashboards with deployed failure/diagnosis evidence |
+| [5](plans/phase-5-ai-operations.md) | Accepted Phase 4 telemetry and dashboard evidence | Python-based evidence assistance and controlled actions through the Platform API |
+| [6](../../architecture/evolution.md) | Optional owner decision after Phase 5; demonstrated need for another compute provider or service boundary | Optional Docker compute adapter and/or polyglot service extraction, each gated by parity, migration, rollback, and operational evidence |
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their acceptance minimum by that phase’s exit; later extensions do not defer it.
 
@@ -74,18 +78,18 @@ Basic access enforcement, audit, secrets, and observability start in Phase 1. Ph
 
 ## Current architecture and optional expansion
 
-The selected delivery architecture through Phase 4 is one Python/FastAPI API application using the existing Kubernetes/k3d workload infrastructure. Logical responsibility boundaries remain useful inside that application, but they do not imply separately deployed catalog, control-plane, or worker services. No additional compute adapter is required for current acceptance.
+The selected delivery architecture through Phase 5 is one Python/FastAPI API application using the existing Kubernetes/k3d workload infrastructure. Logical responsibility boundaries remain useful inside that application, but they do not imply separately deployed catalog, control-plane, or worker services. No additional compute adapter is required for current acceptance.
 
-[ADR-001](../../architecture/decisions/ADR-001-platform-api-abstraction.md), [ADR-002](../../architecture/decisions/ADR-002-docker-vs-kubernetes.md), and [ADR-006](../../architecture/decisions/ADR-006-python-quarkus-evolution.md) retain the former expansion design as an optional Phase 5 direction. If the owner activates that phase, it follows these gates:
+[ADR-001](../../architecture/decisions/ADR-001-platform-api-abstraction.md), [ADR-002](../../architecture/decisions/ADR-002-docker-vs-kubernetes.md), and [ADR-006](../../architecture/decisions/ADR-006-python-quarkus-evolution.md) retain the former expansion design as an optional Phase 6 direction. If the owner activates that phase, it follows these gates:
 
 | Gate | Phase | Required result |
 |---|---|---|
 | Logical seams | Existing baseline | Stable IDs, grants, deployment revisions, operations, provider execution, and observed state remain logically separated within the Python codebase. Persisted jobs use a versioned envelope/result model. |
-| Need and scope decision | Optional Phase 5 entry | Record the concrete limitation that justifies another provider or deployable service and choose only the required expansion package. |
-| Catalog extraction | Optional Phase 5 | If selected, Kotlin/Spring Boot owns migrated application metadata and grants only after reconciliation, authorization, backup/restore, and rollback pass. |
-| Control-plane migration | Optional Phase 5 | If selected, Quarkus passes public-contract and behavior parity before traffic moves. |
-| Worker separation | Optional Phase 5 | If selected, separately deployed Python workers pass interruption, duplicate-delivery, stale-authorization, timeout, and redaction acceptance. |
-| Provider portability | Optional Phase 5 | If selected, Kubernetes and Docker adapters pass the same provider contract and end-to-end lifecycle evidence. |
+| Need and scope decision | Optional Phase 6 entry | Record the concrete limitation that justifies another provider or deployable service and choose only the required expansion package. |
+| Catalog extraction | Optional Phase 6 | If selected, Kotlin/Spring Boot owns migrated application metadata and grants only after reconciliation, authorization, backup/restore, and rollback pass. |
+| Control-plane migration | Optional Phase 6 | If selected, Quarkus passes public-contract and behavior parity before traffic moves. |
+| Worker separation | Optional Phase 6 | If selected, separately deployed Python workers pass interruption, duplicate-delivery, stale-authorization, timeout, and redaction acceptance. |
+| Provider portability | Optional Phase 6 | If selected, Kubernetes and Docker adapters pass the same provider contract and end-to-end lifecycle evidence. |
 
 Use one authoritative writer per data type at every migration step. Prefer backfill, compare, cut over, and retain a bounded rollback path over permanent dual writes. Correlate actor, catalog version, desired revision, operation ID, job ID, and provider resource IDs across services. Extend monitoring and recovery coverage before retiring the corresponding FastAPI path.
 
@@ -93,7 +97,7 @@ Use one authoritative writer per data type at every migration step. Prefer backf
 
 The [delivery backlog](backlog.md) preserves all 20 permanent DEV/OPS IDs and their acceptance criteria. Its [phase task index](backlog.md#phase-task-index) assigns independently checkable tasks to one gate each, including provider, developer-experience and AI work. Stories may span gates; task completion and story completion are recorded separately. This plan supersedes the former six-milestone plan. No story is dropped or marked complete by this amendment.
 
-Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Phase 1 is complete under its recorded limits. Phase 2A multi-service and scheduled components, Phase 2B CI deployment credentials, and Phase 2C platform capabilities are accepted under their recorded evidence and limitations. Phase 3A completes the remaining energy-system use-case enablement slice as generic platform capabilities; complete PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 in the [Phase 3A plan](plans/phase-3a-priority-leftovers.md) before starting new general Phase 3 breadth. Phase 4 depends on those demonstrated foundations. Optional Phase 5 does not gate either phase.
+Deliver Phase 1 in order: **1A operational protection → 1B accountable access → 1C durable single-application lifecycle**. Phase 1 is complete under its recorded limits. Phase 2A multi-service and scheduled components, Phase 2B CI deployment credentials, and Phase 2C platform capabilities are accepted under their recorded evidence and limitations. Phase 3A completes the remaining energy-system use-case enablement slice as generic platform capabilities; complete PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 in the [Phase 3A plan](plans/phase-3a-priority-leftovers.md) before starting new general Phase 3 breadth. Phase 4 tracing and dashboards depend on those demonstrated foundations; Phase 5 AI operations depends on Phase 4. Optional Phase 6 does not gate either phase.
 
 The table assigns delivery responsibility by role; named delivery owners, dates, and capacity remain unassigned. Alert response is assigned to the project owner under the lab response policy. Assign a named owner before starting each new package. Story-level completion and any deferred criteria are recorded in the backlog; a delivered phase does not erase its accepted limitations.
 
@@ -122,7 +126,7 @@ The table assigns delivery responsibility by role; named delivery owners, dates,
 
 Multi-service support, CI credentials, and the Phase 2C platform capabilities are accepted under their owner-recorded evidence and limitations. Phase 3 is the next gate, beginning with generic capabilities prioritized by the energy-system use case. The component change uses a successor schema and explicit migration; do not silently transform the existing singular application object or claim acceptance from single-image tests. CI acceptance must use a distinct machine identity rather than a developer token. All three Phase 2 increments stay on the existing Kubernetes infrastructure and in the single Python API application.
 
-Generic hosted-application OIDC is immediate Phase 3 priority work because the energy-system use case depends on it. Human database access and general AI operations remain later additions. Docker portability and the polyglot service split are optional Phase 5 packages and do not gate those additions. No calendar or effort commitments are implied.
+Generic hosted-application OIDC is immediate Phase 3 priority work because the energy-system use case depends on it. Phase 4 adds tracing and operator dashboards before Phase 5 AI operations. Docker portability and the polyglot service split are optional Phase 6 packages and do not gate those additions. No calendar or effort commitments are implied.
 
 ## Lab validation constraint
 
@@ -139,7 +143,9 @@ Generic hosted-application OIDC is immediate Phase 3 priority work because the e
 | Multi-service scheduled application | Record EV-38 and retain the deferred capacity, database-row, and backup-inventory checks for a later production-like validation | Phase 2A accepted |
 | CI deployment credentials | Retain the deferred expiry, controlled identity-provider outage, and backup-coverage checks for a later production-like validation | Phase 2B accepted |
 | Energy-system use-case enablement | Execute the remaining PLAN-016, PLAN-009, PLAN-017, PLAN-018, and PLAN-019 work in the [Phase 3A completion plan](plans/phase-3a-priority-leftovers.md); record generic and separately owned use-case evidence before closing the gate | Phase 3A |
-| Optional architecture expansion | Keep the single Python API and Kubernetes provider unless a concrete need justifies activating adapter or service-extraction work | Optional Phase 5 |
+| Tracing and dashboards | Select a bounded trace pipeline and provision operator-only Grafana views; record source, cost, authorization and deployed evidence | Phase 4 |
+| AI operations | Use only authorized Platform API context, including scoped telemetry; require evaluation and approval before writes | Phase 5 |
+| Optional architecture expansion | Keep the single Python API and Kubernetes provider unless a concrete need justifies activating adapter or service-extraction work | Optional Phase 6 |
 | Schema reuse | Fit-gap assessment of candidate projects | Before stabilizing v1 |
 | Domains, versions, storage, alert recipients | Keep the deployed profile and source defaults explicit; capture exact live revision and recipient evidence | Before installation changes |
 | RPO/RTO, retention, capacity | Backup policy is selected (24-hour RPO, four-hour RTO, 14/8/6 retention); [ADR-017](../../architecture/decisions/ADR-017-phase-1a-retention-evidence-scope.md) omits full-horizon retention evidence from Phase 1A, so measure recovery, retention, and capacity against targets | Before production-like acceptance |

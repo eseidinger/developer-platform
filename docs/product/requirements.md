@@ -6,7 +6,7 @@ Status: consolidated requirements; prioritization and evidence are drafts. Requi
 
 **MVP (minimum viable product) means Phase 1**, including all three ordered gates: 1A operational protection, 1B accountable access, and 1C durable single-application lifecycle. It is not a separate stage before the numbered phases. See the [Phase 1 gates](../maintainers/delivery/history/phase-1-foundation.md#ordered-work-packages-and-acceptance-gates).
 
-The delivery phase identifies when the listed acceptance evidence is first required. Requirements continue to apply in later phases and to new endpoints/providers. “Confirmed requirement” describes decision status, not a delivery phase. N-01 keeps the public contract free of backend-specific fields; a second-provider proof is an optional Phase 5 expansion rather than a current delivery gate.
+The delivery phase identifies when the listed acceptance evidence is first required. Requirements continue to apply in later phases and to new endpoints/providers. “Confirmed requirement” describes decision status, not a delivery phase. N-01 keeps the public contract free of backend-specific fields; a second-provider proof is an optional Phase 6 expansion rather than a current delivery gate.
 
 Phase 1 acceptance must pass before advancing to Phase 2. Later hardening or extensions do not postpone the Phase 1 minimum:
 
@@ -16,7 +16,7 @@ Phase 1 acceptance must pass before advancing to Phase 2. Later hardening or ext
 | F-06 | Diagnose a failed rollout through authorized basic logs, metrics, health and revision context | Add full log search/follow and retention, resource comparisons and capacity views |
 | F-08 | Validate the supported single-image profile and reject unsupported capabilities before side effects | Publish the selected environment capability profile and extend policy enforcement |
 
-Phase 3 adds developer experience and access extensions; Phase 4 adds AI assistance and controlled actions. The full delivery backlog spans these phases and includes explicitly deferred work, so completing the MVP does not mean completing every backlog story.
+Phase 3 adds developer experience and access extensions; Phase 4 adds tracing and Grafana dashboards; Phase 5 adds AI assistance and controlled actions. The full delivery backlog spans these phases and includes explicitly deferred work, so completing the MVP does not mean completing every backlog story.
 
 | ID | Requirement | Delivery phase | Acceptance evidence |
 |---|---|---|---|
@@ -26,16 +26,16 @@ Phase 3 adds developer experience and access extensions; Phase 4 adds AI assista
 | F-04 | Expose desired and observed state and asynchronous operations | Phase 1 (MVP) | Restart a worker during provisioning and retain a traceable state |
 | F-05 | Support updates, restarts, and controlled removal | Phase 1 (MVP) | Repeatable operations; persistent data is retained |
 | F-06 | Associate logs, basic metrics, health, and deployment revisions | Phase 1 (MVP) | Locate a failed rollout through the API and monitoring |
-| F-07 | Optionally support a shared contract across Kubernetes and Docker providers | Optional Phase 5 | If activated, run the same spec on both providers with no backend fields in the core contract |
+| F-07 | Optionally support a shared contract across Kubernetes and Docker providers | Optional Phase 6 | If activated, run the same spec on both providers with no backend fields in the core contract |
 | F-08 | Check environment capabilities and reject unsupported requirements | Phase 1 (MVP) core; Phase 2 extension | Reject autoscaling on an unsuitable environment without side effects |
 | F-09 | Authorize and audit separate human database access | Phase 3 | Tunnel/database login distinct from application login; revocation test |
 | F-10 | Offer a portal, templates, and OIDC integration for hosted applications | Phase 3 | Template-to-healthy-application flow with separate platform/application permissions |
-| F-11 | Generate AI diagnoses through read-only platform tools | Phase 4 | Incident diagnosis with evidence; deny access to another project's context |
-| F-12 | Execute AI changes through the Platform API using an approved plan | Phase 4 | No mutation without valid approval for the exact revision and target |
+| F-11 | Generate AI diagnoses through read-only platform tools | Phase 5 | Incident diagnosis with evidence; deny access to another project's context |
+| F-12 | Execute AI changes through the Platform API using an approved plan | Phase 5 | No mutation without valid approval for the exact revision and target |
 | F-13 | Deploy one application as multiple cooperating services, including a component triggered by a cron schedule | Phase 2A (next) | UC-07: two long-running services communicate internally; one scheduled component runs without overlap; component updates, status, logs, and failures are independently attributable |
 | F-14 | Create scoped, expiring, rotatable, and revocable machine credentials for CI application deployments | Phase 2B | UC-08: a non-interactive pipeline deploys and observes one scoped application; revocation denies the next request; cross-project and privileged actions remain denied; the secret is returned once and never exposed by later platform surfaces |
 | F-15 | Bootstrap an empty project and run the platform acceptance suite through an expiring, revocable automation identity | Phase 2B | UC-09: a human administrator creates one test-runner client; later suites create disposable projects and role personas without a reusable human token, test grants and platform features, and clean up their identities |
-| N-01 | Keep the public Platform API technology-independent | All phases; second-provider proof optional in Phase 5 | Contract review; F-07 only if Phase 5 is activated |
+| N-01 | Keep the public Platform API technology-independent | All phases; second-provider proof optional in Phase 6 | Contract review; F-07 only if Phase 6 is activated |
 | N-02 | Make provisioning idempotent and resumable after partial failures | Phase 1 (MVP) | Database creation succeeds, deployment fails, retry creates no duplicates |
 | N-03 | Enforce project/environment boundaries server-side | Phase 1 (MVP) | Negative tests for resources, logs, secrets, jobs, and database access |
 | N-04 | Reference, protect, and redact secrets | Phase 1 (MVP) | Spec/audit/log inspection; rotation followed by reconnection |
@@ -43,6 +43,7 @@ Phase 3 adds developer experience and access extensions; Phase 4 adds AI assista
 | N-06 | Keep monitoring available during workload-cluster failure; detect host failure externally | Phase 1 (MVP) | k3d failure and separate host/heartbeat failure tests |
 | N-07 | Keep single-host operation within available resources | Phase 1 (MVP) | Load measurement including log growth, database, and reserve; no swap/disk exhaustion |
 | N-08 | Audit changes, role assignments, and provider operations | Phase 1 (MVP) | Correlate actor, target, revision, timestamp, result, and operation ID |
+| N-09 | Correlate platform operations with bounded traces and provision useful operator dashboards | Phase 4 | Follow a sampled request through an asynchronous operation without sensitive span data; dashboards diagnose a deployment failure and telemetry gap while denying unscoped project access |
 
 ## Delivery acceptance
 

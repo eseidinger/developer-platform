@@ -1,6 +1,6 @@
 # Developer Platform: Technology Roles (historical)
 
-Status: the selected implementation through Phase 4 is one Python/FastAPI Platform API application. The former Kotlin/Spring, Java/Quarkus, and separately deployed Python-worker split is an optional Phase 5 expansion.
+Status: the selected implementation through Phase 5 is one Python/FastAPI Platform API application. The former Kotlin/Spring, Java/Quarkus, and separately deployed Python-worker split is an optional Phase 6 expansion.
 
 ## Current architecture
 
@@ -33,7 +33,7 @@ does not own authorization or platform lifecycle state. See
 
 ## Optional evolution
 
-If an explicit need justifies independently deploying a responsibility, [optional Phase 5](../../../architecture/evolution.md) retains a candidate allocation:
+If an explicit need justifies independently deploying a responsibility, [optional Phase 6](../../../architecture/evolution.md) retains a candidate allocation:
 
 - Kotlin/Spring Boot for an extracted application catalog;
 - Java/Quarkus for an extracted control plane;

@@ -50,7 +50,9 @@ Central storage and alerting are outside k3d but share its host failure domain. 
 
 PostgreSQL exporter metrics, application request/error/latency metrics, workload
 resource usage scrapes and traces remain future work. Attributed centralized
-operational logs are implemented. Proposed OpenTelemetry/Tempo is not installed.
+operational logs are implemented. [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md)
+plans bounded OpenTelemetry tracing, a private trace backend, and provisioned
+operator dashboards; no trace backend or dashboards are installed yet.
 
 Operators should see host, Docker, cluster, database, certificates, storage, jobs and monitoring. Developers should see only authorized applications and logs/health/metrics. Shared dashboard links cannot enforce this boundary. Introduce server-side authorization before exposing those views.
 
@@ -69,4 +71,4 @@ The current catalog stores `provisioning`, `applied`, `failed` or `retired`; it 
 
 Selected heartbeat, SMTP, scrape-rule and backup DOWN/UP notifications have operator-reported receipt in the backlog. Application probe fixtures do not establish live application-rule delivery or complete host/cluster failure acceptance. Continue controlled checks on the existing lab under [ADR-010](decisions/ADR-010-single-environment-lab.md); no duplicate installation is required.
 
-Later AI reads authorized telemetry alongside deployment history and redacted changes, separating observations, gaps and hypotheses. [ADR-005](decisions/ADR-005-observability-watchdog.md) explains target failure boundaries; [Monitoring](../operators/monitoring.md) covers current checks and remaining acceptance.
+Phase 5 AI reads authorized telemetry alongside deployment history and redacted changes, separating observations, gaps and hypotheses. [ADR-005](decisions/ADR-005-observability-watchdog.md) explains target failure boundaries; [Monitoring](../operators/monitoring.md) covers current checks and remaining acceptance.
