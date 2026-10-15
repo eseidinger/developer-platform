@@ -56,7 +56,7 @@ devplat drift --project demo --output json
 
 Regenerate without `--fail-ready` and apply with the current revision to
 recover. This is a source-level journey; deployed acceptance and the injected
-failure, role matrix, and UI/API compatibility checks are Phase 3A work.
+failure, role matrix, and UI/API compatibility checks are Phase 7 anytime work.
 
 | Identity | Project create | Deploy/diagnose | Manage hosted policy | Read app |
 | --- | --- | --- | --- | --- |
@@ -68,4 +68,4 @@ failure, role matrix, and UI/API compatibility checks are Phase 3A work.
 | Unrelated principal | No | No | No | No |
 
 The matrix is the intended authorization contract, not a claim that the
-deployed role/denial matrix has passed; see Phase 3A acceptance.
+deployed role/denial matrix has passed; see Phase 7 acceptance.

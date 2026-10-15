@@ -478,7 +478,7 @@ def main(argv=None) -> int:
             report.data["errorCode"] = error
         report.save()
         print("REPORT " + str(report.directory / "report.json"), flush=True)
-        print("Projects are retained; Phase 3A acceptance remains open.", flush=True)
+        print("Projects are retained; Phase 7 acceptance remains open.", flush=True)
         return 0 if not error and cleaned else 1
     except (Exception, KeyboardInterrupt) as exc:
         code = str(exc) if isinstance(exc, DrillError) else (

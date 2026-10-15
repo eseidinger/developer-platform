@@ -1,7 +1,7 @@
 # Human PostgreSQL access
 
 Status: source implementation, October 14, 2026. Live tunnel, isolation, and
-session-revocation acceptance remain in Phase 3A.
+session-revocation acceptance remain in Phase 7.
 
 Application database credentials are not human credentials. A project
 administrator grants a named OIDC human a separate read-only PostgreSQL login
@@ -70,4 +70,4 @@ devplat database-access grants revoke --project PROJECT \
 
 The API and CLI are not a database shell or an application-data export path.
 The deployed foreign-project denial, credential-separation, and revocation
-checks are tracked as Phase 3A acceptance.
+checks are tracked as Phase 7 acceptance.

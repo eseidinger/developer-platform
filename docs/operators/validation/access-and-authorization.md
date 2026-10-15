@@ -20,7 +20,7 @@ redacted HTTP results as evidence.
 ## Human PostgreSQL access acceptance playbook
 
 The opt-in [`test-platform-human-database-access.yml`](../../../ansible/test-platform-human-database-access.yml)
-wrapper automates the Phase 3A.7 core tunnel and SQL checks. It does **not**
+wrapper automates the Phase 7.7 core tunnel and SQL checks. It does **not**
 deploy the platform, install the bastion, publish the neutral fixture, or close
 the full acceptance gate. Its default `plan` validates the run scope without
 contacting the platform API. A live `run` creates two private, run-scoped fixture
@@ -71,7 +71,7 @@ Ansible log output is not a secret store. The root-only report is at
 `/opt/developer-platform/.runtime/human-database-access/<run-id>/report.json`.
 It records check names and safe results, no SQL password, SSH private key, or
 test-persona secret. Review it privately and record the deployed API/bastion
-revisions, fixture digest, and any failed check in the Phase 3A.7 evidence.
+revisions, fixture digest, and any failed check in the Phase 7.7 evidence.
 `core-passed` means only the automated subset passed. Browser storage, remote
 firewall reachability, and log/screenshot/evidence redaction still need manual
 review. A failed run may leave its projects or a pending test-persona revoke;
@@ -82,7 +82,7 @@ directly.
 
 ## Executed human PostgreSQL access acceptance: October 15, 2026
 
-**EV-47 · owner-accepted passing core tests; partial Phase 3A.7 / PLAN-008 evidence.** The live run on
+**EV-47 · owner-accepted passing core tests; partial Phase 7.7 / PLAN-008 evidence.** The live run on
 `node-01.eseidinger.de` used two disposable projects,
 `hd-5f39d4862423-a` and `hd-5f39d4862423-b`, and the immutable fixture
 `docker.io/eseidinger/developer-platform-acceptance-fixture@sha256:5c14c1bedfc653e98f958b88deacc5af488f885a5d9a6d3b96e9325938b3f0ad`.
@@ -146,7 +146,9 @@ The external-path probe from the controller could not connect to bastion port
 remains deferred. Browser storage and independent log, screenshot, and evidence
 redaction review remain deferred too. The retired fixture databases remain
 retained under the normal data-retention policy. This record does not close PLAN-008 or the
-Phase 3A.7 gate; see [EV-47](../../maintainers/delivery/backlog.md#verification-register).
+Phase 7 gate; the three remaining reviews are the final, lowest-priority
+[7.8 work package](../../maintainers/delivery/plans/phase-7-anytime-leftovers.md#78-complete-the-lowest-priority-human-database-leftovers-plan-008).
+See [EV-47](../../maintainers/delivery/backlog.md#verification-register).
 
 ## Neutral hosted-application acceptance harness
 

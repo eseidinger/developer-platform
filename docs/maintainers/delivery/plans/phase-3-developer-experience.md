@@ -12,14 +12,12 @@ uses the React stack selected in
 [UI implementation plan](ui.md). CLI delivery follows the
 [CLI implementation plan](cli.md).
 
-The [energy-system use-case enablement plan](energy-system-integration.md) is the
-first Phase 3 delivery slice. Its remaining work is now organized as
-[Phase 3A priority-slice completion](phase-3a-priority-leftovers.md): generic
-application identity, component monitoring, authenticated routing, durability,
-recovery, separately owned energy-system evidence, and all deployed Phase 3
-acceptance. Phase 3 implements the source capabilities; Phase 3A is the sole
-acceptance/evidence gate. Portal, CLI, template, and human-database source work
-may proceed independently of the 3A evidence sequence.
+Phase 3 delivers the broader portal, CLI, template, and human database source
+capabilities on the accepted Phase 2C foundation. Remaining generic identity,
+monitoring, integration, recovery, and deployed self-service acceptance is
+tracked in [Phase 7 anytime leftovers](phase-7-anytime-leftovers.md). Phase 7
+may be worked on when capacity allows and does not block Phase 3 delivery.
+Unverified Phase 7 criteria cannot be claimed complete for their own tasks.
 
 ## Priority sequence
 
@@ -30,13 +28,14 @@ approval. The owner accepted it for lab sequencing without deployed journey
 checks; those outcomes remain unverified. Follow
 [UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)
 and the [user workflow](../../../developers/ui.md#define-and-approve-application-access).
-This is a direct enablement of the priority slice. It does not certify the outstanding identity,
-monitoring, integration, and recovery acceptance in the sequence below.
+This does not certify the outstanding identity, monitoring, integration, and
+recovery acceptance in Phase 7.
 
 1. Implement the broader portal/template journey and human database access
    (`PLAN-006` through `PLAN-008`).
-2. Complete [Phase 3A](phase-3a-priority-leftovers.md), which owns all deployed
-   acceptance for `PLAN-006` through `PLAN-020` and the priority slice.
+2. Record completed Phase 3 source and local checks. Track the remaining
+   deployed acceptance in [Phase 7](phase-7-anytime-leftovers.md) as separate,
+   lowest-priority work that may be done at any time.
 
 ## Work packages
 
@@ -49,24 +48,25 @@ monitoring, integration, and recovery acceptance in the sequence below.
   hosted-application OIDC clients, browser callback URIs, machine audiences, and
   client-scoped group claims from stable platform resources. Humans use
   first-login approval and machines use pre-authorization; platform roles never
-  imply application-group membership. F-10 remains a Phase 3 requirement;
-  deferring it requires an explicit scope amendment.
+  imply application-group membership. F-10 remains an open story outcome; its
+  remaining deployed acceptance is in Phase 7.
 - Offer human database access with a separate identity, authorization, and a controlled tunnel.
 - Make ownership, roles, and the distinction between application and platform permissions visible.
-- Accept deployed PLAN-020 access-definition and approval screens over the hosted-access
+- Provide PLAN-020 access-definition and approval screens over the hosted-access
   API. Show pending/approved requests separately from effective memberships and
   active policies; platform roles and CI credentials confer no application groups.
+  The remaining deployed journey acceptance is in Phase 7.
 - Build the self-service journey on the multi-service and scheduled-component contract accepted in Phase 2A; do not create a portal-only component model.
 
 Entry requires the Phase 1, Phase 2A, Phase 2B, and Phase 2C backlog gates, including usable authorized diagnostics, recovery, retirement, and CI-credential APIs. Portal completion cannot substitute for those API acceptance results.
 
 ## Acceptance ownership
 
-All source, local, and deployed acceptance is planned and recorded in
-[Phase 3A](phase-3a-priority-leftovers.md). It first verifies the priority
-use-case slice, then the portal/CLI/template/human-database journeys. Concrete
-energy-system declarations and business assertions remain outside the platform
-repository.
+Record Phase 3 source and local evidence in the backlog. The outstanding
+deployed identity, monitoring, integration, recovery, portal/CLI/template, and
+human-database journeys belong to [Phase 7](phase-7-anytime-leftovers.md).
+Concrete energy-system declarations and business assertions remain outside the
+platform repository.
 
 ## Outcome
 

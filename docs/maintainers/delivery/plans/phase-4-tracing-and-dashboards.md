@@ -1,10 +1,11 @@
 # Phase 4 — Tracing and Grafana Dashboards
 
 Status: planned. Tracing and provisioned dashboards are not implemented. This
-phase follows the Phase 3/3A acceptance gate and precedes AI operations in
-[Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
-Alloy, and operator-only Grafana; it does not reopen Phase 3A monitoring
-acceptance or treat a dashboard as proof of application health.
+phase follows the usable Phase 3 source capabilities and precedes AI operations
+in [Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
+Alloy, and operator-only Grafana. Full PLAN-017 monitoring acceptance remains
+in the independent [Phase 7 leftovers](phase-7-anytime-leftovers.md); any
+telemetry needed for Phase 4 must be verified within this phase.
 
 Execution tracking: [PLAN-021 and PLAN-022](../backlog.md#additional-phase-tasks).
 The [backlog](../backlog.md) remains the evidence and task-status register.
@@ -93,4 +94,4 @@ does not gate tracing, dashboards, or AI operations.
 
 Foundations: [observability architecture](../../../architecture/observability.md),
 [operator monitoring](../../../operators/monitoring.md), and
-[Phase 3A monitoring acceptance](phase-3a-priority-leftovers.md).
+[Phase 7 monitoring acceptance](phase-7-anytime-leftovers.md).
