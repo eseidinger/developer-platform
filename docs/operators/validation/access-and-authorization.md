@@ -82,7 +82,7 @@ directly.
 
 ## Executed human PostgreSQL access acceptance: October 15, 2026
 
-**EV-47 · partial Phase 3A.7 / PLAN-008 evidence.** The live run on
+**EV-47 · owner-accepted passing core tests; partial Phase 3A.7 / PLAN-008 evidence.** The live run on
 `node-01.eseidinger.de` used two disposable projects,
 `hd-5f39d4862423-a` and `hd-5f39d4862423-b`, and the immutable fixture
 `docker.io/eseidinger/developer-platform-acceptance-fixture@sha256:5c14c1bedfc653e98f958b88deacc5af488f885a5d9a6d3b96e9325938b3f0ad`.
@@ -133,6 +133,13 @@ B first returned `202 retiring` while its namespace was being deleted; after
 the namespace disappeared, the confirmed request completed retirement. The
 automated and manual access checks above preceded this clean deployment and
 were not repeated against it.
+
+**Owner acceptance, October 15, 2026:** The owner accepts the 14 passing
+automated checks and the completed manual portal, tunnel, SQL, key-rotation,
+and revocation checks as passed evidence. No repeat run is required solely
+because the same fixes were subsequently deployed from clean commit `9826de7`.
+This decision accepts the checks performed; it does not report the deferred
+reviews as passed or change the original report's `gateClosed: false` result.
 
 The external-path probe from the controller could not connect to bastion port
 2222, consistent with its loopback listener, but a full remote firewall review
