@@ -1049,29 +1049,43 @@ historical snapshots.
 
 - [ ] **PLAN-010 · 5.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 4 gate; scoped data/audit evidence.
 
+  **Source progress (October 15, 2026; `77d3c1d`–`2f3fa82`):** Added classified, human-requested AI runs, project-bound read tools, safe documentation references, sourced result validation and fail-closed regional model configuration. Targeted unit and OpenAPI tests pass. Deployed project-denial and real-model explanation evidence remains open.
+
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No AI layer or authorized context/tools; ADR-008 accepts product focus only, not its implementation.
 
 - [ ] **PLAN-011 · 5.2** — Correlate incident logs, metrics, authorized traces and history with timestamps/comparison windows; distinguish observations/hypotheses and explicitly report missing evidence. Prerequisites: PLAN-010; PLAN-021; DEV-004-T02; DEV-005-T02; DEV-007-T02.
+
+  **Source progress (October 15, 2026):** Bounded read tools expose operation history, five-minute metrics, one-hour safe log counts, scoped trace summaries, readiness reasons and configuration key changes. Run results carry evidence references and abstention. Live correlation quality is unverified.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No AI incident correlation; underlying scoped telemetry and deployment history are also incomplete (UC-06).
 
 - [ ] **PLAN-012 · 5.3** — Implement read-only investigation with tool budgets/errors; evaluate bad database host, pool exhaustion, resource pressure and insufficient evidence for diagnosis, abstention, unnecessary calls and time/cost; test injection and secret/project boundaries. Prerequisites: PLAN-011.
 
+  **Source progress (October 15, 2026):** The LangChain loop limits tools, duration, estimated cost and output size; unknown tools and project arguments are rejected. A synthetic six-case corpus and runner are committed. Actual model scoring, second-provider scoring and deployed security evidence remain open.
+
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No investigation tool loop, incident corpus evaluation or AI boundary tests.
 
 - [ ] **PLAN-013 · 5.4** — Generate a reviewable configuration/deployment diff bound to target and revision, with supporting evidence and a rollback plan; do not execute it at this stage. Prerequisites: PLAN-012.
+
+  **Source progress (October 15, 2026):** A narrow rollback proposal selects a retained successful revision after a failed latest deployment, binds it to a completed sourced run, and records a canonical value-free path diff, hash, target and base revision. Other fix types and deployed review remain open.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No evidence-linked AI diff/approval-plan flow.
 
 - [ ] **PLAN-014 · 5.5** — Apply only an exactly approved diff through authorized Platform API calls; reject stale approvals, audit execution and verify observed health/metrics. Demonstrate regression, investigation, approval and recovery in test resources. Prerequisites: PLAN-013; DEV-007-T02; OPS-001-T01.
 
+  **Source progress (October 15, 2026):** Human project-manager approval binds the diff hash for 15 minutes and one execution. Execution rechecks authority and revision and queues the existing rollback operation; proposal reads expose operation readiness and available metrics. The deployed regression/recovery proof remains open.
+
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No revision-bound AI approvals, execution integration or observed-recovery demonstration (F-12).
 
 - [ ] **PLAN-015 · 5 (after 5.5)** — Demonstrate development assistance grounded in authorized docs, ADRs, contracts and repository context: template selection, change impact or review with runtime evidence; retain source references and project/secret boundaries. Prerequisites: PLAN-014.
 
+  **Source progress (October 15, 2026):** A bounded `development_assistance` run can cite curated committed template, API and ADR references alongside project-scoped observations. A live demonstration remains open.
+
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No development assistant using project docs/contracts/repository/runtime context.
 
 - [ ] **PLAN-021 · 4.1** — Instrument the current API and durable worker with bounded OpenTelemetry traces and operator-only collection/storage. Correlate requests, authorization outcomes, operations, retries and provider calls without secret or personal values; prove scoped access, collection failure isolation, resource limits, and deployed trace readback. Prerequisites: usable scoped metrics/logs and a recorded backend, sampling, retention and recovery decision. Full PLAN-017 acceptance remains in Phase 7 and does not gate this task. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md).
+
+  **Source progress (October 15, 2026; `f0aa876`):** Added bounded platform tracing, private Alloy/Tempo source, sampling configuration, fixed trace storage budget and local configuration checks. Deployed trace readback and failure isolation remain unverified.
 
   **Planning baseline (October 14, 2026):** Prometheus, Loki, Alloy and Grafana exist, but there is no trace backend or instrumented end-to-end operation path. No source, local or deployed tracing acceptance is claimed.
 
@@ -1079,13 +1093,19 @@ historical snapshots.
 
 - [ ] **PLAN-022 · 4.2** — Provision versioned, operator-only Grafana dashboards for platform health/delivery, workloads/capacity, and telemetry/security. Validate panel queries, meaningful missing-data states, safe trace/log links, restart/reconciliation, failure diagnosis, redaction and deployed evidence. Prerequisites: PLAN-021 and existing scoped metrics/logs. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md).
 
+  **Source progress (October 15, 2026; `c7aed4e`):** Added three generated operator dashboards and provisioning source. Live panels, restart and failure drills remain unverified.
+
   **Planning baseline (October 14, 2026):** Grafana data sources are provisioned but dashboards are not. No dashboard implementation or deployed acceptance is claimed.
 
 - [ ] **PLAN-023 · 4.3** — Add a versioned, opt-in application metrics declaration and private scrape discovery for deployed service components; expose bounded project-scoped reads and provision framework-aware Spring Boot, Quarkus, and FastAPI dashboard templates. Prove metric/label limits, missing-data behavior, cross-project denial, retirement cleanup, resource cost, and deployed readback with instrumented neutral fixtures. Prerequisites: PLAN-022's operator dashboard provisioning path and the existing authorized Platform API observation boundary. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023) and [N-10](../../product/requirements.md).
 
+  **Source progress (October 15, 2026; `4c170d5`):** Added an opt-in `v1alpha2` metrics declaration, private discovery/proxy, scoped fixed reads, and generated Spring, Quarkus and FastAPI dashboards. Framework fixture readback remains unverified.
+
   **Planning baseline (October 15, 2026):** Current application discovery feeds only blackbox availability probes; Prometheus does not scrape application `/metrics` endpoints. No framework dashboard templates or application metric reads are implemented.
 
 - [ ] **PLAN-024 · 4.4** — Add opt-in OpenTelemetry tracing for hosted service and scheduled components. Carry safe W3C context through the authenticated platform boundary, accept OTLP only from verified workload identities, derive provenance server-side, bound and redact spans, and provide fixed project-scoped readback while keeping raw trace search operator-only. Prove Spring Boot, Quarkus and FastAPI flows, internal propagation, forged-origin/cross-project denial, sampling gaps, retirement and collector-failure isolation. Prerequisites: PLAN-021 private trace collector and PLAN-022 operator trace links; PLAN-023 application selectors may be reused. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md#44-let-hosted-applications-participate-in-tracing-plan-024) and [N-11](../../product/requirements.md).
+
+  **Source progress (October 15, 2026; `5709217`):** Added versioned trace opt-in, Pod-bound token projection, authenticated OTLP gateway with catalog checks, bounded span redaction and fixed project-scoped reads. End-to-end framework fixtures and live denial checks remain open.
 
   **Planning baseline (October 15, 2026):** No hosted application trace declaration, OTLP ingestion path, platform-to-application trace propagation, verified application-span provenance or scoped trace read exists. Existing workload-log `correlationId` values are not verified trace IDs.
 

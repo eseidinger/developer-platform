@@ -16,7 +16,9 @@ Status: implemented lab signals plus target coverage. Source configuration is no
 | Application availability | Component-aware catalog → blackbox → Prometheus; Kubernetes readiness → kube-state-metrics | Protected public probes check the access boundary, not backend health; no independent external vantage point |
 | Monitoring components | Prometheus and blackbox-exporter self-scrapes | Does not prove email delivery |
 | Logs | Alloy reads Docker files and project pod logs through a dedicated read-only Kubernetes credential → Loki | Workload centralization keeps only minimized operational envelopes; shared backends are operator-only |
-| Views | Grafana Prometheus/Loki data sources | No provisioned dashboards or scoped developer views |
+| Views | Grafana Prometheus/Loki data sources; Phase 4 dashboard provisioning source | Six source dashboards await deployed panel and selector proof; project views use scoped Platform API reads |
+| Traces | Phase 4 source for bounded platform spans, private Alloy/Tempo and authenticated hosted OTLP | No deployed trace/readback evidence; backend and raw search remain operator-only |
+| Hosted metrics | Phase 4 source for opt-in private scrape and fixed project reads | Framework fixtures and live series/cardinality evidence remain open |
 | Alerts | Scrape failure, low disk, unavailable replicas, application failure/missing result/stale discovery → Alertmanager | Default receiver sends nothing; SMTP requires separate configuration |
 | Host health | systemd sender checks API SQL/Kubernetes access and Prometheus readiness → external watchdog | Does not directly inspect Docker, all nodes/workloads, Grafana, Loki or Alertmanager |
 | Backup freshness | Optional scheduled runner → separately authenticated external backup channel | Independent of heartbeat; shares watchdog hosting/mail |
@@ -48,19 +50,18 @@ Central storage and alerting are outside k3d but share its host failure domain. 
 
 ## Target coverage and project views
 
-PostgreSQL exporter metrics, application request/error/latency metrics, workload
-resource usage scrapes and traces remain future work. Attributed centralized
-operational logs are implemented. [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md)
-plans bounded platform and opt-in hosted-application OpenTelemetry tracing, a
-private trace backend, provisioned operator dashboards, and opt-in private
-collection of hosted-application metrics. Application spans need verified
-workload provenance; raw trace search remains operator-only.
+PostgreSQL exporter metrics and workload resource usage scrapes remain future
+work. Attributed centralized operational logs are implemented.
+[Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md)
+has source for bounded platform and opt-in hosted-application tracing, private
+Tempo collection, operator dashboards, and opt-in private hosted metrics. Their
+deployed acceptance remains open. Application spans require verified workload
+provenance; raw trace search remains operator-only.
 The [Phase 4 tracing decision](decisions/ADR-021-phase-4-tracing-boundary.md)
 fixes Tempo/Alloy placement, workload authentication, retention and resource
-limits, and the bounded project-read contract. None is installed yet.
-Spring Boot, Quarkus and FastAPI dashboard templates require matching application
-instrumentation; no application metrics scrape, trace backend or dashboards are
-installed yet.
+limits, and the bounded project-read contract. Spring Boot, Quarkus and FastAPI
+dashboard templates require matching application instrumentation; source
+templates alone do not prove populated panels.
 
 Operators should see host, Docker, cluster, database, certificates, storage, jobs and monitoring. Developers should see only authorized applications and logs/health/metrics. Shared dashboard links cannot enforce this boundary. Introduce server-side authorization before exposing those views.
 

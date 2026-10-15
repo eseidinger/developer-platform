@@ -13,6 +13,10 @@ class ModelAdapter(Protocol):
 
     def bind_tools(self, tools: list[Any]) -> Any: ...
 
+    def estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float: ...
+
+    def reserve_cost_usd(self, input_tokens: int) -> float: ...
+
 
 class OpenAIModelAdapter:
     name = "openai:gpt-6.1-sol"
@@ -37,6 +41,13 @@ class OpenAIModelAdapter:
 
     def bind_tools(self, tools):
         return self.model.bind_tools(tools, parallel_tool_calls=False)
+
+    def estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float:
+        # GPT-6.1 Sol Standard list prices plus 10% EU regional uplift.
+        return (input_tokens * 2.2 + output_tokens * 11.0) / 1_000_000
+
+    def reserve_cost_usd(self, input_tokens: int) -> float:
+        return self.estimate_cost_usd(input_tokens, 1024)
 
 
 def configured_model() -> ModelAdapter:

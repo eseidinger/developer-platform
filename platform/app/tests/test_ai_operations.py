@@ -28,6 +28,12 @@ class _Model:
         self.bound_names = [tool.name for tool in tools]
         return _Bound(self.replies)
 
+    def estimate_cost_usd(self, input_tokens, output_tokens):
+        return 0.000001 * (input_tokens + output_tokens)
+
+    def reserve_cost_usd(self, input_tokens):
+        return self.estimate_cost_usd(input_tokens, 1024)
+
 
 class _Query:
     def __init__(self, row):

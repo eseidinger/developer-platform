@@ -41,11 +41,15 @@ def _safe_text(value, limit=1000):
 def _parse_final(message, evidence):
     try:
         data = json.loads(_text(message))
-        if not isinstance(data.get("insufficient_evidence"), bool):
+        if (not isinstance(data, dict) or not isinstance(data.get("insufficient_evidence"), bool)
+                or not isinstance(data.get("gaps"), list)
+                or not isinstance(data.get("hypotheses"), list)):
             raise ValueError()
         summary = _safe_text(data["summary"], 2000)
         gaps = [_safe_text(gap, 300) for gap in data["gaps"][:8]]
-        known = {item["id"] for item in evidence if item["state"] not in {"unavailable", "missing", "not_declared"}}
+        missing_states = {"unavailable", "missing", "not_declared", "no_output", "unknown",
+                          "collection_failed", "not_applied", "not_found"}
+        known = {item["id"] for item in evidence if item["state"] not in missing_states}
         hypotheses = []
         for item in data["hypotheses"][:3]:
             refs = item["source_ids"]
@@ -60,11 +64,6 @@ def _parse_final(message, evidence):
         return {"summary": "Insufficient verified evidence for a diagnosis.", "hypotheses": [],
                 "gaps": ["Model response did not satisfy the sourced result contract"],
                 "insufficient_evidence": True}
-
-
-def _cost(usage):
-    # GPT-6.1 Sol Standard input/output list prices plus 10% EU regional uplift.
-    return round((usage.get("input_tokens", 0) * 2.2 + usage.get("output_tokens", 0) * 11.0) / 1_000_000, 6)
 
 
 def run(kind, run_id, model, tools, *, clock=time.monotonic):
@@ -85,7 +84,7 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
     with tracing.span("platform.ai.run", **{"platform.ai.run_id": str(run_id), "platform.ai.kind": kind}):
         for _ in range(MAX_MODEL_CALLS):
             estimated_input = sum(len(str(message.content)) for message in messages) / 3
-            reserved = (estimated_input * 2.2 + 1024 * 11) / 1_000_000
+            reserved = model.reserve_cost_usd(int(estimated_input))
             if clock() >= deadline or cost + reserved > MAX_COST_USD:
                 break
             with tracing.span("platform.ai.model", **{"platform.ai.model": model.name}):
@@ -93,7 +92,8 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                 usage = answer.usage_metadata or {}
                 tracing.annotate("platform.ai.input_tokens", int(usage.get("input_tokens", 0)))
                 tracing.annotate("platform.ai.output_tokens", int(usage.get("output_tokens", 0)))
-            cost += _cost(usage)
+            cost += model.estimate_cost_usd(usage.get("input_tokens", 0),
+                                            usage.get("output_tokens", 0))
             if cost > MAX_COST_USD:
                 break
             messages.append(answer)
