@@ -32,6 +32,8 @@ services:
     volumes:
       - grafana:/var/lib/grafana
       - ./datasources.yaml:/etc/grafana/provisioning/datasources/default.yaml:ro
+      - ./dashboards.yaml:/etc/grafana/provisioning/dashboards/default.yaml:ro
+      - ./dashboards:/var/lib/grafana/provisioned-dashboards:ro
     ports: ["127.0.0.1:3000:3000"]
     networks: [platform]
     mem_limit: 512m

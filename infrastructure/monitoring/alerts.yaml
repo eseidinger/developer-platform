@@ -54,6 +54,20 @@ groups:
           severity: warning
         annotations:
           summary: 'Application monitoring discovery is stale or unavailable'
+      - alert: TraceStorageHalfFull
+        expr: node_filesystem_size_bytes{mountpoint="/var/lib/developer-platform/tempo"} - node_filesystem_avail_bytes{mountpoint="/var/lib/developer-platform/tempo"} > 2147483648
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Trace filesystem is over 2 GiB used'
+      - alert: TraceStorageMetricsMissing
+        expr: absent(node_filesystem_size_bytes{mountpoint="/var/lib/developer-platform/tempo"})
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Trace filesystem metrics are missing; check mount and node exporter'
   - name: security-events
     rules:
       - alert: RepeatedAuthenticationFailures

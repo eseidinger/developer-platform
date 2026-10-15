@@ -1,0 +1,10 @@
+apiVersion: 1
+providers:
+  - name: developer-platform
+    orgId: 1
+    folder: Developer Platform
+    type: file
+    disableDeletion: false
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/provisioned-dashboards
