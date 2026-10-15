@@ -15,6 +15,7 @@ PERMISSIONS = {
     "deploy": {"developer", "project-admin", "platform-admin"},
     "retire": {"project-admin", "platform-admin"},
     "grant": {"project-admin", "platform-admin"},
+    "manage": {"project-admin", "platform-admin"},
 }
 
 

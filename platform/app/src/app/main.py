@@ -65,6 +65,7 @@ from . import tracing
 from . import application_metrics
 from . import telemetry_catalog
 from . import trace_read
+from . import ai_store, ai_model, ai_tools, ai_agent, ai_changes
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -102,6 +103,8 @@ async def lifespan(app):
             requested_by TEXT NOT NULL, reviewed_at TIMESTAMPTZ, reviewed_by TEXT)""")
         initialize_catalog(conn)
         telemetry_catalog.initialize(conn)
+        ai_store.initialize(conn)
+        ai_changes.initialize(conn)
         initialize_audit(conn)
         initialize_authorization(conn)
         initialize_deployment_credentials(conn)
@@ -377,6 +380,26 @@ class Project(BaseModel):
 class DataServiceRecoveryRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reason: Literal["unavailable", "access", "data_integrity", "other"]
+
+
+class AIProjectPolicy(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    classification: Literal["public", "internal", "confidential", "restricted"]
+
+
+class AIRunRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    kind: Literal["explain_application", "investigate_incident"]
+
+
+class AIProposalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    run_id: UUID
+
+
+class AIApprovalRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    diff_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
 
 
 class DataServiceRecoveryReview(BaseModel):
@@ -1240,6 +1263,180 @@ def project_trace(name: str, trace_id: str, principal: Principal = Depends(curre
     if result is None:
         raise HTTPException(404, "No retained trace for this project")
     return result
+
+
+@app.put("/projects/{name}/ai/policy")
+def set_ai_policy(name: str, body: AIProjectPolicy,
+                  principal: Principal = Depends(current_principal)):
+    require_human_platform_admin(principal)
+    validate_name(name)
+    with connect() as conn:
+        if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
+            raise HTTPException(404, "Unknown project")
+        ai_store.set_policy(conn, name, body.classification)
+    required_audit(actor_for(principal), "ai.policy.update", "project", name, "succeeded",
+                   {"project": name}, {"classification": body.classification})
+    return {"project": name, "classification": body.classification}
+
+
+@app.get("/projects/{name}/ai/policy")
+def get_ai_policy(name: str, principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    with connect() as conn:
+        classification = ai_store.classification(conn, name)
+    return {"project": name, "classification": classification,
+            "external_model_eligible": classification in {"public", "internal"}}
+
+
+@app.post("/projects/{name}/ai/runs")
+def create_ai_run(name: str, body: AIRunRequest,
+                  principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    validate_name(name)
+    with connect() as conn:
+        if access_scope(conn, principal) is not None:
+            raise HTTPException(403, "AI runs require an authenticated human")
+        classification = ai_store.classification(conn, name)
+        if classification not in {"public", "internal"}:
+            raise HTTPException(403, "Project data is not approved for an external model")
+    try:
+        model = ai_model.configured_model()
+    except ai_model.ModelUnavailable:
+        raise HTTPException(503, "Eligible regional model is not configured") from None
+    with connect() as conn:
+        run_id = ai_store.create_run(conn, name, principal, body.kind, model.name)
+    try:
+        tools = ai_tools.make_tools(name, current_spec, connect)
+        outcome = ai_agent.run(body.kind, run_id, model, tools)
+    except Exception as exc:
+        log.error("AI run failed run_id=%s error_type=%s", run_id, type(exc).__name__)
+        outcome = {"state": "failed", "result": {"summary": "Investigation unavailable",
+                   "hypotheses": [], "gaps": ["Model or read tool failed"],
+                   "insufficient_evidence": True}, "evidence": [], "tool_calls": 0,
+                   "estimated_cost_usd": 0}
+    with connect() as conn:
+        ai_store.finish_run(conn, run_id, outcome["state"], outcome["result"],
+                            outcome["evidence"], outcome["tool_calls"], outcome["estimated_cost_usd"])
+    required_audit(actor_for(principal), "ai.run", "ai-run", str(run_id), outcome["state"],
+                   {"project": name}, {"kind": body.kind, "tool_calls": outcome["tool_calls"]})
+    return {"run_id": str(run_id), "project": name, **outcome}
+
+
+@app.get("/projects/{name}/ai/runs/{run_id}")
+def get_ai_run(name: str, run_id: UUID, principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    with connect() as conn:
+        row = ai_store.get_run(conn, name, run_id)
+    if row is None:
+        raise HTTPException(404, "Unknown project AI run")
+    return {"run_id": str(row[0]), "project": name, "kind": row[1], "state": row[2],
+            "model": row[3], "result": row[4], "evidence": row[5],
+            "tool_calls": row[6], "estimated_cost_usd": float(row[7]),
+            "created_at": row[8], "completed_at": row[9]}
+
+
+def _ai_proposal_view(name, row):
+    return {"proposal_id": str(row[0]), "project": name, "run_id": str(row[1]),
+            "base_revision": row[2], "target_revision": row[3], "diff": row[4],
+            "diff_sha256": row[5], "state": row[6], "created_at": row[7],
+            "approved_at": row[8], "expires_at": row[9],
+            "operation_id": str(row[10]) if row[10] else None,
+            "resulting_revision": row[11],
+            "rollback_plan": "If recovery fails, review the new revision and redeploy the retained base revision with If-Match.",
+            "operation_status_url": f"/v1/operations/{row[10]}" if row[10] else None}
+
+
+@app.post("/projects/{name}/ai/proposals")
+def create_ai_proposal(name: str, body: AIProposalRequest,
+                       principal: Principal = Depends(current_principal)):
+    require_permission(principal, "manage", name)
+    with connect() as conn:
+        if access_scope(conn, principal) is not None:
+            raise HTTPException(403, "A human project manager is required")
+        if ai_store.classification(conn, name) not in {"public", "internal"}:
+            raise HTTPException(403, "Project is not eligible for AI proposals")
+        current = current_spec(name)
+        if current is None or current[0] is None:
+            raise HTTPException(409, "Project has no retained deployment")
+        try:
+            proposal_id, diff, digest = ai_changes.create(conn, name, body.run_id, current[0])
+        except ai_changes.ProposalUnavailable as exc:
+            raise HTTPException(409, str(exc)) from None
+    required_audit(actor_for(principal), "ai.proposal.create", "ai-proposal", str(proposal_id),
+                   "succeeded", {"project": name}, {"base_revision": diff["base_revision"],
+                   "target_revision": diff["target_revision"]})
+    return {"proposal_id": str(proposal_id), "diff": diff, "diff_sha256": digest,
+            "rollback_plan": "If recovery fails, review the new revision and redeploy the retained base revision with If-Match."}
+
+
+@app.get("/projects/{name}/ai/proposals/{proposal_id}")
+def get_ai_proposal(name: str, proposal_id: UUID,
+                    principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    with connect() as conn:
+        row = ai_changes.get(conn, name, proposal_id)
+    if row is None:
+        raise HTTPException(404, "Unknown project proposal")
+    result = _ai_proposal_view(name, row)
+    if row[10]:
+        operation = operation_status(row[10], principal)
+        result["observation"] = {"operation_state": operation["state"],
+                                 "readiness": operation["readiness"]}
+        current = current_spec(name)
+        components = current[1].get("components", []) if current and current[1] else []
+        monitored = next((c for c in components if c.get("metrics")), None)
+        if monitored:
+            try:
+                result["observation"]["metrics"] = application_metrics.observe(name, monitored["name"])
+            except Exception:
+                result["observation"]["metrics"] = {"state": "unavailable"}
+    return result
+
+
+@app.post("/projects/{name}/ai/proposals/{proposal_id}/approval")
+def approve_ai_proposal(name: str, proposal_id: UUID, body: AIApprovalRequest,
+                        principal: Principal = Depends(current_principal)):
+    require_permission(principal, "manage", name)
+    with connect() as conn:
+        if access_scope(conn, principal) is not None:
+            raise HTTPException(403, "Automation cannot approve proposals")
+        try:
+            with conn.transaction():
+                ai_changes.approve(conn, name, proposal_id, body.diff_sha256, principal)
+        except ai_changes.ProposalUnavailable as exc:
+            required_audit(actor_for(principal), "ai.proposal.approve", "ai-proposal", str(proposal_id),
+                           "rejected", {"project": name}, {"reason": "invalid_proposal_or_diff"})
+            raise HTTPException(409, str(exc)) from None
+    required_audit(actor_for(principal), "ai.proposal.approve", "ai-proposal", str(proposal_id),
+                   "succeeded", {"project": name}, {"diff_sha256": body.diff_sha256})
+    return get_ai_proposal(name, proposal_id, principal)
+
+
+@app.post("/projects/{name}/ai/proposals/{proposal_id}/execute")
+def execute_ai_proposal(name: str, proposal_id: UUID, body: AIApprovalRequest,
+                        principal: Principal = Depends(current_principal)):
+    require_permission(principal, "manage", name)
+    with connect() as conn:
+        if access_scope(conn, principal) is not None:
+            raise HTTPException(403, "Automation cannot execute an AI proposal")
+        try:
+            with conn.transaction():
+                if not is_allowed(conn, principal, "manage", name):
+                    raise HTTPException(403, "Project manager permission is required")
+                row = ai_changes.approved_for_execution(conn, name, proposal_id, body.diff_sha256)
+                operation_id, state, revision = queue_deploy(
+                    conn, principal, name, None, row[2], target=row[3])
+                ai_changes.consume(conn, name, proposal_id, operation_id, revision)
+        except (ai_changes.ProposalUnavailable, RevisionConflict, RevisionNotFound, ProjectRetired) as exc:
+            required_audit(actor_for(principal), "ai.proposal.execute", "ai-proposal", str(proposal_id),
+                           "rejected", {"project": name}, {"reason": type(exc).__name__})
+            raise HTTPException(409, "Approval expired, changed, used or revision is stale") from None
+    required_audit(actor_for(principal), "ai.proposal.execute", "ai-proposal", str(proposal_id),
+                   "succeeded", {"project": name}, {"operation_id": str(operation_id),
+                   "revision": revision, "state": state})
+    return {"proposal_id": str(proposal_id), "operation_id": str(operation_id),
+            "state": state, "revision": revision,
+            "operation_status_url": f"/v1/operations/{operation_id}"}
 
 
 @app.get("/projects/{name}/components")
@@ -2181,6 +2378,9 @@ def drop_project_database_and_role(conn, name: str) -> None:
 
 def delete_project_catalog(conn, name: str) -> None:
     """Delete the complete project-owned catalog in foreign-key order."""
+    conn.execute("DELETE FROM ai_change_proposals WHERE project=%s", (name,))
+    conn.execute("DELETE FROM ai_runs WHERE project=%s", (name,))
+    conn.execute("DELETE FROM ai_project_policies WHERE project=%s", (name,))
     conn.execute("DELETE FROM hosted_access_idempotency WHERE project=%s", (name,))
     conn.execute("""DELETE FROM hosted_access_operations WHERE resource_id IN (
         SELECT id FROM hosted_access_resources WHERE project=%s)""", (name,))

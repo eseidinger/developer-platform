@@ -1,0 +1,55 @@
+"""Durable, project-scoped AI status and data-classification policy."""
+
+from uuid import uuid4
+from psycopg.types.json import Jsonb
+
+CLASSES = {"public", "internal", "confidential", "restricted"}
+
+
+def initialize(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS ai_project_policies (
+        project TEXT PRIMARY KEY REFERENCES projects(name) ON DELETE RESTRICT,
+        classification TEXT NOT NULL CHECK (classification IN ('public','internal','confidential','restricted')),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS ai_runs (
+        run_id UUID PRIMARY KEY, project TEXT NOT NULL REFERENCES projects(name),
+        requester_issuer TEXT NOT NULL, requester_subject TEXT NOT NULL,
+        kind TEXT NOT NULL CHECK (kind IN ('explain_application','investigate_incident')),
+        state TEXT NOT NULL CHECK (state IN ('running','completed','abstained','failed')),
+        model TEXT, result JSONB, evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
+        tool_calls INTEGER NOT NULL DEFAULT 0, estimated_cost_usd NUMERIC(8,6) NOT NULL DEFAULT 0,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(), completed_at TIMESTAMPTZ)""")
+    conn.execute("CREATE INDEX IF NOT EXISTS ai_runs_project_created_idx ON ai_runs(project,created_at DESC)")
+
+
+def set_policy(conn, project: str, classification: str):
+    if classification not in CLASSES:
+        raise ValueError("Invalid AI data classification")
+    return conn.execute("""INSERT INTO ai_project_policies(project,classification) VALUES (%s,%s)
+        ON CONFLICT(project) DO UPDATE SET classification=excluded.classification,updated_at=now()
+        RETURNING classification""", (project, classification)).fetchone()
+
+
+def classification(conn, project: str) -> str | None:
+    row = conn.execute("SELECT classification FROM ai_project_policies WHERE project=%s", (project,)).fetchone()
+    return row[0] if row else None
+
+
+def create_run(conn, project, principal, kind, model):
+    run_id = uuid4()
+    conn.execute("""INSERT INTO ai_runs(run_id,project,requester_issuer,requester_subject,kind,state,model)
+        VALUES (%s,%s,%s,%s,%s,'running',%s)""",
+        (run_id, project, principal.issuer, principal.subject, kind, model))
+    return run_id
+
+
+def finish_run(conn, run_id, state, result, evidence, tool_calls, estimated_cost):
+    conn.execute("""UPDATE ai_runs SET state=%s,result=%s,evidence=%s,tool_calls=%s,
+        estimated_cost_usd=%s,completed_at=now() WHERE run_id=%s AND state='running'""",
+        (state, Jsonb(result), Jsonb(evidence), tool_calls, estimated_cost, run_id))
+
+
+def get_run(conn, project, run_id):
+    return conn.execute("""SELECT run_id,kind,state,model,result,evidence,tool_calls,
+        estimated_cost_usd,created_at,completed_at FROM ai_runs
+        WHERE project=%s AND run_id=%s""", (project, run_id)).fetchone()

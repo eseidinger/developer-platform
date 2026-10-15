@@ -1,7 +1,24 @@
 # Phase 5 – AI for Operations and Development
 
-Status: planned. Product focus and technical design are accepted; implementation
-and acceptance evidence remain open. Covers [F-11 and F-12](../../../product/requirements.md).
+Status: source implementation in progress. Read-only investigations and a narrow
+rollback approval workflow are implemented; deployed acceptance evidence and the
+full evaluation corpus remain open. Covers [F-11 and F-12](../../../product/requirements.md).
+
+The source implementation uses LangChain `ChatOpenAI` through the EU API endpoint
+with Responses API `store=false`, a project-bound tool set, and durable run records.
+External calls fail closed until the API key and explicit EU project, processing,
+and Modified Retention amendment verification flags are set. OpenAI's current
+[data controls](https://developers.openai.com/api/docs/guides/your-data) require
+those controls for EU regional processing; the previously accepted default abuse
+monitoring retention needs a policy decision before activation.
+
+The initial write path proposes only rollback from a failed latest deployment to
+a retained, previously successful revision. Its reviewable diff lists changed
+top-level paths without values. A human project administrator approves the exact
+hash for 15 minutes; execution checks current authority, hash, expiry, and base
+revision under transaction and queues the existing rollback operation. The
+proposal view links the operation and reports readiness plus available application
+metrics. Additional fix types and a live recovery demonstration remain open.
 
 Entry requires demonstrated scoped telemetry, revision recovery, secret redaction and audit from the [delivery gates](../README.md#backlog-delivery-commitments), plus the Phase 4 [tracing and dashboard](phase-4-tracing-and-dashboards.md) evidence. Link those results before enabling tools; AI interfaces do not close missing API-level story criteria.
 
