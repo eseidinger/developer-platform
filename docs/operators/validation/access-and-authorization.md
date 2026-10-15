@@ -124,11 +124,21 @@ The installation record identified source `b3acaef1e413e698d772c218dc336da8d5568
 the deployed fixes came from a working tree, so this string does not attest an
 exact committed source tree.
 
+**Follow-up, October 15, 2026:** A fresh deployment recorded clean source
+revision `9826de70829b47f18b8c8018c9348fc81dcb8c43` at 19:14:21 UTC;
+the API `/readyz` returned `ready`. The owner completed retirement of both
+fixture projects. A read-only catalog check confirmed both statuses are
+`retired`, and PostgreSQL still contains their two retained databases. Project
+B first returned `202 retiring` while its namespace was being deleted; after
+the namespace disappeared, the confirmed request completed retirement. The
+automated and manual access checks above preceded this clean deployment and
+were not repeated against it.
+
 The external-path probe from the controller could not connect to bastion port
 2222, consistent with its loopback listener, but a full remote firewall review
 remains deferred. Browser storage and independent log, screenshot, and evidence
-redaction review remain deferred too. The retained fixture projects still
-need owner-reviewed retirement. This record does not close PLAN-008 or the
+redaction review remain deferred too. The retired fixture databases remain
+retained under the normal data-retention policy. This record does not close PLAN-008 or the
 Phase 3A.7 gate; see [EV-47](../../maintainers/delivery/backlog.md#verification-register).
 
 ## Neutral hosted-application acceptance harness
