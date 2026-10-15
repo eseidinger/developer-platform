@@ -628,7 +628,7 @@ The report explicitly leaves these nine checks deferred:
 - `external-use-case-suite`
 
 The held-machine-token expiry check is no longer deferred for this run.
-PLAN-009, PLAN-018, PLAN-019, F-10 and the Phase 3 gate remain open; component
+PLAN-009, PLAN-018, PLAN-019, F-10 and the Phase 7 gate remain open; component
 monitoring/centralized log retention also remains PLAN-017 work. Recovery
 reconciliation, even when subsequently exercised, is not a real backup restore.
 Concrete energy declarations, governance records, domain authorization, and
@@ -729,7 +729,7 @@ deletion do not. This run does not query retained logs after workload restart or
 cleanup, exercise collector/backend outages, or verify alert delivery.
 Record post-retirement/restart readback and a seven-day retention-boundary drill
 with collector/backend health, collection gaps and compactor delay before
-closing PLAN-017. PLAN-009, PLAN-018, PLAN-019, F-10 and Phase 3 remain open;
+closing PLAN-017. PLAN-009, PLAN-018, PLAN-019, F-10 and Phase 7 remain open;
 the externally owned energy suite and configuration contract are unchanged.
 
 ## Executed local validation — October 2, 2026

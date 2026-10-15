@@ -49,4 +49,4 @@ Prove `viewer` cannot mutate, `developer` cannot retire projects or manage grant
 
 Source now contains the provider-neutral JWT verifier, platform-owned grant tables and checks, Keycloak 26.4.1 reference Compose profile, one-time bootstrap grant, and redacted audit hooks. Record the exact deployed provider version, realm/client configuration, redirect URIs, key-rotation behavior, backup coverage and controlled lab acceptance evidence before closing Phase 1B. This source update does not complete OPS-001, OPS-002 or OPS-004.
 
-Details: [Security](../../maintainers/delivery/history/security-design.md), [Phase 3](../../maintainers/delivery/plans/phase-3-developer-experience.md).
+Details: [Security](../../maintainers/delivery/history/security-design.md), [Phase 3](../../maintainers/delivery/history/phase-3-developer-experience.md).

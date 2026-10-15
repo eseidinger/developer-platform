@@ -22,4 +22,4 @@ A shared hostname can avoid browser-origin issues even with separate deployments
 
 For the first template, verify static assets, deep links, API routing, health, and combined rollback. Define a versioned contract and compatibility rules before introducing multi-component support.
 
-Details: [ApplicationSpec](../application-contract.md), [Phase 3](../../maintainers/delivery/plans/phase-3-developer-experience.md).
+Details: [ApplicationSpec](../application-contract.md), [Phase 3](../../maintainers/delivery/history/phase-3-developer-experience.md).

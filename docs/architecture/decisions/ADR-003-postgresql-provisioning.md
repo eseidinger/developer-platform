@@ -33,4 +33,4 @@ Retention is the default deletion behavior; permanent data deletion is a separat
 
 Verify isolation between two projects, separate runtime/human logins, rotation, database creation with retries, and restore including roles.
 
-Details: [ApplicationSpec](../application-contract.md), [Backup and recovery](../../operators/backup-and-recovery.md), [Phase 3](../../maintainers/delivery/plans/phase-3-developer-experience.md).
+Details: [ApplicationSpec](../application-contract.md), [Backup and recovery](../../operators/backup-and-recovery.md), [Phase 3](../../maintainers/delivery/history/phase-3-developer-experience.md).

@@ -6,7 +6,6 @@ Only unfinished, owned implementation plans belong here:
 
 - [Energy-system use-case enablement priority](energy-system-integration.md)
 - [Generic use-case enablement increment](use-case-enablement-increment.md)
-- [Phase 3 developer experience](phase-3-developer-experience.md)
 - [Phase 4 tracing and Grafana dashboards](phase-4-tracing-and-dashboards.md)
 - [Phase 5 AI operations](phase-5-ai-operations.md)
 - [CLI implementation and complete project administration](cli.md)

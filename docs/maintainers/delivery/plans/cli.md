@@ -12,7 +12,7 @@ Platform API used by the portal. It follows the identity boundary in
 [ADR-004](../../../architecture/decisions/ADR-004-identity-and-access-management.md), the
 technology-independent contract principle in
 [ADR-001](../../../architecture/decisions/ADR-001-platform-api-abstraction.md), and the Phase 3
-outcome in [Developer Experience and Access](phase-3-developer-experience.md).
+outcome in [Developer Experience and Access](../history/phase-3-developer-experience.md).
 
 ## Outcome and scope
 
@@ -620,7 +620,7 @@ read-only commands or fails clearly.
 
 ## Completion criteria
 
-The CLI is complete when the Phase 3 create/deploy/observe/diagnose/recover/retire
+The CLI's full acceptance remains in Phase 7 until the create/deploy/observe/diagnose/recover/retire
 journey is reproducible against the deployed Platform API; human and automation
 authentication remain separate; machine-readable output and exit codes are tested;
 the role/denial matrix passes through direct CLI commands; secrets are absent from

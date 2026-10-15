@@ -31,7 +31,7 @@ work package. CLI delivery, the hosted web/PostgreSQL application template, and
 human database tunneling remain separate Phase 3 work packages.
 
 Entry into full acceptance remains gated by the Phase 2 API gates described in
-[Phase 3](phase-3-developer-experience.md). UI foundation work can proceed against
+[Phase 3](../history/phase-3-developer-experience.md). UI foundation work can proceed against
 the committed OpenAPI document and deterministic test fixtures before those gates
 close.
 
@@ -328,8 +328,8 @@ closes this increment for lab sequencing without those checks; see the
 - Exercise rollback to the previous UI artifact and verify that `/portal/*` fallback
   cannot hide 404, 401, 403, 409, 422, 429, or 5xx API responses.
 
-Gate: the complete Phase 3 portal journey and operator smoke journey pass against a
-deployed, version-compatible Platform API, with accessibility and rollback evidence.
+The complete deployed portal journey and operator smoke journey, with accessibility
+and rollback evidence, remain Phase 7 acceptance outcomes.
 
 ## Query and mutation rules
 
@@ -363,7 +363,7 @@ deployed, version-compatible Platform API, with accessibility and rollback evide
 
 ## Completion criteria
 
-The UI is complete when the Phase 3 acceptance journey runs reproducibly against the
+The UI's full acceptance remains in Phase 7 until the journey runs reproducibly against the
 deployed Platform API; every UI action maps to a public API contract; the documented
 persona matrix passes allowed and denied cases; failure diagnosis works without
 Grafana or cluster access; accessibility and secret-handling checks pass; and the
