@@ -1,7 +1,8 @@
 # Phase 4 — Tracing and Grafana Dashboards
 
-Status: planned. Platform and application tracing, application metrics collection,
-and provisioned dashboards are not implemented. This
+Status: source implementation in progress; deployed acceptance remains open.
+Platform and application tracing, application metrics, and dashboards have
+source paths that still require fixture validation and operational evidence. This
 phase follows the usable Phase 3 source capabilities and precedes AI operations
 in [Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
 Alloy, and operator-only Grafana. Full PLAN-017 monitoring acceptance remains

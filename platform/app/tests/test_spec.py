@@ -113,9 +113,9 @@ class EnvelopeContract(unittest.TestCase):
                         {"port": "http", "path": "/metrics?secret=x"}):
             with self.subTest(metrics=metrics), self.assertRaises(ValueError):
                 spec.to_flat({**body, "spec": {"components": [{**component, "telemetry": {"metrics": metrics}}]}})
-        with self.assertRaises(ValueError):
-            spec.to_flat({**body, "spec": {"components": [{**component,
-                "telemetry": {"tracing": {"enabled": True}}}]}})
+        traced = spec.to_flat({**body, "spec": {"components": [{**component,
+            "telemetry": {"tracing": {"enabled": True}}}]}})
+        self.assertEqual(traced["components"][0]["tracing"], {"enabled": True})
 
     def test_v1alpha2_rejects_invalid_schedule(self):
         body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"},

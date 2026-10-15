@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from app.egress import resolve
+from app.egress import resolve, validate
 
 
 class DnsEgressTests(unittest.TestCase):
@@ -27,6 +27,12 @@ class DnsEgressTests(unittest.TestCase):
             resolved = resolve({"dns": "Api.Example.Test.", "port": 443})
         self.assertEqual(resolved, {"dns": "api.example.test", "port": 443,
                                     "resolved_cidrs": ["203.0.113.8/32", "203.0.113.9/32"]})
+
+    def test_platform_network_cannot_be_reached_with_a_general_egress_declaration(self):
+        os.environ["ALLOWED_EGRESS_CIDRS"] = "0.0.0.0/0"
+        os.environ["ALLOWED_EGRESS_PORTS"] = "4318"
+        with self.assertRaisesRegex(ValueError, "private platform network"):
+            validate({"cidr": "172.30.80.14/32", "port": 4318})
 
     def test_rejects_unapproved_dns_answer_or_unresolvable_name(self):
         with patch("app.egress.socket.getaddrinfo", return_value=[

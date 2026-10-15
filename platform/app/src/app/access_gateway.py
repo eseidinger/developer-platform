@@ -24,6 +24,7 @@ from .access_contract import PolicyCreate, canonical_path, match_route
 from .access_provider import audience
 from .access_runtime import browser_name
 from .access_tokens import TokenVerifier
+from . import tracing
 
 
 SESSION = "__Host-platform-activity"
@@ -93,7 +94,8 @@ def upstream_headers(raw_headers, identity, claims, groups, attributes):
     for raw_name, value in raw_headers:
         name = raw_name.decode("latin1").lower()
         if name in HOP_HEADERS | connections | {"authorization", "host", "content-length", "forwarded",
-                "x-original-url", "x-rewrite-url", "x-http-method-override", "x-method-override"} \
+                "x-original-url", "x-rewrite-url", "x-http-method-override", "x-method-override",
+                "traceparent", "tracestate", "baggage"} \
                 or name.startswith(("x-platform-", "x-auth-", "x-forwarded-")):
             continue
         if name == "cookie":
@@ -176,6 +178,7 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
     @asynccontextmanager
     async def lifespan(application):
         nonlocal transport, background
+        tracing.configure()
         if min(len(internal_key), len(session_key)) < 32:
             raise RuntimeError("Application boundary keys are required")
         owned = transport is None
@@ -189,8 +192,18 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
                 await background
             if owned:
                 await transport.aclose()
+            tracing.shutdown()
 
     gateway = FastAPI(title="Hosted application access boundary", lifespan=lifespan, docs_url=None, openapi_url=None)
+
+    @gateway.middleware("http")
+    async def trace_boundary(request, call_next):
+        with tracing.span("platform.http") as active:
+            response = await call_next(request)
+            active.set_attribute("http.route", request.scope.get("route").path if request.scope.get("route") else "unmatched")
+            active.set_attribute("http.request.method", request.method)
+            active.set_attribute("http.response.status_code", response.status_code)
+            return response
     gateway.state.snapshot = snapshot
     gateway.state.refresh = refresh
     gateway.state.verifiers = verifiers
@@ -335,6 +348,8 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
                 result.raw_headers.append((b"set-cookie", value.encode("latin1")))
             return result
         headers = upstream_headers(request.headers.raw, identity, claims, groups, policy["spec"]["identityAttributes"])
+        if tracing.propagation_traceparent():
+            headers.append(("traceparent", tracing.propagation_traceparent()))
         url = policy["spec"]["backend"] + raw_path + ("?" + request.url.query if request.url.query else "")
         upstream = await transport.send(transport.build_request(request.method, url, headers=headers, content=request.stream()), stream=True)
         async def body():
@@ -351,6 +366,8 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
                 result.raw_headers.append((name.encode("latin1"), value.encode("latin1")))
         if state:
             attach_session(result, state, session_key)
+        if tracing.trace_id():
+            result.headers["X-Platform-Trace-Id"] = tracing.trace_id()
         for value in cookies:
             result.raw_headers.append((b"set-cookie", value.encode("latin1")))
         statistics["allowed"] += 1

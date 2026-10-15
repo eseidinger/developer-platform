@@ -1665,7 +1665,6 @@
         "additionalProperties": false,
         "properties": {
           "enabled": {
-            "const": false,
             "default": false,
             "title": "Enabled",
             "type": "boolean"
@@ -4561,6 +4560,57 @@
           }
         ],
         "summary": "Revert Secret Rotation"
+      }
+    },
+    "/projects/{name}/traces/{trace_id}": {
+      "get": {
+        "operationId": "project_trace_projects__name__traces__trace_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Project Trace"
       }
     },
     "/readyz": {

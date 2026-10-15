@@ -29,6 +29,9 @@ def validate(destination: dict) -> dict:
     except ValueError as exc:
         raise ValueError("outbound cidr must be a valid CIDR") from exc
     port = destination["port"]
+    platform_network = ipaddress.ip_network(os.environ.get("PLATFORM_SUBNET", "172.30.80.0/24"))
+    if network.version == platform_network.version and network.overlaps(platform_network):
+        raise ValueError("outbound destination overlaps the private platform network")
     if not any(network.version == allowed.version and network.subnet_of(allowed) for allowed in _cidrs()) or port not in _ports():
         raise ValueError("outbound destination is not allowed by operator policy")
     return {"cidr": str(network), "port": port}

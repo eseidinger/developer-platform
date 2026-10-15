@@ -120,6 +120,9 @@ def shared_manifests(image, api_ip, identity_ip, internal_key, session_key):
                 "containers": [{"name": "authorizer", "image": image, "imagePullPolicy": "IfNotPresent",
                     "ports": [{"containerPort": 8080}],
                     "env": [{"name": "APPLICATION_ACCESS_API", "value": "http://" + api_ip + ":8000"},
+                            {"name": "PLATFORM_OTLP_ENDPOINT", "value": "http://alloy:4318/v1/traces"},
+                            {"name": "PLATFORM_TRACE_SERVICE_NAME", "value": "application-access-boundary"},
+                            {"name": "PLATFORM_TRACE_SAMPLE_RATE", "value": os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "0.1")},
                             {"name": "APPLICATION_ACCESS_REPLICA", "valueFrom": {"fieldRef": {"fieldPath": "metadata.uid"}}}],
                     "envFrom": [{"secretRef": {"name": "authorizer"}}],
                     "securityContext": {"allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,
@@ -137,5 +140,6 @@ def shared_manifests(image, api_ip, identity_ip, internal_key, session_key):
                 {"to": [{"ipBlock": {"cidr": identity_ip + "/32"}}], "ports": [{"port": 8080}]}]}),
         obj("NetworkPolicy", "authorizer-egress", "networking.k8s.io/v1", spec={"podSelector": {"matchLabels": AUTHORIZER_LABELS},
             "policyTypes": ["Egress"], "egress": [{"to": [{"ipBlock": {"cidr": api_ip + "/32"}}], "ports": [{"port": 8000}]},
+                {"to": [{"ipBlock": {"cidr": os.environ.get("ALLOY_IP", "172.30.80.14") + "/32"}}], "ports": [{"port": 4318}]},
                 {"to": [{"namespaceSelector": {"matchLabels": {"platform.example/managed": "true"}}}]},
                 {"to": [{"podSelector": {"matchLabels": {"platform.example/access-role": "browser-proxy"}}}], "ports": [{"port": 4180}]}]})]

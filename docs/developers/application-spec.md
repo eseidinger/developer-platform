@@ -19,8 +19,9 @@ developer terms. All examples are JSON because the current CLI accepts JSON inpu
 
 Service components may opt in to private Prometheus collection with
 `telemetry.metrics`. See the [application contract](../architecture/application-contract.md#application-metrics-declaration-phase-4-implementation-in-progress).
-Opt-in [application tracing](../architecture/application-contract.md#planned-application-tracing-capability-phase-4)
-is also planned for Phase 4; the current schema has no tracing field.
+Service and scheduled components may opt in to [application tracing](../architecture/application-contract.md#application-tracing-declaration-phase-4-implementation-in-progress)
+with `telemetry.tracing.enabled: true`. The [tracing guide](application-tracing.md)
+explains exporter authentication and framework setup.
 
 ## Rules that apply to every request
 
@@ -143,6 +144,7 @@ approved it.
 | `health.readiness` | No | Exactly one of `profile` or `path`. `profile` is `status` or `hello-world` and retains the TCP readiness probe on the first declared port. `path` configures an HTTP GET readiness probe; it must begin with `/` and uses the first declared port unless `port` matches another declared port number. |
 | `outbound` | No | Up to five `{ "cidr": "…", "port": N }` or `{ "dns": "api.example.com", "port": N }` destinations. CIDRs, and every IP address currently resolved for DNS destinations, must be in the operator allow-list. DNS rules are resolved to fixed NetworkPolicy IP rules when the deployment is applied; reapply when the destination address changes. |
 | `telemetry.metrics` | No | `{ "port": "http", "path": "/metrics" }`, where `port` names a declared HTTP service port and `path` is at most 128 characters with no query string. Collection uses a private Kubernetes service proxy and keeps only supported HTTP request series. |
+| `telemetry.tracing.enabled` | No | Boolean, default `false`. `true` projects a short-lived Pod-bound token and supplies the private OTLP endpoint. |
 
 For Spring Boot, add Actuator and the Prometheus Micrometer registry, expose
 `/actuator/prometheus` on a declared service port, and use that path in the
@@ -195,6 +197,7 @@ hosted protection.
 | `retryLimit` | No | Integer 0–10; default `6`. Kubernetes retries a failed Job with exponential backoff. This does not establish dependency ordering. |
 | `maxRunSeconds` | No | Integer 60–86400. Stops a Job that exceeds this duration. |
 | `outbound` | No | Same CIDR or DNS TCP egress declaration supported by service components. |
+| `telemetry.tracing.enabled` | No | Boolean, default `false`; scheduled jobs start independently sampled traces. |
 
 Scheduled components do not accept `ports`, `replicas`, `exposure`, or `health`.
 

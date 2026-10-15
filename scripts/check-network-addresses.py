@@ -14,6 +14,8 @@ FIXED_SERVICES = {
     "postgres": ("POSTGRES_IP", "172.30.80.10"),
     "platform-api": ("PLATFORM_API_IP", "172.30.80.11"),
     "keycloak": ("KEYCLOAK_IP", "172.30.80.12"),
+    "telemetry-gateway": ("TELEMETRY_GATEWAY_IP", "172.30.80.13"),
+    "alloy": ("ALLOY_IP", "172.30.80.14"),
 }
 
 
@@ -25,7 +27,7 @@ def addresses(config):
     except ValueError:
         raise ValueError("PLATFORM_SUBNET and fixed service addresses must be valid IPv4 values.") from None
     if len(set(result.values())) != len(result):
-        raise ValueError("POSTGRES_IP, PLATFORM_API_IP and KEYCLOAK_IP must be distinct.")
+        raise ValueError("Fixed service IP addresses must be distinct.")
     for service, address in result.items():
         if address not in subnet or address in (subnet.network_address, subnet.broadcast_address):
             raise ValueError(f"The fixed address for {service} must be a usable address in PLATFORM_SUBNET.")

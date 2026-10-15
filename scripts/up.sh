@@ -51,6 +51,7 @@ kubectl apply -f infrastructure/kubernetes/controller.yaml
 kubectl apply -f infrastructure/kubernetes/metrics.yaml
 kubectl apply -f infrastructure/kubernetes/log-reader.yaml
 kubectl apply -f infrastructure/kubernetes/metrics-reader.yaml
+kubectl apply -f infrastructure/kubernetes/telemetry-reviewer.yaml
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret provisioner-token -o json > .runtime/token.json
   if python3 scripts/kubeconfig.py; then break; fi
@@ -79,6 +80,14 @@ test -s .runtime/metrics-reader.token
 test -s .runtime/metrics-reader-ca.crt
 chmod 644 .runtime/metrics-reader.token .runtime/metrics-reader-ca.crt
 rm -f .runtime/metrics-reader-token.json
+for attempt in $(seq 1 30); do
+  kubectl -n platform-system get secret telemetry-reviewer-token -o json > .runtime/telemetry-reviewer-token.json
+  if python3 scripts/kubeconfig.py --telemetry-reviewer; then break; fi
+  sleep 2
+done
+test -s .runtime/telemetry-reviewer.kubeconfig
+chmod 644 .runtime/telemetry-reviewer.kubeconfig
+rm -f .runtime/telemetry-reviewer-token.json
 # Claim the fixed identity/API addresses before monitoring and edge containers
 # can receive them from Docker's dynamic allocator. This starts only the API's
 # required dependencies (PostgreSQL and the two identity initializers).

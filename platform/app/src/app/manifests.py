@@ -1,5 +1,6 @@
 """Runtime-independent Kubernetes workload contract."""
 import ipaddress
+import os
 import re
 
 from .config import env_list
@@ -158,6 +159,19 @@ def component_resources(name, components, database_ip, password, configuration=N
             container["command"] = component["command"]
         if component.get("args") is not None:
             container["args"] = component["args"]
+        tracing_enabled = bool(component.get("tracing", {}).get("enabled"))
+        if tracing_enabled:
+            gateway_ip = str(ipaddress.IPv4Address(os.environ.get("TELEMETRY_GATEWAY_IP", "172.30.80.13")))
+            container.setdefault("env", []).extend([
+                {"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://" + gateway_ip + ":4318"},
+                {"name": "OTEL_EXPORTER_OTLP_PROTOCOL", "value": "http/protobuf"},
+                {"name": "OTEL_SERVICE_NAME", "value": name + "." + component["name"]},
+                {"name": "OTEL_TRACES_SAMPLER", "value": "parentbased_traceidratio"},
+                {"name": "OTEL_TRACES_SAMPLER_ARG", "value": os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "0.1")},
+                {"name": "PLATFORM_TELEMETRY_TOKEN_FILE", "value": "/var/run/platform-telemetry/token"},
+            ])
+            container["volumeMounts"].append({"name": "telemetry-token", "mountPath": "/var/run/platform-telemetry",
+                                              "readOnly": True})
         if component["type"] == "service":
             ports = component.get("ports") or []
             if ports:
@@ -176,6 +190,11 @@ def component_resources(name, components, database_ip, password, configuration=N
                     "runAsGroup": 10001, "fsGroup": 10001,
                     "seccompProfile": {"type": "RuntimeDefault"}},
                 "containers": [container], "volumes": [{"name": "tmp", "emptyDir": {"sizeLimit": "64Mi"}}]}
+        if tracing_enabled:
+            spec["serviceAccountName"] = "telemetry-" + component["name"]
+            spec["volumes"].append({"name": "telemetry-token", "projected": {"sources": [{
+                "serviceAccountToken": {"path": "token", "audience": "platform-telemetry",
+                                        "expirationSeconds": 600}}]}})
         if restart_policy:
             spec["restartPolicy"] = restart_policy
         return spec
@@ -207,6 +226,13 @@ def component_resources(name, components, database_ip, password, configuration=N
                  "ports": [{"protocol": "TCP", "port": 5432}]}]})]
     for component in components:
         component_labels = {"app.kubernetes.io/name": name, "platform.example/component": component["name"]}
+        if component.get("tracing", {}).get("enabled"):
+            manifests.append(obj("v1", "ServiceAccount", "telemetry-" + component["name"],
+                                 automountServiceAccountToken=False))
+            manifests.append(obj("networking.k8s.io/v1", "NetworkPolicy", component["name"] + "-telemetry",
+                spec={"podSelector": {"matchLabels": component_labels}, "policyTypes": ["Egress"],
+                      "egress": [{"to": [{"ipBlock": {"cidr": os.environ.get("TELEMETRY_GATEWAY_IP", "172.30.80.13") + "/32"}}],
+                                  "ports": [{"protocol": "TCP", "port": 4318}]}]}))
         if component["type"] == "service":
             deployment = obj("apps/v1", "Deployment", component["name"], spec={
                 "replicas": component.get("replicas", 1), "progressDeadlineSeconds": 120,

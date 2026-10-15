@@ -139,7 +139,7 @@ otelcol.processor.transform "platform_safe" {
   trace_statements {
     context = "resource"
     statements = [
-      `keep_keys(attributes, ["service.name"])`,
+      `keep_keys(attributes, ["service.name", "platform.project", "platform.application", "platform.component"])`,
       `truncate_all(attributes, 128)`,
     ]
   }
@@ -148,7 +148,7 @@ otelcol.processor.transform "platform_safe" {
     statements = [
       `keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type"])`,
       `truncate_all(attributes, 128)`,
-      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step"`,
+      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step" and name != "application.span"`,
       `set(status.message, "")`,
     ]
   }

@@ -73,7 +73,9 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - ../../.runtime/log-reader.kubeconfig:/run/alloy/log-reader.kubeconfig:ro
       - alloy:/var/lib/alloy
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${ALLOY_IP:-172.30.80.14}
     mem_limit: 512m
     read_only: true
     tmpfs: ["/tmp"]

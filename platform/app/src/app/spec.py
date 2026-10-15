@@ -186,7 +186,7 @@ class MetricsDeclaration(_Strict):
 
 
 class TracingDeclaration(_Strict):
-    enabled: Literal[False] = False
+    enabled: bool = False
 
 
 class ServiceTelemetry(_Strict):
@@ -305,6 +305,8 @@ CAPABILITIES = {
         "applicationMetrics": {"serviceOptIn": True, "prometheusFormat": True,
                                "port": "declared HTTP service port", "maxPathLength": 128,
                                "collection": "private Kubernetes service proxy"},
+        "applicationTracing": {"serviceOptIn": True, "scheduledOptIn": True,
+                               "protocol": "OTLP HTTP protobuf", "tokenAudience": "platform-telemetry"},
     }},
 }
 
@@ -376,6 +378,8 @@ def to_flat(body):
                     flat_component["max_run_seconds"] = component.maxRunSeconds
             if component.outbound:
                 flat_component["outbound"] = [destination.model_dump(exclude_none=True) for destination in component.outbound]
+            if component.telemetry and component.telemetry.tracing and component.telemetry.tracing.enabled:
+                flat_component["tracing"] = {"enabled": True}
             components.append(flat_component)
         flat = {"name": envelope.metadata.name, "components": components}
         if envelope.spec.configuration is not None:

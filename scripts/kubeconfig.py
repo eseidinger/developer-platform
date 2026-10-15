@@ -4,10 +4,13 @@ import argparse
 from pathlib import Path
 parser = argparse.ArgumentParser()
 parser.add_argument("--log-reader", action="store_true")
+parser.add_argument("--telemetry-reviewer", action="store_true")
 args = parser.parse_args()
-account = "workload-log-reader" if args.log_reader else "provisioner"
-token_file = ".runtime/log-reader-token.json" if args.log_reader else ".runtime/token.json"
-output_file = ".runtime/log-reader.kubeconfig" if args.log_reader else ".runtime/controller.kubeconfig"
+account = "telemetry-reviewer" if args.telemetry_reviewer else ("workload-log-reader" if args.log_reader else "provisioner")
+token_file = (".runtime/telemetry-reviewer-token.json" if args.telemetry_reviewer else
+              (".runtime/log-reader-token.json" if args.log_reader else ".runtime/token.json"))
+output_file = (".runtime/telemetry-reviewer.kubeconfig" if args.telemetry_reviewer else
+               (".runtime/log-reader.kubeconfig" if args.log_reader else ".runtime/controller.kubeconfig"))
 secret = json.loads(Path(token_file).read_text())
 data = secret.get("data", {})
 if not data.get("token"):

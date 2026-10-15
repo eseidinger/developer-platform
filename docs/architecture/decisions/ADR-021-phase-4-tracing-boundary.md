@@ -1,7 +1,7 @@
 # ADR-021 – Phase 4 Tracing Boundary and Budget
 
-Created and accepted: October 15, 2026. Status: **Accepted design; no tracing
-runtime or application tracing contract is implemented yet**. The project owner
+Created and accepted: October 15, 2026. Status: **Accepted design; source
+implementation in progress, deployed acceptance pending**. The project owner
 delegated the Phase 4 implementation choices. Acceptance still requires the
 source, local, and deployed evidence in the
 [Phase 4 plan](../../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md).
@@ -9,7 +9,8 @@ source, local, and deployed evidence in the
 ## Context
 
 The lab has one host, a Compose monitoring stack outside k3d, project workloads
-inside k3d, operator-only Grafana, and no trace backend. Workload pods currently
+inside k3d and operator-only Grafana. The source adds a Tempo backend; deployed
+readback and limits still require acceptance. Workload pods currently
 disable automatic Kubernetes ServiceAccount token mounting and have default-deny
 egress. The accepted host reserve is at least 8 GiB RAM, 2 CPUs, and 50 GB disk
 unallocated to projects. Tracing must not open shared telemetry storage to

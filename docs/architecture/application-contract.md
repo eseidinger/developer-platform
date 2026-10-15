@@ -63,13 +63,13 @@ Operators may use the shared Prometheus/Grafana backends; project readers receiv
 only fixed project-scoped views through the Platform API. Missing or failed
 scrapes are explicit, not healthy zeros. See [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023).
 
-## Planned application tracing capability (Phase 4)
+## Application tracing declaration (Phase 4 implementation in progress)
 
 Service and scheduled components may opt in to a private OpenTelemetry trace
 export path with the additive `v1alpha2` field
-`spec.components[].telemetry.tracing.enabled: true`. This field is not accepted
-by the current API; the environment must advertise `applicationTracing` before
-it can be used.
+`spec.components[].telemetry.tracing.enabled: true`. The API accepts this
+additive field and advertises `applicationTracing`. Omission or `false` keeps
+tracing disabled.
 The platform supplies a private OTLP endpoint and verified project/application/
 component identity. A workload cannot choose its own project identity through
 span attributes, and a declaration cannot configure an arbitrary exporter URL

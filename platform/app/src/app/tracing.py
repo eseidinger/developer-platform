@@ -37,8 +37,11 @@ def configure() -> None:
         return
     if not endpoint.startswith("http://alloy:4318/"):
         raise ValueError("PLATFORM_OTLP_ENDPOINT must use the private Alloy endpoint")
+    service_name = os.environ.get("PLATFORM_TRACE_SERVICE_NAME", "platform-api")
+    if service_name not in {"platform-api", "application-access-boundary"}:
+        raise ValueError("Unknown platform trace service name")
     _provider = TracerProvider(
-        resource=Resource.create({"service.name": "platform-api"}),
+        resource=Resource.create({"service.name": service_name}),
         sampler=ParentBased(TraceIdRatioBased(rate)),
     )
     _provider.add_span_processor(BatchSpanProcessor(
@@ -70,6 +73,13 @@ def current_traceparent() -> str | None:
     if not context.is_valid or not context.trace_flags.sampled:
         return None
     return f"00-{context.trace_id:032x}-{context.span_id:016x}-01"
+
+
+def propagation_traceparent() -> str | None:
+    context = trace.get_current_span().get_span_context()
+    if not context.is_valid:
+        return None
+    return f"00-{context.trace_id:032x}-{context.span_id:016x}-{'01' if context.trace_flags.sampled else '00'}"
 
 
 def origin_link(value: str | None) -> list[Link]:

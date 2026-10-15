@@ -1,9 +1,10 @@
 # Platform trace bootstrap
 
 The platform API emits explicit, sampled spans to the private Alloy listener.
-Alloy removes unapproved resource and span attributes before forwarding to
-Tempo. The Grafana Tempo data source is operator-only. No hosted workload is
-authorized to send traces yet; that requires the workload identity gateway.
+Alloy removes unapproved platform span attributes before forwarding to Tempo.
+The Grafana Tempo data source is operator-only. Opted-in hosted workloads send
+to the dedicated private gateway; it checks a rotating Pod-bound token, the
+current Pod and catalog opt-in, then rewrites the batch to a small allowlist.
 
 On the lab host, prepare the dedicated four GiB filesystem before running
 `scripts/up.sh`:
@@ -35,5 +36,7 @@ docker run --rm -v "$PWD/infrastructure/monitoring/config.alloy:/etc/alloy/confi
 
 Before accepting deployed tracing, measure the 100% fixture rate, verify
 end-to-end readback and rejection behavior, resource cost, disk admission at
-three GiB, and actual 24-hour compaction. The disk image protects the host at
-four GiB; automatic admission stop at three GiB is still pending.
+three GiB, and actual 24-hour compaction. The gateway stops workload ingress
+at three GiB until usage falls below two GiB. The dedicated filesystem caps
+total trace data at four GiB. The platform API's own exporter bypasses the
+gateway and is still subject to Tempo's ingest limit and filesystem cap.

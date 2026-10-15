@@ -1,4 +1,32 @@
 services:
+  telemetry-gateway:
+    build: .
+    restart: unless-stopped
+    command: ["uvicorn", "app.telemetry_gateway:app", "--host", "0.0.0.0", "--port", "4318", "--no-access-log"]
+    environment:
+      POSTGRES_HOST: postgres
+      TELEMETRY_CATALOG_PASSWORD: ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
+      KUBECONFIG: /run/telemetry/kubeconfig
+    volumes:
+      - ../.runtime/telemetry-reviewer.kubeconfig:/run/telemetry/kubeconfig:ro
+      - /var/lib/developer-platform/tempo:/run/tempo:ro
+    networks:
+      platform:
+        ipv4_address: ${TELEMETRY_GATEWAY_IP:-172.30.80.13}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4318/healthz')"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
   platform-api:
     build: .
     restart: unless-stopped
@@ -6,6 +34,7 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
       DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
+      TELEMETRY_CATALOG_PASSWORD: ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
       DATABASE_BASTION_TOKEN: ${DATABASE_BASTION_TOKEN:?Run scripts/init.py}
       PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
       PLATFORM_AUDIT_READER_PASSWORD: ${PLATFORM_AUDIT_READER_PASSWORD:?Add the generated value from .env.example to .env}
@@ -21,6 +50,7 @@ services:
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
+      PLATFORM_SUBNET: ${PLATFORM_SUBNET:-172.30.80.0/24}
       IMAGE_REGISTRIES: ${IMAGE_REGISTRIES:-docker.io,ghcr.io,quay.io}
       DRIFT_SCAN_INTERVAL_SECONDS: ${DRIFT_SCAN_INTERVAL_SECONDS:-300}
       REVISION_RETENTION: ${REVISION_RETENTION:-25}
@@ -28,6 +58,7 @@ services:
       PROMETHEUS_URL: http://prometheus:9090
       PLATFORM_OTLP_ENDPOINT: http://alloy:4318/v1/traces
       PLATFORM_TRACE_SAMPLE_RATE: ${PLATFORM_TRACE_SAMPLE_RATE:-0.1}
+      TELEMETRY_GATEWAY_IP: ${TELEMETRY_GATEWAY_IP:-172.30.80.13}
       ALLOWED_EGRESS_CIDRS: ${ALLOWED_EGRESS_CIDRS:-}
       ALLOWED_EGRESS_PORTS: ${ALLOWED_EGRESS_PORTS:-}
       PROJECT_QUOTAS_JSON: "${PROJECT_QUOTAS_JSON:-{}}"

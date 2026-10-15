@@ -111,6 +111,8 @@ class AccessContractTests(unittest.TestCase):
     def test_unsigned_external_headers_and_tokens_do_not_reach_backend(self):
         raw = [(b"authorization", b"Bearer stolen"), (b"x-platform-principal-id", b"forged"),
                (b"x-auth-request-user", b"forged"), (b"x-forwarded-user", b"forged"),
+               (b"traceparent", b"00-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa-bbbbbbbbbbbbbbbb-01"),
+               (b"tracestate", b"vendor=untrusted"), (b"baggage", b"secret=value"),
                (b"cookie", b"__Host-platform-session=secret; app-theme=dark")]
         identity, groups = admitted_identity(data(), POLICY, claims(), "bearer-token")
         headers = dict(upstream_headers(raw, identity, claims(), groups, POLICY["spec"]["identityAttributes"]))
@@ -118,6 +120,9 @@ class AccessContractTests(unittest.TestCase):
         self.assertEqual(headers["cookie"], "app-theme=dark")
         self.assertNotIn("authorization", headers)
         self.assertNotIn("x-auth-request-user", headers)
+        self.assertNotIn("traceparent", headers)
+        self.assertNotIn("tracestate", headers)
+        self.assertNotIn("baggage", headers)
         self.assertNotIn("X-Platform-Principal-Email", headers)
 
     def test_session_idle_absolute_and_recovery_epoch(self):

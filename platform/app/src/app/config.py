@@ -7,7 +7,7 @@ from kubernetes.client.exceptions import ApiException
 MAX_VALUES = 50
 MAX_VALUE_LENGTH = 1024
 _NAME = re.compile(r"^[A-Za-z_][A-Za-z0-9_]{0,62}$")
-_RESERVED_PREFIXES = ("PG", "KUBERNETES_", "PLATFORM_")
+_RESERVED_PREFIXES = ("PG", "KUBERNETES_", "PLATFORM_", "OTEL_")
 _SECRET_LIKE = re.compile(r"PASS|SECRET|TOKEN|CREDENTIAL|PRIVATE|API_?KEY|AUTH", re.IGNORECASE)
 
 

@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: telemetry-reviewer
+  namespace: platform-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-telemetry-reviewer
+rules:
+  - apiGroups: [authentication.k8s.io]
+    resources: [tokenreviews]
+    verbs: [create]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-telemetry-reviewer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-telemetry-reviewer
+subjects:
+  - kind: ServiceAccount
+    name: telemetry-reviewer
+    namespace: platform-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: telemetry-reviewer-token
+  namespace: platform-system
+  annotations:
+    kubernetes.io/service-account.name: telemetry-reviewer
+type: kubernetes.io/service-account-token

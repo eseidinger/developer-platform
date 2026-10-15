@@ -115,6 +115,21 @@ class WorkloadContract(unittest.TestCase):
         binding = next(doc for doc in docs if doc["kind"] == "RoleBinding")
         self.assertEqual(binding["subjects"][0]["name"], "workload-metrics-reader")
 
+    def test_tracing_opt_in_projects_pod_bound_token_without_automatic_mount(self):
+        docs = component_resources("shop", [{"name": "api", "type": "service",
+            "resolved_image": "example/api:1", "ports": [{"name": "http", "port": 8080}],
+            "tracing": {"enabled": True}}], "172.30.80.10", "secret")
+        pod = next(doc for doc in docs if doc["kind"] == "Deployment")["spec"]["template"]["spec"]
+        self.assertFalse(pod["automountServiceAccountToken"])
+        self.assertEqual(pod["serviceAccountName"], "telemetry-api")
+        token = next(v for v in pod["volumes"] if v["name"] == "telemetry-token")
+        self.assertEqual(token["projected"]["sources"][0]["serviceAccountToken"]["audience"],
+                         "platform-telemetry")
+        self.assertEqual(token["projected"]["sources"][0]["serviceAccountToken"]["expirationSeconds"], 600)
+        policy = next(doc for doc in docs if doc["kind"] == "NetworkPolicy" and
+                      doc["metadata"]["name"] == "api-telemetry")
+        self.assertEqual(policy["spec"]["egress"][0]["ports"][0]["port"], 4318)
+
     def test_component_http_readiness_and_job_deadline(self):
         docs = component_resources("shop", [
             {"name": "web", "type": "service", "resolved_image": "registry/web@sha256:one",

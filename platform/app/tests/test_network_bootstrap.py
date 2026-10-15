@@ -29,6 +29,7 @@ class NetworkBootstrapTests(unittest.TestCase):
         subnet, fixed = network_addresses.addresses({
             "PLATFORM_SUBNET": "192.0.2.0/24", "POSTGRES_IP": "192.0.2.10",
             "PLATFORM_API_IP": "192.0.2.11", "KEYCLOAK_IP": "192.0.2.12",
+            "TELEMETRY_GATEWAY_IP": "192.0.2.13", "ALLOY_IP": "192.0.2.14",
         })
         self.assertEqual(subnet, ipaddress.IPv4Network("192.0.2.0/24"))
         self.assertEqual(str(fixed["postgres"]), "192.0.2.10")

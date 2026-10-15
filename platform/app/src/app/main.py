@@ -63,6 +63,8 @@ from .access_worker import loop as application_access_loop
 from . import human_database_access
 from . import tracing
 from . import application_metrics
+from . import telemetry_catalog
+from . import trace_read
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -99,6 +101,7 @@ async def lifespan(app):
             reason TEXT NOT NULL, status TEXT NOT NULL, requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             requested_by TEXT NOT NULL, reviewed_at TIMESTAMPTZ, reviewed_by TEXT)""")
         initialize_catalog(conn)
+        telemetry_catalog.initialize(conn)
         initialize_audit(conn)
         initialize_authorization(conn)
         initialize_deployment_credentials(conn)
@@ -1222,6 +1225,21 @@ def project_application_metrics(name: str, component: str = Query(min_length=1, 
         return {"project": name, "component": component, "state": "not_applied",
                 "reason": "DeploymentNotApplied"}
     return application_metrics.observe(name, component)
+
+
+@app.get("/projects/{name}/traces/{trace_id}")
+def project_trace(name: str, trace_id: str, principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    validate_name(name)
+    try:
+        result = trace_read.read(name, trace_id)
+    except ValueError:
+        raise HTTPException(422, "Invalid trace ID") from None
+    except trace_read.TraceUnavailable:
+        raise HTTPException(503, "Trace backend unavailable") from None
+    if result is None:
+        raise HTTPException(404, "No retained trace for this project")
+    return result
 
 
 @app.get("/projects/{name}/components")
