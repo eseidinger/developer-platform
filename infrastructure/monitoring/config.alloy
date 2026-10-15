@@ -114,3 +114,68 @@ loki.process "workloads" {
   }
   forward_to = [loki.write.local.receiver]
 }
+
+// Platform-owned spans only. Ingress accepts no metrics or logs. A separate
+// authenticated gateway is required before any workload may export spans.
+otelcol.receiver.otlp "platform" {
+  http {
+    endpoint = "0.0.0.0:4318"
+    max_request_body_size = "256KiB"
+  }
+  output {
+    traces = [otelcol.processor.memory_limiter.platform.input]
+  }
+}
+otelcol.processor.memory_limiter "platform" {
+  check_interval = "1s"
+  limit = "128MiB"
+  spike_limit = "32MiB"
+  output {
+    traces = [otelcol.processor.transform.platform_safe.input]
+  }
+}
+otelcol.processor.transform "platform_safe" {
+  error_mode = "propagate"
+  trace_statements {
+    context = "resource"
+    statements = [
+      `keep_keys(attributes, ["service.name"])`,
+      `truncate_all(attributes, 128)`,
+    ]
+  }
+  trace_statements {
+    context = "span"
+    statements = [
+      `keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type"])`,
+      `truncate_all(attributes, 128)`,
+      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step"`,
+      `set(status.message, "")`,
+    ]
+  }
+  output {
+    traces = [otelcol.processor.batch.platform.input]
+  }
+}
+otelcol.processor.batch "platform" {
+  send_batch_size = 128
+  timeout = "2s"
+  output {
+    traces = [otelcol.exporter.otlphttp.tempo.input]
+  }
+}
+otelcol.exporter.otlphttp "tempo" {
+  client {
+    endpoint = "http://tempo:4318"
+    timeout = "2s"
+  }
+  sending_queue {
+    enabled = true
+    queue_size = 32
+    num_consumers = 2
+    block_on_overflow = false
+  }
+  retry_on_failure {
+    enabled = true
+    max_elapsed_time = "30s"
+  }
+}

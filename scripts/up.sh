@@ -6,6 +6,10 @@ for tool in docker k3d kubectl python3; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 test -f .env || { echo "Run python3 scripts/init.py first" >&2; exit 1; }
+if ! mountpoint -q /var/lib/developer-platform/tempo; then
+  echo "Prepare the bounded trace filesystem: sudo bash scripts/prepare-tempo-storage.sh" >&2
+  exit 1
+fi
 python3 scripts/check-network-addresses.py
 # Only generated KEY=value settings are accepted; never source arbitrary shell code.
 eval "$(python3 scripts/env.py)"

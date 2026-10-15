@@ -61,6 +61,7 @@ from .keycloak_credentials import create_client as create_credential_client, del
 from . import access_store
 from .access_worker import loop as application_access_loop
 from . import human_database_access
+from . import tracing
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -81,6 +82,7 @@ def connect_project_database(name: str):
 @asynccontextmanager
 async def lifespan(app):
     global runtime, verifier
+    tracing.configure()
     for key in ("DATABASE_KEY", "PLATFORM_AUDIT_PASSWORD", "PLATFORM_AUDIT_READER_PASSWORD"):
         if len(os.environ.get(key, "")) < 32:
             raise RuntimeError(key + " must contain at least 32 characters")
@@ -146,8 +148,28 @@ async def lifespan(app):
         drift_worker.join(timeout=6)
         credential_cleanup_worker.join(timeout=6)
         access_worker.join(timeout=6)
+        tracing.shutdown()
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
+
+
+@app.middleware("http")
+async def trace_request(request: Request, call_next):
+    # Incoming traceparent and baggage are deliberately ignored at the public edge.
+    with tracing.span("platform.http") as active:
+        try:
+            response = await call_next(request)
+        except Exception:
+            active.set_attribute("platform.outcome", "error")
+            raise
+        route = request.scope.get("route")
+        active.set_attribute("http.route", route.path if route is not None else "unmatched")
+        active.set_attribute("http.request.method", request.method)
+        active.set_attribute("http.response.status_code", response.status_code)
+        if response.status_code < 400 and tracing.trace_id():
+            response.headers["X-Platform-Trace-Id"] = tracing.trace_id()
+        return response
+
 STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
 app.mount("/assets", StaticFiles(directory=os.path.join(STATIC_DIR, "assets"), check_dir=False), name="static-assets")
 
@@ -1060,11 +1082,11 @@ def queue_deploy(conn, principal: Principal, name: str, spec: Optional[dict],
             }
             queued = conn.execute("""INSERT INTO application_operations(
                 application_id, revision, operation_kind, state, actor_issuer, actor_subject,
-                envelope_version, envelope)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                envelope_version, envelope, origin_traceparent)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                 RETURNING operation_id""",
                 (application_id, revision, "deploy", "queued",
-                 principal.issuer, principal.subject, 1, Jsonb(envelope))).fetchone()
+                 principal.issuer, principal.subject, 1, Jsonb(envelope), tracing.current_traceparent())).fetchone()
             if queued is None:
                 raise RuntimeError("Could not persist deployment operation")
             return queued[0], "queued", revision
@@ -1962,11 +1984,11 @@ def restart(name: str, principal: Principal = Depends(current_principal)):
                         }
                         queued = conn.execute("""INSERT INTO application_operations(
                             application_id, revision, operation_kind, state, actor_issuer, actor_subject,
-                            envelope_version, envelope)
-                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
+                            envelope_version, envelope, origin_traceparent)
+                            VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                             RETURNING operation_id""",
                             (application_id, revision, "restart", "queued",
-                             principal.issuer, principal.subject, 1, Jsonb(envelope))).fetchone()
+                             principal.issuer, principal.subject, 1, Jsonb(envelope), tracing.current_traceparent())).fetchone()
                         if queued is None:
                             raise RuntimeError("Could not persist restart operation")
                         operation_id = queued[0]

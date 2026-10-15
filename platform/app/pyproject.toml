@@ -12,6 +12,8 @@ dependencies = [
   "fastapi==0.141.1",
   "httpx2==2.13.1",
   "kubernetes==36.0.3",
+  "opentelemetry-exporter-otlp-proto-http>=1.38,<2",
+  "opentelemetry-sdk>=1.38,<2",
   "psycopg[binary]==3.3.6",
   "PyJWT[crypto]==2.15.1",
   "uvicorn==0.53.0",

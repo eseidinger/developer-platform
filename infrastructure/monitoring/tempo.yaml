@@ -1,0 +1,29 @@
+stream_over_http_enabled: true
+server:
+  http_listen_port: 3200
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        http:
+          endpoint: 0.0.0.0:4318
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /data/tempo/wal
+    local:
+      path: /data/tempo/blocks
+backend_worker:
+  compaction:
+    block_retention: 24h
+overrides:
+  defaults:
+    ingestion:
+      rate_limit_bytes: 16384
+      burst_size_bytes: 131072
+      max_traces_per_user: 2000
+    global:
+      max_bytes_per_trace: 262144
+usage_report:
+  reporting_enabled: false

@@ -11,6 +11,7 @@ from .audit import Actor, record_event
 from .authorization import is_allowed
 from .identity import Principal
 from .manifests import component_resources
+from . import tracing
 
 
 LIFECYCLE_LOCK_ID = 731904
@@ -50,6 +51,8 @@ def _with_telemetry(manifest, revision, operation_id):
 def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int,
                    error_code: str, audit_result: str, mark_project_failed: bool,
                    log: logging.Logger, trace: dict[str, Any] | None = None) -> None:
+    tracing.annotate("platform.outcome", "failed")
+    tracing.annotate("platform.error_type", error_code)
     record_event(actor, "operation.execute", "operation", str(operation_id), audit_result,
                  {"project": project}, {"error_code": error_code, **(trace or {})},
                  revision=str(revision), operation_id=str(operation_id))
@@ -161,7 +164,8 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
             step = "catalog"
             publish_catalog(conn)
             step = "database"
-            provision_database(conn, project, password)
+            with tracing.span("platform.operation.step", **{"platform.step": "database"}):
+                provision_database(conn, project, password)
             # Keep the last restart marker so server-side apply does not roll the pods again.
             latest = conn.execute("""SELECT latest_restart.operation_id
                 FROM application_operations latest_restart
@@ -174,7 +178,8 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         for manifest in manifests:
             manifest = _with_telemetry(manifest, revision, operation_id)
             step = f"apply:{manifest['kind']}"
-            apply(manifest)
+            with tracing.span("platform.operation.step", **{"platform.step": "apply", "platform.resource_kind": manifest["kind"]}):
+                apply(manifest)
     except Exception as exc:
         # Only the step, exception class and numeric HTTP status are kept; the message may hold secrets.
         trace: dict[str, Any] = {"step": step, "error_type": type(exc).__name__}
@@ -202,6 +207,7 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
             WHERE operation_id=%s""", (Jsonb(result), operation_id))
     log.info("Deployment operation applied operation_id=%s project=%s revision=%s",
              operation_id, project, revision)
+    tracing.annotate("platform.outcome", "succeeded")
 
 
 def process_one(connect: Callable, password_for: Callable, provision_database: Callable,
@@ -218,8 +224,12 @@ def process_one(connect: Callable, password_for: Callable, provision_database: C
             try:
                 conn.execute("SELECT pg_advisory_lock(%s)", (LIFECYCLE_LOCK_ID,))
                 lifecycle_locked = True
-                _execute_locked(conn, operation_id, password_for, provision_database,
-                                apply, resources, publish_catalog, log, remove)
+                origin = conn.execute("SELECT origin_traceparent FROM application_operations WHERE operation_id=%s",
+                                      (operation_id,)).fetchone()
+                with tracing.span("platform.operation.execute", links=tracing.origin_link(origin[0] if origin else None),
+                                  **{"platform.operation.id": str(operation_id)}):
+                    _execute_locked(conn, operation_id, password_for, provision_database,
+                                    apply, resources, publish_catalog, log, remove)
                 return True
             finally:
                 if lifecycle_locked:

@@ -60,6 +60,7 @@ def initialize(conn) -> None:
             state TEXT NOT NULL CHECK (state IN ('queued', 'running', 'succeeded', 'failed')),
             actor_issuer TEXT NOT NULL,
             actor_subject TEXT NOT NULL,
+            origin_traceparent TEXT,
             envelope_version SMALLINT NOT NULL CHECK (envelope_version > 0),
             envelope JSONB NOT NULL,
             result_version SMALLINT CHECK (result_version > 0),
@@ -75,6 +76,7 @@ def initialize(conn) -> None:
         )""")
         conn.execute("ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS actor_issuer TEXT")
         conn.execute("ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS actor_subject TEXT")
+        conn.execute("ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS origin_traceparent TEXT")
         conn.execute("""UPDATE application_operations
             SET actor_issuer=COALESCE(actor_issuer, ''), actor_subject=COALESCE(actor_subject, '')
             WHERE actor_issuer IS NULL OR actor_subject IS NULL""")
