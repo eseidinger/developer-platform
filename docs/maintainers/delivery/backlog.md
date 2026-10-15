@@ -1107,6 +1107,8 @@ historical snapshots.
 
   **Source progress (October 15, 2026; `5709217`):** Added versioned trace opt-in, Pod-bound token projection, authenticated OTLP gateway with catalog checks, bounded span redaction and fixed project-scoped reads. End-to-end framework fixtures and live denial checks remain open.
 
+  **Forwarder check (October 15, 2026; `02761b0`):** Added a Pod-local OTLP forwarder that rereads the projected token per batch, with token inaccessible to the app container and sidecar resource requests included in quota/admission. The image built locally, the Alloy configuration validated in its pinned image, and targeted manifest/forwarder/capacity tests passed. The local Compose API, Alloy and Keycloak containers are restarting, `.env` lacks new required values, and the dedicated Tempo mount is absent; no live acceptance is inferred from these source checks.
+
   **Planning baseline (October 15, 2026):** No hosted application trace declaration, OTLP ingestion path, platform-to-application trace propagation, verified application-span provenance or scoped trace read exists. Existing workload-log `correlationId` values are not verified trace IDs.
 
   **Design decision (October 15, 2026):** [ADR-021](../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md) fixes the additive `v1alpha2` opt-in field, private gateway address and Pod-bound telemetry token/`TokenReview` path, server-derived provenance, fixed 24-hour project read, and fail-closed ingestion behavior. Implementation and deployed proof remain open.
