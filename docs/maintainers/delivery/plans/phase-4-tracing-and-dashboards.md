@@ -99,9 +99,17 @@ another project's data or mistaking missing signals for healthy ones.
    raw URL paths with identifiers from entering shared series or responses.
 4. Provision and validate framework-aware operator dashboard templates for
    Spring Boot, Quarkus and FastAPI against their actual metric names. Document
-   the required application instrumentation and use neutral fixtures to test
-   request rate, errors, latency, collection failure, target retirement and
-   project isolation. A template with empty panels is not acceptance evidence.
+   the required application instrumentation. Each template has an Application
+   selector populated from discovered, opted-in targets, qualified by project;
+   a dependent Component selector narrows multi-service applications. Selectors
+   default to one application and every panel query uses the selected project,
+   application and component labels. Do not offer an unbounded all-applications
+   selection. These Grafana selectors are operator conveniences, not project
+   authorization; project users continue to use the scoped Platform API.
+   Use neutral fixtures to test switching applications and components without
+   stale or mixed data, request rate, errors, latency, collection failure,
+   target retirement and project isolation. A template with empty panels is not
+   acceptance evidence.
 
 **Exit evidence:** each opted-in fixture yields bounded request/error/latency
 metrics and a working dashboard; undeclared and foreign targets remain

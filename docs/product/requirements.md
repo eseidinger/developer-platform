@@ -44,7 +44,7 @@ Phase 3 adds developer experience and access extensions; Phase 4 adds tracing an
 | N-07 | Keep single-host operation within available resources | Phase 1 (MVP) | Load measurement including log growth, database, and reserve; no swap/disk exhaustion |
 | N-08 | Audit changes, role assignments, and provider operations | Phase 1 (MVP) | Correlate actor, target, revision, timestamp, result, and operation ID |
 | N-09 | Correlate platform operations with bounded traces and provision useful operator dashboards | Phase 4 | Follow a sampled request through an asynchronous operation without sensitive span data; dashboards diagnose a deployment failure and telemetry gap while denying unscoped project access |
-| N-10 | Collect opted-in hosted-application metrics through a private, bounded platform path and provide framework-aware dashboards | Phase 4 | A declared Spring Boot, Quarkus, and FastAPI fixture each yields scoped request/error/latency signals and a usable dashboard; undeclared or cross-project targets and unscoped reads are denied; missing metrics are not shown as healthy |
+| N-10 | Collect opted-in hosted-application metrics through a private, bounded platform path and provide framework-aware dashboards | Phase 4 | A declared Spring Boot, Quarkus, and FastAPI fixture each yields scoped request/error/latency signals and a dashboard with application/component selection; undeclared or cross-project targets and unscoped reads are denied; missing metrics are not shown as healthy |
 
 ## Delivery acceptance
 
