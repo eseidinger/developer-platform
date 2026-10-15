@@ -24,11 +24,11 @@ attributes into spans, labels, links, panels, or screenshots.
 The current baseline has provisioned Prometheus and Loki data sources but no
 trace backend or provisioned dashboards. [ADR-021](../../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md)
 selects Tempo 3 single-process/local storage, existing Compose Alloy, a private
-authenticated workload OTLP gateway, a 10% default sample rate, 24-hour trace
-retention, and a hard 4 GiB trace-volume budget. It also fixes the workload
-identity, app declaration, and project-read boundaries. These are design
-decisions, not deployed capabilities. Verify the chosen limits on the lab before
-acceptance.
+authenticated workload OTLP gateway, an operator-configurable root sample rate
+defaulting to 10%, 24-hour trace retention, and a hard 4 GiB trace-volume
+budget. It also fixes the workload identity, app declaration, and project-read
+boundaries. These are design decisions, not deployed capabilities. Verify the
+chosen limits on the lab before acceptance.
 
 ## Ordered work packages
 
@@ -44,14 +44,18 @@ acceptance.
    and Tempo paths per ADR-021 with the selected sampling, limits, retention,
    network exposure, health checks, and backup/recovery scope.
    Trace delivery failure must not block deployment or weaken authorization.
+   Validate the operator-managed sampling probability, apply it through a
+   controlled rollout, and verify that downstream components follow the root
+   decision. Keep ingest and storage bounds in force at every supported rate.
 3. Expose trace IDs only in scoped diagnostic/audit-safe responses where they
    help an authorized reader; keep raw trace search and the Grafana trace data
    source operator-only until a separately authorized project view exists.
 4. Test an allowed and a denied request, successful and failed asynchronous
    operations, interruption/retry, backend unavailability, cross-project
-   access, and secret/PII redaction. Record trace completeness, sampled gaps,
-   resource cost, revisions, and the retention policy without claiming an
-   elapsed-retention result from configuration alone.
+   access, and secret/PII redaction. Exercise 0%, the 10% default, and a
+   temporary 100% fixture rate; restore the normal setting. Record trace
+   completeness, sampled gaps, resource cost, revisions, and the retention
+   policy without claiming elapsed-retention results from configuration alone.
 
 **Exit evidence:** an operator can follow a sampled, synthetic operation across
 the API and worker into its provider outcome, while another project cannot

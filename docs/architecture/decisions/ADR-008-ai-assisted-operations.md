@@ -1,6 +1,7 @@
 # ADR-008 – AI Support for Development and Operations
 
-Created: September 25, 2026. Status: **Accepted product focus**; tool and approval model proposed.
+Created: September 25, 2026. Phase 5 technical choices accepted October 15, 2026.
+Status: **Accepted design; implementation and acceptance evidence remain open**.
 
 ## Context
 
@@ -10,7 +11,17 @@ AI should support operations and development. The platform has relevant context:
 
 Place the AI layer above the Platform API. It explains platform context, correlates incidents, and supports changes. A general-purpose model-hosting service is not a prerequisite for this roadmap.
 
-Proposed implementation: MCP as a controlled tool interface, initially read-only. Then introduce change proposals with diffs and execution through deterministic platform operations after explicit approval.
+An external model may receive selected project-scoped telemetry and documentation needed for an authorized AI request. The Platform API first enforces the caller's project permissions, limits the requested time window and result size, and minimizes and redacts the context. The accepted initial policy permits only redacted Public and Internal context; Confidential data requires a separate explicit project handling decision and provider controls before transmission. Restricted values, including credentials and tokens, must never be sent. Model output has no authority to retrieve additional projects or perform writes.
+
+Start evaluation with an OpenAI API model, provisionally `gpt-6.1-sol`, through a provider-neutral model adapter. Keep prompts, tool definitions, and evaluation cases independent of OpenAI-specific SDK objects so another provider or a local model can be substituted and judged against the same acceptance corpus. Model availability and account access must be checked before implementation. Do not opt in to provider training on project content; use `store: false` for every OpenAI Responses API request. The owner accepts OpenAI's default abuse-monitoring retention for the initial Public and Internal context boundary. Under the [current OpenAI API data controls](https://developers.openai.com/api/docs/guides/your-data), those logs may retain customer content for up to 30 days, with stated exceptions. `store: false` does not remove that retention. Reassess provider terms before expanding data classes or changing providers.
+
+Use an eligible EU-resident OpenAI API project and EU regional processing for the initial model. Verify account, model, endpoint, and processing-tier support before sending project content; fail closed rather than silently routing to a global endpoint. Apply the same location rule to any replacement provider. The [OpenAI data controls](https://developers.openai.com/api/docs/guides/your-data) list EU support for the provisional model, subject to account eligibility.
+
+Use LangChain for the provider-neutral model interface and the bounded read-only investigation loop. Keep tool definitions typed and execution inside the authorized Platform API. Do not expose an MCP endpoint in the initial Phase 5 implementation; a future external client may use an MCP adapter over the same controlled tools. The model can propose a change but cannot execute it. Deterministic platform operations perform writes only after an explicit approval.
+
+An authenticated human with current project `manage` authority may approve an AI proposal, including one they requested themselves in this single-responder lab. Automation credentials cannot approve. Approval is explicit, single-use, valid for 15 minutes, and bound to the canonical diff, target, and base revision. Recheck authority and revision immediately before execution, audit the decision and outcome, and reject stale, expired, reused, or changed approvals.
+
+Instrument AI runs through the Phase 4 OpenTelemetry path with bounded agent, model-call, and tool-call spans. Allow only safe names, durations, token counts, outcomes, and opaque run IDs; do not capture prompts, responses, tool arguments/results, or retrieved project content. Raw traces remain operator-only. A separate project-scoped AI-run view shows safe status and evidence references. Durable approval and outcome records live outside the 24-hour trace store.
 
 ## Alternatives
 
@@ -18,10 +29,10 @@ A logs-only assistant lacks context. Direct infrastructure access bypasses autho
 
 ## Consequences
 
-Tool access, retrieval, and telemetry must respect project boundaries. Minimize and redact sensitive data. Hypotheses require evidence and explicit data gaps. Approval binds the target, revision, action, and validity; changed plans require renewed review.
+Tool access, retrieval, and telemetry must respect project boundaries. Minimize and redact sensitive data. Hypotheses require evidence and explicit data gaps. A changed plan requires renewed approval. Enforce initial investigation limits of eight read-tool calls, 90 seconds, and $0.25 estimated model cost; tune them only through recorded evaluation and a design update.
 
 ## Validation
 
-Use an incident corpus with expected causes and explicitly unknown cases. Test cross-project access, secret leakage, prompt injection, and unapproved writes. Measure value through diagnosis quality and safe execution.
+Expand the incident corpus beyond the initial four scenarios with known-cause and insufficient-evidence variants. Require zero cross-project disclosures, secret disclosures, and unapproved writes; at least 80% correct, sourced diagnosis on known-cause cases; and safe abstention on every insufficient-evidence case. Measure latency, tool use, model cost, and trace coverage. Re-run the same corpus against a second provider adapter to prove that the platform contracts are provider-neutral.
 
 Details: [Phase 5](../../maintainers/delivery/plans/phase-5-ai-operations.md), [Security](../../maintainers/delivery/history/security-design.md).

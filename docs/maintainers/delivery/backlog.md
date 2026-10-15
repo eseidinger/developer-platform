@@ -1038,6 +1038,15 @@ These tasks make the existing phase work executable without inventing new DEV/OP
   Phase 7 acceptance checks remain open; EV-45/46 establish API and neutral-fixture behavior,
   not this portal journey.
 
+**Phase 5 planning decision (October 15, 2026):** The owner accepted the
+EU-resident initial OpenAI boundary, LangChain with internal typed tools,
+15-minute single-use project-manager approval including self-approval, bounded
+investigation/evaluation gates, and content-free agent tracing. [ADR-008](../../architecture/decisions/ADR-008-ai-assisted-operations.md)
+and the [Phase 5 plan](plans/phase-5-ai-operations.md) contain the exact
+choices. This is a design decision; PLAN-010 through PLAN-015 remain unchecked
+pending implementation and evidence. The dated task-evidence notes below are
+historical snapshots.
+
 - [ ] **PLAN-010 · 5.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 4 gate; scoped data/audit evidence.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No AI layer or authorized context/tools; ADR-008 accepts product focus only, not its implementation.
