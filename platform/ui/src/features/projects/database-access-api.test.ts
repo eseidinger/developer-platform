@@ -1,6 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
-import { parseCredential, parseGrant, parseGrants, parseMyAccess } from './database-access-api'
+import { parseCredential, parseGrant, parseGrants, parseMyAccess, revokeHumanDatabaseGrant } from './database-access-api'
+
+const requests = vi.hoisted(() => ({ DELETE: vi.fn() }))
+vi.mock('@/api/client', () => ({ apiClient: requests }))
 
 const grant = {
   project: 'demo', issuer: 'https://identity.example', subject: 'person-1',
@@ -10,6 +13,15 @@ const grant = {
 }
 
 describe('human database access response boundaries', () => {
+  it('sends only the required issuer and subject when revoking a grant', async () => {
+    requests.DELETE.mockResolvedValueOnce({ error: undefined, response: new Response(null, { status: 200 }) })
+    await revokeHumanDatabaseGrant('demo', parseGrant(grant))
+    expect(requests.DELETE).toHaveBeenCalledWith('/projects/{name}/database-access/grants', {
+      params: { path: { name: 'demo' } },
+      body: { issuer: grant.issuer, subject: grant.subject },
+    })
+  })
+
   it('keeps only safe grant metadata and rejects malformed lists', () => {
     expect(parseGrant(grant)).toEqual({
       project: 'demo', issuer: 'https://identity.example', subject: 'person-1',

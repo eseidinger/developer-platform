@@ -200,7 +200,7 @@ project-administrator token outside the repository:
 ```bash
 ansible-playbook -i ansible/inventory.yml \
   ansible/test-platform-identity-provider-outage.yml \
-  -e platform_api_url=https://platform.example.com \
+  -e platform_api_url=https://platform.eseidinger.de \
   -e platform_test_project=disposable-outage-drill \
   -e platform_identity_drill_host=platform \
   -e @/path/to/protected-project-admin-vars.yml \

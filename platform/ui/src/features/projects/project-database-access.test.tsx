@@ -64,6 +64,23 @@ describe('project human database controls', () => {
     await waitFor(() => expect(revokeHumanDatabaseGrant).toHaveBeenCalledWith('demo', grant))
   })
 
+  it('removes the personal identity when a revoked grant refetch returns 404', async () => {
+    const user = userEvent.setup()
+    vi.mocked(getMyDatabaseAccess)
+      .mockResolvedValueOnce({ ...grant, database: 'project_demo', sshUser: 'platform-db' })
+      .mockRejectedValueOnce(new ApiError('No active grant', 404))
+    vi.mocked(listHumanDatabaseGrants)
+      .mockResolvedValueOnce([grant])
+      .mockResolvedValueOnce([{ ...grant, active: false }])
+    vi.mocked(revokeHumanDatabaseGrant).mockResolvedValue(undefined)
+    mount()
+    expect(await screen.findByText('Your database identity')).toBeInTheDocument()
+    await user.click(await screen.findByRole('button', { name: 'Revoke' }))
+    await user.click(screen.getByRole('button', { name: 'Revoke access' }))
+    expect(await screen.findByText('You do not have a personal database grant for this project.')).toBeInTheDocument()
+    expect(screen.queryByText('Your database identity')).not.toBeInTheDocument()
+  })
+
   it('discards a one-time password when its dialog closes', async () => {
     const user = userEvent.setup()
     vi.mocked(issueMyDatabaseCredential).mockResolvedValue({ project: 'demo', database: 'project_demo', username: 'human_abc', password: 'only-once' })

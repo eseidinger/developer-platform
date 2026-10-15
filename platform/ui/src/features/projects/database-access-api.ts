@@ -77,7 +77,7 @@ async function createHumanDatabaseGrant(name: string, grant: NewHumanDatabaseGra
 
 async function revokeHumanDatabaseGrant(name: string, grant: Pick<HumanDatabaseGrant, 'issuer' | 'subject'>) {
   const { error, response } = await apiClient.DELETE('/projects/{name}/database-access/grants', {
-    params: { path: { name } }, body: grant,
+    params: { path: { name } }, body: { issuer: grant.issuer, subject: grant.subject },
   })
   if (error) throw apiErrorFromResponse(response, error)
 }

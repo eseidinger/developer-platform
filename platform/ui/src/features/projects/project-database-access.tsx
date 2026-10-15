@@ -37,7 +37,7 @@ function ProjectDatabaseAccess({ name, enabled }: { name: string; enabled: boole
 
     {mine.isLoading && <p role="status" className="mt-4 text-sm text-muted-foreground">Loading your database access…</p>}
     {mine.isError && !expectedAbsence(mine.error, 404) && !expectedAbsence(mine.error, 403) && <p role="alert" className="mt-4 text-sm text-destructive">{mine.error.message}</p>}
-    {mine.data ? <div className="mt-4 rounded-lg border border-border p-4 text-sm">
+    {mine.isSuccess && mine.data ? <div className="mt-4 rounded-lg border border-border p-4 text-sm">
       <h3 className="font-medium">Your database identity</h3>
       <dl className="mt-2 grid gap-2 sm:grid-cols-2">
         <div><dt className="text-muted-foreground">Database</dt><dd className="break-all font-mono">{mine.data.database}</dd></div>

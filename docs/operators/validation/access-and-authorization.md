@@ -80,6 +80,57 @@ documented operator API, and retire/purge only the verified fixture projects
 under the normal project-retirement procedure. Do not delete their databases
 directly.
 
+## Executed human PostgreSQL access acceptance: October 15, 2026
+
+**EV-47 · partial Phase 3A.7 / PLAN-008 evidence.** The live run on
+`node-01.eseidinger.de` used two disposable projects,
+`hd-5f39d4862423-a` and `hd-5f39d4862423-b`, and the immutable fixture
+`docker.io/eseidinger/developer-platform-acceptance-fixture@sha256:5c14c1bedfc653e98f958b88deacc5af488f885a5d9a6d3b96e9325938b3f0ad`.
+The private report is
+`/opt/developer-platform/.runtime/human-database-access/5f39d4862423/report.json`
+(mode `0600`). Run `5f39d4862423` lasted from 17:43:50 to 17:44:13 UTC.
+It returned `core-passed`: all 14 named checks passed, cleanup was `complete`,
+and `gateClosed` was `false`. The runner revoked its temporary grant and test
+persona; it retained both fixture projects for owner-reviewed retirement.
+
+The automated checks covered isolated bastion configuration, a human platform
+administrator, two ready project databases, denial of an ungranted key and an
+automation grant, a human grant with a distinct SQL credential, an authorized
+tunnel, read-only access to the granted database, denial of the foreign project,
+termination of an existing SQL session, denial of a new SQL login and SSH key
+after revocation, redacted audit events, and test-persona revocation. The
+installed bastion was active and listening on `127.0.0.1:2222`; its dedicated
+Ed25519 host key was checked against the controller's trusted host key.
+
+The owner then confirmed the browser and SQL journey using a separate portal
+grant on project A. The portal displayed a one-time SQL password that
+disappeared when its dialog reopened. A tunnel through the operator's
+ProxyJump reached the project A database and read its synthetic marker; a write
+and a project B login were denied. Replacing the SSH key changed the portal
+fingerprint; a new connection with the old key was denied and the replacement
+key connected before revocation. After the portal grant was revoked, the owner
+observed termination of the existing SQL session and denial of a new SQL login;
+a new SSH connection with the replacement key was also denied. After a browser
+refresh, the portal showed the grant as revoked and removed the personal
+database-identity panel.
+
+Two UI defects surfaced during this journey and were fixed and deployed before
+the final portal check: revoke sent surplus grant fields to a strict API and
+returned 422, and the personal identity panel displayed stale cached data
+after the API returned 404. Focused UI regression tests passed (nine tests
+after the second fix), as did UI typecheck, lint, and build. The final deployed
+UI asset was `index-C2zxuYLg.js`; the API was ready and the bastion active.
+The installation record identified source `b3acaef1e413e698d772c218dc336da8d55684b0+dirty`:
+the deployed fixes came from a working tree, so this string does not attest an
+exact committed source tree.
+
+The external-path probe from the controller could not connect to bastion port
+2222, consistent with its loopback listener, but a full remote firewall review
+remains deferred. Browser storage and independent log, screenshot, and evidence
+redaction review remain deferred too. The retained fixture projects still
+need owner-reviewed retirement. This record does not close PLAN-008 or the
+Phase 3A.7 gate; see [EV-47](../../maintainers/delivery/backlog.md#verification-register).
+
 ## Neutral hosted-application acceptance harness
 
 Validation status (October 11, 2026): the deployed neutral-fixture core suite,
@@ -190,7 +241,7 @@ to the existing installation (substitute the actual host/install directory):
 
 ```bash
 scp platform/acceptance/harness.py \
-  root@node-01.example.com:/opt/developer-platform/platform/acceptance/harness.py
+  root@node-01.eseidinger.de:/opt/developer-platform/platform/acceptance/harness.py
 ```
 
 Run `sha256sum platform/acceptance/harness.py` on both sides and confirm they
@@ -218,7 +269,7 @@ from a Markdown file under `/opt/developer-platform`.
 ```bash
 cd /opt/developer-platform
 umask 077
-export ISSUER='https://identity.example.com/realms/platform'
+export ISSUER='https://identity.eseidinger.de/realms/platform'
 
 python3 - <<'PY'
 import base64
@@ -349,7 +400,7 @@ explicit environment confirmation:
   --fixture-image '<public-registry>/hosted-access-fixture@sha256:<digest>' \
   --apps-domain apps.example.org \
   --operator-token-file .runtime/operator-session.json \
-  --unrelated-host example.com
+  --unrelated-host eseidinger.de
 ```
 
 The core run verifies digest-pinned ready deployments; synthetic classification
@@ -944,7 +995,7 @@ resource labels, so further matching events should remain one ongoing incident.
    ```bash
    for n in $(seq 1 5); do
      curl -sS -o /dev/null -w '%{http_code}\n' \
-       https://platform.example.com/projects
+       https://platform.eseidinger.de/projects
    done
    ```
 

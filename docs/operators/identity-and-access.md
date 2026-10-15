@@ -15,10 +15,10 @@ history, tickets, or shared evidence.
 
 ## Prerequisites
 
-1. Choose an identity hostname, for example `identity.example.com`, and create
+1. Choose an identity hostname, for example `identity.eseidinger.de`, and create
    DNS pointing it to the platform host. The hostname must be reachable over
    HTTPS for user login and issuer validation.
-2. Set `platform_identity_domain: identity.example.com` in the Ansible
+2. Set `platform_identity_domain: identity.eseidinger.de` in the Ansible
    inventory. The [deploy playbook](../../ansible/deploy.yml) writes it as
    `IDENTITY_DOMAIN` on every deployment.
 3. Confirm the host has a current encrypted backup and that no backup or
@@ -48,7 +48,7 @@ reachable. Substitute the configured identity domain:
 cd /opt/developer-platform
 docker compose ps keycloak keycloak-db-init proxy
 curl --fail --silent --show-error \
-  https://identity.example.com/realms/platform/.well-known/openid-configuration >/dev/null
+  https://identity.eseidinger.de/realms/platform/.well-known/openid-configuration >/dev/null
 ```
 
 If the issuer is not reachable, correct DNS, firewall, Caddy/TLS, or the
@@ -61,7 +61,7 @@ docker compose logs --tail=100 keycloak proxy platform-api
 
 ## Create the first individual administrator
 
-1. Open `https://identity.example.com` and select **Administration Console**.
+1. Open `https://identity.eseidinger.de` and select **Administration Console**.
 2. Sign in as `admin` using `KEYCLOAK_ADMIN_PASSWORD` from the host's protected
    `.env`; do not export or display it in a terminal transcript.
 3. Select the `platform` realm, create an enabled individual user, set that
