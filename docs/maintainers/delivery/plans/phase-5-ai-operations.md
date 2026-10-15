@@ -20,6 +20,15 @@ revision under transaction and queues the existing rollback operation. The
 proposal view links the operation and reports readiness plus available application
 metrics. Additional fix types and a live recovery demonstration remain open.
 
+After regional model eligibility is verified, run
+`UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python scripts/evaluate-ai.py`
+with the deployment's model environment. The synthetic corpus covers an incorrect
+database host, pool exhaustion, resource pressure, missing evidence, untrusted
+document text, and a foreign-project request. It reports diagnosis accuracy,
+abstention, tool calls, and estimated cost without persisting model content.
+The corpus is a gate, not a substitute for the deployed regression and recovery
+demonstration or the required second-provider run.
+
 Entry requires demonstrated scoped telemetry, revision recovery, secret redaction and audit from the [delivery gates](../README.md#backlog-delivery-commitments), plus the Phase 4 [tracing and dashboard](phase-4-tracing-and-dashboards.md) evidence. Link those results before enabling tools; AI interfaces do not close missing API-level story criteria.
 
 Execution tracking: use the [phase task index and acceptance checkboxes](../backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.

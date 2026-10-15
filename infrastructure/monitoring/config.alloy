@@ -146,9 +146,9 @@ otelcol.processor.transform "platform_safe" {
   trace_statements {
     context = "span"
     statements = [
-      `keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type"])`,
+      `keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type", "platform.ai.run_id", "platform.ai.kind", "platform.ai.model", "platform.ai.tool", "platform.ai.input_tokens", "platform.ai.output_tokens", "platform.ai.outcome", "platform.ai.tool_error_count"])`,
       `truncate_all(attributes, 128)`,
-      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step" and name != "application.span"`,
+      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step" and name != "platform.ai.run" and name != "platform.ai.model" and name != "platform.ai.tool" and name != "application.span"`,
       `set(status.message, "")`,
     ]
   }

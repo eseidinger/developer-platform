@@ -3,10 +3,12 @@
 import json
 import logging
 from collections import Counter
+from datetime import datetime, timezone
 
 from langchain_core.tools import StructuredTool
 
 from . import application_metrics, trace_read
+from .readiness import observe_deployment
 from .retained_logs import observe_retained_logs
 
 
@@ -22,7 +24,14 @@ def application_view(current):
                            for item in (components or [])]}
 
 
-def make_tools(project, current_spec, connect):
+SAFE_RUNTIME_REASONS = {"ObserverUnavailable", "DeploymentNotFound", "DeploymentImageMismatch",
+                        "ProgressDeadlineExceeded", "ReplicaFailure", "RolloutInProgress",
+                        "PodNotScheduled", "ContainerWaiting", "ContainersNotReady",
+                        "CrashLoopBackOff", "OOMKilled", "ImagePullBackOff", "ErrImagePull",
+                        "CreateContainerConfigError", "Unschedulable"}
+
+
+def make_tools(project, current_spec, connect, runtime=None):
     """No model tool accepts a project parameter or infrastructure query language."""
     def _current():
         current = current_spec(project)
@@ -73,13 +82,15 @@ def make_tools(project, current_spec, connect):
         result = observe_retained_logs(project, logging.getLogger(__name__), tail=50, since_seconds=3600)
         counts = Counter(json.loads(line["message"])["event"] for line in result["lines"])
         return {"source": "retained-operational-logs", "state": result["state"],
-                "window_seconds": 3600, "event_counts": dict(counts), "truncated": result["truncated"]}
+                "window_seconds": 3600, "observed_at": result["observed_at"],
+                "event_counts": dict(counts), "truncated": result["truncated"]}
 
     def get_events() -> dict:
         """Count recent deployment outcomes without exposing audit details."""
         data = get_deployments()
         return {"source": "application-operations", "outcomes": dict(Counter(
-            operation["state"] for operation in data["operations"]))}
+            operation["state"] for operation in data["operations"])),
+            "observed_at": datetime.now(timezone.utc).isoformat()}
 
     def get_dependencies() -> dict:
         """Read bounded dependency counts from the current application declaration."""
@@ -90,12 +101,57 @@ def make_tools(project, current_spec, connect):
                 "component_count": len(components)}
 
     def get_configuration() -> dict:
-        """Read only the count of non-secret configuration keys, never values."""
+        """Read configuration key counts and changed key names, never values."""
         current = _current()
-        return {"source": "project-catalog", "non_secret_key_count":
-                len(current[1].get("configuration", {})) if current else 0}
+        if not current:
+            return {"source": "project-catalog", "state": "missing"}
+        with connect() as conn:
+            rows = conn.execute("""SELECT r.spec FROM application_revisions r
+                JOIN project_applications a ON a.application_id=r.application_id
+                JOIN project_environments e ON e.environment_id=a.environment_id
+                JOIN projects p ON p.project_id=e.project_id
+                WHERE p.name=%s ORDER BY r.revision DESC LIMIT 2""", (project,)).fetchall()
+        current_values = current[1].get("configuration") or {}
+        previous_values = (rows[1][0].get("configuration") or {}) if len(rows) > 1 else {}
+        changed = sorted(key for key in set(current_values) | set(previous_values)
+                         if current_values.get(key) != previous_values.get(key))
+        return {"source": "project-catalog", "state": "ok",
+                "non_secret_key_count": len(current_values),
+                "changed_key_names_since_previous_revision": changed[:20],
+                "changed_count": len(changed)}
+
+    def get_runtime_status() -> dict:
+        """Read bounded deployment readiness and safe Kubernetes reason codes."""
+        current = _current()
+        if not current:
+            return {"source": "project-runtime", "state": "missing"}
+        components = current[1].get("components", [])
+        service = next((c for c in components if c["type"] == "service"), None)
+        if service:
+            observed = observe_deployment(runtime, project, service.get("resolved_image", service["image"]),
+                                          logging.getLogger(__name__), service["name"])
+        else:
+            image = current[1].get("resolved_image", current[1].get("image"))
+            if not image:
+                return {"source": "project-runtime", "state": "not_applicable"}
+            observed = observe_deployment(runtime, project, image, logging.getLogger(__name__))
+        reason = observed.get("reason")
+        return {"source": "project-runtime", "state": observed["state"],
+                "reason": reason if reason in SAFE_RUNTIME_REASONS else "OtherRuntimeReason",
+                "desired_replicas": observed["desired_replicas"],
+                "ready_replicas": observed["ready_replicas"],
+                "observed_at": observed["observed_at"]}
+
+    def get_documentation() -> dict:
+        """Read the fixed platform reference for deployment revision and rollback semantics."""
+        return {"source": "docs/api/openapi.json", "reference": "/v1/operations/{operation_id}",
+                "facts": ["A deploy request queues an operation and returns its ID.",
+                          "Inspect operation status and readiness before declaring recovery.",
+                          "Rollback re-applies a retained revision as a new revision."],
+                "observed_at": datetime.now(timezone.utc).isoformat()}
 
     functions = [get_application, get_deployments, get_metrics, get_traces,
-                 get_logs, get_events, get_dependencies, get_configuration]
+                 get_logs, get_events, get_dependencies, get_configuration, get_runtime_status,
+                 get_documentation]
     return [StructuredTool.from_function(func=function, name=function.__name__,
                                          description=function.__doc__.strip()) for function in functions]

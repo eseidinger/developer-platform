@@ -1306,7 +1306,7 @@ def create_ai_run(name: str, body: AIRunRequest,
     with connect() as conn:
         run_id = ai_store.create_run(conn, name, principal, body.kind, model.name)
     try:
-        tools = ai_tools.make_tools(name, current_spec, connect)
+        tools = ai_tools.make_tools(name, current_spec, connect, runtime)
         outcome = ai_agent.run(body.kind, run_id, model, tools)
     except Exception as exc:
         log.error("AI run failed run_id=%s error_type=%s", run_id, type(exc).__name__)

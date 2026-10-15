@@ -84,7 +84,9 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                 break
             with tracing.span("platform.ai.model", **{"platform.ai.model": model.name}):
                 answer = bound.invoke(messages)
-            usage = answer.usage_metadata or {}
+                usage = answer.usage_metadata or {}
+                tracing.annotate("platform.ai.input_tokens", int(usage.get("input_tokens", 0)))
+                tracing.annotate("platform.ai.output_tokens", int(usage.get("output_tokens", 0)))
             cost += _cost(usage)
             if cost > MAX_COST_USD:
                 break
@@ -92,6 +94,7 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
             requests = answer.tool_calls if isinstance(answer, AIMessage) else []
             if not requests:
                 result = _parse_final(answer, evidence)
+                tracing.annotate("platform.ai.outcome", "abstained" if result["insufficient_evidence"] else "completed")
                 return {"state": "abstained" if result["insufficient_evidence"] else "completed",
                         "result": result, "evidence": evidence, "tool_calls": calls,
                         "estimated_cost_usd": round(cost, 6)}
@@ -100,7 +103,9 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                     break
                 name = request.get("name")
                 arguments = request.get("args")
-                if name not in tool_map or not isinstance(arguments, dict) or len(json.dumps(arguments)) > 1024:
+                if (name not in tool_map or not isinstance(arguments, dict)
+                        or len(json.dumps(arguments)) > 1024
+                        or set(arguments) - set(tool_map[name].args)):
                     break
                 calls += 1
                 evidence_id = "E" + str(calls)
@@ -108,10 +113,12 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                 try:
                     with tracing.span("platform.ai.tool", **{"platform.ai.tool": name}):
                         observation = tool_map[name].invoke(arguments)
+                        tracing.annotate("platform.ai.outcome", "ok")
                     content = json.dumps(observation, default=str, separators=(",", ":"))
                     if len(content) > MAX_TOOL_RESULT_BYTES:
                         raise ValueError("Tool result too large")
                 except Exception:
+                    tracing.annotate("platform.ai.tool_error_count", 1)
                     observation = None
                     content = json.dumps({"state": "unavailable", "reason": "ReadToolUnavailable"})
                 evidence.append({"id": evidence_id, "tool": name,
@@ -122,6 +129,7 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
             else:
                 continue
             break
+        tracing.annotate("platform.ai.outcome", "abstained")
     return {"state": "abstained", "result": {"summary": "Investigation limit reached.",
             "hypotheses": [], "gaps": ["Time, cost, or read-tool limit reached"],
             "insufficient_evidence": True}, "evidence": evidence, "tool_calls": calls,
