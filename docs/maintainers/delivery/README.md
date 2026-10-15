@@ -25,6 +25,7 @@ without confirmed dates.
 | October 6, 2026 | React UI stack selected for the Phase 3 portal | React, TypeScript and Vite with typed OpenAPI access, TanStack Query, React Router, shadcn/Base UI, Tailwind, forms/validation, and browser/component tests replace the open Angular candidate |
 | October 10, 2026 | Generic capabilities required by the energy-system use case made the Phase 3 priority slice | Application-owned declarations consume generic hosted-application OIDC, authenticated HTTPS egress, component monitoring, restart, and recovery; the platform contains no ODIP/VEF-specific profiles or behavior |
 | October 14, 2026 | Tracing and dashboards inserted before AI operations | Phase 4 adds bounded tracing and provisioned operator Grafana dashboards; AI operations moves to Phase 5 and optional architecture expansion to Phase 6 |
+| October 15, 2026 | Phase 4 tracing design selected | [ADR-021](../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md) fixes Tempo/Alloy, authenticated app export, opt-in contract, sampling, storage budget, and scoped trace reads; implementation remains open |
 | October 15, 2026 | Remaining acceptance moved to the last, anytime phase | Former Phase 3A work is Phase 7: visible, unscheduled leftovers that do not gate Phases 3–5 or optional 6 |
 
 ## Implementation status

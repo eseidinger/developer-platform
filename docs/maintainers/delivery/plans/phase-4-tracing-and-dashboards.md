@@ -22,12 +22,13 @@ tokens, passwords, secrets, personal data, or unbounded application-supplied
 attributes into spans, labels, links, panels, or screenshots.
 
 The current baseline has provisioned Prometheus and Loki data sources but no
-trace backend or provisioned dashboards. Choose and document the tracing
-backend and collector path before installation; OpenTelemetry instrumentation
-and an operator-only Grafana-compatible backend (such as Tempo) are the
-candidate design, not an already accepted runtime choice. Set a sampling,
-storage, and retention budget that fits the single-host lab before enabling
-collection.
+trace backend or provisioned dashboards. [ADR-021](../../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md)
+selects Tempo 3 single-process/local storage, existing Compose Alloy, a private
+authenticated workload OTLP gateway, a 10% default sample rate, 24-hour trace
+retention, and a hard 4 GiB trace-volume budget. It also fixes the workload
+identity, app declaration, and project-read boundaries. These are design
+decisions, not deployed capabilities. Verify the chosen limits on the lab before
+acceptance.
 
 ## Ordered work packages
 
@@ -39,9 +40,9 @@ collection.
    its initiating request without confusing a durable operation ID with a
    continuously live trace. Propagate a safe trace context to platform-owned
    boundaries; never trust arbitrary client span attributes.
-2. Instrument the Python API and operation worker, then deploy a private
-   collector and trace store with explicit sampling, limits, retention,
-   authentication/network exposure, health checks, and backup/recovery scope.
+2. Instrument the Python API and operation worker, then deploy private Alloy
+   and Tempo paths per ADR-021 with the selected sampling, limits, retention,
+   network exposure, health checks, and backup/recovery scope.
    Trace delivery failure must not block deployment or weaken authorization.
 3. Expose trace IDs only in scoped diagnostic/audit-safe responses where they
    help an authorized reader; keep raw trace search and the Grafana trace data
@@ -119,17 +120,18 @@ The capability is a platform contract, independent of the application framework.
 
 ### 4.4 — Let hosted applications participate in tracing (`PLAN-024`)
 
-1. Define and version an opt-in tracing declaration for service and scheduled
-   components, advertise the capability, and reject unsupported fields before
-   side effects. Existing declarations remain valid. Do not publish an example
-   JSON field in the current developer reference until the API accepts it.
+1. Add the ADR-021 opt-in `spec.components[].telemetry.tracing.enabled` field
+   for service and scheduled
+   components, advertise `applicationTracing`, and reject unsupported use before
+   side effects. Existing declarations remain valid. Do not publish this as a
+   currently accepted field in the developer reference until the API accepts it.
    Document Spring Boot, Quarkus and FastAPI instrumentation recipes using
    OpenTelemetry and OTLP; the platform supplies the private endpoint and
    stable service identity, while the application emits its own spans.
 2. At the public access boundary, start a new trace for untrusted external
    requests; strip inbound baggage and `tracestate`. Propagate the generated
-   W3C `traceparent` context through the authenticated gateway into
-   the application and between declared in-project services. Continue a sampled
+   W3C `traceparent` context through the authenticated gateway into the
+   application and between declared in-project services. Continue a sampled
    request across synchronous calls; link independent durable work to its
    initiating trace when one exists, without claiming a continuously live
    parent span.
@@ -137,20 +139,22 @@ The capability is a platform contract, independent of the application framework.
    instrumented services; scheduled jobs start their own bounded traces.
    Trace context carries no authorization and never replaces application access
    policy or the trusted principal headers.
-3. Provide an internal OTLP receiver reachable only by opted-in workloads.
-   Before accepting spans, verify workload identity with an audience-bound
-   credential or equivalent mechanism and derive project, application and
-   component provenance server-side. Document the chosen identity transport and
-   collector placement before deployment; network reachability alone is not
-   proof of identity. Reject forged resource attributes, revoked/retired targets,
-   and cross-project submissions. Allowlist stored attributes and normalize route
+3. Provide the private Compose OTLP gateway selected in ADR-021. Give each
+   opted-in component a no-RBAC ServiceAccount and an explicitly projected,
+   Pod-bound 10-minute `platform-telemetry` token, while retaining disabled
+   automatic token mounting. Verify every batch with Kubernetes `TokenReview`,
+   match current Pod/catalog opt-in state, and derive project, application and
+   component provenance server-side. Reject forged resource attributes,
+   revoked/retired targets, and cross-project submissions. Allowlist stored
+   attributes and normalize route
    templates; drop arbitrary application attributes before storage. Bound export
    rate, span size, attribute count, sampling, storage and retention. Collection
    outages must not block requests or deployments.
-4. Keep raw traces and trace search operator-only. Add a fixed, bounded Platform
-   API read for an authorized project's verified application spans, with no
-   caller-supplied query language; omit foreign and platform-internal spans even
-   when a trace crosses projects. In operator Grafana, link the selected
+4. Keep raw traces and trace search operator-only. Add the fixed ADR-021
+   `GET /projects/{name}/traces/{trace_id}` read, requiring current `view`
+   permission and returning at most 200 sanitized spans/64 KiB from the last
+   24 hours. Omit foreign and platform-internal spans even when a trace crosses
+   projects. In operator Grafana, link the selected
    application/component dashboard to sampled traces only when verified project
    labels and time windows match. Distinguish absent sampling from collection
    failure. Never export request/response bodies, SQL text/parameters, tokens,
@@ -181,5 +185,6 @@ trace-store credential. Optional architecture expansion moves to Phase 6 and
 does not gate tracing, dashboards, or AI operations.
 
 Foundations: [observability architecture](../../../architecture/observability.md),
+[ADR-021 tracing decision](../../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md),
 [operator monitoring](../../../operators/monitoring.md), and
 [Phase 7 monitoring acceptance](phase-7-anytime-leftovers.md).

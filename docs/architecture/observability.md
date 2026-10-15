@@ -55,6 +55,9 @@ plans bounded platform and opt-in hosted-application OpenTelemetry tracing, a
 private trace backend, provisioned operator dashboards, and opt-in private
 collection of hosted-application metrics. Application spans need verified
 workload provenance; raw trace search remains operator-only.
+The [Phase 4 tracing decision](decisions/ADR-021-phase-4-tracing-boundary.md)
+fixes Tempo/Alloy placement, workload authentication, retention and resource
+limits, and the bounded project-read contract. None is installed yet.
 Spring Boot, Quarkus and FastAPI dashboard templates require matching application
 instrumentation; no application metrics scrape, trace backend or dashboards are
 installed yet.

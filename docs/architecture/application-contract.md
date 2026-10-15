@@ -67,8 +67,10 @@ scrapes are explicit, not healthy zeros. See [Phase 4](../maintainers/delivery/p
 ## Planned application tracing capability (Phase 4)
 
 Service and scheduled components may opt in to a private OpenTelemetry trace
-export path. The exact versioned declaration is not accepted by the current
-`v1alpha2` API; the environment must advertise support before it can be used.
+export path with the additive `v1alpha2` field
+`spec.components[].telemetry.tracing.enabled: true`. This field is not accepted
+by the current API; the environment must advertise `applicationTracing` before
+it can be used.
 The platform supplies a private OTLP endpoint and verified project/application/
 component identity. A workload cannot choose its own project identity through
 span attributes, and a declaration cannot configure an arbitrary exporter URL
@@ -80,6 +82,8 @@ are untrusted. Raw traces remain operator-only; any project-facing read is a
 fixed, bounded, server-scoped Platform API view. Span export excludes secrets,
 personal data, bodies, SQL text and raw identifier-bearing URLs, with explicit
 sampling and storage limits. See [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#44-let-hosted-applications-participate-in-tracing-plan-024).
+The chosen backend, collector path, token verification, budget and read contract
+are recorded in [ADR-021](decisions/ADR-021-phase-4-tracing-boundary.md).
 
 ## Generic cross-project integration profile
 

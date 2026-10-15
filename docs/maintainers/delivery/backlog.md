@@ -1066,6 +1066,8 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Planning baseline (October 14, 2026):** Prometheus, Loki, Alloy and Grafana exist, but there is no trace backend or instrumented end-to-end operation path. No source, local or deployed tracing acceptance is claimed.
 
+  **Design decision (October 15, 2026):** [ADR-021](../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md) selects Tempo 3 single-process/local storage, Compose Alloy, 10% head sampling, 24-hour retention, a hard 4 GiB trace filesystem, bounded ingestion and disposable trace recovery. These are accepted implementation choices, not acceptance evidence.
+
 - [ ] **PLAN-022 · 4.2** — Provision versioned, operator-only Grafana dashboards for platform health/delivery, workloads/capacity, and telemetry/security. Validate panel queries, meaningful missing-data states, safe trace/log links, restart/reconciliation, failure diagnosis, redaction and deployed evidence. Prerequisites: PLAN-021 and existing scoped metrics/logs. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md).
 
   **Planning baseline (October 14, 2026):** Grafana data sources are provisioned but dashboards are not. No dashboard implementation or deployed acceptance is claimed.
@@ -1077,6 +1079,8 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 - [ ] **PLAN-024 · 4.4** — Add opt-in OpenTelemetry tracing for hosted service and scheduled components. Carry safe W3C context through the authenticated platform boundary, accept OTLP only from verified workload identities, derive provenance server-side, bound and redact spans, and provide fixed project-scoped readback while keeping raw trace search operator-only. Prove Spring Boot, Quarkus and FastAPI flows, internal propagation, forged-origin/cross-project denial, sampling gaps, retirement and collector-failure isolation. Prerequisites: PLAN-021 private trace collector and PLAN-022 operator trace links; PLAN-023 application selectors may be reused. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md#44-let-hosted-applications-participate-in-tracing-plan-024) and [N-11](../../product/requirements.md).
 
   **Planning baseline (October 15, 2026):** No hosted application trace declaration, OTLP ingestion path, platform-to-application trace propagation, verified application-span provenance or scoped trace read exists. Existing workload-log `correlationId` values are not verified trace IDs.
+
+  **Design decision (October 15, 2026):** [ADR-021](../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md) fixes the additive `v1alpha2` opt-in field, private gateway address and Pod-bound telemetry token/`TokenReview` path, server-derived provenance, fixed 24-hour project read, and fail-closed ingestion behavior. Implementation and deployed proof remain open.
 
 
 ## Shared implementation baseline
