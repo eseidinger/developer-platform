@@ -19,6 +19,8 @@ developer terms. All examples are JSON because the current CLI accepts JSON inpu
 
 Opt-in application metrics collection is a [planned Phase 4 capability](../architecture/application-contract.md#planned-application-metrics-capability-phase-4).
 The current schema has no metrics field; declaring one now is rejected.
+Opt-in [application tracing](../architecture/application-contract.md#planned-application-tracing-capability-phase-4)
+is also planned for Phase 4; the current schema has no tracing field.
 
 ## Rules that apply to every request
 

@@ -1,13 +1,14 @@
 # Phase 4 — Tracing and Grafana Dashboards
 
-Status: planned. Tracing, application metrics collection, and provisioned dashboards are not implemented. This
+Status: planned. Platform and application tracing, application metrics collection,
+and provisioned dashboards are not implemented. This
 phase follows the usable Phase 3 source capabilities and precedes AI operations
 in [Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
 Alloy, and operator-only Grafana. Full PLAN-017 monitoring acceptance remains
 in the independent [Phase 7 leftovers](phase-7-anytime-leftovers.md); any
 telemetry needed for Phase 4 must be verified within this phase.
 
-Execution tracking: [PLAN-021, PLAN-022, and PLAN-023](../backlog.md#additional-phase-tasks).
+Execution tracking: [PLAN-021 through PLAN-024](../backlog.md#additional-phase-tasks).
 The [backlog](../backlog.md) remains the evidence and task-status register.
 
 ## Goal and boundaries
@@ -116,9 +117,61 @@ metrics and a working dashboard; undeclared and foreign targets remain
 inaccessible, and failed collection is visible without disrupting deployment.
 The capability is a platform contract, independent of the application framework.
 
+### 4.4 — Let hosted applications participate in tracing (`PLAN-024`)
+
+1. Define and version an opt-in tracing declaration for service and scheduled
+   components, advertise the capability, and reject unsupported fields before
+   side effects. Existing declarations remain valid. Do not publish an example
+   JSON field in the current developer reference until the API accepts it.
+   Document Spring Boot, Quarkus and FastAPI instrumentation recipes using
+   OpenTelemetry and OTLP; the platform supplies the private endpoint and
+   stable service identity, while the application emits its own spans.
+2. At the public access boundary, start a new trace for untrusted external
+   requests; strip inbound baggage and `tracestate`. Propagate the generated
+   W3C `traceparent` context through the authenticated gateway into
+   the application and between declared in-project services. Continue a sampled
+   request across synchronous calls; link independent durable work to its
+   initiating trace when one exists, without claiming a continuously live
+   parent span.
+   Set bounded sampling at the boundary and use parent-based sampling in
+   instrumented services; scheduled jobs start their own bounded traces.
+   Trace context carries no authorization and never replaces application access
+   policy or the trusted principal headers.
+3. Provide an internal OTLP receiver reachable only by opted-in workloads.
+   Before accepting spans, verify workload identity with an audience-bound
+   credential or equivalent mechanism and derive project, application and
+   component provenance server-side. Document the chosen identity transport and
+   collector placement before deployment; network reachability alone is not
+   proof of identity. Reject forged resource attributes, revoked/retired targets,
+   and cross-project submissions. Allowlist stored attributes and normalize route
+   templates; drop arbitrary application attributes before storage. Bound export
+   rate, span size, attribute count, sampling, storage and retention. Collection
+   outages must not block requests or deployments.
+4. Keep raw traces and trace search operator-only. Add a fixed, bounded Platform
+   API read for an authorized project's verified application spans, with no
+   caller-supplied query language; omit foreign and platform-internal spans even
+   when a trace crosses projects. In operator Grafana, link the selected
+   application/component dashboard to sampled traces only when verified project
+   labels and time windows match. Distinguish absent sampling from collection
+   failure. Never export request/response bodies, SQL text/parameters, tokens,
+   personal data, raw identifier-bearing URLs or unrestricted baggage.
+5. Exercise Spring Boot, Quarkus and FastAPI neutral fixtures: admitted and
+   denied public calls, service-to-service calls, scheduled work, sampling gaps,
+   restart/retry, collector outage/recovery, forged context and origin labels,
+   cross-project denial and retirement. Verify trace-to-log correlation only
+   when a trace ID is explicitly emitted in the existing safe log envelope;
+   do not treat an arbitrary `correlationId` as a trace ID. Record exact images,
+   revisions, trace coverage, resource cost and retention configuration.
+
+**Exit evidence:** an operator follows a sampled admitted request from the
+platform boundary into an opted-in app and its downstream component; an
+authorized project reader sees only verified spans from that project. Forged
+origins and foreign reads fail, sensitive values never enter stored spans, and
+the app continues to work when trace collection fails.
+
 ## Phase exit and handoff
 
-All three tasks need source, local, and deployed evidence against the recorded
+All four tasks need source, local, and deployed evidence against the recorded
 installation; neither source JSON nor a green Grafana health check closes the
 phase. Record collector/backend images, configuration, dashboard revisions,
 sampled trace coverage, resource cost, access denials, and remaining limits in

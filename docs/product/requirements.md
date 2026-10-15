@@ -16,7 +16,7 @@ Phase 1 acceptance must pass before advancing to Phase 2. Later hardening or ext
 | F-06 | Diagnose a failed rollout through authorized basic logs, metrics, health and revision context | Add full log search/follow and retention, resource comparisons and capacity views |
 | F-08 | Validate the supported single-image profile and reject unsupported capabilities before side effects | Publish the selected environment capability profile and extend policy enforcement |
 
-Phase 3 adds developer experience and access extensions; Phase 4 adds tracing and Grafana dashboards; Phase 5 adds AI assistance and controlled actions. The full delivery backlog spans these phases and includes explicitly deferred work, so completing the MVP does not mean completing every backlog story.
+Phase 3 adds developer experience and access extensions; Phase 4 adds platform and opted-in application telemetry with Grafana dashboards; Phase 5 adds AI assistance and controlled actions. The full delivery backlog spans these phases and includes explicitly deferred work, so completing the MVP does not mean completing every backlog story.
 
 | ID | Requirement | Delivery phase | Acceptance evidence |
 |---|---|---|---|
@@ -45,6 +45,7 @@ Phase 3 adds developer experience and access extensions; Phase 4 adds tracing an
 | N-08 | Audit changes, role assignments, and provider operations | Phase 1 (MVP) | Correlate actor, target, revision, timestamp, result, and operation ID |
 | N-09 | Correlate platform operations with bounded traces and provision useful operator dashboards | Phase 4 | Follow a sampled request through an asynchronous operation without sensitive span data; dashboards diagnose a deployment failure and telemetry gap while denying unscoped project access |
 | N-10 | Collect opted-in hosted-application metrics through a private, bounded platform path and provide framework-aware dashboards | Phase 4 | A declared Spring Boot, Quarkus, and FastAPI fixture each yields scoped request/error/latency signals and a dashboard with application/component selection; undeclared or cross-project targets and unscoped reads are denied; missing metrics are not shown as healthy |
+| N-11 | Correlate opted-in hosted-application spans with platform traces through a private, authenticated collector | Phase 4 | Sampled Spring Boot, Quarkus and FastAPI flows cross the platform boundary and permitted component calls; forged origins and foreign reads fail; collection outages do not interrupt application requests |
 
 ## Delivery acceptance
 
