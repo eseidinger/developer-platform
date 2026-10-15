@@ -44,6 +44,26 @@ field must not silently acquire a different meaning.
 10. Provider portability is a contract constraint, not a requirement to operate a
     second provider.
 
+## Planned application metrics capability (Phase 4)
+
+A service component may opt in to platform collection of Prometheus-format
+application metrics by declaring a bounded metrics path and one of its declared
+HTTP ports. The exact versioned field shape remains to be designed and is not
+accepted by the current `v1alpha2` API. The capability must be advertised by the
+environment before a declaration can use it. Unknown or unsupported metrics
+fields fail before provider side effects; existing declarations remain valid.
+
+The platform derives scrape targets from the accepted project/component identity
+and reaches them on a private, platform-controlled path. Metrics collection must
+not add a public route, bypass application access policy, or accept arbitrary
+URLs, scrape credentials, or caller-supplied project labels. Bound sample count,
+series cardinality, response size, scrape rate and retention to the lab budget.
+Allow only Public or Internal metric names and label values; reject or drop
+secrets, personal data, raw paths with identifiers and unbounded labels.
+Operators may use the shared Prometheus/Grafana backends; project readers receive
+only fixed project-scoped views through the Platform API. Missing or failed
+scrapes are explicit, not healthy zeros. See [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023).
+
 ## Generic cross-project integration profile
 
 The initial hosted-application integration profile permits one public component

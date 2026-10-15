@@ -63,6 +63,11 @@ blackbox exporter for route behavior, kube-state-metrics for Kubernetes object
 state, node-exporter for host state, and the monitoring services themselves.
 Grafana has Prometheus and Loki as data sources.
 
+The planned Phase 4 [application metrics capability](../architecture/application-contract.md#planned-application-metrics-capability-phase-4)
+adds opt-in, private Prometheus-format scrapes for declared service components
+and bounded project-scoped metric reads. Current application discovery supplies
+blackbox availability targets only; it does not collect framework metrics.
+
 For a protected public component, the probe tests the **access boundary**:
 an unauthenticated request should receive an expected redirect or denial. It
 does not authenticate as an application user and does not prove that the

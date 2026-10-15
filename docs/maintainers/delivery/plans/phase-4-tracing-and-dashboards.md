@@ -1,13 +1,13 @@
 # Phase 4 — Tracing and Grafana Dashboards
 
-Status: planned. Tracing and provisioned dashboards are not implemented. This
+Status: planned. Tracing, application metrics collection, and provisioned dashboards are not implemented. This
 phase follows the usable Phase 3 source capabilities and precedes AI operations
 in [Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
 Alloy, and operator-only Grafana. Full PLAN-017 monitoring acceptance remains
 in the independent [Phase 7 leftovers](phase-7-anytime-leftovers.md); any
 telemetry needed for Phase 4 must be verified within this phase.
 
-Execution tracking: [PLAN-021 and PLAN-022](../backlog.md#additional-phase-tasks).
+Execution tracking: [PLAN-021, PLAN-022, and PLAN-023](../backlog.md#additional-phase-tasks).
 The [backlog](../backlog.md) remains the evidence and task-status register.
 
 ## Goal and boundaries
@@ -81,9 +81,36 @@ works safely when collection is unavailable.
 locate a fixture deployment failure and a telemetry gap without exposing
 another project's data or mistaking missing signals for healthy ones.
 
+### 4.3 — Collect hosted-application metrics (`PLAN-023`)
+
+1. Define and version an opt-in component metrics declaration using one declared
+   HTTP port and a bounded path. Advertise the capability; reject unsupported
+   fields before side effects. Existing applications stay valid without a metrics
+   declaration. Keep the exact JSON shape out of the current developer reference
+   until the API accepts it.
+2. Discover only accepted, active service components and scrape them through a
+   private, platform-controlled path. Do not expose a public metrics route or
+   depend on browser/application access grants. Bound scrape time, response size,
+   sample and series cardinality, labels, retention and resource cost. Report
+   missing or failed scrapes distinctly from healthy zero values.
+3. Provide fixed, project-scoped application metric reads through the Platform
+   API and keep raw Prometheus/Grafana access operator-only. Prevent arbitrary
+   PromQL, cross-project selectors, untrusted labels, secrets, personal data and
+   raw URL paths with identifiers from entering shared series or responses.
+4. Provision and validate framework-aware operator dashboard templates for
+   Spring Boot, Quarkus and FastAPI against their actual metric names. Document
+   the required application instrumentation and use neutral fixtures to test
+   request rate, errors, latency, collection failure, target retirement and
+   project isolation. A template with empty panels is not acceptance evidence.
+
+**Exit evidence:** each opted-in fixture yields bounded request/error/latency
+metrics and a working dashboard; undeclared and foreign targets remain
+inaccessible, and failed collection is visible without disrupting deployment.
+The capability is a platform contract, independent of the application framework.
+
 ## Phase exit and handoff
 
-Both tasks need source, local, and deployed evidence against the recorded
+All three tasks need source, local, and deployed evidence against the recorded
 installation; neither source JSON nor a green Grafana health check closes the
 phase. Record collector/backend images, configuration, dashboard revisions,
 sampled trace coverage, resource cost, access denials, and remaining limits in

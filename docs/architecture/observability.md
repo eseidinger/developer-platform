@@ -51,8 +51,11 @@ Central storage and alerting are outside k3d but share its host failure domain. 
 PostgreSQL exporter metrics, application request/error/latency metrics, workload
 resource usage scrapes and traces remain future work. Attributed centralized
 operational logs are implemented. [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md)
-plans bounded OpenTelemetry tracing, a private trace backend, and provisioned
-operator dashboards; no trace backend or dashboards are installed yet.
+plans bounded OpenTelemetry tracing, a private trace backend, provisioned
+operator dashboards, and opt-in private collection of hosted-application metrics.
+Spring Boot, Quarkus and FastAPI dashboard templates require matching application
+instrumentation; no application metrics scrape, trace backend or dashboards are
+installed yet.
 
 Operators should see host, Docker, cluster, database, certificates, storage, jobs and monitoring. Developers should see only authorized applications and logs/health/metrics. Shared dashboard links cannot enforce this boundary. Introduce server-side authorization before exposing those views.
 

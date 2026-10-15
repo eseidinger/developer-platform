@@ -28,7 +28,7 @@ Each task belongs to exactly one phase or sub-gate; story IDs remain the overall
 
 Top-level task checkboxes remain open where full acceptance is outstanding. Checked progress criteria below record narrower verified outcomes; they do not close the parent task or phase. Task evidence below distinguishes partial or absent source implementation, verified local checks, and operational acceptance. Close a task only after its listed outcome is verified, or record an explicit owner-directed acceptance exception that names every unverified outcome; record date, revision, environment, results and limitations beside it. Link shared checks by evidence ID. Update implementation findings here when code changes; other documents link here rather than maintain a separate status assessment. Close a story only when every original acceptance criterion passes. A Phase 3 design decision does not close deferred implementation tasks.
 
-Scheduled phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.2 → 5.1–5.5**. Dependencies below identify ordering within a phase. Phase 2A adds multi-service and scheduled components; Phase 2B adds CI deployment credentials; Phase 2C covers the current-platform capabilities. Phase 3 delivers general developer experience, Phase 4 adds tracing and Grafana dashboards, and Phase 5 adds AI operations. Optional Phase 6 architecture expansion is unscheduled. [Phase 7 anytime leftovers](plans/phase-7-anytime-leftovers.md) is displayed last, has the lowest priority, and may be worked on independently when capacity allows; it does not gate Phases 3–5 or optional 6. Its unfinished task outcomes remain open. Concrete energy-system declarations and domain acceptance remain externally owned. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
+Scheduled phase gates are **1A → 1B → 1C → 2A → 2B → 2C → 3 → 4.1–4.3 → 5.1–5.5**. Dependencies below identify ordering within a phase. Phase 2A adds multi-service and scheduled components; Phase 2B adds CI deployment credentials; Phase 2C covers the current-platform capabilities. Phase 3 delivers general developer experience, Phase 4 adds tracing and Grafana dashboards, and Phase 5 adds AI operations. Optional Phase 6 architecture expansion is unscheduled. [Phase 7 anytime leftovers](plans/phase-7-anytime-leftovers.md) is displayed last, has the lowest priority, and may be worked on independently when capacity allows; it does not gate Phases 3–5 or optional 6. Its unfinished task outcomes remain open. Concrete energy-system declarations and domain acceptance remain externally owned. Component attribution in initial diagnostics uses the single implemented component; rerun those checks when the model expands.
 
 **Gate status, October 15, 2026:** Phase 1A is complete. Its three scheduled tasks are checked complete; ADR-011, ADR-016, and ADR-017 record the accepted lab limitations. Phase 1B is complete under its recorded owner-directed alert-delivery exception. Phase 1C is complete as of October 3, 2026: all ten tasks are checked with live evidence (EV-30 to EV-37), and the unit-tested-only items and the not-yet-run access/audit drill are recorded owner-accepted limits in the Phase 1C audit below. Phase 2A passed its deployed component acceptance suite on node-01 (EV-38 and EV-39); database-row preservation, backup-inventory, and representative capacity measurements are owner-accepted deferred checks. Phase 2B is accepted under its owner-directed acceptance exception: its basic deployed automation suite passed, while the expiry, controlled identity-provider-outage, and deployed backup-coverage checks are deferred. **Phase 2C is complete:** protected live drills passed for components, retirement, PostgreSQL recovery, data-aware rollback, capacity admission, egress policy, and failure signals; the owner confirmed notification receipt (EV-39 to EV-44). Remaining single-lab constraints are accepted limitations. **Phase 3 is complete by owner-directed source/local scope decision** at checkout `f7a8aff`; the unverified deployed journeys are named in the [completion record](history/phase-3-developer-experience.md#completion-record-october-15-2026). **Phase 7 is open and unscheduled:** it collects those acceptance leftovers in the [anytime plan](plans/phase-7-anytime-leftovers.md) and does not block Phases 4–5.
 
@@ -95,6 +95,7 @@ This index lists execution tasks, not story completion promises. Task details an
 | 3, complete | Owner-accepted developer-experience source/local milestones; open PLAN-006/007/008 outcomes remain in Phase 7 |
 | 4.1 | PLAN-021: tracing |
 | 4.2 | PLAN-022: Grafana dashboards |
+| 4.3 | PLAN-023: opt-in hosted-application metrics and framework dashboard templates |
 | 5.1 | PLAN-010 |
 | 5.2 | PLAN-011 |
 | 5.3 | PLAN-012 |
@@ -1068,6 +1069,10 @@ These tasks make the existing phase work executable without inventing new DEV/OP
 
   **Planning baseline (October 14, 2026):** Grafana data sources are provisioned but dashboards are not. No dashboard implementation or deployed acceptance is claimed.
 
+- [ ] **PLAN-023 · 4.3** — Add a versioned, opt-in application metrics declaration and private scrape discovery for deployed service components; expose bounded project-scoped reads and provision framework-aware Spring Boot, Quarkus, and FastAPI dashboard templates. Prove metric/label limits, missing-data behavior, cross-project denial, retirement cleanup, resource cost, and deployed readback with instrumented neutral fixtures. Prerequisites: PLAN-022's operator dashboard provisioning path and the existing authorized Platform API observation boundary. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023) and [N-10](../../product/requirements.md).
+
+  **Planning baseline (October 15, 2026):** Current application discovery feeds only blackbox availability probes; Prometheus does not scrape application `/metrics` endpoints. No framework dashboard templates or application metric reads are implemented.
+
 
 ## Shared implementation baseline
 
@@ -1164,5 +1169,6 @@ Requirement outcomes inherit task evidence; this table is a navigation map, not 
 | N-07 | OPS-003-T01/02, OPS-005-T01/02 |
 | N-08 | OPS-001-T01/02, DEV-012-T02/03, and audit checks on every later mutation/access change |
 | N-09 | PLAN-021/022 |
+| N-10 | PLAN-023 |
 
 The phase task index remains authoritative for scheduling, including deferred component-specific extensions. Requirement or story closure needs all applicable criteria, not just the foundation tasks listed here.

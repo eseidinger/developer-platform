@@ -17,6 +17,9 @@ The generated [OpenAPI contract](../api/openapi.json) is the machine-readable
 source of truth. This page explains the same currently implemented constraints in
 developer terms. All examples are JSON because the current CLI accepts JSON input.
 
+Opt-in application metrics collection is a [planned Phase 4 capability](../architecture/application-contract.md#planned-application-metrics-capability-phase-4).
+The current schema has no metrics field; declaring one now is rejected.
+
 ## Rules that apply to every request
 
 - Send one complete declaration. This is a desired-state `PUT`, not a patch.
