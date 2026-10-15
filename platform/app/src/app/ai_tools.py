@@ -143,11 +143,17 @@ def make_tools(project, current_spec, connect, runtime=None):
                 "observed_at": observed["observed_at"]}
 
     def get_documentation() -> dict:
-        """Read the fixed platform reference for deployment revision and rollback semantics."""
-        return {"source": "docs/api/openapi.json", "reference": "/v1/operations/{operation_id}",
-                "facts": ["A deploy request queues an operation and returns its ID.",
-                          "Inspect operation status and readiness before declaring recovery.",
-                          "Rollback re-applies a retained revision as a new revision."],
+        """Read fixed committed references for templates, revisions and integration."""
+        return {"source": "committed-platform-documentation",
+                "references": [
+                    {"path": "examples/web-postgres/README.md",
+                     "fact": "A web service with PostgreSQL example exists."},
+                    {"path": "docs/api/openapi.json",
+                     "fact": "Deployment queues an operation; inspect its status and readiness."},
+                    {"path": "docs/architecture/decisions/ADR-020-generic-hosted-application-integration.md",
+                     "fact": "Hosted application integration is declaration based and project scoped."},
+                    {"path": "docs/architecture/decisions/ADR-021-phase-4-tracing-boundary.md",
+                     "fact": "Telemetry is opt-in and trace context is bounded at the platform boundary."}],
                 "observed_at": datetime.now(timezone.utc).isoformat()}
 
     functions = [get_application, get_deployments, get_metrics, get_traces,

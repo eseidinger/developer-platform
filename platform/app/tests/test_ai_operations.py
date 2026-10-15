@@ -6,7 +6,7 @@ from unittest.mock import patch
 from langchain_core.messages import AIMessage
 from langchain_core.tools import StructuredTool
 
-from app import ai_agent, ai_changes, ai_evaluation, ai_model, ai_tools
+from app import ai_agent, ai_changes, ai_evaluation, ai_model, ai_tools, authorization
 
 
 class _Bound:
@@ -162,6 +162,19 @@ class AIOperationsTests(unittest.TestCase):
         unknown = ai_evaluation.CASES[3]
         outcome["result"] = {"hypotheses": [], "insufficient_evidence": True}
         self.assertTrue(ai_evaluation.score(unknown, outcome)["passed"])
+
+    def test_manage_authority_excludes_developer_and_deployment_credential(self):
+        principal = type("Principal", (), {"issuer": "issuer", "subject": "person"})()
+        with patch.object(authorization, "_roles", return_value={"developer"}), \
+             patch("app.deployment_credentials.access_scope", return_value=None):
+            self.assertFalse(authorization.is_allowed(None, principal, "manage", "shop"))
+        with patch.object(authorization, "_roles", return_value={"project-admin"}), \
+             patch("app.deployment_credentials.access_scope", return_value=None):
+            self.assertTrue(authorization.is_allowed(None, principal, "manage", "shop"))
+        machine = type("Machine", (), {"active": True, "kind": "deployment", "project": "shop"})()
+        with patch.object(authorization, "_roles", return_value={"project-admin"}), \
+             patch("app.deployment_credentials.access_scope", return_value=machine):
+            self.assertFalse(authorization.is_allowed(None, principal, "manage", "shop"))
 
 
 if __name__ == "__main__":

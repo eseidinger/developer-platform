@@ -6,6 +6,9 @@ full evaluation corpus remain open. Covers [F-11 and F-12](../../../product/requ
 
 The source implementation uses LangChain `ChatOpenAI` through the EU API endpoint
 with Responses API `store=false`, a project-bound tool set, and durable run records.
+The `development_assistance` run uses fixed, committed documentation and the
+caller's authorized project observations for a bounded template and change-impact
+explanation. It does not read arbitrary repository files.
 External calls fail closed until the API key and explicit EU project, processing,
 and Modified Retention amendment verification flags are set. OpenAI's current
 [data controls](https://developers.openai.com/api/docs/guides/your-data) require

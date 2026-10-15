@@ -57,7 +57,8 @@
           "kind": {
             "enum": [
               "explain_application",
-              "investigate_incident"
+              "investigate_incident",
+              "development_assistance"
             ],
             "title": "Kind",
             "type": "string"

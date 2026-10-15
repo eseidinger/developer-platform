@@ -14,12 +14,15 @@ def initialize(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS ai_runs (
         run_id UUID PRIMARY KEY, project TEXT NOT NULL REFERENCES projects(name),
         requester_issuer TEXT NOT NULL, requester_subject TEXT NOT NULL,
-        kind TEXT NOT NULL CHECK (kind IN ('explain_application','investigate_incident')),
+        kind TEXT NOT NULL CHECK (kind IN ('explain_application','investigate_incident','development_assistance')),
         state TEXT NOT NULL CHECK (state IN ('running','completed','abstained','failed')),
         model TEXT, result JSONB, evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
         tool_calls INTEGER NOT NULL DEFAULT 0, estimated_cost_usd NUMERIC(8,6) NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(), completed_at TIMESTAMPTZ)""")
     conn.execute("CREATE INDEX IF NOT EXISTS ai_runs_project_created_idx ON ai_runs(project,created_at DESC)")
+    conn.execute("ALTER TABLE ai_runs DROP CONSTRAINT IF EXISTS ai_runs_kind_check")
+    conn.execute("""ALTER TABLE ai_runs ADD CONSTRAINT ai_runs_kind_check
+        CHECK (kind IN ('explain_application','investigate_incident','development_assistance'))""")
 
 
 def set_policy(conn, project: str, classification: str):

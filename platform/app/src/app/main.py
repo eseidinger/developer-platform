@@ -389,7 +389,7 @@ class AIProjectPolicy(BaseModel):
 
 class AIRunRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    kind: Literal["explain_application", "investigate_incident"]
+    kind: Literal["explain_application", "investigate_incident", "development_assistance"]
 
 
 class AIProposalRequest(BaseModel):

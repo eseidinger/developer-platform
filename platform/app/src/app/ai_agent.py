@@ -3,6 +3,7 @@
 import json
 import re
 import time
+from datetime import datetime, timezone
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
@@ -68,9 +69,14 @@ def _cost(usage):
 
 def run(kind, run_id, model, tools, *, clock=time.monotonic):
     deadline = clock() + MAX_SECONDS
-    messages = [SystemMessage(content=SYSTEM), HumanMessage(content=(
-        "Explain the current application and cite its catalog source." if kind == "explain_application" else
-        "Investigate the current project incident using read-only evidence. State missing data."))]
+    requests = {
+        "explain_application": "Explain the current application and cite its catalog source.",
+        "investigate_incident": "Investigate the current project incident using read-only evidence. State missing data.",
+        "development_assistance": "Select a suitable committed example or API reference for this application, "
+            "and explain likely change impact using the current revision and deployment evidence. "
+            "Use read-only project and documentation tools. Cite sources and state gaps.",
+    }
+    messages = [SystemMessage(content=SYSTEM), HumanMessage(content=requests[kind])]
     tool_map = {tool.name: tool for tool in tools}
     bound = model.bind_tools(tools)
     evidence = []
@@ -123,7 +129,8 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                     content = json.dumps({"state": "unavailable", "reason": "ReadToolUnavailable"})
                 evidence.append({"id": evidence_id, "tool": name,
                                  "source": observation.get("source", "unknown") if isinstance(observation, dict) else "unknown",
-                                 "state": observation.get("state", "ok") if isinstance(observation, dict) else "unavailable"})
+                                 "state": observation.get("state", "ok") if isinstance(observation, dict) else "unavailable",
+                                 "at": datetime.now(timezone.utc).isoformat()})
                 messages.append(ToolMessage(content=json.dumps({"source_id": evidence_id,
                     "observation": json.loads(content)}), tool_call_id=request["id"]))
             else:
