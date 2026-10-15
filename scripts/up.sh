@@ -88,6 +88,8 @@ done
 test -s .runtime/telemetry-reviewer.kubeconfig
 chmod 644 .runtime/telemetry-reviewer.kubeconfig
 rm -f .runtime/telemetry-reviewer-token.json
+docker build -f platform/Dockerfile.telemetry-forwarder -t developer-platform-telemetry-forwarder:local platform
+k3d image import developer-platform-telemetry-forwarder:local -c workloads
 # Claim the fixed identity/API addresses before monitoring and edge containers
 # can receive them from Docker's dynamic allocator. This starts only the API's
 # required dependencies (PostgreSQL and the two identity initializers).

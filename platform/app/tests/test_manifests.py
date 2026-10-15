@@ -126,6 +126,13 @@ class WorkloadContract(unittest.TestCase):
         self.assertEqual(token["projected"]["sources"][0]["serviceAccountToken"]["audience"],
                          "platform-telemetry")
         self.assertEqual(token["projected"]["sources"][0]["serviceAccountToken"]["expirationSeconds"], 600)
+        application, forwarder = pod["containers"]
+        self.assertNotIn("telemetry-token", [mount["name"] for mount in application["volumeMounts"]])
+        self.assertIn({"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://127.0.0.1:4318"},
+                      application["env"])
+        self.assertEqual(forwarder["name"], "telemetry-forwarder")
+        self.assertIn("telemetry-token", [mount["name"] for mount in forwarder["volumeMounts"]])
+        self.assertEqual(forwarder["resources"]["requests"]["memory"], "64Mi")
         policy = next(doc for doc in docs if doc["kind"] == "NetworkPolicy" and
                       doc["metadata"]["name"] == "api-telemetry")
         self.assertEqual(policy["spec"]["egress"][0]["ports"][0]["port"], 4318)

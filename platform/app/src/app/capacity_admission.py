@@ -4,7 +4,7 @@ import os
 
 from kubernetes.utils.quantity import parse_quantity
 
-from .manifests import DEFAULT_RESOURCES
+from .manifests import DEFAULT_RESOURCES, TELEMETRY_FORWARDER_RESOURCES
 
 
 def _get(value, name, default=None):
@@ -45,7 +45,10 @@ def _proposed(spec):
     for component in components:
         resources = component.get("resources") or DEFAULT_RESOURCES
         replicas = component.get("replicas", 1) if component["type"] == "service" else 1
-        values = _request_total([{"resources": resources}])
+        containers = [{"resources": resources}]
+        if component.get("tracing", {}).get("enabled"):
+            containers.append({"resources": TELEMETRY_FORWARDER_RESOURCES})
+        values = _request_total(containers)
         for key in total:
             total[key] += values[key] * replicas
     return total

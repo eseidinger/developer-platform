@@ -3,7 +3,11 @@
 Status: source implementation in progress; deployed acceptance remains open.
 Platform and application tracing, application metrics, and dashboards have
 source paths that still require fixture validation and operational evidence. This
-phase follows the usable Phase 3 source capabilities and precedes AI operations
+includes a Pod-local HTTP/protobuf forwarder for opted-in traces: it reads the
+rotating Pod-bound token for each batch, so framework exporters can use the
+standard localhost OTLP endpoint. Its resource requests count in quota and
+capacity admission. See [trace setup](../../../infrastructure/monitoring/TRACING.md).
+The phase follows the usable Phase 3 source capabilities and precedes AI operations
 in [Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
 Alloy, and operator-only Grafana. Full PLAN-017 monitoring acceptance remains
 in the independent [Phase 7 leftovers](phase-7-anytime-leftovers.md); any

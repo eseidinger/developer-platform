@@ -9,6 +9,8 @@ DEFAULT_QUOTA = {
     "pods": "10", "services": "5", "services.loadbalancers": "0", "services.nodeports": "0",
     "persistentvolumeclaims": "0",
 }
+TELEMETRY_FORWARDER_RESOURCES = {"requests": {"cpu": "25m", "memory": "64Mi"},
+                                 "limits": {"cpu": "100m", "memory": "128Mi"}}
 OVERRIDABLE = {"requests.cpu", "requests.memory", "limits.cpu", "limits.memory", "pods"}
 
 
@@ -70,8 +72,15 @@ def validate_component_capacity(project: str, components: list[dict]) -> None:
         largest_service = max(largest_service, replicas if component["type"] == "service" else 0)
         requested = component.get("resources") or {"requests": {"cpu": "100m", "memory": "128Mi"},
                                                      "limits": {"cpu": "500m", "memory": "256Mi"}}
+        if component.get("tracing", {}).get("enabled"):
+            sidecar = TELEMETRY_FORWARDER_RESOURCES
+        else:
+            sidecar = None
         for section in totals:
             cpu, memory = _cpu(requested[section]["cpu"]), _memory(requested[section]["memory"])
+            if sidecar:
+                cpu += _cpu(sidecar[section]["cpu"])
+                memory += _memory(sidecar[section]["memory"])
             totals[section]["cpu"] += cpu * replicas
             totals[section]["memory"] += memory * replicas
             if component["type"] == "service":

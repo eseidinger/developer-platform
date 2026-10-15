@@ -5,7 +5,7 @@ import re
 
 from .config import env_list
 from .egress import resolve as resolve_egress_dns
-from .project_policy import quota_for
+from .project_policy import quota_for, TELEMETRY_FORWARDER_RESOURCES
 
 def validate_name(value):
     if not re.fullmatch(r"[a-z][a-z0-9-]{0,30}[a-z0-9]|[a-z]", value):
@@ -163,15 +163,15 @@ def component_resources(name, components, database_ip, password, configuration=N
         if tracing_enabled:
             gateway_ip = str(ipaddress.IPv4Address(os.environ.get("TELEMETRY_GATEWAY_IP", "172.30.80.13")))
             container.setdefault("env", []).extend([
-                {"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://" + gateway_ip + ":4318"},
+                {"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://127.0.0.1:4318"},
                 {"name": "OTEL_EXPORTER_OTLP_PROTOCOL", "value": "http/protobuf"},
                 {"name": "OTEL_SERVICE_NAME", "value": name + "." + component["name"]},
                 {"name": "OTEL_TRACES_SAMPLER", "value": "parentbased_traceidratio"},
                 {"name": "OTEL_TRACES_SAMPLER_ARG", "value": os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "0.1")},
-                {"name": "PLATFORM_TELEMETRY_TOKEN_FILE", "value": "/var/run/platform-telemetry/token"},
+                {"name": "QUARKUS_OTEL_TRACES_EXPORTER", "value": "otlp"},
+                {"name": "QUARKUS_OTEL_EXPORTER_OTLP_PROTOCOL", "value": "http/protobuf"},
+                {"name": "QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://127.0.0.1:4318"},
             ])
-            container["volumeMounts"].append({"name": "telemetry-token", "mountPath": "/var/run/platform-telemetry",
-                                              "readOnly": True})
         if component["type"] == "service":
             ports = component.get("ports") or []
             if ports:
@@ -195,6 +195,17 @@ def component_resources(name, components, database_ip, password, configuration=N
             spec["volumes"].append({"name": "telemetry-token", "projected": {"sources": [{
                 "serviceAccountToken": {"path": "token", "audience": "platform-telemetry",
                                         "expirationSeconds": 600}}]}})
+            spec["containers"].append({
+                "name": "telemetry-forwarder", "image": "developer-platform-telemetry-forwarder:local",
+                "imagePullPolicy": "IfNotPresent",
+                "command": ["python", "/forwarder.py"],
+                "env": [{"name": "TELEMETRY_GATEWAY_URL", "value": "http://" + gateway_ip + ":4318/v1/traces"}],
+                "resources": TELEMETRY_FORWARDER_RESOURCES,
+                "securityContext": {"allowPrivilegeEscalation": False,
+                    "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
+                "volumeMounts": [{"name": "telemetry-token", "mountPath": "/var/run/platform-telemetry",
+                                  "readOnly": True}],
+            })
         if restart_policy:
             spec["restartPolicy"] = restart_policy
         return spec

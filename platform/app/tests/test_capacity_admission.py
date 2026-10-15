@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from app.capacity_admission import assess, snapshot
+from app.capacity_admission import _proposed, assess, snapshot
 
 
 class CapacityAdmissionTests(unittest.TestCase):
@@ -95,6 +95,14 @@ class CapacityAdmissionTests(unittest.TestCase):
         runtime.resources.get.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
         self.assertEqual(assess(runtime, {"image": "example"}, logging.getLogger("test")),
                          {"state": "unavailable", "reason": "InvalidCapacityReserve"})
+
+    def test_tracing_forwarder_is_included_in_proposed_requests(self):
+        component = {"type": "service", "replicas": 2,
+                     "resources": {"requests": {"cpu": "100m", "memory": "128Mi"}}}
+        plain = _proposed({"components": [component]})
+        traced = _proposed({"components": [{**component, "tracing": {"enabled": True}}]})
+        self.assertEqual(traced["cpu"] - plain["cpu"], 50)
+        self.assertEqual(traced["memory"] - plain["memory"], 128)
 
 
 if __name__ == "__main__":

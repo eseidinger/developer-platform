@@ -38,6 +38,15 @@ class ProjectQuotaPolicyTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "operator project quota policy is invalid"):
             quota_for("shop")
 
+    def test_tracing_forwarder_counts_against_project_quota(self):
+        os.environ["PROJECT_QUOTAS_JSON"] = '{"shop":{"requests.cpu":"200m"}}'
+        component = {"name": "api", "type": "service", "replicas": 1,
+                     "resources": {"requests": {"cpu": "100m", "memory": "128Mi"},
+                                   "limits": {"cpu": "500m", "memory": "256Mi"}}}
+        validate_component_capacity("shop", [component])
+        with self.assertRaisesRegex(ValueError, "resource quota"):
+            validate_component_capacity("shop", [{**component, "tracing": {"enabled": True}}])
+
     def test_flat_project_is_rejected_before_operation_when_its_quota_is_exceeded(self):
         os.environ["PROJECT_QUOTAS_JSON"] = '{"shop":{"requests.cpu":"150m","limits.cpu":"600m"}}'
         with self.assertRaisesRegex(ValueError, "resource quota"):
