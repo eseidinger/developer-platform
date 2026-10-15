@@ -44,14 +44,13 @@ field must not silently acquire a different meaning.
 10. Provider portability is a contract constraint, not a requirement to operate a
     second provider.
 
-## Planned application metrics capability (Phase 4)
+## Application metrics declaration (Phase 4 implementation in progress)
 
 A service component may opt in to platform collection of Prometheus-format
-application metrics by declaring a bounded metrics path and one of its declared
-HTTP ports. The exact versioned field shape remains to be designed and is not
-accepted by the current `v1alpha2` API. The capability must be advertised by the
-environment before a declaration can use it. Unknown or unsupported metrics
-fields fail before provider side effects; existing declarations remain valid.
+application metrics with `telemetry.metrics: {port: "http", path: "/metrics"}`,
+where `http` names one declared HTTP service port. The API accepts this additive
+`v1alpha2` declaration and advertises `applicationMetrics`. Existing declarations
+remain valid. Unknown fields and invalid ports or paths fail before side effects.
 
 The platform derives scrape targets from the accepted project/component identity
 and reaches them on a private, platform-controlled path. Metrics collection must

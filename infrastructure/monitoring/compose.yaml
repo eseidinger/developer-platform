@@ -20,6 +20,8 @@ services:
       - ./alerts.yaml:/etc/prometheus/alerts.yml:ro
       - prometheus:/prometheus
       - monitoring_discovery:/etc/prometheus/discovery:ro
+      - ../../.runtime/metrics-reader.token:/run/prometheus/metrics-reader.token:ro
+      - ../../.runtime/metrics-reader-ca.crt:/run/prometheus/metrics-reader-ca.crt:ro
     ports: ["127.0.0.1:9090:9090"]
     networks: [platform]
     mem_limit: 1g

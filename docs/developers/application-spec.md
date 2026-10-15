@@ -17,8 +17,8 @@ The generated [OpenAPI contract](../api/openapi.json) is the machine-readable
 source of truth. This page explains the same currently implemented constraints in
 developer terms. All examples are JSON because the current CLI accepts JSON input.
 
-Opt-in application metrics collection is a [planned Phase 4 capability](../architecture/application-contract.md#planned-application-metrics-capability-phase-4).
-The current schema has no metrics field; declaring one now is rejected.
+Service components may opt in to private Prometheus collection with
+`telemetry.metrics`. See the [application contract](../architecture/application-contract.md#application-metrics-declaration-phase-4-implementation-in-progress).
 Opt-in [application tracing](../architecture/application-contract.md#planned-application-tracing-capability-phase-4)
 is also planned for Phase 4; the current schema has no tracing field.
 
@@ -142,6 +142,24 @@ approved it.
 | `exposure` | No | `private` (default) or `public`. At most one service in an application can be public. |
 | `health.readiness` | No | Exactly one of `profile` or `path`. `profile` is `status` or `hello-world` and retains the TCP readiness probe on the first declared port. `path` configures an HTTP GET readiness probe; it must begin with `/` and uses the first declared port unless `port` matches another declared port number. |
 | `outbound` | No | Up to five `{ "cidr": "…", "port": N }` or `{ "dns": "api.example.com", "port": N }` destinations. CIDRs, and every IP address currently resolved for DNS destinations, must be in the operator allow-list. DNS rules are resolved to fixed NetworkPolicy IP rules when the deployment is applied; reapply when the destination address changes. |
+| `telemetry.metrics` | No | `{ "port": "http", "path": "/metrics" }`, where `port` names a declared HTTP service port and `path` is at most 128 characters with no query string. Collection uses a private Kubernetes service proxy and keeps only supported HTTP request series. |
+
+For Spring Boot, add Actuator and the Prometheus Micrometer registry, expose
+`/actuator/prometheus` on a declared service port, and use that path in the
+declaration. For Quarkus, add `quarkus-micrometer-registry-prometheus` and
+declare `/q/metrics`. For FastAPI, instrument requests with
+[`prometheus-fastapi-instrumentator`](https://github.com/trallnag/prometheus-fastapi-instrumentator)
+or an equivalent library that emits `http_requests_total` and
+`http_request_duration_seconds_{sum,count}` at `/metrics`. The platform keeps
+only these request series and fixed project/component labels, so raw path,
+handler, URI, user and custom metric labels are discarded. The first two
+frameworks emit Micrometer's `http_server_requests_seconds_{count,sum}`;
+[Spring Actuator](https://docs.spring.io/spring-boot/reference/actuator/metrics.html)
+and [Quarkus Micrometer](https://quarkus.io/guides/telemetry-micrometer/)
+document their setup. Project readers can use the fixed
+`GET /projects/{name}/application-metrics?component={component}` view;
+operators have three framework dashboards with project, application and
+component selectors. A failed scrape is reported separately from a zero rate.
 
 A public service gets an ingress at
 `https://<component>-<project>.<apps-domain>`. Private services get in-project

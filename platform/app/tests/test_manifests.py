@@ -101,6 +101,20 @@ class WorkloadContract(unittest.TestCase):
         self.assertEqual(pod["containers"][0]["env"], [{"name": "MODE", "value": "batch"}])
         self.assertEqual(cronjob["jobTemplate"]["spec"]["backoffLimit"], 6)
 
+    def test_metrics_proxy_rbac_is_scoped_to_opted_in_services(self):
+        docs = component_resources("shop", [
+            {"name": "api", "type": "service", "resolved_image": "example/api:1",
+             "ports": [{"name": "http", "port": 8080}],
+             "metrics": {"port": "http", "path": "/metrics"}},
+            {"name": "other", "type": "service", "resolved_image": "example/other:1",
+             "ports": [{"name": "http", "port": 8081}]},
+        ], "172.30.80.10", "secret")
+        role = next(doc for doc in docs if doc["kind"] == "Role")
+        self.assertEqual(role["rules"], [{"apiGroups": [""], "resources": ["services/proxy"],
+                                          "resourceNames": ["api"], "verbs": ["get"]}])
+        binding = next(doc for doc in docs if doc["kind"] == "RoleBinding")
+        self.assertEqual(binding["subjects"][0]["name"], "workload-metrics-reader")
+
     def test_component_http_readiness_and_job_deadline(self):
         docs = component_resources("shop", [
             {"name": "web", "type": "service", "resolved_image": "registry/web@sha256:one",

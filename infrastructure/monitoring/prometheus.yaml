@@ -47,3 +47,31 @@ scrape_configs:
         replacement: blackbox-exporter:9115
       - action: labeldrop
         regex: 'probe_module|probe_hostname'
+  - job_name: application-metrics
+    scheme: https
+    scrape_interval: 30s
+    scrape_timeout: 5s
+    sample_limit: 500
+    body_size_limit: 256KB
+    label_limit: 16
+    label_name_length_limit: 64
+    label_value_length_limit: 128
+    authorization:
+      type: Bearer
+      credentials_file: /run/prometheus/metrics-reader.token
+    tls_config:
+      ca_file: /run/prometheus/metrics-reader-ca.crt
+    file_sd_configs:
+      - files: [/etc/prometheus/discovery/application-metrics.json]
+        refresh_interval: 15s
+    relabel_configs:
+      - source_labels: [proxy_path]
+        target_label: __metrics_path__
+      - action: labeldrop
+        regex: proxy_path
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'http_server_requests_seconds_(count|sum|bucket)|http_requests_total|http_request_duration_seconds_(count|sum|bucket)'
+        action: keep
+      - action: labelkeep
+        regex: '__name__|job|instance|project|environment|application|component|namespace|method|status|outcome|le'

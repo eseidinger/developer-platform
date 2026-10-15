@@ -752,6 +752,29 @@
         "title": "Metadata",
         "type": "object"
       },
+      "MetricsDeclaration": {
+        "additionalProperties": false,
+        "properties": {
+          "path": {
+            "maxLength": 128,
+            "minLength": 1,
+            "pattern": "^/[A-Za-z0-9._~/-]*$",
+            "title": "Path",
+            "type": "string"
+          },
+          "port": {
+            "pattern": "^[a-z][a-z0-9-]{0,14}$",
+            "title": "Port",
+            "type": "string"
+          }
+        },
+        "required": [
+          "port",
+          "path"
+        ],
+        "title": "MetricsDeclaration",
+        "type": "object"
+      },
       "OutboundDestination": {
         "additionalProperties": false,
         "description": "One operator-approved TCP egress exception for any component.",
@@ -1322,6 +1345,16 @@
             "title": "Schedule",
             "type": "string"
           },
+          "telemetry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ScheduledTelemetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "timeZone": {
             "const": "UTC",
             "default": "UTC",
@@ -1341,6 +1374,23 @@
           "schedule"
         ],
         "title": "ScheduledComponent",
+        "type": "object"
+      },
+      "ScheduledTelemetry": {
+        "additionalProperties": false,
+        "properties": {
+          "tracing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TracingDeclaration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ScheduledTelemetry",
         "type": "object"
       },
       "ServiceComponent": {
@@ -1414,6 +1464,16 @@
           "runtime": {
             "$ref": "#/components/schemas/ComponentRuntime"
           },
+          "telemetry": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ServiceTelemetry"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "type": {
             "const": "service",
             "title": "Type",
@@ -1456,6 +1516,33 @@
           "projectWideCredential"
         ],
         "title": "ServiceRequest",
+        "type": "object"
+      },
+      "ServiceTelemetry": {
+        "additionalProperties": false,
+        "properties": {
+          "metrics": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/MetricsDeclaration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tracing": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/TracingDeclaration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "ServiceTelemetry",
         "type": "object"
       },
       "Spec": {
@@ -1572,6 +1659,19 @@
           "name"
         ],
         "title": "TestRunnerCredentialCreate",
+        "type": "object"
+      },
+      "TracingDeclaration": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "const": false,
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "title": "TracingDeclaration",
         "type": "object"
       },
       "ValidationError": {
@@ -2590,6 +2690,59 @@
           }
         ],
         "summary": "Provision"
+      }
+    },
+    "/projects/{name}/application-metrics": {
+      "get": {
+        "operationId": "project_application_metrics_projects__name__application_metrics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "component",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 1,
+              "title": "Component",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Project Application Metrics"
       }
     },
     "/projects/{name}/components": {

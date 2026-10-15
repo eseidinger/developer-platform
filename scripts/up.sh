@@ -50,6 +50,7 @@ kubectl wait --for=condition=Ready nodes --all --timeout=180s
 kubectl apply -f infrastructure/kubernetes/controller.yaml
 kubectl apply -f infrastructure/kubernetes/metrics.yaml
 kubectl apply -f infrastructure/kubernetes/log-reader.yaml
+kubectl apply -f infrastructure/kubernetes/metrics-reader.yaml
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret provisioner-token -o json > .runtime/token.json
   if python3 scripts/kubeconfig.py; then break; fi
@@ -69,6 +70,15 @@ test -s .runtime/log-reader.kubeconfig
 # Alloy is a trusted operator collector; do not mount the provisioner credential.
 chmod 644 .runtime/log-reader.kubeconfig
 rm -f .runtime/log-reader-token.json
+for attempt in $(seq 1 30); do
+  kubectl -n platform-system get secret workload-metrics-reader-token -o json > .runtime/metrics-reader-token.json
+  if python3 scripts/metrics-reader-credentials.py; then break; fi
+  sleep 2
+done
+test -s .runtime/metrics-reader.token
+test -s .runtime/metrics-reader-ca.crt
+chmod 644 .runtime/metrics-reader.token .runtime/metrics-reader-ca.crt
+rm -f .runtime/metrics-reader-token.json
 # Claim the fixed identity/API addresses before monitoring and edge containers
 # can receive them from Docker's dynamic allocator. This starts only the API's
 # required dependencies (PostgreSQL and the two identity initializers).

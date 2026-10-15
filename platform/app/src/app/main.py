@@ -62,6 +62,7 @@ from . import access_store
 from .access_worker import loop as application_access_loop
 from . import human_database_access
 from . import tracing
+from . import application_metrics
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -1203,6 +1204,24 @@ def drift(name: str, principal: Principal = Depends(current_principal)):
     required_audit(actor, "project.drift.detected" if result["state"] == "drifted" else "project.drift.inspect",
                    "project", name, "succeeded", {"project": name}, detail)
     return {"project": name, "revision": current[0], **result}
+
+
+@app.get("/projects/{name}/application-metrics")
+def project_application_metrics(name: str, component: str = Query(min_length=1, max_length=32),
+                                principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    validate_name(component)
+    current = current_spec(name)
+    if current is None or not current[1] or current[1].get("components") is None:
+        raise HTTPException(404, "No application metrics declaration")
+    declared = next((item for item in current[1]["components"]
+                     if item["name"] == component and item.get("metrics")), None)
+    if declared is None:
+        raise HTTPException(404, "No application metrics declaration")
+    if current[2] != "applied":
+        return {"project": name, "component": component, "state": "not_applied",
+                "reason": "DeploymentNotApplied"}
+    return application_metrics.observe(name, component)
 
 
 @app.get("/projects/{name}/components")

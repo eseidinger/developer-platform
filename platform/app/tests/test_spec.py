@@ -100,6 +100,23 @@ class EnvelopeContract(unittest.TestCase):
              "command": ["python", "-m", "jobs"], "schedule": "*/15 * * * *", "time_zone": "UTC",
              "concurrency_policy": "Forbid", "retry_limit": 6}]})
 
+    def test_service_metrics_opt_in_uses_declared_port_and_bounded_path(self):
+        component = {"name": "api", "type": "service", "runtime": {"type": "container", "image": "registry/api:v1"},
+                     "ports": [{"name": "http", "protocol": "http", "port": 8080}],
+                     "telemetry": {"metrics": {"port": "http", "path": "/actuator/prometheus"}}}
+        body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"},
+                "spec": {"components": [component]}}
+        self.assertEqual(spec.to_flat(body)["components"][0]["metrics"],
+                         {"port": "http", "path": "/actuator/prometheus"})
+        for metrics in ({"port": "other", "path": "/metrics"},
+                        {"port": "http", "path": "//evil"},
+                        {"port": "http", "path": "/metrics?secret=x"}):
+            with self.subTest(metrics=metrics), self.assertRaises(ValueError):
+                spec.to_flat({**body, "spec": {"components": [{**component, "telemetry": {"metrics": metrics}}]}})
+        with self.assertRaises(ValueError):
+            spec.to_flat({**body, "spec": {"components": [{**component,
+                "telemetry": {"tracing": {"enabled": True}}}]}})
+
     def test_v1alpha2_rejects_invalid_schedule(self):
         body = {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": "shop"},
                 "spec": {"components": [{"name": "job", "type": "scheduled",

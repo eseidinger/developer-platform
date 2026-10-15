@@ -172,6 +172,32 @@ class _Component(_Strict):
         return value
 
 
+class MetricsDeclaration(_Strict):
+    port: str = Field(pattern=r"^[a-z][a-z0-9-]{0,14}$")
+    path: str = Field(min_length=1, max_length=128,
+                      pattern=r"^/[A-Za-z0-9._~/-]*$")
+
+    @field_validator("path")
+    @classmethod
+    def safe_path(cls, value):
+        if "//" in value or any(segment in {".", ".."} for segment in value.split("/")):
+            raise ValueError("metrics path cannot contain empty or dot segments")
+        return value
+
+
+class TracingDeclaration(_Strict):
+    enabled: Literal[False] = False
+
+
+class ServiceTelemetry(_Strict):
+    metrics: Optional[MetricsDeclaration] = None
+    tracing: Optional[TracingDeclaration] = None
+
+
+class ScheduledTelemetry(_Strict):
+    tracing: Optional[TracingDeclaration] = None
+
+
 class OutboundDestination(_Strict):
     """One operator-approved TCP egress exception for any component."""
     cidr: Optional[str] = None
@@ -191,6 +217,7 @@ class ServiceComponent(_Component):
     replicas: int = Field(default=1, ge=1, le=5)
     exposure: Literal["private", "public"] = "private"
     health: Optional[Health] = None
+    telemetry: Optional[ServiceTelemetry] = None
 
     @model_validator(mode="after")
     def unique_ports(self):
@@ -202,6 +229,9 @@ class ServiceComponent(_Component):
             declared = {port.port for port in self.ports}
             if self.health.readiness.port is not None and self.health.readiness.port not in declared:
                 raise ValueError("readiness port must be one of the declared service ports")
+        if self.telemetry and self.telemetry.metrics:
+            if not self.ports or self.telemetry.metrics.port not in {port.name for port in self.ports}:
+                raise ValueError("metrics port must name a declared HTTP service port")
         return self
 
 
@@ -212,6 +242,7 @@ class ScheduledComponent(_Component):
     concurrencyPolicy: Literal["Forbid"] = "Forbid"
     retryLimit: int = Field(default=6, ge=0, le=10)
     maxRunSeconds: Optional[int] = Field(default=None, ge=60, le=86400)
+    telemetry: Optional[ScheduledTelemetry] = None
 
     @field_validator("schedule")
     @classmethod
@@ -271,6 +302,9 @@ CAPABILITIES = {
                                     "dnsResolvedAtApply": True},
                        "service": {"internalHttpPorts": True, "maxReplicas": 5},
                        "scheduled": {"cronFields": 5, "timeZone": ["UTC"], "concurrencyPolicy": ["Forbid"]}},
+        "applicationMetrics": {"serviceOptIn": True, "prometheusFormat": True,
+                               "port": "declared HTTP service port", "maxPathLength": 128,
+                               "collection": "private Kubernetes service proxy"},
     }},
 }
 
@@ -331,6 +365,9 @@ def to_flat(body):
                         flat_component["readiness_path"] = readiness.path
                         if readiness.port is not None:
                             flat_component["readiness_port"] = readiness.port
+                if component.telemetry and component.telemetry.metrics:
+                    metrics = component.telemetry.metrics
+                    flat_component["metrics"] = {"port": metrics.port, "path": metrics.path}
             else:
                 flat_component.update({"schedule": component.schedule, "time_zone": component.timeZone,
                                        "concurrency_policy": component.concurrencyPolicy,

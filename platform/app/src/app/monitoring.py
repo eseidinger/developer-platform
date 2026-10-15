@@ -61,6 +61,33 @@ def target_groups(rows, domain):
     return groups
 
 
+def metric_target_groups(rows):
+    """Private Kubernetes service-proxy scrape targets from accepted active specs."""
+    groups = []
+    for name, spec, status in sorted(rows):
+        if status != "applied" or not spec or spec.get("components") is None:
+            continue
+        validate_name(name)
+        for component in sorted(spec["components"], key=lambda item: item["name"]):
+            metrics = component.get("metrics")
+            if component["type"] != "service" or not metrics:
+                continue
+            validate_name(component["name"])
+            port = metrics["port"]
+            path = metrics["path"]
+            if port not in {p["name"] for p in component.get("ports", [])}:
+                raise ValueError("Metrics port must be declared")
+            if (not isinstance(path, str) or not re.fullmatch(r"/[A-Za-z0-9._~/-]{0,127}", path)
+                    or "//" in path or any(segment in {".", ".."} for segment in path.split("/"))):
+                raise ValueError("Invalid metrics path")
+            groups.append({"targets": ["k3d-workloads-server-0:6443"], "labels": {
+                "project": name, "environment": "default", "application": name,
+                "component": component["name"], "namespace": "project-" + name,
+                "proxy_path": f"/api/v1/namespaces/project-{name}/services/http:{component['name']}:{port}/proxy{path}",
+            }})
+    return groups
+
+
 def atomic_write(path, content):
     path = Path(path)
     fd, temporary = tempfile.mkstemp(prefix=".discovery-", dir=path.parent)
@@ -80,8 +107,10 @@ def publish_catalog(conn):
     directory = Path(os.environ.get("MONITORING_DISCOVERY_DIR", "/var/lib/platform-monitoring"))
     rows = conn.execute("SELECT name, spec, status FROM projects ORDER BY name").fetchall()
     groups = target_groups(rows, os.environ["APPS_DOMAIN"])
+    metric_groups = metric_target_groups(rows)
     directory.mkdir(parents=True, exist_ok=True)
     atomic_write(directory / "applications.json", json.dumps(groups) + "\n")
+    atomic_write(directory / "application-metrics.json", json.dumps(metric_groups) + "\n")
     atomic_write(directory / "discovery.prom",
                  "# HELP platform_discovery_last_success_timestamp_seconds Last catalog publication.\n"
                  "# TYPE platform_discovery_last_success_timestamp_seconds gauge\n"

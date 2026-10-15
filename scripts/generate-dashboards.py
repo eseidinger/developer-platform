@@ -54,6 +54,42 @@ DASHBOARDS = [
 ]
 
 
+def application_variables():
+    def variable(name, query, sort=1):
+        return {"name": name, "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"},
+                "query": {"query": query, "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+                "refresh": 1, "sort": sort, "multi": False, "includeAll": False,
+                "current": {"text": "", "value": ""}}
+    return {"list": [
+        variable("project", 'label_values(up{job="application-metrics"}, project)'),
+        variable("application", 'label_values(up{job="application-metrics",project="$project"}, application)'),
+        variable("component", 'label_values(up{job="application-metrics",project="$project",application="$application"}, component)'),
+    ]}
+
+
+def framework_dashboard(framework, metric):
+    selector = 'job="application-metrics",project="$project",application="$application",component="$component"'
+    requests = f'{metric}_count' if metric != "http_requests_total" else metric
+    duration = "http_request_duration_seconds" if framework == "FastAPI" else "http_server_requests_seconds"
+    panels = [
+        panel(1, "Collection state", f'up{{{selector}}}',
+              description="One is a successful private scrape; zero is a failed scrape."),
+        panel(2, "Request rate", f'sum(rate({requests}{{{selector}}}[5m]))', unit="reqps",
+              description="Five-minute request rate from the framework's HTTP server counter."),
+        panel(3, "Server error rate", f'sum(rate({requests}{{{selector},status=~"5..|5xx"}}[5m]))', unit="reqps",
+              description="Five-minute 5xx rate; an empty panel can mean no error series was emitted."),
+        panel(4, "Mean request duration",
+              f'sum(rate({duration}_sum{{{selector}}}[5m])) / sum(rate({duration}_count{{{selector}}}[5m]))',
+              unit="s", description="Five-minute mean duration; no data when no duration series exists."),
+    ]
+    return {"uid": "application-" + framework.lower().replace(" ", "-"),
+            "title": framework + " application metrics", "schemaVersion": 41, "version": 1,
+            "editable": False, "timezone": "browser", "refresh": "30s",
+            "time": {"from": "now-1h", "to": "now"},
+            "tags": ["developer-platform", "operator", "application-metrics"],
+            "templating": application_variables(), "panels": panels}
+
+
 def generate():
     ROOT.mkdir(parents=True, exist_ok=True)
     for uid, title, definitions in DASHBOARDS:
@@ -66,6 +102,11 @@ def generate():
                        for i, (name, expr, unit, description) in enumerate(definitions, 1)],
         }
         (ROOT / f"{uid}.json").write_text(json.dumps(dashboard, indent=2) + "\n")
+    for framework, metric in (("Spring Boot", "http_server_requests_seconds"),
+                              ("Quarkus", "http_server_requests_seconds"),
+                              ("FastAPI", "http_requests_total")):
+        dashboard = framework_dashboard(framework, metric)
+        (ROOT / f"{dashboard['uid']}.json").write_text(json.dumps(dashboard, indent=2) + "\n")
 
 
 if __name__ == "__main__":
