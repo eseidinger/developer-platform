@@ -1,8 +1,9 @@
 # Phase 5 – AI for Operations and Development
 
 Status: source implementation in progress. Read-only investigations and a narrow
-rollback approval workflow are implemented; deployed acceptance evidence and the
-full evaluation corpus remain open. Covers [F-11 and F-12](../../../product/requirements.md).
+rollback approval workflow are implemented; the controlled live startup diagnosis
+and approved recovery journey passed. Remaining deployed acceptance and the full
+evaluation corpus remain open. Covers [F-11 and F-12](../../../product/requirements.md).
 
 The source implementation uses LangChain `ChatOpenAI` through an explicitly selected OpenAI API endpoint
 with Responses API `store=false`, a project-bound tool set, and durable run records.
@@ -29,7 +30,8 @@ top-level paths without values. A human project administrator approves the exact
 hash for 15 minutes; execution checks current authority, hash, expiry, and base
 revision under transaction and queues the existing rollback operation. The
 proposal view links the operation and reports readiness plus available application
-metrics. Additional fix types and a live recovery demonstration remain open.
+metrics. The controlled live rollback recovery demonstration passed; additional
+fix types and rejection safeguards remain open.
 
 After the selected model/account configuration is verified, run
 `UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python scripts/evaluate-ai.py`
@@ -199,7 +201,7 @@ It uses a digest-pinned image, bounded resources and a readiness probe, with no
 database or public route. The owner created the empty project on October 16,
 2026. Human CLI baseline deployment passed as operation
 `a911869f-bf6d-44e1-bad8-35f7f9fd9e56`, revision 1, with readiness 1/1
-on October 16, 2026. Fault injection and recovery still need live results.
+on October 16, 2026. The later live fault and recovery results are recorded below.
 The declaration passed API model validation, and the image served HTTP 200 locally
 as UID 10001 with a read-only filesystem and dropped capabilities.
 
@@ -212,8 +214,15 @@ fails. The proposal path also accepts an applied revision whose service readines
 server-observed `failed`; healthy, progressing and unavailable observations do
 not qualify. It still requires a completed sourced AI run, a prior successful
 retained revision and the existing explicit approval/revision checks. The owner
-observed revision 2 applied with `CrashLoopBackOff`; this establishes startup
-failure, while the diagnosis, proposal and recovery journey remains open.
+observed revision 2 applied with `CrashLoopBackOff`. On October 16, 2026, human
+investigation `c667e949-cd80-4c3c-813a-56494d47547c` completed with a sourced
+startup-option diagnosis. Proposal `2ee5e988-5e18-4440-a274-a64c2f49e813` bound
+rollback from revision 2 to revision 1. After exact-diff human approval,
+operation `82f348a5-473b-48db-b8b9-aa568637175d` succeeded at new revision 3.
+Operation and independent component readback confirmed readiness 1/1 with the
+expected pinned image. This controlled live recovery journey passed; approval
+rejection safeguards, full evaluation/security gates and development assistance
+remain open. No request-metric recovery is claimed for this uninstrumented fixture.
 
 The demonstration introduces a traceable regression using test resources, shows the investigation, an approvable fix, and the observed recovery state. Prompt-injection, secret-handling, and project-boundary tests are acceptance criteria.
 
