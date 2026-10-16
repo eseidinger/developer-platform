@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 import httpx
+import pytest
 from typer.testing import CliRunner
 
 from platform_cli.__main__ import app
@@ -182,6 +183,64 @@ def test_public_contract_has_a_domain_command_for_every_operation():
     paths = {(method.upper(), path) for path, operations in source["paths"].items()
              for method in operations if method.upper() in {"GET", "POST", "PUT", "PATCH", "DELETE"}}
     assert paths == {(item.method, item.path) for item in COMMANDS} | EXCLUSIONS.keys()
+
+
+@pytest.mark.parametrize("arguments,path,params", [
+    (["metrics", "get", "--component", "web"], "/projects/orders/application-metrics", {"component": "web"}),
+    (["traces", "get", "a" * 32], "/projects/orders/traces/" + "a" * 32, {}),
+    (["ai", "policy", "get"], "/projects/orders/ai/policy", {}),
+    (["ai", "runs", "get", "run-1"], "/projects/orders/ai/runs/run-1", {}),
+    (["ai", "proposals", "get", "proposal-1"], "/projects/orders/ai/proposals/proposal-1", {}),
+])
+def test_telemetry_and_ai_reads_preserve_project_ids_and_query(monkeypatch, tmp_path, arguments, path, params):
+    def handler(request):
+        assert request.method == "GET"
+        assert request.url.path == path
+        assert dict(request.url.params) == params
+        assert request.headers["authorization"] == "Bearer human-token"
+        return httpx.Response(200, json={"project": "orders", "state": "ok"})
+
+    runner = _cli(monkeypatch, tmp_path, handler)
+    result = runner.invoke(app, arguments + ["--project", "orders", "--output", "json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout)["project"] == "orders"
+
+
+@pytest.mark.parametrize("arguments,method,suffix,body,confirm", [
+    (["ai", "policy", "replace"], "PUT", "policy", {"classification": "internal"}, True),
+    (["ai", "runs", "create"], "POST", "runs", {"kind": "investigate_incident"}, False),
+    (["ai", "proposals", "create"], "POST", "proposals", {"run_id": "run-1"}, False),
+    (["ai", "proposals", "approve", "proposal-1"], "POST", "proposals/proposal-1/approval",
+     {"diff_sha256": "a" * 64}, True),
+    (["ai", "proposals", "execute", "proposal-1"], "POST", "proposals/proposal-1/execute",
+     {"diff_sha256": "a" * 64}, True),
+])
+def test_ai_mutations_send_exact_reviewed_document(monkeypatch, tmp_path, arguments, method, suffix, body, confirm):
+    document = tmp_path / "request.json"
+    document.write_text(json.dumps(body))
+
+    def handler(request):
+        assert request.method == method
+        assert request.url.path == "/projects/orders/ai/" + suffix
+        assert json.loads(request.content) == body
+        return httpx.Response(200, json={"project": "orders", "state": "succeeded"})
+
+    runner = _cli(monkeypatch, tmp_path, handler)
+    options = ["--confirm-project", "orders"] if confirm else []
+    result = runner.invoke(app, arguments + ["--project", "orders", "--file", str(document),
+                                            "--output", "json"] + options)
+    assert result.exit_code == 0, result.output
+
+
+@pytest.mark.parametrize("action", ["approve", "execute"])
+def test_ai_approval_and_execution_require_project_confirmation(monkeypatch, tmp_path, action):
+    requests = []
+    runner = _cli(monkeypatch, tmp_path, lambda request: requests.append(request))
+    result = runner.invoke(app, ["ai", "proposals", action, "proposal-1", "--project", "orders",
+                                 "--file", "not-read-without-confirmation.json"])
+    assert result.exit_code == 2, result.output
+    assert "--confirm-project" in result.output
+    assert not requests
 
 
 def test_human_database_grant_and_one_time_credential(monkeypatch, tmp_path):

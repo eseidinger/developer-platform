@@ -67,6 +67,17 @@ and one-time passwords; see the [human database access guide](database-access.md
 `operator audit export --start TIMESTAMP --end TIMESTAMP --format csv` writes the
 bounded CSV response to stdout; the default JSON format uses normal output modes.
 
+`metrics get --project orders --component web` reads bounded HTTP request metrics;
+`traces get TRACE_ID --project orders` reads one retained project trace. The
+`ai policy`, `ai runs`, and `ai proposals` groups expose the corresponding AI API
+operations. Mutations read complete JSON documents with `--file`: policy replacement
+accepts `classification`, run creation accepts `kind`, proposal creation accepts
+`run_id`, and approval/execution accept the exact reviewed `diff_sha256`. Policy
+replacement, approval, and execution also require `--confirm-project orders`.
+Execution returns a durable operation ID; use `operations get` or `operations watch`
+to inspect deployment readiness. AI eligibility, authority, and stale approval
+checks remain enforced by the API.
+
 Use `--output json` for machine output on stdout. Progress, recovery IDs, and
 warnings go to stderr. `logs --follow` emits successive JSON objects while it
 runs. `--debug` shows only method, API path, status, timing, and request ID.

@@ -406,7 +406,8 @@ def execute(spec: CommandSpec, state, values: dict):
 
 def register(app: typer.Typer, spec: CommandSpec):
     """Expose only the options relevant to this operation, retaining domain names."""
-    positional = [name for name in ("resource_id", "credential_id", "operation_id", "request_id", "secret") if "{" + name + "}" in spec.path]
+    positional = [name for name in ("resource_id", "credential_id", "operation_id", "request_id", "secret",
+                                   "trace_id", "run_id", "proposal_id") if "{" + name + "}" in spec.path]
     params = [inspect.Parameter("ctx", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=typer.Context)]
     for name in positional:
         params.append(inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD,
