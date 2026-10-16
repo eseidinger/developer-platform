@@ -94,7 +94,7 @@ class Catalog:
             self.result = [(1,)] if active else []
         elif query.startswith("INSERT INTO application_operations"):
             (application_id, revision, operation_kind, state, actor_issuer, actor_subject,
-             envelope_version, envelope) = params
+             envelope_version, envelope, origin_traceparent) = params
             operation_id = str(uuid4())
             application_key = next(key for key, app_id in self.application_ids.items()
                                    if app_id == application_id)
