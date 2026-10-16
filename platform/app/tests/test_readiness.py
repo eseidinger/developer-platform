@@ -74,7 +74,7 @@ class ReadinessObservationTests(unittest.TestCase):
         result = observe_deployment(self.runtime, "smoke", "example:v1", self.log, include_pod_diagnostics=True)
         self.assertEqual(result["state"], "failed")
         self.assertEqual(result["reason"], "ProgressDeadlineExceeded")
-        self.assertEqual(result["pod_diagnostics"], {"containers": [{"ready": False, "restart_count": 5,
+        self.assertEqual(result["pod_diagnostics"], {"containers": [{"ready": False, "revision": None, "restart_count": 5,
             "current_reason": "CrashLoopBackOff", "previous_reason": "Error", "previous_exit_code": 2}], "truncated": False})
         self.assertNotIn("private-secret", str(result))
         self.assertNotIn("pod_diagnostics", self.observe())

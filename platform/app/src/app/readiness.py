@@ -1,5 +1,6 @@
 """Live readiness observations for the supported single-container workload."""
 from datetime import datetime, timezone
+import re
 from typing import Any
 
 from kubernetes.client.exceptions import ApiException
@@ -40,7 +41,10 @@ def _safe_pod_diagnostics(pods, container_name):
         for container in _field(_field(pod, "status", {}), "containerStatuses", []) or []:
             if _field(container, "name") != container_name:
                 continue
-            item = {"ready": _field(container, "ready") is True}
+            annotations = _field(_field(pod, "metadata", {}), "annotations", {}) or {}
+            revision = annotations.get("platform.example/revision", "")
+            item = {"ready": _field(container, "ready") is True,
+                    "revision": int(revision) if isinstance(revision, str) and re.fullmatch(r"[0-9]{1,10}", revision) else None}
             restarts = _field(container, "restartCount", 0)
             if type(restarts) is int and restarts >= 0:
                 item["restart_count"] = min(restarts, 1000000)

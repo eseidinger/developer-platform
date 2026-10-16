@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from langchain_core.tools import StructuredTool
 
-from . import application_metrics, trace_read
+from . import application_metrics, trace_read, ai_startup
 from .readiness import observe_deployment
 from .retained_logs import observe_retained_logs
 
@@ -144,7 +144,7 @@ def make_tools(project, current_spec, connect, runtime=None):
                 **(component_change_summary(current[1], previous) if comparable else {})}
 
     def get_runtime_status() -> dict:
-        """Read bounded deployment readiness and safe Kubernetes reason codes."""
+        """Read rollout health, pod revision IDs, exits and fixed startup-log failure codes; never raw logs."""
         current = _current()
         if not current:
             return {"source": "project-runtime", "state": "missing"}
@@ -160,11 +160,15 @@ def make_tools(project, current_spec, connect, runtime=None):
             observed = observe_deployment(runtime, project, image, logging.getLogger(__name__),
                                           include_pod_diagnostics=True)
         reason = observed.get("reason")
+        startup = ({"state": "not_applicable"} if not service or observed["state"] not in {"failed", "progressing"}
+                   else ai_startup.observe_startup_failure(runtime, project, service["name"], current[0]))
         return {"source": "project-runtime", "state": observed["state"],
+                "revision": current[0], "component": service["name"] if service else "app",
                 "reason": reason if reason in SAFE_RUNTIME_REASONS else "OtherRuntimeReason",
                 "desired_replicas": observed["desired_replicas"],
                 "ready_replicas": observed["ready_replicas"],
                 "pod_diagnostics": observed.get("pod_diagnostics", {"state": "unavailable"}),
+                "startup_failure": startup,
                 "observed_at": observed["observed_at"]}
 
     def get_documentation() -> dict:
