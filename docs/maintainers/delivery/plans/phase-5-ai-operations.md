@@ -170,6 +170,16 @@ on October 16, 2026. Fault injection and recovery still need live results.
 The declaration passed API model validation, and the image served HTTP 200 locally
 as UID 10001 with a read-only filesystem and dropped capabilities.
 
+The [controlled startup fault](../../../../examples/ai-acceptance/startup-failure.json)
+changes only the baseline container arguments to an invalid option. It passed
+API declaration validation and exited with code 2 in an isolated local container.
+Submit it without waiting for readiness and inspect the returned operation and
+component status separately: manifest application can succeed while the workload
+fails. The initial proposal implementation currently requires a failed apply
+operation; support for a server-verified runtime failure remains to be completed
+before this scenario's proposal/recovery acceptance. No live fault result is
+claimed by the local fixture check.
+
 The demonstration introduces a traceable regression using test resources, shows the investigation, an approvable fix, and the observed recovery state. Prompt-injection, secret-handling, and project-boundary tests are acceptance criteria.
 
 [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md) and [Observability](../../../architecture/observability.md) describe boundaries and data sources.
