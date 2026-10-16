@@ -1288,6 +1288,43 @@ def get_ai_policy(name: str, principal: Principal = Depends(current_principal)):
             "external_model_eligible": classification in {"public", "internal"}}
 
 
+@app.get("/projects/{name}/ai/context")
+def ai_context(name: str, principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    with connect() as conn:
+        human = access_scope(conn, principal) is None
+        classification = ai_store.classification(conn, name)
+        manage = human and is_allowed(conn, principal, "manage", name)
+        edit_policy = human and is_platform_admin(conn, principal)
+    current = current_spec(name)
+    return {"project": name, "classification": classification,
+            "external_model_eligible": classification in {"public", "internal"},
+            "current_revision": current[0] if current else None,
+            "permissions": {"run": human, "manage": manage, "edit_policy": edit_policy}}
+
+
+@app.get("/projects/{name}/ai/runs")
+def list_ai_runs(name: str, limit: int = Query(20, ge=1, le=50), before: UUID | None = None,
+                 principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    with connect() as conn:
+        rows = ai_store.history(conn, name, limit, before)
+    items = [{"run_id": str(r[0]), "project": name, "kind": r[1], "state": r[2],
+              "model": r[3], "tool_calls": r[4], "estimated_cost_usd": float(r[5]),
+              "created_at": r[6], "completed_at": r[7], "base_revision": r[8]} for r in rows[:limit]]
+    return {"items": items, "next_cursor": str(rows[limit-1][0]) if len(rows) > limit else None}
+
+
+@app.get("/projects/{name}/ai/proposals")
+def list_ai_proposals(name: str, limit: int = Query(20, ge=1, le=50), before: UUID | None = None,
+                      principal: Principal = Depends(current_principal)):
+    require_permission(principal, "view", name)
+    with connect() as conn:
+        rows = ai_changes.history(conn, name, limit, before)
+    return {"items": [_ai_proposal_view(name, r) for r in rows[:limit]],
+            "next_cursor": str(rows[limit-1][0]) if len(rows) > limit else None}
+
+
 @app.post("/projects/{name}/ai/runs")
 def create_ai_run(name: str, body: AIRunRequest,
                   principal: Principal = Depends(current_principal)):
@@ -1303,10 +1340,12 @@ def create_ai_run(name: str, body: AIRunRequest,
         model = ai_model.configured_model()
     except ai_model.ModelUnavailable:
         raise HTTPException(503, "Eligible regional model is not configured") from None
+    snapshot = current_spec(name)
+    base_revision = snapshot[0] if snapshot else None
     with connect() as conn:
-        run_id = ai_store.create_run(conn, name, principal, body.kind, model.name)
+        run_id = ai_store.create_run(conn, name, principal, body.kind, model.name, base_revision)
     try:
-        tools = ai_tools.make_tools(name, current_spec, connect, runtime)
+        tools = ai_tools.make_tools(name, lambda _: snapshot, connect, runtime)
         outcome = ai_agent.run(body.kind, run_id, model, tools)
     except Exception as exc:
         log.error("AI run failed run_id=%s error_type=%s", run_id, type(exc).__name__)
@@ -1334,7 +1373,7 @@ def get_ai_run(name: str, run_id: UUID, principal: Principal = Depends(current_p
     return {"run_id": str(row[0]), "project": name, "kind": row[1], "state": row[2],
             "model": row[3], "result": row[4], "evidence": row[5],
             "tool_calls": row[6], "estimated_cost_usd": float(row[7]),
-            "created_at": row[8], "completed_at": row[9]}
+            "created_at": row[8], "completed_at": row[9], "base_revision": row[10]}
 
 
 def _ai_proposal_view(name, row):

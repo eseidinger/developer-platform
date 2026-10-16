@@ -91,14 +91,15 @@ Development support follows using project knowledge from documentation, ADRs, AP
 
 ## 5.6 — Integrate AI into the project portal (`PLAN-025`)
 
-**Planned, required for Phase 5; not implemented or accepted.** On October 16,
+**Implementation in progress, required for Phase 5; browser acceptance pending.** On October 16,
 2026, inspection found generated API types for AI endpoints but no portal routes,
 screens or controls. Existing CLI/API acceptance does not establish UI behavior.
 Add an **AI assistance** area to the existing project workspace and navigation,
 using the same authenticated Platform API and established portal components.
 
-- **Policy:** Show classification and external-model eligibility. Human project
-  managers can update policy with explicit project confirmation. Explain
+- **Policy:** Show classification and external-model eligibility. Human platform
+  administrators can update policy with explicit project confirmation. Preserve
+  the existing server restriction; project managers approve and execute proposals. Explain
   ineligible/unclassified projects and provider-unavailable states without
   exposing credentials or suggesting that browser controls authorize a request.
 - **Read-only assistance:** Offer explicit actions for application explanation,

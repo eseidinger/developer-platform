@@ -23,6 +23,7 @@ def initialize(conn):
         approver_issuer TEXT, approver_subject TEXT,
         operation_id UUID, resulting_revision BIGINT,
         UNIQUE (run_id))""")
+    conn.execute("CREATE INDEX IF NOT EXISTS ai_proposals_history_idx ON ai_change_proposals(project,created_at DESC,proposal_id DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS ai_change_proposals_project_idx ON ai_change_proposals(project,created_at DESC)")
 
 
@@ -68,17 +69,20 @@ def candidate(conn, project, base_revision, runtime_failed=None):
 
 
 def create(conn, project, run_id, base_revision, runtime_failed=None):
-    run = conn.execute("SELECT state,evidence FROM ai_runs WHERE project=%s AND run_id=%s",
+    run = conn.execute("SELECT state,evidence,kind,base_revision FROM ai_runs WHERE project=%s AND run_id=%s",
                        (project, run_id)).fetchone()
-    if not run or run[0] != "completed" or not run[1]:
-        raise ProposalUnavailable("A completed sourced investigation is required")
+    if (not run or run[0] != "completed" or not run[1]
+            or run[2] != "investigate_incident" or run[3] != base_revision):
+        raise ProposalUnavailable("A completed sourced investigation bound to the current revision is required")
     target, base_spec, target_spec = candidate(conn, project, base_revision, runtime_failed)
     diff, digest = canonical_diff(project, base_revision, target, base_spec, target_spec)
     proposal_id = uuid4()
-    conn.execute("""INSERT INTO ai_change_proposals
+    inserted = conn.execute("""INSERT INTO ai_change_proposals
         (proposal_id,project,run_id,base_revision,target_revision,diff,diff_sha256,state)
-        VALUES (%s,%s,%s,%s,%s,%s,%s,'proposed')""",
-        (proposal_id, project, run_id, base_revision, target, Jsonb(diff), digest))
+        VALUES (%s,%s,%s,%s,%s,%s,%s,'proposed') ON CONFLICT (run_id) DO NOTHING RETURNING proposal_id""",
+        (proposal_id, project, run_id, base_revision, target, Jsonb(diff), digest)).fetchone()
+    if not inserted:
+        raise ProposalUnavailable("An existing proposal already uses this investigation; inspect proposal history")
     return proposal_id, diff, digest
 
 
@@ -116,3 +120,12 @@ def consume(conn, project, proposal_id, operation_id, revision):
     conn.execute("""UPDATE ai_change_proposals SET state='executed',operation_id=%s,
         resulting_revision=%s WHERE project=%s AND proposal_id=%s AND state='approved'""",
         (operation_id, revision, project, proposal_id))
+
+
+def history(conn, project, limit, before=None):
+    return conn.execute("""SELECT proposal_id,run_id,base_revision,target_revision,diff,diff_sha256,
+        state,created_at,approved_at,expires_at,operation_id,resulting_revision
+        FROM ai_change_proposals WHERE project=%s AND (%s::uuid IS NULL OR (created_at,proposal_id)<(
+            SELECT created_at,proposal_id FROM ai_change_proposals WHERE project=%s AND proposal_id=%s))
+        ORDER BY created_at DESC,proposal_id DESC LIMIT %s""",
+        (project, before, project, before, limit + 1)).fetchall()

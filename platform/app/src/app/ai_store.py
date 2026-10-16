@@ -19,6 +19,8 @@ def initialize(conn):
         model TEXT, result JSONB, evidence JSONB NOT NULL DEFAULT '[]'::jsonb,
         tool_calls INTEGER NOT NULL DEFAULT 0, estimated_cost_usd NUMERIC(8,6) NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(), completed_at TIMESTAMPTZ)""")
+    conn.execute("ALTER TABLE ai_runs ADD COLUMN IF NOT EXISTS base_revision BIGINT")
+    conn.execute("CREATE INDEX IF NOT EXISTS ai_runs_history_idx ON ai_runs(project,created_at DESC,run_id DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS ai_runs_project_created_idx ON ai_runs(project,created_at DESC)")
     conn.execute("ALTER TABLE ai_runs DROP CONSTRAINT IF EXISTS ai_runs_kind_check")
     conn.execute("""ALTER TABLE ai_runs ADD CONSTRAINT ai_runs_kind_check
@@ -38,11 +40,11 @@ def classification(conn, project: str) -> str | None:
     return row[0] if row else None
 
 
-def create_run(conn, project, principal, kind, model):
+def create_run(conn, project, principal, kind, model, base_revision=None):
     run_id = uuid4()
-    conn.execute("""INSERT INTO ai_runs(run_id,project,requester_issuer,requester_subject,kind,state,model)
-        VALUES (%s,%s,%s,%s,%s,'running',%s)""",
-        (run_id, project, principal.issuer, principal.subject, kind, model))
+    conn.execute("""INSERT INTO ai_runs(run_id,project,requester_issuer,requester_subject,kind,state,model,base_revision)
+        VALUES (%s,%s,%s,%s,%s,'running',%s,%s)""",
+        (run_id, project, principal.issuer, principal.subject, kind, model, base_revision))
     return run_id
 
 
@@ -54,5 +56,15 @@ def finish_run(conn, run_id, state, result, evidence, tool_calls, estimated_cost
 
 def get_run(conn, project, run_id):
     return conn.execute("""SELECT run_id,kind,state,model,result,evidence,tool_calls,
-        estimated_cost_usd,created_at,completed_at FROM ai_runs
+        estimated_cost_usd,created_at,completed_at,base_revision FROM ai_runs
         WHERE project=%s AND run_id=%s""", (project, run_id)).fetchone()
+
+
+def history(conn, project, limit, before=None):
+    """Keyset pagination; a foreign/missing cursor cannot reveal another project."""
+    return conn.execute("""SELECT run_id,kind,state,model,tool_calls,estimated_cost_usd,
+        created_at,completed_at,base_revision FROM ai_runs
+        WHERE project=%s AND (%s::uuid IS NULL OR (created_at,run_id)<(
+            SELECT created_at,run_id FROM ai_runs WHERE project=%s AND run_id=%s))
+        ORDER BY created_at DESC,run_id DESC LIMIT %s""",
+        (project, before, project, before, limit + 1)).fetchall()

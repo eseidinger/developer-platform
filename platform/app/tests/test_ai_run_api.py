@@ -60,9 +60,10 @@ class AIRunAuditTests(unittest.TestCase):
                 stack.enter_context(patch.object(main, 'access_scope', return_value=None))
                 stack.enter_context(patch.object(main.ai_store, 'classification', return_value='internal'))
                 stack.enter_context(patch.object(main.ai_model, 'configured_model'))
+                stack.enter_context(patch.object(main, 'current_spec', return_value=(2, {}, 'applied')))
                 create = stack.enter_context(patch.object(main.ai_store, 'create_run', return_value=run_id))
                 finish = stack.enter_context(patch.object(main.ai_store, 'finish_run'))
-                stack.enter_context(patch.object(main.ai_tools, 'make_tools', return_value=[]))
+                tools = stack.enter_context(patch.object(main.ai_tools, 'make_tools', return_value=[]))
                 agent = stack.enter_context(patch.object(main.ai_agent, 'run', return_value=outcome))
 
                 def append(actor, action, target_kind, target_id, result, scope, detail):
@@ -80,6 +81,8 @@ class AIRunAuditTests(unittest.TestCase):
                 self.assertEqual(response['state'], state)
                 self.assertEqual(response['run_id'], str(run_id))
                 create.assert_called_once()
+                self.assertEqual(create.call_args.args[-1], 2)
+                self.assertEqual(tools.call_args.args[1]("demo"), (2, {}, "applied"))
                 agent.assert_called_once()
                 finish.assert_called_once()
                 audit.assert_called_once()
