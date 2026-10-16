@@ -16,7 +16,7 @@ SEARCH_ROOTS = [
     ROOT / "infrastructure",
     ROOT / "ansible",
 ]
-IGNORED_PARTS = {"node_modules", ".git", ".pytest_cache"}
+IGNORED_PARTS = {"node_modules", ".git", ".pytest_cache", ".venv", "venv"}
 LINK = re.compile(r"!?\[[^\]]*\]\((?P<destination><[^>]+>|[^)\s]+)(?:\s+['\"][^)]*['\"])?\)")
 HEADING = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*#*\s*$")
 

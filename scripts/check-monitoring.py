@@ -6,6 +6,7 @@ import shutil
 import socket
 import ssl
 import subprocess
+import sys
 import tempfile
 import threading
 import time
@@ -20,7 +21,11 @@ BLACKBOX = "prom/blackbox-exporter:v0.27.0"
 
 
 def run(*args):
-    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
+    try:
+        return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
+    except subprocess.CalledProcessError as error:
+        print(error.output, file=sys.stderr)
+        raise
 
 
 class Handler(http.server.BaseHTTPRequestHandler):
@@ -60,17 +65,23 @@ def main():
         temp = Path(directory)
         temp.chmod(0o755)
         config = ROOT / "infrastructure/monitoring"
-        shutil.copy(config / "prometheus.yaml", temp / "prometheus.yml")
+        configuration = (config / "prometheus.yaml").read_text()
+        configuration = configuration.replace("/run/prometheus/metrics-reader.token", "/etc/prometheus/metrics-reader.token")
+        configuration = configuration.replace("/run/prometheus/metrics-reader-ca.crt", "/etc/prometheus/cert.pem")
+        (temp / "prometheus.yml").write_text(configuration)
         shutil.copy(config / "alerts.yaml", temp / "alerts.yml")
         (temp / "discovery").mkdir()
         (temp / "discovery/applications.json").write_text("[]\n")
+        (temp / "discovery/application-metrics.json").write_text("[]\n")
+        # Disposable credentials satisfy config validation without reading the lab's secrets.
+        (temp / "metrics-reader.token").write_text("monitoring-fixture-only\n")
+        run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
+            "-subj", "/CN=smoke.apps.localhost", "-keyout", str(temp / "key.pem"),
+            "-out", str(temp / "cert.pem"))
         print(run("docker", "run", "--rm", "--entrypoint", "/bin/promtool", "-v",
                   f"{temp}:/etc/prometheus:ro", PROMETHEUS, "check", "config", "/etc/prometheus/prometheus.yml"))
         print(run("docker", "run", "--rm", "--entrypoint", "/bin/promtool", "-v",
                   f"{config}:/work:ro", "-w", "/work", PROMETHEUS, "test", "rules", "tests/alerts.test.yaml"))
-        run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
-            "-subj", "/CN=smoke.apps.localhost", "-keyout", str(temp / "key.pem"),
-            "-out", str(temp / "cert.pem"))
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(temp / "cert.pem", temp / "key.pem")
         tls_server.socket = tls.wrap_socket(tls_server.socket, server_side=True)
@@ -116,7 +127,6 @@ def main():
                 assert "probe_success 0\n" in response.read().decode()
             print("PASS untrusted TLS certificate rejected")
             # Use the actual discovery generator and relabel configuration in a real Prometheus.
-            import sys
             sys.path.insert(0, str(ROOT / "platform" / "app" / "src"))
             from app.monitoring import atomic_write, target_groups
             groups = target_groups([
@@ -131,7 +141,8 @@ def main():
                                     ({"smoke": "ok", "provider": "health/ready"}.get(group["labels"]["project"], "error"))]
             atomic_write(temp / "discovery/applications.json", json.dumps(groups))
             configuration = (temp / "prometheus.yml").read_text()
-            configuration = configuration.replace("scrape_interval: 30s", "scrape_interval: 1s\n  scrape_timeout: 1s")
+            configuration = configuration.replace("global:\n  scrape_interval: 30s",
+                                                  "global:\n  scrape_interval: 1s\n  scrape_timeout: 1s")
             configuration = configuration.replace("refresh_interval: 15s", "refresh_interval: 1s")
             configuration = configuration.replace("scrape_timeout: 10s", "scrape_timeout: 1s")
             configuration = configuration.replace("blackbox-exporter:9115", f"127.0.0.1:{port}")
