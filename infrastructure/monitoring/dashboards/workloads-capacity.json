@@ -34,7 +34,7 @@
         {
           "refId": "A",
           "expr": "kube_pod_status_ready{namespace=~\"project-.*\",condition=\"true\"}",
-          "legendFormat": "{{job}} {{instance}} {{project}} {{component}}"
+          "legendFormat": "{{namespace}} / {{pod}}"
         }
       ],
       "fieldConfig": {
@@ -69,7 +69,7 @@
         {
           "refId": "A",
           "expr": "kube_deployment_spec_replicas{namespace=~\"project-.*\"}",
-          "legendFormat": "{{job}} {{instance}} {{project}} {{component}}"
+          "legendFormat": "{{namespace}} / {{deployment}}"
         }
       ],
       "fieldConfig": {

@@ -143,7 +143,7 @@ approved it.
 | `exposure` | No | `private` (default) or `public`. At most one service in an application can be public. |
 | `health.readiness` | No | Exactly one of `profile` or `path`. `profile` is `status` or `hello-world` and retains the TCP readiness probe on the first declared port. `path` configures an HTTP GET readiness probe; it must begin with `/` and uses the first declared port unless `port` matches another declared port number. |
 | `outbound` | No | Up to five `{ "cidr": "…", "port": N }` or `{ "dns": "api.example.com", "port": N }` destinations. CIDRs, and every IP address currently resolved for DNS destinations, must be in the operator allow-list. DNS rules are resolved to fixed NetworkPolicy IP rules when the deployment is applied; reapply when the destination address changes. |
-| `telemetry.metrics` | No | `{ "port": "http", "path": "/metrics" }`, where `port` names a declared HTTP service port and `path` is at most 128 characters with no query string. Collection uses a private Kubernetes service proxy and keeps only supported HTTP request series. |
+| `telemetry.metrics` | No | `{ "port": "http", "path": "/metrics" }`, where `port` names a declared HTTP service port and `path` is at most 128 characters with no query string. Collection uses a private Kubernetes service proxy and keeps supported HTTP series and reviewed Micrometer JVM/process metrics. |
 | `telemetry.tracing.enabled` | No | Boolean, default `false`. `true` projects a short-lived Pod-bound token and supplies the private OTLP endpoint. |
 
 For Spring Boot, add Actuator and the Prometheus Micrometer registry, expose
@@ -152,16 +152,36 @@ declaration. For Quarkus, add `quarkus-micrometer-registry-prometheus` and
 declare `/q/metrics`. For FastAPI, instrument requests with
 [`prometheus-fastapi-instrumentator`](https://github.com/trallnag/prometheus-fastapi-instrumentator)
 or an equivalent library that emits `http_requests_total` and
-`http_request_duration_seconds_{sum,count}` at `/metrics`. The platform keeps
-only these request series and fixed project/component labels, so raw path,
-handler, URI, user and custom metric labels are discarded. The first two
+`http_request_duration_seconds_{sum,count}` at `/metrics`. These are that library's
+conventions, rather than a built-in FastAPI metric standard. The platform keeps
+supported request series and fixed project/component labels; raw path, handler,
+URI, user and custom metric labels are discarded. The first two
 frameworks emit Micrometer's `http_server_requests_seconds_{count,sum}`;
 [Spring Actuator](https://docs.spring.io/spring-boot/reference/actuator/metrics.html)
 and [Quarkus Micrometer](https://quarkus.io/guides/telemetry-micrometer/)
 document their setup. Project readers can use the fixed
 `GET /projects/{name}/application-metrics?component={component}` view;
-operators have three framework dashboards with project, application and
-component selectors. A failed scrape is reported separately from a zero rate.
+operators have one **Application metrics** dashboard with project, application and
+component selectors. It supports both conventions, preferring Micrometer when
+both are emitted by the same component. A failed scrape is reported separately
+from a zero rate.
+
+The additional **Micrometer JVM** dashboard shows heap/non-heap memory and pools,
+GC pauses/allocation/pressure, CPU, threads/states, classes, buffers and file
+descriptors. It selects applications that expose JVM memory metrics. The reviewed
+collection allowlist includes the corresponding `jvm_*` families and selected
+`process_*`/`system_*` gauges; it preserves runtime dimensions `area`, `id`, `state`,
+`gc`, `action`, `cause` and `pool`. These dimensions are stripped from HTTP series.
+Arbitrary metrics, runtime version metadata and custom labels remain excluded.
+Existing bounds remain: 500 samples per scrape, 256 KB responses, 16 labels per
+sample and 128 bytes per label value. JVM data is operator-only; the fixed
+project metrics API continues to return HTTP summaries. Disabled binders and
+Quarkus native executables can lack JVM series and show no data.
+
+[OpenTelemetry HTTP semantic conventions](https://opentelemetry.io/docs/specs/semconv/http/http-metrics/)
+provide another, framework-neutral naming convention that FastAPI instrumentation
+can use. Its metric names need an explicit mapping to this platform's supported
+Prometheus series. The injected OTLP endpoint currently accepts traces only.
 
 A public service gets an ingress at
 `https://<component>-<project>.<apps-domain>`. Private services get in-project

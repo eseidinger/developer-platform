@@ -1,0 +1,809 @@
+{
+  "uid": "micrometer-jvm",
+  "title": "Micrometer JVM",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "developer-platform",
+    "operator",
+    "application-metrics"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(jvm_memory_used_bytes{job=\"application-metrics\"}, project)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "application",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(jvm_memory_used_bytes{job=\"application-metrics\",project=\"$project\"}, application)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      },
+      {
+        "name": "component",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(jvm_memory_used_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\"}, component)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Collection state",
+      "description": "One is a successful private scrape. This dashboard requires Micrometer JVM binders and a JVM runtime. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "Scrape"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "JVM uptime",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(process_uptime_seconds{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Uptime"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Heap memory",
+      "description": "Memory aggregated across pools in this area. Unknown or nonpositive maxima are omitted. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",area=\"heap\"})",
+          "legendFormat": "Used"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(jvm_memory_committed_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",area=\"heap\"})",
+          "legendFormat": "Committed"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(jvm_memory_max_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",area=\"heap\"} > 0)",
+          "legendFormat": "Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Non-heap memory",
+      "description": "Memory aggregated across pools in this area. Unknown or nonpositive maxima are omitted. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_memory_used_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",area=\"nonheap\"})",
+          "legendFormat": "Used"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(jvm_memory_committed_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",area=\"nonheap\"})",
+          "legendFormat": "Committed"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(jvm_memory_max_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",area=\"nonheap\"} > 0)",
+          "legendFormat": "Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Memory by pool",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_memory_used_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "{{area}} / {{id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "CPU usage",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(process_cpu_usage{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Process"
+        },
+        {
+          "refId": "B",
+          "expr": "max(system_cpu_usage{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "System"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Threads",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_threads_live_threads{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Live"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(jvm_threads_daemon_threads{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Daemon"
+        },
+        {
+          "refId": "C",
+          "expr": "sum(jvm_threads_peak_threads{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Peak"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Thread states",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (state) (jvm_threads_states_threads{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "{{state}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "GC pause rate",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (gc,action,cause) (rate(jvm_gc_pause_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))",
+          "legendFormat": "{{gc}} / {{action}} / {{cause}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "GC mean pause duration",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(jvm_gc_pause_seconds_sum{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) / (sum(rate(jvm_gc_pause_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) > 0)",
+          "legendFormat": "Mean pause"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "GC maximum pause",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_gc_pause_seconds_max{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "{{gc}} / {{action}} / {{cause}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "GC allocation and promotion",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(jvm_gc_memory_allocated_bytes_total{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))",
+          "legendFormat": "Allocated"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(rate(jvm_gc_memory_promoted_bytes_total{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))",
+          "legendFormat": "Promoted"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "Bps"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "GC live and maximum data",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 48
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_gc_live_data_size_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Live"
+        },
+        {
+          "refId": "B",
+          "expr": "sum(jvm_gc_max_data_size_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "GC overhead and memory pressure",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_gc_overhead{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "GC overhead"
+        },
+        {
+          "refId": "B",
+          "expr": "jvm_memory_usage_after_gc{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "{{pool}} after GC"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Loaded classes",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 56
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(jvm_classes_loaded_classes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Loaded"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "Class unloading rate",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 56
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(jvm_classes_unloaded_classes_total{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))",
+          "legendFormat": "Unloaded"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Buffer memory",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_buffer_memory_used_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "{{id}} / used"
+        },
+        {
+          "refId": "B",
+          "expr": "jvm_buffer_total_capacity_bytes{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "{{id}} / capacity"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Buffer count",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 64
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "jvm_buffer_count_buffers{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}",
+          "legendFormat": "{{id}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "File descriptors",
+      "description": "Micrometer JVM/process metrics for the selected component. Unsupported binders produce no data. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 72
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "max(process_files_open_files{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Open"
+        },
+        {
+          "refId": "B",
+          "expr": "max(process_files_max_files{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"})",
+          "legendFormat": "Max"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
-  "uid": "application-quarkus",
-  "title": "Quarkus application metrics",
+  "uid": "application-metrics",
+  "title": "Application metrics",
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
@@ -119,7 +119,7 @@
       "id": 2,
       "type": "timeseries",
       "title": "Request rate",
-      "description": "Five-minute request rate from the framework's HTTP server counter. Missing data means collection or target discovery needs checking.",
+      "description": "Five-minute HTTP request rate. Supports Micrometer and Prometheus FastAPI Instrumentator; prefers Micrometer if both are present. Missing data means collection or target discovery needs checking.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -133,7 +133,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))",
+          "expr": "sum(rate(http_server_requests_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) or sum(rate(http_requests_total{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))",
           "legendFormat": "{{job}} {{instance}} {{project}} {{component}}"
         }
       ],
@@ -154,7 +154,7 @@
       "id": 3,
       "type": "timeseries",
       "title": "Server error rate",
-      "description": "Five-minute 5xx rate; an empty panel can mean no error series was emitted. Missing data means collection or target discovery needs checking.",
+      "description": "Five-minute 5xx rate. Zero is shown only when a supported request counter is present. Missing data means collection or target discovery needs checking.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -168,7 +168,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_requests_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",status=~\"5..|5xx\"}[5m]))",
+          "expr": "(sum(rate(http_server_requests_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",status=~\"5..|5xx\"}[5m])) or sum(rate(http_requests_total{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\",status=~\"5..|5xx\"}[5m]))) or ((sum(rate(http_server_requests_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) or sum(rate(http_requests_total{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))) * 0)",
           "legendFormat": "{{job}} {{instance}} {{project}} {{component}}"
         }
       ],
@@ -189,7 +189,7 @@
       "id": 4,
       "type": "timeseries",
       "title": "Mean request duration",
-      "description": "Five-minute mean duration; no data when no duration series exists. Missing data means collection or target discovery needs checking.",
+      "description": "Five-minute mean duration; no data until requests and a supported duration series exist. Missing data means collection or target discovery needs checking.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -203,7 +203,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "sum(rate(http_server_requests_seconds_sum{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) / sum(rate(http_server_requests_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m]))",
+          "expr": "(sum(rate(http_server_requests_seconds_sum{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) / (sum(rate(http_server_requests_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) > 0)) or (sum(rate(http_request_duration_seconds_sum{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) / (sum(rate(http_request_duration_seconds_count{job=\"application-metrics\",project=\"$project\",application=\"$application\",component=\"$component\"}[5m])) > 0))",
           "legendFormat": "{{job}} {{instance}} {{project}} {{component}}"
         }
       ],

@@ -71,7 +71,36 @@ scrape_configs:
         regex: proxy_path
     metric_relabel_configs:
       - source_labels: [__name__]
-        regex: 'http_server_requests_seconds_(count|sum|bucket)|http_requests_total|http_request_duration_seconds_(count|sum|bucket)'
+        regex: 'http_server_requests_seconds_(count|sum|bucket)|http_requests_total|http_request_duration_seconds_(count|sum|bucket)|jvm_memory_(used_bytes|committed_bytes|max_bytes|usage_after_gc)|jvm_buffer_(count_buffers|memory_used_bytes|total_capacity_bytes)|jvm_gc_(live_data_size_bytes|max_data_size_bytes|memory_allocated_bytes_total|memory_promoted_bytes_total|overhead|pause_seconds_(count|sum|max))|jvm_threads_(live_threads|daemon_threads|peak_threads|states_threads|started_threads_total)|jvm_classes_(loaded_classes|unloaded_classes_total)|process_(cpu_usage|uptime_seconds|start_time_seconds|files_open_files|files_max_files)|system_(cpu_usage|cpu_count|load_average_1m)'
         action: keep
+      # Runtime dimensions belong only to reviewed JVM metrics, never HTTP request IDs.
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        target_label: area
+        replacement: ''
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        target_label: id
+        replacement: ''
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        target_label: state
+        replacement: ''
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        target_label: gc
+        replacement: ''
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        target_label: action
+        replacement: ''
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        target_label: cause
+        replacement: ''
+      - source_labels: [__name__]
+        regex: 'http_.*'
+        target_label: pool
+        replacement: ''
       - action: labelkeep
-        regex: '__name__|job|instance|project|environment|application|component|namespace|method|status|outcome|le'
+        regex: '__name__|job|instance|project|environment|application|component|namespace|method|status|outcome|le|area|id|state|gc|action|cause|pool'

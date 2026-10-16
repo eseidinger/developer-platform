@@ -104,7 +104,7 @@
         {
           "refId": "A",
           "expr": "kube_deployment_status_replicas_unavailable{namespace=~\"project-.*\"}",
-          "legendFormat": "{{job}} {{instance}} {{project}} {{component}}"
+          "legendFormat": "{{namespace}} / {{deployment}}"
         }
       ],
       "fieldConfig": {

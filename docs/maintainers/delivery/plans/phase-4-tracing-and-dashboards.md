@@ -108,8 +108,10 @@ another project's data or mistaking missing signals for healthy ones.
    API and keep raw Prometheus/Grafana access operator-only. Prevent arbitrary
    PromQL, cross-project selectors, untrusted labels, secrets, personal data and
    raw URL paths with identifiers from entering shared series or responses.
-4. Provision and validate framework-aware operator dashboard templates for
-   Spring Boot, Quarkus and FastAPI against their actual metric names. Document
+4. Provision and validate one shared Application metrics dashboard for Spring
+   Boot, Quarkus and FastAPI HTTP conventions, plus a Micrometer JVM dashboard
+   for JVM/process metrics. Keep project/application/component selectors and
+   reviewed runtime dimensions within existing scrape limits. Document
    the required application instrumentation. Each template has an Application
    selector populated from discovered, opted-in targets, qualified by project;
    a dependent Component selector narrows multi-service applications. Selectors

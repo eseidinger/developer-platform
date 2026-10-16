@@ -16,6 +16,7 @@ eval "$(python3 scripts/env.py)"
 umask 077
 mkdir -p .runtime
 chmod 700 .runtime
+python3 scripts/generate-dashboards.py
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 docker compose up -d --wait --wait-timeout 120 postgres
 python3 scripts/cluster_config.py > .runtime/k3d.yaml
