@@ -1047,6 +1047,13 @@ choices. This is a design decision; PLAN-010 through PLAN-015 remain unchecked
 pending implementation and evidence. The dated task-evidence notes below are
 historical snapshots.
 
+**OpenAI EU policy update (October 16, 2026):** The owner accepted the additional
+abuse-monitoring controls and Modified Retention amendment required for EU data
+residency, superseding the earlier default-retention decision. OpenAI approval,
+an executed amendment, and EU project/model/endpoint eligibility have not been
+verified. Keep external model calls disabled until those checks are recorded;
+the policy decision alone is not provider account activation. See [ADR-008](../../architecture/decisions/ADR-008-ai-assisted-operations.md).
+
 - [ ] **PLAN-010 · 5.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 4 gate; scoped data/audit evidence.
 
   **Source progress (October 15, 2026; `77d3c1d`–`2f3fa82`):** Added classified, human-requested AI runs, project-bound read tools, safe documentation references, sourced result validation and fail-closed regional model configuration. Targeted unit and OpenAPI tests pass. Deployed project-denial and real-model explanation evidence remains open.

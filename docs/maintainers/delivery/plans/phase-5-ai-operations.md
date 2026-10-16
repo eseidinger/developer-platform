@@ -10,10 +10,12 @@ The `development_assistance` run uses fixed, committed documentation and the
 caller's authorized project observations for a bounded template and change-impact
 explanation. It does not read arbitrary repository files.
 External calls fail closed until the API key and explicit EU project, processing,
-and Modified Retention amendment verification flags are set. OpenAI's current
-[data controls](https://developers.openai.com/api/docs/guides/your-data) require
-those controls for EU regional processing; the previously accepted default abuse
-monitoring retention needs a policy decision before activation.
+and Modified Retention amendment verification flags are set. The October 16, 2026
+owner decision accepts OpenAI's additional abuse-monitoring controls and Modified
+Retention amendment for EU data residency, superseding default-retention acceptance.
+OpenAI's approval, an executed amendment, and EU project/model/endpoint eligibility
+still need operator verification before setting the flags. See the current
+[data controls](https://developers.openai.com/api/docs/guides/your-data).
 
 The initial write path proposes only rollback from a failed latest deployment to
 a retained, previously successful revision. Its reviewable diff lists changed
@@ -65,7 +67,8 @@ API model, provisionally `gpt-6.1-sol`, using an eligible EU-resident API projec
 and EU regional processing. Verify account, model, endpoint, and tier eligibility
 and fail closed if EU processing is unavailable. Do not opt in to provider
 training; set `store: false` on OpenAI Responses API calls. The owner accepts
-OpenAI's default abuse-monitoring retention for this initial boundary.
+the additional provider controls and amendment required for EU data residency;
+provider approval and execution must be verified before activation.
 
 Use LangChain for model integration and the bounded read-only investigation
 loop, behind platform-owned typed tool and response contracts. Keep
