@@ -174,6 +174,24 @@ it does not establish authenticated deployed model calls or workload recovery.
 `scripts/verify-ai-portal-history.py` supplies rollback-only PostgreSQL checks for
 pagination, foreign cursors and stale/unsupported/legacy proposal sources.
 
+### Deployed verification — October 16, 2026
+
+Targeted `platform-api` deployment includes API and built portal; final source
+baseline `4b20f11` (history guards `e9a9f00`, UI `5dabe4c`). The container became
+healthy. Seven PostgreSQL history/revision-source checks passed using temporary
+tables and a forced rollback; nine existing approval/foreign-read checks passed
+with temporary tables removed and no live proposals written. Read-only workload
+inspection confirmed `ai-acceptance` remains at revision 3 with all service
+components ready.
+
+The first anonymous Chromium check found a missing FastAPI deep-link route.
+`4b20f11` adds `/projects/{name}/ai` to the supported SPA routes; all four portal
+backend regression tests passed and the API was rebuilt. The repeated live
+Chromium check passed: direct route HTTP 200, reload successful, zero browser
+errors and zero AI mutations. Unauthenticated context/run-history/proposal-history
+requests each returned 401. This is anonymous deployment evidence, with no OIDC
+login, provider calls, policy changes, approvals or workload mutations.
+
 The deployed human policy/explanation/investigation/proposal/approval/execution/
 recovery/development-assistance browser journey remains an acceptance step. Prior
 CLI journeys are preserved as CLI evidence and do not close this UI gate.
