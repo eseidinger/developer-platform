@@ -26,7 +26,9 @@ network requirements. The playbook does not change the firewall.
 
 The playbook installs Docker from its official APT repository, verifies downloaded
 kubectl and k3d checksums, copies deployment sources to `/opt/developer-platform`,
-generates secrets on the target, and runs `scripts/up.sh`. It then waits for the
+generates secrets on the target, prepares the bounded Tempo filesystem, and runs
+`scripts/up.sh`. The Tempo script is transferred with the new source, so it does
+not need to exist on the host before deployment. The playbook then waits for the
 API dependency-readiness endpoint. Bootstrap also waits for Alloy's internal
 readiness health check; a restarting/unhealthy collector fails deployment rather
 than being masked by API/Prometheus readiness. This does not attest log ingestion

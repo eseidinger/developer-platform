@@ -67,7 +67,7 @@
   tasks:
     - name: Install host prerequisites
       ansible.builtin.apt:
-        name: [ca-certificates, python3, python3-apt, bash, tar]
+        name: [ca-certificates, python3, python3-apt, bash, tar, e2fsprogs]
         state: present
         update_cache: true
         cache_valid_time: 3600
@@ -248,6 +248,19 @@
             argv: [docker, compose, config, --quiet]
             chdir: "{{ platform_install_dir }}"
           changed_when: false
+
+        - name: Check bounded Tempo trace storage mount
+          ansible.builtin.command:
+            argv: [mountpoint, -q, /var/lib/developer-platform/tempo]
+          register: platform_tempo_mount
+          failed_when: false
+          changed_when: false
+
+        - name: Prepare bounded Tempo trace storage
+          ansible.builtin.command:
+            argv: [bash, scripts/prepare-tempo-storage.sh]
+            chdir: "{{ platform_install_dir }}"
+          changed_when: platform_tempo_mount.rc != 0
 
         - name: Check for maintenance jobs that must not overlap deployment
           ansible.builtin.command:
