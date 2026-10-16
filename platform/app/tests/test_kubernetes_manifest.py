@@ -47,10 +47,10 @@ class ProvisionerRbacManifestTests(unittest.TestCase):
     def test_traced_metrics_workloads_can_be_reconciled(self):
         manifest = CONTROLLER_MANIFEST.read_text()
         self.assertRegex(manifest, r'resources: \[serviceaccounts\]\s+'
-                         r'verbs: \[patch, delete\]')
+                         r'verbs: \[create, patch, delete\]')
         self.assertRegex(manifest, r'resources: \[services/proxy\]\s+verbs: \[get\]')
         self.assertRegex(manifest, r'resources: \[roles, rolebindings\]\s+'
-                         r'verbs: \[patch, delete\]')
+                         r'verbs: \[create, patch, delete\]')
 
 
 if __name__ == "__main__":

@@ -21,10 +21,10 @@ rules:
   - apiGroups: [""]
     resources: [services, secrets]
     verbs: [delete]
-  # Server-side apply uses PATCH; these accounts are removed during component reconciliation.
+  # Server-side apply needs create for a new object and patch for later revisions.
   - apiGroups: [""]
     resources: [serviceaccounts]
-    verbs: [patch, delete]
+    verbs: [create, patch, delete]
   # The provisioner must hold the permission it delegates to each project's metrics-reader Role.
   - apiGroups: [""]
     resources: [services/proxy]
@@ -64,7 +64,7 @@ rules:
     verbs: [delete]
   - apiGroups: [rbac.authorization.k8s.io]
     resources: [roles, rolebindings]
-    verbs: [patch, delete]
+    verbs: [create, patch, delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
