@@ -1101,6 +1101,8 @@ See [ADR-008](../../architecture/decisions/ADR-008-ai-assisted-operations.md).
 
 - [ ] **PLAN-013 · 5.4** — Generate a reviewable configuration/deployment diff bound to target and revision, with supporting evidence and a rollback plan; do not execute it at this stage. Prerequisites: PLAN-012.
 
+  **Runtime-failure proposal support (October 16, 2026; `f98a431`):** The owner classified `ai-acceptance` Internal and applied the controlled invalid-startup-option fixture at revision 2 (operation `ff395e57-66f8-4b03-9b5c-97412cfe17b6`). Apply succeeded, while readiness reported `CrashLoopBackOff` with an old ready replica. This exposed a proposal eligibility gap: only failed apply operations qualified. Source now also accepts a succeeded apply when the server confirms service runtime state `failed`; healthy/progressing/unknown states, stale revisions and in-flight operations remain rejected. Completed sourced runs, prior retained success, human approval and execution checks remain required. Twenty-eight AI tests passed. The targeted API deployment became healthy, and a read-only live check observed revision 2 `failed / ProgressDeadlineExceeded` and selected retained revision 1 as the candidate. No proposal was created, approved or executed by this check; human diagnosis/proposal/recovery acceptance remains open.
+
   **Source progress (October 15, 2026):** A narrow rollback proposal selects a retained successful revision after a failed latest deployment, binds it to a completed sourced run, and records a canonical value-free path diff, hash, target and base revision. Other fix types and deployed review remain open.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No evidence-linked AI diff/approval-plan flow.
