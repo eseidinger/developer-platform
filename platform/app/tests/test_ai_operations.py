@@ -1,7 +1,7 @@
 import json
 import os
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 from langchain_core.messages import AIMessage
 from langchain_core.tools import StructuredTool
@@ -64,6 +64,28 @@ def _answer(summary, references, insufficient=False):
 
 
 class AIOperationsTests(unittest.TestCase):
+    def test_revision_comparison_exposes_fields_not_startup_or_secret_values(self):
+        previous = {"components": [{"name": "web", "args": ["old-secret"]}],
+                    "configuration": {"TOKEN": "old-secret"}}
+        current_spec = {"components": [{"name": "web", "args": ["new-secret"]}],
+                        "configuration": {"TOKEN": "new-secret"}}
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        connection.execute.return_value.fetchall.return_value = [(2, current_spec), (1, previous)]
+        tools = {t.name: t for t in ai_tools.make_tools("shop", lambda _: (2, current_spec, "applied"),
+                                                       lambda: connection)}
+        result = tools["get_configuration"].invoke({})
+        self.assertEqual(result["component_changes"], [{"component": "web", "fields": ["args"]}])
+        self.assertEqual(result["previous_revision"], 1)
+        self.assertEqual(result["changed_key_names_since_previous_revision"], ["TOKEN"])
+        self.assertNotIn("secret", json.dumps(result).replace("non_secret", ""))
+        self.assertEqual(connection.execute.call_args.args[1], ("shop", 2))
+        connection.execute.return_value.fetchall.return_value = [(2, current_spec)]
+        unavailable = tools["get_configuration"].invoke({})
+        self.assertEqual(unavailable["comparison_state"], "unavailable")
+        self.assertIsNone(unavailable["changed_count"])
+        self.assertNotIn("component_changes", unavailable)
+
     def test_explicit_global_acceptance_uses_global_endpoint_without_eu_claims(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "OPENAI_DATA_REGION": "global",
                                     "OPENAI_GLOBAL_PROCESSING_ACCEPTED": "true"}, clear=True), \

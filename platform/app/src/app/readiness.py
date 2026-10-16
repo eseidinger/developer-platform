@@ -14,8 +14,8 @@ def _field(value: Any, name: str, default=None):
 def _snapshot(state: str, desired_image: str, *, desired_replicas: int = 1,
               ready_replicas: int = 0, deployment_image: str | None = None,
               active_images: list[str] | None = None, active_image_ids: list[str] | None = None,
-              reason: str | None = None) -> dict[str, Any]:
-    return {
+              reason: str | None = None, pod_diagnostics=None) -> dict[str, Any]:
+    result = {
         "state": state,
         "desired_replicas": desired_replicas,
         "ready_replicas": ready_replicas,
@@ -26,6 +26,37 @@ def _snapshot(state: str, desired_image: str, *, desired_replicas: int = 1,
         "reason": reason,
         "observed_at": datetime.now(timezone.utc).isoformat(),
     }
+    if pod_diagnostics is not None:
+        result["pod_diagnostics"] = pod_diagnostics
+    return result
+
+
+def _safe_pod_diagnostics(pods, container_name):
+    """Fixed codes and numeric status only; exclude messages, names and sidecars."""
+    codes = {"CrashLoopBackOff", "OOMKilled", "Error", "Completed", "ImagePullBackOff",
+             "ErrImagePull", "CreateContainerConfigError", "ContainerCreating", "RunContainerError"}
+    summaries = []
+    for pod in pods:
+        for container in _field(_field(pod, "status", {}), "containerStatuses", []) or []:
+            if _field(container, "name") != container_name:
+                continue
+            item = {"ready": _field(container, "ready") is True}
+            restarts = _field(container, "restartCount", 0)
+            if type(restarts) is int and restarts >= 0:
+                item["restart_count"] = min(restarts, 1000000)
+            for field, label in (("state", "current"), ("lastState", "previous")):
+                state = _field(container, field, {})
+                waiting = _field(state, "waiting")
+                terminated = _field(state, "terminated")
+                if waiting is not None or terminated is not None:
+                    status = waiting if waiting is not None else terminated
+                    reason = _field(status, "reason")
+                    item[label + "_reason"] = reason if reason in codes else "OtherContainerReason"
+                    exit_code = _field(terminated, "exitCode")
+                    if type(exit_code) is int and 0 <= exit_code <= 255:
+                        item[label + "_exit_code"] = exit_code
+            summaries.append(item)
+    return {"containers": summaries[:10], "truncated": len(summaries) > 10}
 
 
 def _pod_diagnostic(pods: list[Any]) -> str | None:
@@ -65,7 +96,7 @@ def _active_images(pods: list[Any]) -> tuple[list[str], list[str]]:
 
 
 def observe_deployment(runtime: Any, project: str, desired_image: str, log,
-                       deployment_name: str | None = None) -> dict[str, Any]:
+                       deployment_name: str | None = None, *, include_pod_diagnostics=False) -> dict[str, Any]:
     namespace = "project-" + project
     if runtime is None:
         log.error("Deployment readiness observer unavailable project=%s", project)
@@ -113,6 +144,8 @@ def observe_deployment(runtime: Any, project: str, desired_image: str, log,
                   project, type(exc).__name__)
         return _snapshot("unknown", desired_image, **base, reason="ObserverUnavailable")
 
+    if include_pod_diagnostics:
+        base["pod_diagnostics"] = _safe_pod_diagnostics(pods, _field(containers[0], "name") if containers else None)
     images, image_ids = _active_images(pods)
     if deployment_image != desired_image:
         return _snapshot("progressing", desired_image, **base, active_images=images,

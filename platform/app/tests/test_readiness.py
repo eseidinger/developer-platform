@@ -63,6 +63,22 @@ class Resources:
 
 
 class ReadinessObservationTests(unittest.TestCase):
+    def test_opt_in_diagnostics_survive_deadline_and_exclude_sidecar_and_messages(self):
+        self.deployment.value = deployment(conditions=[condition("Progressing", "False", "ProgressDeadlineExceeded")])
+        self.pods.value = {"items": [{"status": {"containerStatuses": [
+            {"name": "app", "ready": False, "restartCount": 5,
+             "state": {"waiting": {"reason": "CrashLoopBackOff", "message": "private-secret"}},
+             "lastState": {"terminated": {"reason": "Error", "exitCode": 2, "message": "private-secret"}}},
+            {"name": "sidecar", "ready": False, "state": {"waiting": {"reason": "private-secret"}}}
+        ]}}]}
+        result = observe_deployment(self.runtime, "smoke", "example:v1", self.log, include_pod_diagnostics=True)
+        self.assertEqual(result["state"], "failed")
+        self.assertEqual(result["reason"], "ProgressDeadlineExceeded")
+        self.assertEqual(result["pod_diagnostics"], {"containers": [{"ready": False, "restart_count": 5,
+            "current_reason": "CrashLoopBackOff", "previous_reason": "Error", "previous_exit_code": 2}], "truncated": False})
+        self.assertNotIn("private-secret", str(result))
+        self.assertNotIn("pod_diagnostics", self.observe())
+
     def setUp(self):
         self.deployment = Resource(deployment(ready=1, updated=1))
         self.pods = Resource({"items": [{

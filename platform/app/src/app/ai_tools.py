@@ -31,6 +31,23 @@ SAFE_RUNTIME_REASONS = {"ObserverUnavailable", "DeploymentNotFound", "Deployment
                         "CreateContainerConfigError", "Unschedulable"}
 
 
+def component_change_summary(current, previous):
+    """Compare fixed declaration fields without exporting their values."""
+    before = {c["name"]: c for c in previous.get("components", [])}
+    after = {c["name"]: c for c in current.get("components", [])}
+    changes = []
+    for name in sorted(set(before) | set(after)):
+        if name not in before or name not in after:
+            changes.append({"component": name, "fields": ["added" if name in after else "removed"]})
+            continue
+        fields = [field for field in ("image", "command", "args", "resources", "replicas", "health",
+                                      "ports", "outbound", "metrics", "tracing")
+                  if before[name].get(field) != after[name].get(field)]
+        if fields:
+            changes.append({"component": name, "fields": fields})
+    return {"component_changes": changes[:10], "component_changes_truncated": len(changes) > 10}
+
+
 def make_tools(project, current_spec, connect, runtime=None):
     """No model tool accepts a project parameter or infrastructure query language."""
     def _current():
@@ -101,24 +118,30 @@ def make_tools(project, current_spec, connect, runtime=None):
                 "component_count": len(components)}
 
     def get_configuration() -> dict:
-        """Read configuration key counts and changed key names, never values."""
+        """Compare revisions: configuration keys and changed component fields, including startup args; never values."""
         current = _current()
         if not current:
             return {"source": "project-catalog", "state": "missing"}
         with connect() as conn:
-            rows = conn.execute("""SELECT r.spec FROM application_revisions r
+            rows = conn.execute("""SELECT r.revision,r.spec FROM application_revisions r
                 JOIN project_applications a ON a.application_id=r.application_id
                 JOIN project_environments e ON e.environment_id=a.environment_id
                 JOIN projects p ON p.project_id=e.project_id
-                WHERE p.name=%s ORDER BY r.revision DESC LIMIT 2""", (project,)).fetchall()
+                WHERE p.name=%s AND r.revision<=%s ORDER BY r.revision DESC LIMIT 2""",
+                (project, current[0])).fetchall()
+        comparable = len(rows) == 2 and rows[0][0] == current[0]
         current_values = current[1].get("configuration") or {}
-        previous_values = (rows[1][0].get("configuration") or {}) if len(rows) > 1 else {}
+        previous = rows[1][1] if comparable else {}
+        previous_values = previous.get("configuration") or {}
         changed = sorted(key for key in set(current_values) | set(previous_values)
                          if current_values.get(key) != previous_values.get(key))
         return {"source": "project-catalog", "state": "ok",
                 "non_secret_key_count": len(current_values),
-                "changed_key_names_since_previous_revision": changed[:20],
-                "changed_count": len(changed)}
+                "revision": current[0], "comparison_state": "ok" if comparable else "unavailable",
+                "previous_revision": rows[1][0] if comparable else None,
+                "changed_key_names_since_previous_revision": changed[:20] if comparable else [],
+                "changed_count": len(changed) if comparable else None,
+                **(component_change_summary(current[1], previous) if comparable else {})}
 
     def get_runtime_status() -> dict:
         """Read bounded deployment readiness and safe Kubernetes reason codes."""
@@ -129,17 +152,19 @@ def make_tools(project, current_spec, connect, runtime=None):
         service = next((c for c in components if c["type"] == "service"), None)
         if service:
             observed = observe_deployment(runtime, project, service.get("resolved_image", service["image"]),
-                                          logging.getLogger(__name__), service["name"])
+                                          logging.getLogger(__name__), service["name"], include_pod_diagnostics=True)
         else:
             image = current[1].get("resolved_image", current[1].get("image"))
             if not image:
                 return {"source": "project-runtime", "state": "not_applicable"}
-            observed = observe_deployment(runtime, project, image, logging.getLogger(__name__))
+            observed = observe_deployment(runtime, project, image, logging.getLogger(__name__),
+                                          include_pod_diagnostics=True)
         reason = observed.get("reason")
         return {"source": "project-runtime", "state": observed["state"],
                 "reason": reason if reason in SAFE_RUNTIME_REASONS else "OtherRuntimeReason",
                 "desired_replicas": observed["desired_replicas"],
                 "ready_replicas": observed["ready_replicas"],
+                "pod_diagnostics": observed.get("pod_diagnostics", {"state": "unavailable"}),
                 "observed_at": observed["observed_at"]}
 
     def get_documentation() -> dict:
