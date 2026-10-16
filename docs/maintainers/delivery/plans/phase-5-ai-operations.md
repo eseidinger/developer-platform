@@ -34,7 +34,13 @@ abstention, tool calls, and estimated cost without persisting model content.
 The corpus is a gate, not a substitute for the deployed regression and recovery
 demonstration or the required second-provider run.
 
-Entry requires demonstrated scoped telemetry, revision recovery, secret redaction and audit from the [delivery gates](../README.md#backlog-delivery-commitments), plus the Phase 4 [tracing and dashboard](phase-4-tracing-and-dashboards.md) evidence. Link those results before enabling tools; AI interfaces do not close missing API-level story criteria.
+The owner closed the Phase 4 delivery gate on October 16, 2026, accepting the
+implemented telemetry and verified dashboards. Remaining Phase 4 acceptance and
+fixes belong to [Phase 7 package 7.9](phase-7-anytime-leftovers.md#79-complete-deferred-phase-4-acceptance)
+and do not block this phase. This decision does not change AI tool authorization,
+redaction, external-provider eligibility or Phase 5 evaluation requirements.
+
+Entry requires demonstrated scoped telemetry, revision recovery, secret redaction and audit from the [delivery gates](../README.md#backlog-delivery-commitments), plus the owner-accepted Phase 4 [tracing and dashboard](phase-4-tracing-and-dashboards.md) completion record. Link those results before enabling tools; AI interfaces do not close missing API-level story criteria.
 
 Execution tracking: use the [phase task index and acceptance checkboxes](../backlog.md#phase-task-index). Each task has one delivery gate; story completion may require later or deferred tasks.
 

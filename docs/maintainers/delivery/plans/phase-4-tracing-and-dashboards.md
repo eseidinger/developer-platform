@@ -1,17 +1,17 @@
 # Phase 4 — Tracing and Grafana Dashboards
 
-Status: source implementation in progress; deployed acceptance remains open.
-Platform and application tracing, application metrics, and dashboards have
-source paths that still require fixture validation and operational evidence. This
-includes a Pod-local HTTP/protobuf forwarder for opted-in traces: it reads the
-rotating Pod-bound token for each batch, so framework exporters can use the
-standard localhost OTLP endpoint. Its resource requests count in quota and
-capacity admission. See [trace setup](../../../../infrastructure/monitoring/TRACING.md).
+Status: **complete by owner direction, October 16, 2026**, at deployed/source
+baseline `4681e56`. The owner accepted the implemented telemetry and verified
+operator dashboards and directed all remaining acceptance work into the final,
+lowest-priority [Phase 7 leftovers](phase-7-anytime-leftovers.md#79-complete-deferred-phase-4-acceptance).
+This closes the Phase 4 delivery gate and PLAN-021 through PLAN-024 under an
+explicit acceptance exception; deferred checks remain unverified, not passed.
+
 The phase follows the usable Phase 3 source capabilities and precedes AI operations
 in [Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
 Alloy, and operator-only Grafana. Full PLAN-017 monitoring acceptance remains
 in the independent [Phase 7 leftovers](phase-7-anytime-leftovers.md); any
-telemetry needed for Phase 4 must be verified within this phase.
+remaining Phase 4 acceptance is now tracked in package 7.9 and does not gate Phase 5.
 
 Execution tracking: [PLAN-021 through PLAN-024](../backlog.md#additional-phase-tasks).
 The [backlog](../backlog.md) remains the evidence and task-status register.
@@ -25,7 +25,8 @@ the recorded automated query and provisioning checks. Do not require a repeat
 JVM dashboard acceptance run using disposable applications. FastAPI runtime
 coverage, unperformed failure/recovery drills, trace/log links, project-access
 and retirement checks, and storage/retention evidence remain separate open items.
-This accepts the performed checks without closing all four Phase 4 tasks.
+These performed checks are passed. The subsequent owner-directed completion
+decision below closes the delivery tasks while preserving deferred acceptance.
 
 The owner also confirmed the **PostgreSQL** dashboard and new host storage panels
 working after deployment through `b347e92` on October 16, 2026. Their live functional
@@ -41,14 +42,14 @@ API observations. Do not ingest request bodies, SQL statements or parameters,
 tokens, passwords, secrets, personal data, or unbounded application-supplied
 attributes into spans, labels, links, panels, or screenshots.
 
-The current baseline has provisioned Prometheus and Loki data sources but no
-trace backend or provisioned dashboards. [ADR-021](../../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md)
+The original planning baseline had provisioned Prometheus and Loki data sources
+but no trace backend or provisioned dashboards. [ADR-021](../../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md)
 selects Tempo 3 single-process/local storage, existing Compose Alloy, a private
 authenticated workload OTLP gateway, an operator-configurable root sample rate
 defaulting to 10%, 24-hour trace retention, and a hard 4 GiB trace-volume
 budget. It also fixes the workload identity, app declaration, and project-read
-boundaries. These are design decisions, not deployed capabilities. Verify the
-chosen limits on the lab before acceptance.
+boundaries. These decisions now have implementation and partial deployed evidence in the
+backlog; remaining limit/retention verification belongs to Phase 7 package 7.9.
 
 ## Ordered work packages
 
@@ -201,11 +202,21 @@ the app continues to work when trace collection fails.
 
 ## Phase exit and handoff
 
-All four tasks need source, local, and deployed evidence against the recorded
-installation; neither source JSON nor a green Grafana health check closes the
-phase. Record collector/backend images, configuration, dashboard revisions,
-sampled trace coverage, resource cost, access denials, and remaining limits in
-the backlog. Phase 5 AI investigation may consume only the authorized,
+**Completion record (October 16, 2026):** The owner directed closure of Phase 4
+and transfer of its remaining checks to Phase 7 package 7.9. PLAN-021 through
+PLAN-024 are complete for delivery sequencing under this explicit exception.
+Existing source/local results and node-01 readback remain evidence; VEF/ODIP,
+PostgreSQL and host storage dashboard checks remain owner-accepted passed.
+
+The exception covers the unperformed end-to-end tracing/retry/scheduled flows,
+project/forged-origin/redaction checks, 0/10/100% sampling, telemetry failure and
+recovery, retirement, FastAPI runtime coverage, restart/reprovisioning, trace/log
+links, and retention/storage/resource-cost checks listed in package 7.9. It also
+covers any implementation corrections needed when those checks are eventually
+run. None is claimed to have passed. The original work packages above preserve
+the intended criteria; their outstanding execution now belongs to Phase 7.
+
+Phase 5 AI investigation may consume only the authorized,
 redacted Platform API views established here, never an unrestricted Grafana or
 trace-store credential. Optional architecture expansion moves to Phase 6 and
 does not gate tracing, dashboards, or AI operations.

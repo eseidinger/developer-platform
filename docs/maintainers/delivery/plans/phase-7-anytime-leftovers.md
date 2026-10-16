@@ -6,7 +6,8 @@ plan and may be worked on whenever capacity allows; it does not gate Phases 3,
 This plan collects the remaining work in
 `PLAN-016`, `PLAN-009`, `PLAN-017`, `PLAN-018`, `PLAN-019`, `PLAN-006`,
 `PLAN-007`, and `PLAN-008`, plus the deferred deployed portal acceptance for
-owner-accepted `PLAN-020`. It does not replace their acceptance criteria or
+owner-accepted `PLAN-020`, and all deferred acceptance/fixes from owner-completed
+Phase 4 (`PLAN-021`–`PLAN-024`, package 7.9). It does not replace their acceptance criteria or
 create a new task ID. The
 [delivery backlog](../backlog.md) remains the authoritative task and evidence
 register.
@@ -16,7 +17,7 @@ register.
 Close the generic hosted-application use-case enablement slice with reproducible
 deployed evidence. This phase finishes the neutral platform contract,
 identity/access behavior, component-aware monitoring, the authenticated
-provider/consumer integration gate, and recovery. It must remain
+provider/consumer integration gate, and recovery, plus the deferred Phase 4 telemetry acceptance. It must remain
 provider-neutral: concrete energy-system declarations and domain assertions are
 owned and tested outside this repository.
 
@@ -28,7 +29,8 @@ are accepted.
 
 Exit: every acceptance criterion for `PLAN-016`, `PLAN-009`, `PLAN-017`,
 `PLAN-018`, `PLAN-019`, `PLAN-006`, `PLAN-007`, and `PLAN-008`, and the
-deferred deployed portal journeys in `PLAN-020`, has dated source, local, and
+deferred deployed portal journeys in `PLAN-020`, and the Phase 4 follow-ups in
+package 7.9, has dated source, local, and
 deployed evidence (or a new explicit owner-directed exception). The generic and
 externally owned versioned results are recorded together. Only then may Phase 7
 be closed; incomplete work here remains visible without blocking the other
@@ -193,9 +195,52 @@ no-rerun decision. This evidence, rather than a source build or UI fixture,
 establishes the functional portion of `PLAN-006`–`PLAN-008`; the final reviews
 or an explicit owner-directed exception are still required to close `PLAN-008`.
 
+### 7.9 — Complete deferred Phase 4 acceptance
+
+**Unscheduled, lowest priority; non-gating for Phase 5.** On October 16, 2026,
+the owner closed Phase 4 at baseline `4681e56` and moved all remaining checks
+and resulting implementation fixes here. These are follow-ups to `PLAN-021`
+through `PLAN-024`, not new task IDs or evidence that unperformed tests passed.
+VEF/ODIP dashboard checks, PostgreSQL and host storage panels, and the recorded
+local/live metric readback are already accepted; do not repeat those solely
+because acceptance moved phases.
+
+- [ ] **Tracing (`PLAN-021`, `PLAN-024`):** Follow API → durable worker → provider
+  outcomes and application-to-application traces. Cover allowed/denied requests,
+  successful/failed operations, interruption/retry, scheduled work, and sampled
+  coverage across the recorded framework images. Correct any missing trace path.
+- [ ] **Security (`PLAN-021`, `PLAN-023`, `PLAN-024`):** Verify project-scoped metric
+  and trace reads, cross-project denial, forged context/resource-origin rejection,
+  and secret/PII redaction in stored spans, metrics, links and evidence.
+- [ ] **Sampling (`PLAN-021`, `PLAN-024`):** Exercise 0%, the 10% default and temporary
+  100% fixture sampling; check root decisions and downstream behavior, distinguish
+  sampling gaps from collection failure, and restore normal settings.
+- [ ] **Failure/recovery (`PLAN-021`–`PLAN-024`):** Inject bounded application and
+  telemetry collector/backend failures. Show useful no-data/error states, continued
+  application/deployment operation and authorization, and collection recovery.
+- [ ] **Lifecycle (`PLAN-023`, `PLAN-024`):** Verify retirement removes metric targets,
+  revokes trace submissions and preserves the intended scoped historical reads.
+- [ ] **FastAPI runtime (`PLAN-023`, `PLAN-024`):** Deploy an instrumented FastAPI
+  fixture and verify metrics, selectors and traces. Existing synthetic Prometheus
+  convention tests remain local evidence, not deployed framework acceptance.
+- [ ] **Operational acceptance (`PLAN-021`–`PLAN-024`):** Verify fresh-start/restart
+  provisioning and reconciliation; safe trace/log/operation links; application and
+  component switching without mixed/stale signals; redacted artifacts and exact
+  backend, collector, dashboard and fixture revisions. Measure resource cost and
+  confirm ingestion/cardinality limits, 24-hour trace retention, the 4 GiB trace
+  filesystem and shared monitoring storage budgets, recording elapsed checks
+  separately from configuration. Keep the existing seven-day Loki check in 7.3.
+
+**Exit evidence:** each unchecked outcome has dated source/local/deployed results
+and limits, or a new explicit owner exception. Repair defects discovered during
+these checks and rerun affected verification. Phase 4 stays closed for delivery
+sequencing; these outcomes remain unverified until executed. Run this package
+when capacity allows, before the final human-database reviews in 7.8; its number
+preserves existing package references rather than imposing numeric execution order.
+
 ### 7.8 — Complete the lowest-priority human database leftovers (`PLAN-008`)
 
-Schedule this **last**, after all other Phase 7 work packages. EV-47's
+Schedule this **last**, after all other Phase 7 work packages, including 7.9. EV-47's
 automated and manual core tests are accepted as passed and need no repeat solely
 for the later clean deployment. The following reviews remain unverified:
 
@@ -219,7 +264,8 @@ not turn an unperformed check into a passing result.
 - Preserve real backups and verified-success history when injecting bounded
   faults. Follow the existing lab policy; do not create an additional
   environment merely for this phase.
-- A failed check returns work to its owning `PLAN-xxx`; record the remediation
+- A failed check returns work to its owning `PLAN-xxx` follow-up; owner-completed
+  Phase 4 delivery tasks remain closed while their fixes stay in package 7.9. Record the remediation
   and rerun dependent packages in order.
 - `PLAN-020` remains accepted for lab sequencing, but package 7.6 closes its
   waived deployed browser/audit evidence before Phase 7 exit or a
@@ -230,8 +276,9 @@ not turn an unperformed check into a passing result.
 `PLAN-016` → `PLAN-009` → `PLAN-017` → `PLAN-018` → `PLAN-019`, with portal
 acceptance package 7.6 run after the identity/access API is available. Package
 7.7 runs after the Phase 3 source capabilities are ready. Run 7.8 last,
-after 7.1–7.7; its reviews or an explicit owner-directed exception remain
-required before Phase 7 exit.
+after 7.1–7.7 and 7.9; its reviews or an explicit owner-directed exception remain
+required before Phase 7 exit. Package 7.9 can run independently once the
+implemented Phase 4 telemetry is available and does not gate Phase 5.
 
 `PLAN-018` requires the implemented and accepted identity, contract, and
 monitoring outcomes. `PLAN-019` requires the completed deployed integration
