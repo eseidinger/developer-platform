@@ -33,7 +33,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "kube_pod_status_ready{namespace=~\"project-.*\",condition=\"true\"}",
+          "expr": "kube_pod_status_ready{namespace=~\"$namespace\",condition=\"true\"}",
           "legendFormat": "{{namespace}} / {{pod}}"
         }
       ],
@@ -68,7 +68,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "kube_deployment_spec_replicas{namespace=~\"project-.*\"}",
+          "expr": "kube_deployment_spec_replicas{namespace=~\"$namespace\"}",
           "legendFormat": "{{namespace}} / {{deployment}}"
         }
       ],
@@ -124,7 +124,7 @@
       "id": 4,
       "type": "timeseries",
       "title": "Host CPU utilization",
-      "description": "Five-minute host CPU use. Database and per-container CPU signals are not currently collected. Missing data means collection or target discovery needs checking.",
+      "description": "Five-minute host CPU use across the platform host. Missing data means collection or target discovery needs checking.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -154,6 +154,247 @@
           "placement": "bottom"
         }
       }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Pod CPU: usage, requests and limits",
+      "description": "Active pods only. Steady-state container totals include native tracing sidecars, excluding ordinary startup init containers and pod overhead. CPU is measured in cores; memory usage is working set. Limits are absent if any container (or deployment pod) lacks a positive limit. These are configured totals, not scheduler admission or peak startup requirements. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform:pod_cpu_usage_cores:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{pod}} \u2014 Usage"
+        },
+        {
+          "refId": "B",
+          "expr": "platform:pod_cpu_requests_cores:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{pod}} \u2014 Requests"
+        },
+        {
+          "refId": "C",
+          "expr": "platform:pod_cpu_limits_cores:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{pod}} \u2014 Limits"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cores"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Pod memory: usage, requests and limits",
+      "description": "Active pods only. Steady-state container totals include native tracing sidecars, excluding ordinary startup init containers and pod overhead. CPU is measured in cores; memory usage is working set. Limits are absent if any container (or deployment pod) lacks a positive limit. These are configured totals, not scheduler admission or peak startup requirements. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform:pod_memory_working_set_bytes:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{pod}} \u2014 Usage"
+        },
+        {
+          "refId": "B",
+          "expr": "platform:pod_memory_requests_bytes:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{pod}} \u2014 Requests"
+        },
+        {
+          "refId": "C",
+          "expr": "platform:pod_memory_limits_bytes:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{pod}} \u2014 Limits"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Deployment CPU: usage, requests and limits",
+      "description": "Active pods only. Steady-state container totals include native tracing sidecars, excluding ordinary startup init containers and pod overhead. CPU is measured in cores; memory usage is working set. Limits are absent if any container (or deployment pod) lacks a positive limit. These are configured totals, not scheduler admission or peak startup requirements. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform:deployment_cpu_usage_cores:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{deployment}} \u2014 Usage"
+        },
+        {
+          "refId": "B",
+          "expr": "platform:deployment_cpu_requests_cores:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{deployment}} \u2014 Requests"
+        },
+        {
+          "refId": "C",
+          "expr": "platform:deployment_cpu_limits_cores:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{deployment}} \u2014 Limits"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "cores"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Deployment memory: usage, requests and limits",
+      "description": "Active pods only. Steady-state container totals include native tracing sidecars, excluding ordinary startup init containers and pod overhead. CPU is measured in cores; memory usage is working set. Limits are absent if any container (or deployment pod) lacks a positive limit. These are configured totals, not scheduler admission or peak startup requirements. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform:deployment_memory_working_set_bytes:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{deployment}} \u2014 Usage"
+        },
+        {
+          "refId": "B",
+          "expr": "platform:deployment_memory_requests_bytes:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{deployment}} \u2014 Requests"
+        },
+        {
+          "refId": "C",
+          "expr": "platform:deployment_memory_limits_bytes:sum{namespace=~\"$namespace\"}",
+          "legendFormat": "{{namespace}} / {{deployment}} \u2014 Limits"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Container usage collection",
+      "description": "TLS-verified kubelet cAdvisor scrape by node; zero means usage collection failed. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{job=\"kubernetes-cadvisor\"}",
+          "legendFormat": "{{node}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "namespace",
+        "label": "Project namespace",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(kube_pod_info{job=\"kubernetes-state\",namespace=~\"project-.+\"}, namespace)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": "project-.+",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  }
 }

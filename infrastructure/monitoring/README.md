@@ -289,3 +289,41 @@ intended inbox. Restore the original replica count and confirm readiness, the
 successful probe, and the recovery email. Record revision, target, original
 replicas, failure/recovery and receipt times. Test retirement separately on an
 intentionally disposable application. Local fixtures do not close OPS-007-T01.
+
+## Workload CPU and memory capacity
+
+**Workloads and capacity** has a project-namespace selector and pod/deployment
+comparisons of CPU usage (cores), memory working set (bytes), configured requests,
+and configured limits. CPU usage needs at least two scrapes in its five-minute
+rate window. Deployment totals join Pod → ReplicaSet → Deployment ownership, so
+rolling ReplicaSets are grouped together; scheduled jobs remain visible as pods.
+Only Pending, Running and Unknown pods contribute to current resource totals.
+Historical samples remain available over the selected time range.
+
+Requests and limits are steady-state container sums, including native restartable
+init sidecars (`restartPolicy: Always`). Ordinary sequential init containers and
+pod overhead are excluded: these panels do not claim the scheduler's effective
+peak startup requirement. A limit is omitted when any contributing container or
+deployment pod lacks a positive limit; missing limits never mean zero capacity.
+Host panels continue to show the whole host, independently of namespace selection.
+
+Prometheus discovers all nodes through the TLS-verified Kubernetes API and scrapes
+private kubelet HTTPS `/metrics/cadvisor` endpoints using a separate
+`capacity-metrics-reader` service account. It can list/watch nodes and get
+`nodes/metrics`; it cannot proxy nodes, exec, read secrets or mutate workloads.
+The cluster CA verifies both discovery and kubelet serving certificates. Bootstrap
+extracts `.runtime/capacity-reader.token` and `.runtime/capacity-reader-ca.crt`,
+mounting them only into Prometheus; the token has the existing UID 65534 read ACL.
+Revoke by deleting `capacity-metrics-reader-token` and rebootstrap to reissue it.
+
+Only `container_cpu_usage_seconds_total` and
+`container_memory_working_set_bytes` for named project containers are retained;
+sandbox containers and arbitrary labels are discarded. Scrapes are bounded to
+10,000 retained samples and a 16 MB response per node. The **Container usage
+collection** panel and existing scrape alerts expose collection failures; missing
+usage is not synthesized as healthy zero. Recording rules in `capacity-rules.yaml`
+combine these metrics with kube-state-metrics resource and ownership data.
+
+`scripts/check-monitoring.py` validates the configuration and executes
+`tests/capacity.test.yaml`: it covers namespace isolation, rolling ReplicaSets,
+sidecars, ordinary init exclusion, completed jobs, and incomplete limits.

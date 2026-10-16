@@ -1,0 +1,322 @@
+rule_files:
+- ../capacity-rules.yaml
+evaluation_interval: 30s
+tests:
+- interval: 30s
+  input_series:
+  - series: kube_pod_status_phase{job="kubernetes-state",namespace="project-a",pod="web-one",phase="Running"}
+    values: 1+0x10
+  - series: kube_pod_owner{job="kubernetes-state",namespace="project-a",pod="web-one",owner_kind="ReplicaSet",owner_name="web-old",owner_is_controller="true"}
+    values: 1+0x10
+  - series: kube_pod_container_info{job="kubernetes-state",namespace="project-a",pod="web-one",container="web"}
+    values: 1+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-one",container="web",resource="cpu"}
+    values: 0.1+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-one",container="web",resource="cpu"}
+    values: 0.2+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-one",container="web",resource="memory"}
+    values: 100+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-one",container="web",resource="memory"}
+    values: 200+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="web-one",container="web",id="web"}
+    values: 0+3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="web-one",container="web",id="web"}
+    values: 50+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="web-one",container="sidecar",restart_policy="Always"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-one",container="sidecar",resource="cpu"}
+    values: 0.025+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-one",container="sidecar",resource="cpu"}
+    values: 0.05+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-one",container="sidecar",resource="memory"}
+    values: 20+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-one",container="sidecar",resource="memory"}
+    values: 40+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="web-one",container="sidecar",id="sidecar"}
+    values: 0+0.3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="web-one",container="sidecar",id="sidecar"}
+    values: 10+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="web-one",container="setup",restart_policy="OnFailure"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-one",container="setup",resource="cpu"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-one",container="setup",resource="cpu"}
+    values: 20000+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-one",container="setup",resource="memory"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-one",container="setup",resource="memory"}
+    values: 20000+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="web-one",container="POD"}
+    values: 0+1000x10
+  - series: kube_pod_status_phase{job="kubernetes-state",namespace="project-a",pod="web-two",phase="Running"}
+    values: 1+0x10
+  - series: kube_pod_owner{job="kubernetes-state",namespace="project-a",pod="web-two",owner_kind="ReplicaSet",owner_name="web-new",owner_is_controller="true"}
+    values: 1+0x10
+  - series: kube_pod_container_info{job="kubernetes-state",namespace="project-a",pod="web-two",container="web"}
+    values: 1+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-two",container="web",resource="cpu"}
+    values: 0.1+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-two",container="web",resource="cpu"}
+    values: 0.2+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-two",container="web",resource="memory"}
+    values: 100+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-two",container="web",resource="memory"}
+    values: 200+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="web-two",container="web",id="web"}
+    values: 0+3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="web-two",container="web",id="web"}
+    values: 50+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="web-two",container="sidecar",restart_policy="Always"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-two",container="sidecar",resource="cpu"}
+    values: 0.025+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-two",container="sidecar",resource="memory"}
+    values: 20+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="web-two",container="sidecar",id="sidecar"}
+    values: 0+0.3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="web-two",container="sidecar",id="sidecar"}
+    values: 10+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="web-two",container="setup",restart_policy="OnFailure"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-two",container="setup",resource="cpu"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-two",container="setup",resource="cpu"}
+    values: 20000+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="web-two",container="setup",resource="memory"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="web-two",container="setup",resource="memory"}
+    values: 20000+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="web-two",container="POD"}
+    values: 0+1000x10
+  - series: kube_pod_status_phase{job="kubernetes-state",namespace="project-b",pod="web-three",phase="Running"}
+    values: 1+0x10
+  - series: kube_pod_owner{job="kubernetes-state",namespace="project-b",pod="web-three",owner_kind="ReplicaSet",owner_name="web-b",owner_is_controller="true"}
+    values: 1+0x10
+  - series: kube_pod_container_info{job="kubernetes-state",namespace="project-b",pod="web-three",container="web"}
+    values: 1+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-b",pod="web-three",container="web",resource="cpu"}
+    values: 0.1+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-b",pod="web-three",container="web",resource="cpu"}
+    values: 0.2+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-b",pod="web-three",container="web",resource="memory"}
+    values: 100+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-b",pod="web-three",container="web",resource="memory"}
+    values: 200+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-b",pod="web-three",container="web",id="web"}
+    values: 0+3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-b",pod="web-three",container="web",id="web"}
+    values: 50+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-b",pod="web-three",container="sidecar",restart_policy="Always"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-b",pod="web-three",container="sidecar",resource="cpu"}
+    values: 0.025+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-b",pod="web-three",container="sidecar",resource="cpu"}
+    values: 0.05+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-b",pod="web-three",container="sidecar",resource="memory"}
+    values: 20+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-b",pod="web-three",container="sidecar",resource="memory"}
+    values: 40+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-b",pod="web-three",container="sidecar",id="sidecar"}
+    values: 0+0.3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-b",pod="web-three",container="sidecar",id="sidecar"}
+    values: 10+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-b",pod="web-three",container="setup",restart_policy="OnFailure"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-b",pod="web-three",container="setup",resource="cpu"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-b",pod="web-three",container="setup",resource="cpu"}
+    values: 20000+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-b",pod="web-three",container="setup",resource="memory"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-b",pod="web-three",container="setup",resource="memory"}
+    values: 20000+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-b",pod="web-three",container="POD"}
+    values: 0+1000x10
+  - series: kube_pod_status_phase{job="kubernetes-state",namespace="project-a",pod="job-done",phase="Succeeded"}
+    values: 1+0x10
+  - series: kube_pod_owner{job="kubernetes-state",namespace="project-a",pod="job-done",owner_kind="Job",owner_name="job",owner_is_controller="true"}
+    values: 1+0x10
+  - series: kube_pod_container_info{job="kubernetes-state",namespace="project-a",pod="job-done",container="web"}
+    values: 1+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-done",container="web",resource="cpu"}
+    values: 0.1+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-done",container="web",resource="cpu"}
+    values: 0.2+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-done",container="web",resource="memory"}
+    values: 100+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-done",container="web",resource="memory"}
+    values: 200+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="job-done",container="web",id="web"}
+    values: 0+3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="job-done",container="web",id="web"}
+    values: 50+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="job-done",container="sidecar",restart_policy="Always"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-done",container="sidecar",resource="cpu"}
+    values: 0.025+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-done",container="sidecar",resource="cpu"}
+    values: 0.05+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-done",container="sidecar",resource="memory"}
+    values: 20+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-done",container="sidecar",resource="memory"}
+    values: 40+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="job-done",container="sidecar",id="sidecar"}
+    values: 0+0.3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="job-done",container="sidecar",id="sidecar"}
+    values: 10+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="job-done",container="setup",restart_policy="OnFailure"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-done",container="setup",resource="cpu"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-done",container="setup",resource="cpu"}
+    values: 20000+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-done",container="setup",resource="memory"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-done",container="setup",resource="memory"}
+    values: 20000+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="job-done",container="POD"}
+    values: 0+1000x10
+  - series: kube_pod_status_phase{job="kubernetes-state",namespace="project-a",pod="job-active",phase="Running"}
+    values: 1+0x10
+  - series: kube_pod_owner{job="kubernetes-state",namespace="project-a",pod="job-active",owner_kind="Job",owner_name="job",owner_is_controller="true"}
+    values: 1+0x10
+  - series: kube_pod_container_info{job="kubernetes-state",namespace="project-a",pod="job-active",container="web"}
+    values: 1+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-active",container="web",resource="cpu"}
+    values: 0.1+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-active",container="web",resource="cpu"}
+    values: 0.2+0x10
+  - series: kube_pod_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-active",container="web",resource="memory"}
+    values: 100+0x10
+  - series: kube_pod_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-active",container="web",resource="memory"}
+    values: 200+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="job-active",container="web",id="web"}
+    values: 0+3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="job-active",container="web",id="web"}
+    values: 50+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="job-active",container="sidecar",restart_policy="Always"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-active",container="sidecar",resource="cpu"}
+    values: 0.025+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-active",container="sidecar",resource="cpu"}
+    values: 0.05+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-active",container="sidecar",resource="memory"}
+    values: 20+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-active",container="sidecar",resource="memory"}
+    values: 40+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="job-active",container="sidecar",id="sidecar"}
+    values: 0+0.3x10
+  - series: container_memory_working_set_bytes{job="kubernetes-cadvisor",namespace="project-a",pod="job-active",container="sidecar",id="sidecar"}
+    values: 10+0x10
+  - series: kube_pod_init_container_info{job="kubernetes-state",namespace="project-a",pod="job-active",container="setup",restart_policy="OnFailure"}
+    values: 1+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-active",container="setup",resource="cpu"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-active",container="setup",resource="cpu"}
+    values: 20000+0x10
+  - series: kube_pod_init_container_resource_requests{job="kubernetes-state",namespace="project-a",pod="job-active",container="setup",resource="memory"}
+    values: 10000+0x10
+  - series: kube_pod_init_container_resource_limits{job="kubernetes-state",namespace="project-a",pod="job-active",container="setup",resource="memory"}
+    values: 20000+0x10
+  - series: container_cpu_usage_seconds_total{job="kubernetes-cadvisor",namespace="project-a",pod="job-active",container="POD"}
+    values: 0+1000x10
+  - series: kube_replicaset_owner{job="kubernetes-state",namespace="project-a",replicaset="web-old",owner_kind="Deployment",owner_name="web",owner_is_controller="true"}
+    values: 1+0x10
+  - series: kube_replicaset_owner{job="kubernetes-state",namespace="project-a",replicaset="web-new",owner_kind="Deployment",owner_name="web",owner_is_controller="true"}
+    values: 1+0x10
+  - series: kube_replicaset_owner{job="kubernetes-state",namespace="project-b",replicaset="web-b",owner_kind="Deployment",owner_name="web",owner_is_controller="true"}
+    values: 1+0x10
+  promql_expr_test:
+  - expr: platform:pod_cpu_requests_cores:sum{namespace="project-a",pod="job-active"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:pod_cpu_requests_cores:sum{namespace="project-a",pod="job-active"}
+      value: 0.125
+  - expr: platform:deployment_cpu_requests_cores:sum{namespace="project-a"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_cpu_requests_cores:sum{namespace="project-a",deployment="web"}
+      value: 0.25
+  - expr: platform:deployment_cpu_requests_cores:sum{namespace="project-b"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_cpu_requests_cores:sum{namespace="project-b",deployment="web"}
+      value: 0.125
+  - expr: platform:pod_memory_requests_bytes:sum{namespace="project-a",pod="job-active"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:pod_memory_requests_bytes:sum{namespace="project-a",pod="job-active"}
+      value: 120
+  - expr: platform:deployment_memory_requests_bytes:sum{namespace="project-a"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_memory_requests_bytes:sum{namespace="project-a",deployment="web"}
+      value: 240
+  - expr: platform:deployment_memory_requests_bytes:sum{namespace="project-b"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_memory_requests_bytes:sum{namespace="project-b",deployment="web"}
+      value: 120
+  - expr: platform:pod_cpu_usage_cores:sum{namespace="project-a",pod="job-active"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:pod_cpu_usage_cores:sum{namespace="project-a",pod="job-active"}
+      value: 0.11
+  - expr: platform:deployment_cpu_usage_cores:sum{namespace="project-a"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_cpu_usage_cores:sum{namespace="project-a",deployment="web"}
+      value: 0.22
+  - expr: platform:deployment_cpu_usage_cores:sum{namespace="project-b"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_cpu_usage_cores:sum{namespace="project-b",deployment="web"}
+      value: 0.11
+  - expr: platform:pod_memory_working_set_bytes:sum{namespace="project-a",pod="job-active"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:pod_memory_working_set_bytes:sum{namespace="project-a",pod="job-active"}
+      value: 60
+  - expr: platform:deployment_memory_working_set_bytes:sum{namespace="project-a"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_memory_working_set_bytes:sum{namespace="project-a",deployment="web"}
+      value: 120
+  - expr: platform:deployment_memory_working_set_bytes:sum{namespace="project-b"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_memory_working_set_bytes:sum{namespace="project-b",deployment="web"}
+      value: 60
+  - expr: platform:pod_cpu_limits_cores:sum{pod="web-one"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:pod_cpu_limits_cores:sum{namespace="project-a",pod="web-one"}
+      value: 0.25
+  - expr: platform:pod_memory_limits_bytes:sum{pod="web-one"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:pod_memory_limits_bytes:sum{namespace="project-a",pod="web-one"}
+      value: 240
+  - expr: platform:pod_cpu_limits_cores:sum{pod="web-two"}
+    eval_time: 5m
+    exp_samples: []
+  - expr: platform:deployment_cpu_limits_cores:sum{namespace="project-a"}
+    eval_time: 5m
+    exp_samples: []
+  - expr: platform:deployment_memory_limits_bytes:sum{namespace="project-a"}
+    eval_time: 5m
+    exp_samples: []
+  - expr: platform:deployment_cpu_limits_cores:sum{namespace="project-b"}
+    eval_time: 5m
+    exp_samples:
+    - labels: platform:deployment_cpu_limits_cores:sum{namespace="project-b",deployment="web"}
+      value: 0.25
+  - expr: platform:pod_cpu_requests_cores:sum{pod="job-done"}
+    eval_time: 5m
+    exp_samples: []
+  - expr: platform:pod_memory_working_set_bytes:sum{pod="job-done"}
+    eval_time: 5m
+    exp_samples: []
+  - expr: platform:pod_deployment:info{pod="job-active"}
+    eval_time: 5m
+    exp_samples: []

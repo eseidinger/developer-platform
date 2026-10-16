@@ -56,6 +56,7 @@ kubectl apply -f infrastructure/kubernetes/controller.yaml
 kubectl apply -f infrastructure/kubernetes/metrics.yaml
 kubectl apply -f infrastructure/kubernetes/log-reader.yaml
 kubectl apply -f infrastructure/kubernetes/metrics-reader.yaml
+kubectl apply -f infrastructure/kubernetes/capacity-reader.yaml
 kubectl apply -f infrastructure/kubernetes/telemetry-reviewer.yaml
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret provisioner-token -o json > .runtime/token.json
@@ -92,6 +93,18 @@ chmod 600 .runtime/metrics-reader.token
 setfacl -m u:65534:r-- .runtime/metrics-reader.token
 chmod 644 .runtime/metrics-reader-ca.crt
 rm -f .runtime/metrics-reader-token.json
+for attempt in $(seq 1 30); do
+  kubectl -n platform-system get secret capacity-metrics-reader-token -o json > .runtime/capacity-reader-token.json
+  if python3 scripts/metrics-reader-credentials.py --capacity; then break; fi
+  sleep 2
+done
+test -s .runtime/capacity-reader.token
+test -s .runtime/capacity-reader-ca.crt
+setfacl -b .runtime/capacity-reader.token
+chmod 600 .runtime/capacity-reader.token
+setfacl -m u:65534:r-- .runtime/capacity-reader.token
+chmod 644 .runtime/capacity-reader-ca.crt
+rm -f .runtime/capacity-reader-token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret telemetry-reviewer-token -o json > .runtime/telemetry-reviewer-token.json
   if python3 scripts/kubeconfig.py --telemetry-reviewer; then break; fi

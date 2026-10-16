@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: capacity-metrics-reader
+  namespace: platform-system
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: capacity-metrics-reader-token
+  namespace: platform-system
+  annotations:
+    kubernetes.io/service-account.name: capacity-metrics-reader
+type: kubernetes.io/service-account-token
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: capacity-metrics-reader
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [list, watch]
+  - apiGroups: [""]
+    resources: [nodes/metrics]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: capacity-metrics-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: capacity-metrics-reader
+subjects:
+  - kind: ServiceAccount
+    name: capacity-metrics-reader
+    namespace: platform-system

@@ -1,6 +1,6 @@
 global:
   scrape_interval: 30s
-rule_files: [/etc/prometheus/alerts.yml]
+rule_files: [/etc/prometheus/alerts.yml, /etc/prometheus/capacity-rules.yml]
 alerting:
   alertmanagers:
     - static_configs:
@@ -15,6 +15,39 @@ scrape_configs:
   - job_name: kubernetes-state
     static_configs:
       - targets: ["k3d-workloads-server-0:30090"]
+  - job_name: kubernetes-cadvisor
+    scheme: https
+    metrics_path: /metrics/cadvisor
+    scrape_timeout: 10s
+    sample_limit: 10000
+    body_size_limit: 16MB
+    label_limit: 12
+    authorization:
+      credentials_file: /run/prometheus/capacity-reader.token
+    tls_config:
+      ca_file: /run/prometheus/capacity-reader-ca.crt
+    kubernetes_sd_configs:
+      - role: node
+        api_server: https://k3d-workloads-server-0:6443
+        authorization:
+          credentials_file: /run/prometheus/capacity-reader.token
+        tls_config:
+          ca_file: /run/prometheus/capacity-reader-ca.crt
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_node_name]
+        target_label: node
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_cpu_usage_seconds_total|container_memory_working_set_bytes'
+        action: keep
+      - source_labels: [namespace]
+        regex: 'project-.+'
+        action: keep
+      - source_labels: [container]
+        regex: '|POD'
+        action: drop
+      - action: labelkeep
+        regex: '__name__|job|instance|node|namespace|pod|container|id|cpu'
   - job_name: blackbox-exporter
     static_configs:
       - targets: ["blackbox-exporter:9115"]

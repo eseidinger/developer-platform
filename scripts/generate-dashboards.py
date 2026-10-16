@@ -23,7 +23,7 @@ def panel(index, title, expr, *, unit="short", description="", kind="timeseries"
 
 DASHBOARDS = [
     ("platform-health-delivery", "Platform health and delivery", [
-        ("Core scrape availability", 'up{job=~"prometheus|host|kubernetes-state|blackbox-exporter|alloy"}', "short",
+        ("Core scrape availability", 'up{job=~"prometheus|host|kubernetes-state|kubernetes-cadvisor|blackbox-exporter|alloy"}', "short",
          "Prometheus target availability (1 = scrape succeeded); this does not prove application health."),
         ("Public access boundary probes", 'probe_success{job="applications"}', "short",
          "A successful protected probe proves access boundary denial, not backend readiness."),
@@ -40,7 +40,7 @@ DASHBOARDS = [
         ("Host memory available", 'node_memory_MemAvailable_bytes{job="host"}', "bytes",
          "Host available memory from node exporter, not a per-project quota."),
         ("Host CPU utilization", '1 - avg by (instance) (rate(node_cpu_seconds_total{job="host",mode="idle"}[5m]))', "percentunit",
-         "Five-minute host CPU use. Database and per-container CPU signals are not currently collected."),
+         "Five-minute host CPU use across the platform host."),
     ]),
     ("telemetry-security", "Telemetry pipeline and security", [
         ("Collector and backend scrape availability", 'up{job=~"alloy|prometheus|host|alertmanager"}', "short",
@@ -155,6 +155,34 @@ def micrometer_dashboard():
     return application_base("micrometer-jvm", "Micrometer JVM", panels, "jvm_memory_used_bytes")
 
 
+def augment_capacity(dashboard):
+    dashboard["templating"] = {"list": [{
+        "name": "namespace", "label": "Project namespace", "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "query": {"query": 'label_values(kube_pod_info{job="kubernetes-state",namespace=~"project-.+"}, namespace)',
+                  "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 1, "sort": 1, "multi": True, "includeAll": True,
+        "allValue": "project-.+", "current": {"text": "All", "value": "$__all"},
+    }]}
+    for current in dashboard["panels"][:2]:
+        current["targets"][0]["expr"] = current["targets"][0]["expr"].replace('namespace=~"project-.*"', 'namespace=~"$namespace"')
+    for scope in ("pod", "deployment"):
+        for resource, unit, usage, suffix in (
+            ("CPU", "cores", "cpu_usage_cores", "cpu"),
+            ("memory", "bytes", "memory_working_set_bytes", "memory"),
+        ):
+            current = panel(len(dashboard["panels"]) + 1, f"{scope.capitalize()} {resource}: usage, requests and limits", "", unit=unit,
+                            description="Active pods only. Steady-state container totals include native tracing sidecars, excluding ordinary startup init containers and pod overhead. CPU is measured in cores; memory usage is working set. Limits are absent if any container (or deployment pod) lacks a positive limit. These are configured totals, not scheduler admission or peak startup requirements.")
+            definitions = [("Usage", usage), ("Requests", f"{suffix}_requests_{unit}"), ("Limits", f"{suffix}_limits_{unit}")]
+            current["targets"] = [{"refId": chr(65 + i),
+                                   "expr": f'platform:{scope}_{metric}:sum{{namespace=~"$namespace"}}',
+                                   "legendFormat": "{{namespace}} / {{" + scope + "}} — " + label}
+                                  for i, (label, metric) in enumerate(definitions)]
+            dashboard["panels"].append(current)
+    dashboard["panels"].append(panel(len(dashboard["panels"]) + 1, "Container usage collection", 'up{job="kubernetes-cadvisor"}',
+                                      description="TLS-verified kubelet cAdvisor scrape by node; zero means usage collection failed.", legend="{{node}}"))
+
+
 def generate(check=False):
     ROOT.mkdir(parents=True, exist_ok=True)
     expected = {}
@@ -168,6 +196,8 @@ def generate(check=False):
                              **({"legend": legend[0]} if legend else {}))
                        for i, (name, expr, unit, description, *legend) in enumerate(definitions, 1)],
         }
+        if uid == "workloads-capacity":
+            augment_capacity(dashboard)
         expected[uid] = dashboard
     for dashboard in (application_dashboard(), micrometer_dashboard()):
         expected[dashboard["uid"]] = dashboard

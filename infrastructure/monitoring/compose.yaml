@@ -20,6 +20,9 @@ services:
     volumes:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
       - ./alerts.yaml:/etc/prometheus/alerts.yml:ro
+      - ./capacity-rules.yaml:/etc/prometheus/capacity-rules.yml:ro
+      - ../../.runtime/capacity-reader.token:/run/prometheus/capacity-reader.token:ro
+      - ../../.runtime/capacity-reader-ca.crt:/run/prometheus/capacity-reader-ca.crt:ro
       - prometheus:/prometheus
       - monitoring_discovery:/etc/prometheus/discovery:ro
       - ../../.runtime/metrics-reader.token:/run/prometheus/metrics-reader.token:ro

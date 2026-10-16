@@ -68,8 +68,11 @@ def main():
         configuration = (config / "prometheus.yaml").read_text()
         configuration = configuration.replace("/run/prometheus/metrics-reader.token", "/etc/prometheus/metrics-reader.token")
         configuration = configuration.replace("/run/prometheus/metrics-reader-ca.crt", "/etc/prometheus/cert.pem")
+        configuration = configuration.replace("/run/prometheus/capacity-reader.token", "/etc/prometheus/metrics-reader.token")
+        configuration = configuration.replace("/run/prometheus/capacity-reader-ca.crt", "/etc/prometheus/cert.pem")
         (temp / "prometheus.yml").write_text(configuration)
         shutil.copy(config / "alerts.yaml", temp / "alerts.yml")
+        shutil.copy(config / "capacity-rules.yaml", temp / "capacity-rules.yml")
         (temp / "discovery").mkdir()
         (temp / "discovery/applications.json").write_text("[]\n")
         (temp / "discovery/application-metrics.json").write_text("[]\n")
@@ -82,6 +85,8 @@ def main():
                   f"{temp}:/etc/prometheus:ro", PROMETHEUS, "check", "config", "/etc/prometheus/prometheus.yml"))
         print(run("docker", "run", "--rm", "--entrypoint", "/bin/promtool", "-v",
                   f"{config}:/work:ro", "-w", "/work", PROMETHEUS, "test", "rules", "tests/alerts.test.yaml"))
+        print(run("docker", "run", "--rm", "--entrypoint", "/bin/promtool", "-v",
+                  f"{config}:/work:ro", "-w", "/work", PROMETHEUS, "test", "rules", "tests/capacity.test.yaml"))
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(temp / "cert.pem", temp / "key.pem")
         tls_server.socket = tls.wrap_socket(tls_server.socket, server_side=True)
