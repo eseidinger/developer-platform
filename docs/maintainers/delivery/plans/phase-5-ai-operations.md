@@ -129,8 +129,12 @@ AI results distinguish `observations` (facts with validated evidence IDs) from
 `hypotheses` (tentative diagnoses with validated evidence IDs). A catalog
 explanation may complete with sourced observations and no hypothesis. Missing
 business functionality or runtime health is a scope gap, not a reason to reject
-an otherwise supported catalog explanation. Missing or foreign sources still
-force abstention; incident diagnosis still requires supported hypotheses.
+an otherwise supported catalog explanation. References to collected sources
+without usable data produce fixed availability-only observations; they cannot
+establish application facts or make an explanation sufficient. Every hypothesis
+requires at least one available source. Unknown source IDs force abstention.
+Contract rejections expose a fixed validation reason code without retaining or
+logging model output. Incident diagnosis still requires supported hypotheses.
 Historical saved results remain unchanged.
 
 ## Agent observability
