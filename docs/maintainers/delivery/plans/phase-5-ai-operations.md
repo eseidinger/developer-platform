@@ -203,6 +203,11 @@ A corpus starts with an incorrect database host, an exhausted connection pool,
 resource pressure, and a case with insufficient data. Expand it with known-cause
 and insufficient-evidence variants. Initially cap each investigation at eight
 read-tool calls, 90 seconds, and $0.25 estimated model cost. Model requests use
+the remaining ninth model-call slot for a tools-disabled final assessment when
+eight reads have been consumed. The provider adapter must honor the
+`allow_tools=False` binding; the agent also refuses any additional tool execution.
+Finalization stays within the same time/cost limits and may still abstain.
+Model requests use
 at most 30 seconds or the remaining run time, with automatic retries disabled.
 The CLI waits up to 120 seconds for synchronous AI-run creation. Model failures
 preserve prior evidence, tool counts and known usage; failed-request usage is

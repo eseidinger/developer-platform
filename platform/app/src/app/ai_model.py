@@ -11,7 +11,7 @@ class ModelUnavailable(Exception):
 class ModelAdapter(Protocol):
     name: str
 
-    def bind_tools(self, tools: list[Any]) -> Any: ...
+    def bind_tools(self, tools: list[Any], *, allow_tools: bool = True) -> Any: ...
 
     def estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float: ...
 
@@ -51,8 +51,9 @@ class OpenAIModelAdapter:
             timeout=30, max_retries=0,
         )
 
-    def bind_tools(self, tools):
-        return self.model.bind_tools(tools, parallel_tool_calls=False)
+    def bind_tools(self, tools, *, allow_tools=True):
+        options = {} if allow_tools else {"tool_choice": "none"}
+        return self.model.bind_tools(tools, parallel_tool_calls=False, **options)
 
     def estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float:
         # GPT-6.1 Sol Standard prices; EU processing adds a 10% uplift.

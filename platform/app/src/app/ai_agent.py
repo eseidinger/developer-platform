@@ -121,8 +121,15 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
     evidence = []
     calls = 0
     cost = 0.0
+    finalizing = False
     with tracing.span("platform.ai.run", **{"platform.ai.run_id": str(run_id), "platform.ai.kind": kind}):
         for _ in range(MAX_MODEL_CALLS):
+            if calls >= MAX_TOOLS and not finalizing:
+                bound = model.bind_tools(tools, allow_tools=False)
+                messages.append(HumanMessage(content="The read-tool budget is exhausted. Return the final JSON "
+                    "assessment using only collected evidence. Do not request any more tools. "
+                    "If a cause is unsupported, report insufficient evidence."))
+                finalizing = True
             estimated_input = sum(len(str(message.content)) for message in messages) / 3
             reserved = model.reserve_cost_usd(int(estimated_input))
             if clock() >= deadline or cost + reserved > MAX_COST_USD:

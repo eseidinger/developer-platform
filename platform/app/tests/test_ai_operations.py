@@ -26,10 +26,13 @@ class _Model:
     def __init__(self, replies):
         self.replies = replies
         self.bound_names = []
+        self.bind_modes = []
+        self.bound = _Bound(replies)
 
-    def bind_tools(self, tools):
+    def bind_tools(self, tools, *, allow_tools=True):
         self.bound_names = [tool.name for tool in tools]
-        return _Bound(self.replies)
+        self.bind_modes.append(allow_tools)
+        return self.bound
 
     def estimate_cost_usd(self, input_tokens, output_tokens):
         return 0.000001 * (input_tokens + output_tokens)
@@ -64,6 +67,41 @@ def _answer(summary, references, insufficient=False):
 
 
 class AIOperationsTests(unittest.TestCase):
+    def test_exhausted_read_budget_gets_a_tools_disabled_final_assessment(self):
+        reads = []
+        def read() -> dict:
+            reads.append(1)
+            return {"source": "project-runtime", "state": "failed", "reason": "OOMKilled"}
+        tool = StructuredTool.from_function(read, name="get_runtime_status", description="Read readiness")
+        replies = [AIMessage(content="", tool_calls=[{
+            "name": tool.name, "args": {}, "id": "c" + str(i)}]) for i in range(8)]
+        model = _Model(replies + [_answer("Likely memory exhaustion", ["E1"])])
+        outcome = ai_agent.run("investigate_incident", "synthetic-budget", model, [tool])
+        self.assertEqual(outcome["state"], "completed")
+        self.assertEqual(outcome["tool_calls"], 8)
+        self.assertEqual(len(reads), 8)
+        self.assertEqual(model.bind_modes, [True, False])
+
+    def test_finalization_cannot_execute_an_extra_tool_if_provider_ignores_disable(self):
+        reads = []
+        def read() -> dict:
+            reads.append(1)
+            return {"source": "project-runtime", "state": "missing"}
+        tool = StructuredTool.from_function(read, name="get_runtime_status", description="Read readiness")
+        replies = [AIMessage(content="", tool_calls=[{
+            "name": tool.name, "args": {}, "id": "c" + str(i)}]) for i in range(9)]
+        outcome = ai_agent.run("investigate_incident", "synthetic-budget", _Model(replies), [tool])
+        self.assertEqual(outcome["state"], "abstained")
+        self.assertEqual(outcome["tool_calls"], 8)
+        self.assertEqual(len(reads), 8)
+
+    def test_openai_finalization_disables_tools_at_provider_boundary(self):
+        adapter = object.__new__(ai_model.OpenAIModelAdapter)
+        from unittest.mock import Mock
+        adapter.model = Mock()
+        adapter.bind_tools([], allow_tools=False)
+        adapter.model.bind_tools.assert_called_once_with([], parallel_tool_calls=False, tool_choice="none")
+
     def test_revision_comparison_exposes_fields_not_startup_or_secret_values(self):
         previous = {"components": [{"name": "web", "args": ["old-secret"]}],
                     "configuration": {"TOKEN": "old-secret"}}
