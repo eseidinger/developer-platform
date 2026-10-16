@@ -39,7 +39,9 @@ docker compose down "${volumes[@]}"
 python3 - <<'PY'
 from pathlib import Path
 for name in ("admin.kubeconfig", "controller.kubeconfig", "token.json", "k3d.yaml",
-             "log-reader.kubeconfig", "log-reader-token.json"):
+             "log-reader.kubeconfig", "log-reader-token.json",
+             "metrics-reader.token", "metrics-reader-ca.crt", "metrics-reader-token.json",
+             "telemetry-reviewer.kubeconfig", "telemetry-reviewer-token.json"):
     (Path(".runtime") / name).unlink(missing_ok=True)
 PY
 if (( ${#volumes[@]} )); then

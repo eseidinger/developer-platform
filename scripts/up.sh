@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/.runtime/bin:$PATH"
-for tool in docker k3d kubectl python3; do
+for tool in docker k3d kubectl python3 setfacl; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 test -f .env || { echo "Run python3 scripts/init.py first" >&2; exit 1; }
@@ -58,8 +58,10 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 test -s .runtime/controller.kubeconfig
-# Container UID 10001 needs read access; .runtime remains private to the host user.
-chmod 644 .runtime/controller.kubeconfig
+# Give only the Platform API's UID read access to its scoped credential.
+setfacl -b .runtime/controller.kubeconfig
+chmod 600 .runtime/controller.kubeconfig
+setfacl -m u:10001:r-- .runtime/controller.kubeconfig
 rm -f .runtime/token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret workload-log-reader-token -o json > .runtime/log-reader-token.json
@@ -67,9 +69,11 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 test -s .runtime/log-reader.kubeconfig
-# Bind mounts require container-readable files; the parent remains host-private.
-# Alloy is a trusted operator collector; do not mount the provisioner credential.
-chmod 644 .runtime/log-reader.kubeconfig
+# Alloy runs as UID 0 with all capabilities dropped. Its bind mount exposes
+# only this log-reader credential, even when bootstrap runs as a non-root user.
+setfacl -b .runtime/log-reader.kubeconfig
+chmod 600 .runtime/log-reader.kubeconfig
+setfacl -m u:0:r-- .runtime/log-reader.kubeconfig
 rm -f .runtime/log-reader-token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret workload-metrics-reader-token -o json > .runtime/metrics-reader-token.json
@@ -78,7 +82,10 @@ for attempt in $(seq 1 30); do
 done
 test -s .runtime/metrics-reader.token
 test -s .runtime/metrics-reader-ca.crt
-chmod 644 .runtime/metrics-reader.token .runtime/metrics-reader-ca.crt
+setfacl -b .runtime/metrics-reader.token
+chmod 600 .runtime/metrics-reader.token
+setfacl -m u:65534:r-- .runtime/metrics-reader.token
+chmod 644 .runtime/metrics-reader-ca.crt
 rm -f .runtime/metrics-reader-token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret telemetry-reviewer-token -o json > .runtime/telemetry-reviewer-token.json
@@ -86,7 +93,9 @@ for attempt in $(seq 1 30); do
   sleep 2
 done
 test -s .runtime/telemetry-reviewer.kubeconfig
-chmod 644 .runtime/telemetry-reviewer.kubeconfig
+setfacl -b .runtime/telemetry-reviewer.kubeconfig
+chmod 600 .runtime/telemetry-reviewer.kubeconfig
+setfacl -m u:10001:r-- .runtime/telemetry-reviewer.kubeconfig
 rm -f .runtime/telemetry-reviewer-token.json
 docker build -f platform/Dockerfile.telemetry-forwarder -t developer-platform-telemetry-forwarder:local platform
 k3d image import developer-platform-telemetry-forwarder:local -c workloads

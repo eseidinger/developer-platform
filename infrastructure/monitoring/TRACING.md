@@ -21,6 +21,11 @@ Run the preparation command again after a host reboot, before starting the
 Compose stack. The image and mount live in `/var/lib/developer-platform`,
 outside the source checkout and platform backup. Tempo retains blocks for 24
 hours; this is configuration, not proof that elapsed deletion has occurred.
+The remote Ansible deployment transfers the script and prepares the mount
+before starting Compose. Bootstrap keeps Kubernetes bearer credentials owner
+only and grants read access by UID-specific ACL to the API, Alloy, Prometheus,
+and telemetry gateway as needed. The host needs the `acl` package; the
+deployment playbook installs it.
 
 `PLATFORM_TRACE_SAMPLE_RATE` sets the root probability from 0 to 1 and defaults
 to 0.1. Change it in `.env`, then recreate `platform-api` through the normal
