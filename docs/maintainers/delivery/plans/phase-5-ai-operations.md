@@ -91,7 +91,7 @@ Development support follows using project knowledge from documentation, ADRs, AP
 
 ## 5.6 — Integrate AI into the project portal (`PLAN-025`)
 
-**Implemented in source; local checks passed. Required for Phase 5; deployed human browser acceptance pending.** On October 16,
+**Complete and owner-accepted on October 16, 2026.** On October 16,
 2026, inspection found generated API types for AI endpoints but no portal routes,
 screens or controls. Existing CLI/API acceptance does not establish UI behavior.
 Add an **AI assistance** area to the existing project workspace and navigation,
@@ -192,9 +192,15 @@ errors and zero AI mutations. Unauthenticated context/run-history/proposal-histo
 requests each returned 401. This is anonymous deployment evidence, with no OIDC
 login, provider calls, policy changes, approvals or workload mutations.
 
-The deployed human policy/explanation/investigation/proposal/approval/execution/
-recovery/development-assistance browser journey remains an acceptance step. Prior
-CLI journeys are preserved as CLI evidence and do not close this UI gate.
+### Owner UI acceptance — October 16, 2026
+
+After deployment of `4b20f11`, the owner reported: “i have tested the ui and it
+is accepted”. Record the deployed AI portal as owner-tested and accepted; close
+PLAN-025 / Phase 5.6. The owner did not supply individual run/proposal IDs or a
+per-scenario transcript, so this is owner acceptance of the UI, without claiming
+additional independently observed cases or audit evidence. Existing automated,
+PostgreSQL, anonymous browser and CLI evidence retain their recorded scope.
+Other Phase 5 tasks and evaluation gates keep their existing status.
 
 ## Initial Global project configuration
 
