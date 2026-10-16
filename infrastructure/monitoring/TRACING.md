@@ -21,6 +21,9 @@ Run the preparation command again after a host reboot, before starting the
 Compose stack. The image and mount live in `/var/lib/developer-platform`,
 outside the source checkout and platform backup. Tempo retains blocks for 24
 hours; this is configuration, not proof that elapsed deletion has occurred.
+The same bounded filesystem is mounted at `/data/tempo` and `/var/tempo` inside
+Tempo; Tempo 3 writes live-store runtime files under the latter path. Bootstrap
+waits for Tempo's `/ready` endpoint before reporting success.
 The remote Ansible deployment transfers the script and prepares the mount
 before starting Compose. Bootstrap keeps Kubernetes bearer credentials owner
 only and grants read access by UID-specific ACL to the API, Alloy, Prometheus,

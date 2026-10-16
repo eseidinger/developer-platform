@@ -107,6 +107,17 @@ echo "Starting fixed-address identity and Platform API services first..."
 docker compose up -d --build --wait --wait-timeout 180 platform-api
 python3 scripts/check-network-addresses.py
 docker compose up -d --build --remove-orphans
+echo "Waiting for Tempo to accept queries (up to 120 seconds)..."
+for attempt in $(seq 1 24); do
+  if docker compose exec -T platform-api python -c 'import urllib.request; urllib.request.urlopen("http://tempo:3200/ready", timeout=3)' >/dev/null 2>&1; then
+    break
+  fi
+  if [[ "$attempt" == 24 ]]; then
+    echo "Tempo did not become ready." >&2
+    exit 1
+  fi
+  sleep 5
+done
 echo "Waiting for the Alloy collector to become ready (up to 120 seconds)..."
 docker compose up -d --no-deps --wait --wait-timeout 120 alloy
 docker build -f platform/Dockerfile.access -t developer-platform-access-authorizer:local platform

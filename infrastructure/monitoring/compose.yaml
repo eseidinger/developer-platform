@@ -52,6 +52,8 @@ services:
     volumes:
       - ./tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/lib/developer-platform/tempo:/data/tempo
+      # Tempo 3 live-store and internal runtime data default under /var/tempo.
+      - /var/lib/developer-platform/tempo:/var/tempo
     networks:
       platform:
         ipv4_address: ${TEMPO_IP:-172.30.80.24}
