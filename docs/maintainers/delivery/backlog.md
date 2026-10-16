@@ -1058,6 +1058,8 @@ the policy decision alone is not provider account activation. See [ADR-008](../.
 
   **Source progress (October 15, 2026; `77d3c1d`–`2f3fa82`):** Added classified, human-requested AI runs, project-bound read tools, safe documentation references, sourced result validation and fail-closed regional model configuration. Targeted unit and OpenAPI tests pass. Deployed project-denial and real-model explanation evidence remains open.
 
+  **Deployed gate check (October 16, 2026; `4508274`):** Node-01 Ansible deployment passed 37 tasks with no failures. The API is healthy and its OpenAI EU project, processing, and amendment verification flags remain false. This establishes fail-closed deployment configuration, not account eligibility or model evaluation.
+
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No AI layer or authorized context/tools; ADR-008 accepts product focus only, not its implementation.
 
 - [ ] **PLAN-011 · 5.2** — Correlate incident logs, metrics, authorized traces and history with timestamps/comparison windows; distinguish observations/hypotheses and explicitly report missing evidence. Prerequisites: PLAN-010; PLAN-021; DEV-004-T02; DEV-005-T02; DEV-007-T02.
@@ -1093,6 +1095,8 @@ the policy decision alone is not provider account activation. See [ADR-008](../.
 - [ ] **PLAN-021 · 4.1** — Instrument the current API and durable worker with bounded OpenTelemetry traces and operator-only collection/storage. Correlate requests, authorization outcomes, operations, retries and provider calls without secret or personal values; prove scoped access, collection failure isolation, resource limits, and deployed trace readback. Prerequisites: usable scoped metrics/logs and a recorded backend, sampling, retention and recovery decision. Full PLAN-017 acceptance remains in Phase 7 and does not gate this task. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md).
 
   **Source progress (October 15, 2026; `f0aa876`):** Added bounded platform tracing, private Alloy/Tempo source, sampling configuration, fixed trace storage budget and local configuration checks. Deployed trace readback and failure isolation remain unverified.
+
+  **Deployed infrastructure check (October 16, 2026; `4508274`):** After the operator prepared the four GiB Tempo mount, the Ansible deployment completed with 37 successful tasks and no failures. PostgreSQL and Platform API were healthy; Alloy and the telemetry gateway were healthy; the API container received HTTP 200 from Tempo `/ready`; and the fixed-address check passed. Scoped Kubernetes credential files were mode 0640 with UID-specific ACLs. No representative trace readback, retention elapsed check, application framework fixture, collector-failure drill, or dashboard panel acceptance is established by this startup check.
 
   **Planning baseline (October 14, 2026):** Prometheus, Loki, Alloy and Grafana exist, but there is no trace backend or instrumented end-to-end operation path. No source, local or deployed tracing acceptance is claimed.
 
