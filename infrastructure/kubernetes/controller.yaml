@@ -21,6 +21,14 @@ rules:
   - apiGroups: [""]
     resources: [services, secrets]
     verbs: [delete]
+  # Server-side apply uses PATCH; these accounts are removed during component reconciliation.
+  - apiGroups: [""]
+    resources: [serviceaccounts]
+    verbs: [patch, delete]
+  # The provisioner must hold the permission it delegates to each project's metrics-reader Role.
+  - apiGroups: [""]
+    resources: [services/proxy]
+    verbs: [get]
   # RBAC cannot scope delete by name; the admission policy below limits it to managed project namespaces.
   - apiGroups: [""]
     resources: [namespaces]
@@ -54,6 +62,9 @@ rules:
   - apiGroups: [networking.k8s.io]
     resources: [networkpolicies, ingresses]
     verbs: [delete]
+  - apiGroups: [rbac.authorization.k8s.io]
+    resources: [roles, rolebindings]
+    verbs: [patch, delete]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
