@@ -1339,7 +1339,7 @@ def create_ai_run(name: str, body: AIRunRequest,
     try:
         model = ai_model.configured_model()
     except ai_model.ModelUnavailable:
-        raise HTTPException(503, "Eligible regional model is not configured") from None
+        raise HTTPException(503, "Eligible model is not configured") from None
     snapshot = current_spec(name)
     base_revision = snapshot[0] if snapshot else None
     with connect() as conn:

@@ -91,7 +91,7 @@ Development support follows using project knowledge from documentation, ADRs, AP
 
 ## 5.6 — Integrate AI into the project portal (`PLAN-025`)
 
-**Implementation in progress, required for Phase 5; browser acceptance pending.** On October 16,
+**Implemented in source; local checks passed. Required for Phase 5; deployed human browser acceptance pending.** On October 16,
 2026, inspection found generated API types for AI endpoints but no portal routes,
 screens or controls. Existing CLI/API acceptance does not establish UI behavior.
 Add an **AI assistance** area to the existing project workspace and navigation,
@@ -137,6 +137,46 @@ stale/expired/reused approvals, unauthorized requests and cross-project denial,
 with keyboard/focus checks and redacted browser/audit evidence. Keep source,
 local and deployed results distinct. Second-provider work remains independently
 deferred to Phase 7 package 7.10.
+
+### Portal implementation evidence — October 16, 2026
+
+The project workspace links to `/projects/:name/ai`. The portal provides policy
+visibility, three explicit run actions, paginated run/proposal history, source
+links, result gaps and cost, and separate exact-hash approval and execution
+confirmations. It follows operation state, readiness and optional bounded HTTP
+metrics. Unknown request outcomes lock further writes until a successful history
+refresh; no creation POST is retried automatically. Running records can be
+reopened after reload; polling stops after five minutes and can be resumed.
+Project changes/unmount clear the AI query cache, and pending responses cannot
+navigate a different project. Results render as escaped text; they are not saved
+to browser persistent storage. Dialog cancellation restores keyboard focus.
+
+`GET /projects/{name}/ai/context` exposes server-derived human/run/manage/policy
+permissions and current revision. Only human platform administrators edit policy;
+human project managers create, approve and execute proposals. New project-scoped
+history endpoints use UUID cursors, a timestamp/UUID ordering and limits 1–50
+(default 20), and return no other project's rows through a foreign cursor. Run
+lists omit result/evidence bodies; details are fetched separately.
+
+New runs record the trusted catalog revision and freeze catalog reads to that
+snapshot. Proposal creation now requires a completed, sourced
+`investigate_incident` run bound to the current revision. Historical runs have a
+nullable revision and remain readable, but cannot create new proposals. Duplicate
+proposal creation returns a conflict directing the caller to history. Existing
+execution checks and previously executed proposals retain their semantics.
+
+Local verification: 70 AI backend tests passed; UI API consistency, lint,
+TypeScript, 40 unit tests and production build passed. The complete portal browser
+suite passed 25 tests, including 14 initial AI cases; the final AI-only suite
+passed 16 cases after adding keyboard-focus and running-record resumption checks.
+Browser evidence uses deterministic intercepted APIs and synthetic model results;
+it does not establish authenticated deployed model calls or workload recovery.
+`scripts/verify-ai-portal-history.py` supplies rollback-only PostgreSQL checks for
+pagination, foreign cursors and stale/unsupported/legacy proposal sources.
+
+The deployed human policy/explanation/investigation/proposal/approval/execution/
+recovery/development-assistance browser journey remains an acceptance step. Prior
+CLI journeys are preserved as CLI evidence and do not close this UI gate.
 
 ## Initial Global project configuration
 
