@@ -1348,6 +1348,18 @@ def _ai_proposal_view(name, row):
             "operation_status_url": f"/v1/operations/{row[10]}" if row[10] else None}
 
 
+def _ai_runtime_failed(name, spec):
+    """Use current server observations, never a model's assertion of failure."""
+    services = [c for c in spec.get("components", []) if c["type"] == "service"]
+    if not services and spec.get("image"):
+        services = [{"name": None, **spec}]
+    try:
+        return any(observe_deployment(runtime, name, c.get("resolved_image", c["image"]),
+                                      log, c["name"])["state"] == "failed" for c in services)
+    except Exception:
+        return False
+
+
 @app.post("/projects/{name}/ai/proposals")
 def create_ai_proposal(name: str, body: AIProposalRequest,
                        principal: Principal = Depends(current_principal)):
@@ -1361,7 +1373,8 @@ def create_ai_proposal(name: str, body: AIProposalRequest,
         if current is None or current[0] is None:
             raise HTTPException(409, "Project has no retained deployment")
         try:
-            proposal_id, diff, digest = ai_changes.create(conn, name, body.run_id, current[0])
+            proposal_id, diff, digest = ai_changes.create(conn, name, body.run_id, current[0],
+                runtime_failed=lambda: _ai_runtime_failed(name, current[1]))
         except ai_changes.ProposalUnavailable as exc:
             raise HTTPException(409, str(exc)) from None
     required_audit(actor_for(principal), "ai.proposal.create", "ai-proposal", str(proposal_id),

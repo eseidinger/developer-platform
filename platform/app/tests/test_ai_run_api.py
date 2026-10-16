@@ -59,3 +59,44 @@ class AIRunAuditTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as error:
                 main.required_audit(main.Actor('oidc', 'human'), 'ai.run', 'ai-run', 'run', 'succeeded')
         self.assertEqual(error.exception.status_code, 503)
+
+
+class RuntimeRollbackCandidateTests(unittest.TestCase):
+    def connection(self, revision=2, state='succeeded'):
+        from unittest.mock import Mock
+        connection = Mock()
+        connection.execute.return_value.fetchone.side_effect = [
+            (revision, state), (1, {'image': 'good'}), ({'image': 'bad'},)]
+        return connection
+
+    def test_applied_runtime_failure_allows_retained_rollback_candidate(self):
+        callback = unittest.mock.Mock(return_value=True)
+        target, base, previous = main.ai_changes.candidate(self.connection(), 'demo', 2, callback)
+        self.assertEqual((target, base, previous), (1, {'image': 'bad'}, {'image': 'good'}))
+        callback.assert_called_once_with()
+
+    def test_no_runtime_failure_or_inflight_or_stale_deployment_is_rejected(self):
+        for revision, state, confirmed in [(2, 'succeeded', False), (2, 'queued', True),
+                                           (2, 'running', True), (3, 'failed', True)]:
+            with self.subTest(revision=revision, state=state):
+                with self.assertRaises(main.ai_changes.ProposalUnavailable):
+                    main.ai_changes.candidate(self.connection(revision, state), 'demo', 2, lambda: confirmed)
+
+    def test_failed_apply_does_not_require_available_runtime(self):
+        callback = unittest.mock.Mock(side_effect=AssertionError('Should not query runtime'))
+        self.assertEqual(main.ai_changes.candidate(self.connection(state='failed'), 'demo', 2, callback)[0], 1)
+        callback.assert_not_called()
+
+    def test_runtime_confirmation_excludes_progressing_healthy_and_missing_states(self):
+        spec = {'components': [{'name': 'web', 'type': 'service', 'image': 'image'}]}
+        for state in ('ready', 'progressing', 'unknown', 'not_found', 'failed'):
+            with self.subTest(state=state), patch.object(main, 'observe_deployment', return_value={'state': state}):
+                self.assertEqual(main._ai_runtime_failed('demo', spec), state == 'failed')
+        with patch.object(main, 'observe_deployment', side_effect=RuntimeError('Observer unavailable')):
+            self.assertFalse(main._ai_runtime_failed('demo', spec))
+
+    def test_a_failed_secondary_service_is_also_observed(self):
+        spec = {'components': [{'name': name, 'type': 'service', 'image': 'image'} for name in ('web', 'api')]}
+        with patch.object(main, 'observe_deployment', side_effect=[{'state': 'ready'}, {'state': 'failed'}]) as observe:
+            self.assertTrue(main._ai_runtime_failed('demo', spec))
+        self.assertEqual(observe.call_count, 2)

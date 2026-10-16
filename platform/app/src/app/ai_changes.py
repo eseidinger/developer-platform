@@ -37,14 +37,17 @@ def canonical_diff(project, base, target, base_spec, target_spec):
     return diff, digest
 
 
-def candidate(conn, project, base_revision):
+def candidate(conn, project, base_revision, runtime_failed=None):
     row = conn.execute("""SELECT o.revision,o.state FROM application_operations o
         JOIN project_applications a ON a.application_id=o.application_id
         JOIN project_environments e ON e.environment_id=a.environment_id
         JOIN projects p ON p.project_id=e.project_id
         WHERE p.name=%s ORDER BY o.created_at DESC LIMIT 1""", (project,)).fetchone()
-    if not row or row != (base_revision, "failed"):
-        raise ProposalUnavailable("Latest revision does not have a failed deployment")
+    if not row or row[0] != base_revision:
+        raise ProposalUnavailable("Latest deployment revision changed")
+    if row[1] != "failed" and not (
+            row[1] == "succeeded" and runtime_failed is not None and runtime_failed() is True):
+        raise ProposalUnavailable("Latest revision has neither a failed apply nor a confirmed runtime failure")
     target = conn.execute("""SELECT o.revision,r.spec FROM application_operations o
         JOIN project_applications a ON a.application_id=o.application_id
         JOIN project_environments e ON e.environment_id=a.environment_id
@@ -64,12 +67,12 @@ def candidate(conn, project, base_revision):
     return target[0], current[0], target[1]
 
 
-def create(conn, project, run_id, base_revision):
+def create(conn, project, run_id, base_revision, runtime_failed=None):
     run = conn.execute("SELECT state,evidence FROM ai_runs WHERE project=%s AND run_id=%s",
                        (project, run_id)).fetchone()
     if not run or run[0] != "completed" or not run[1]:
         raise ProposalUnavailable("A completed sourced investigation is required")
-    target, base_spec, target_spec = candidate(conn, project, base_revision)
+    target, base_spec, target_spec = candidate(conn, project, base_revision, runtime_failed)
     diff, digest = canonical_diff(project, base_revision, target, base_spec, target_spec)
     proposal_id = uuid4()
     conn.execute("""INSERT INTO ai_change_proposals

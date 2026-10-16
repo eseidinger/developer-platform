@@ -23,7 +23,7 @@ existing EU eligibility/processing/amendment verification flags. It never falls
 back to Global. Global acceptance does not set those flags. Global account/model connectivity
 is verified; diagnosis quality and live workflow acceptance remain open.
 
-The initial write path proposes only rollback from a failed latest deployment to
+The initial write path proposes only rollback from a failed latest apply or a server-confirmed failed runtime to
 a retained, previously successful revision. Its reviewable diff lists changed
 top-level paths without values. A human project administrator approves the exact
 hash for 15 minutes; execution checks current authority, hash, expiry, and base
@@ -175,10 +175,12 @@ changes only the baseline container arguments to an invalid option. It passed
 API declaration validation and exited with code 2 in an isolated local container.
 Submit it without waiting for readiness and inspect the returned operation and
 component status separately: manifest application can succeed while the workload
-fails. The initial proposal implementation currently requires a failed apply
-operation; support for a server-verified runtime failure remains to be completed
-before this scenario's proposal/recovery acceptance. No live fault result is
-claimed by the local fixture check.
+fails. The proposal path also accepts an applied revision whose service readiness is
+server-observed `failed`; healthy, progressing and unavailable observations do
+not qualify. It still requires a completed sourced AI run, a prior successful
+retained revision and the existing explicit approval/revision checks. The owner
+observed revision 2 applied with `CrashLoopBackOff`; this establishes startup
+failure, while the diagnosis, proposal and recovery journey remains open.
 
 The demonstration introduces a traceable regression using test resources, shows the investigation, an approvable fix, and the observed recovery state. Prompt-injection, secret-handling, and project-boundary tests are acceptance criteria.
 
