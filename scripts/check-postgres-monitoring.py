@@ -71,7 +71,8 @@ def main():
             run("docker", "network", "create", name)
             run("docker", "run", "--rm", "-d", "--name", name, "--network", name,
                 "--network-alias", "postgres", "-e", "POSTGRES_PASSWORD=fixture-only-admin", "-e", "POSTGRES_DB=platform", "postgres:18.6-trixie")
-            wait_for(lambda: subprocess.run(["docker", "exec", name, "pg_isready", "-U", "postgres", "-d", "platform"], capture_output=True).returncode == 0)
+            # The image's temporary initialization server uses only Unix sockets.
+            wait_for(lambda: subprocess.run(["docker", "exec", name, "pg_isready", "-h", "127.0.0.1", "-U", "postgres", "-d", "platform"], capture_output=True).returncode == 0)
             sql(setup.monitoring_sql(password))
             sql(setup.monitoring_sql(password))  # Existing-database bootstrap is repeatable.
             sql("CREATE DATABASE project_fixture_a; CREATE DATABASE project_fixture_b;")
