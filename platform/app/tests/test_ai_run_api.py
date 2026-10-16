@@ -19,6 +19,36 @@ class Connection:
 
 
 class AIRunAuditTests(unittest.TestCase):
+    def test_ineligible_classification_is_rejected_before_model_access(self):
+        for classification in (None, "confidential", "restricted"):
+            with self.subTest(classification=classification), ExitStack() as stack:
+                stack.enter_context(patch.object(main, "require_permission"))
+                stack.enter_context(patch.object(main, "connect", return_value=Connection()))
+                stack.enter_context(patch.object(main, "access_scope", return_value=None))
+                stack.enter_context(patch.object(main.ai_store, "classification", return_value=classification))
+                model = stack.enter_context(patch.object(main.ai_model, "configured_model"))
+                agent = stack.enter_context(patch.object(main.ai_agent, "run"))
+                with self.assertRaises(HTTPException) as error:
+                    main.create_ai_run("demo", main.AIRunRequest(kind="explain_application"),
+                                       Principal("https://issuer.example", "human"))
+                self.assertEqual(error.exception.status_code, 403)
+                model.assert_not_called()
+                agent.assert_not_called()
+
+    def test_automation_is_rejected_before_model_access(self):
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(main, "require_permission"))
+            stack.enter_context(patch.object(main, "connect", return_value=Connection()))
+            stack.enter_context(patch.object(main, "access_scope", return_value={"kind": "automation"}))
+            model = stack.enter_context(patch.object(main.ai_model, "configured_model"))
+            agent = stack.enter_context(patch.object(main.ai_agent, "run"))
+            with self.assertRaises(HTTPException) as error:
+                main.create_ai_run("demo", main.AIRunRequest(kind="explain_application"),
+                                   Principal("https://issuer.example", "automation"))
+            self.assertEqual(error.exception.status_code, 403)
+            model.assert_not_called()
+            agent.assert_not_called()
+
     def test_run_states_use_valid_audit_results_and_preserve_domain_state(self):
         for state in ('completed', 'abstained', 'failed'):
             with self.subTest(state=state), ExitStack() as stack:

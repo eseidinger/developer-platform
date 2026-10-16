@@ -43,6 +43,13 @@ abstention, tool calls, and estimated cost without persisting model content.
 The corpus is a gate, not a substitute for the deployed regression and recovery
 demonstration or the required second-provider run.
 
+The October 16 post-finalization rerun remains below that gate: one of three
+known-cause cases passed (resource pressure); the database-host and pool cases
+abstained. All three abstention cases passed, with eight reads per case and
+$0.103454 total estimated cost. The next quality work is bounded database/pool
+diagnostics and production-contract-aligned evaluation evidence; thresholds and
+historical failed results remain unchanged. The second-provider run is also open.
+
 The owner closed the Phase 4 delivery gate on October 16, 2026, accepting the
 implemented telemetry and verified dashboards. Remaining Phase 4 acceptance and
 fixes belong to [Phase 7 package 7.9](phase-7-anytime-leftovers.md#79-complete-deferred-phase-4-acceptance)
@@ -202,7 +209,7 @@ full adversarial corpus and second-provider evaluation.
 A corpus starts with an incorrect database host, an exhausted connection pool,
 resource pressure, and a case with insufficient data. Expand it with known-cause
 and insufficient-evidence variants. Initially cap each investigation at eight
-read-tool calls, 90 seconds, and $0.25 estimated model cost. Model requests use
+read-tool calls, 90 seconds, and $0.25 estimated model cost. The agent uses
 the remaining ninth model-call slot for a tools-disabled final assessment when
 eight reads have been consumed. The provider adapter must honor the
 `allow_tools=False` binding; the agent also refuses any additional tool execution.

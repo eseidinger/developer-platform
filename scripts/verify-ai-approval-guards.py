@@ -7,7 +7,7 @@ audit records, project revisions or workloads are written.
 import json
 from uuid import uuid4
 
-from app import ai_changes, main
+from app import ai_changes, ai_store, main
 from app.identity import Principal
 
 
@@ -53,7 +53,16 @@ def verify():
                 conn, "synthetic-ai-guard", proposal, digest))
             rejected("reapproval_after_execution", lambda: ai_changes.approve(
                 conn, "synthetic-ai-guard", proposal, digest, principal))
+            conn.execute("CREATE TEMP TABLE ai_runs (LIKE public.ai_runs INCLUDING DEFAULTS) ON COMMIT DROP")
+            conn.execute("""INSERT INTO pg_temp.ai_runs
+                (run_id,project,requester_issuer,requester_subject,kind,state,result)
+                VALUES (%s,'synthetic-ai-guard','https://synthetic.invalid','synthetic-human',
+                        'explain_application','completed','{}')""", (run,))
+            assert ai_store.get_run(conn, "synthetic-ai-guard", run) is not None
+            assert ai_store.get_run(conn, "foreign-project", run) is None
+            checks.append("foreign_run_read")
         assert conn.execute("SELECT to_regclass('pg_temp.ai_change_proposals')").fetchone()[0] is None
+        assert conn.execute("SELECT to_regclass('pg_temp.ai_runs')").fetchone()[0] is None
     return {"passed": checks, "temporary_table_rolled_back": True, "live_proposals_written": False}
 
 
