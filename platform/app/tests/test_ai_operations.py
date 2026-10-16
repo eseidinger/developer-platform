@@ -115,6 +115,40 @@ class AIOperationsTests(unittest.TestCase):
         self.assertEqual(outcome["tool_calls"], 1)
         self.assertEqual(outcome["evidence"][0]["source"], "project-catalog")
 
+    def test_catalog_explanation_completes_with_sourced_facts_and_no_hypothesis(self):
+        tool = StructuredTool.from_function(func=lambda: {"source": "project-catalog", "state": "applied",
+            "revision": 17, "components": [{"name": "web", "type": "service"}]},
+            name="get_application", description="Read the current catalog")
+        final = AIMessage(content=json.dumps({"summary": "Revision 17 is applied.",
+            "observations": [{"statement": "The web component is a service.", "source_ids": ["E1"]}],
+            "hypotheses": [], "gaps": ["Business functionality and runtime health are not described."],
+            "insufficient_evidence": False}))
+        model = _Model([AIMessage(content="", tool_calls=[{
+            "name": "get_application", "args": {}, "id": "call-1"}]), final])
+        outcome = ai_agent.run("explain_application", "run-explanation", model, [tool])
+        self.assertEqual(outcome["state"], "completed")
+        self.assertEqual(outcome["result"]["hypotheses"], [])
+        self.assertEqual(outcome["result"]["observations"][0]["source_ids"], ["E1"])
+        self.assertEqual(outcome["tool_calls"], 1)
+
+    def test_explanation_rejects_missing_unavailable_or_foreign_observation_sources(self):
+        for refs, evidence in (([], [{"id": "E1", "state": "applied"}]),
+                               (["foreign"], [{"id": "E1", "state": "applied"}]),
+                               (["E1"], [{"id": "E1", "state": "missing"}]),
+                               (["E1"], [])):
+            with self.subTest(refs=refs, evidence=evidence):
+                message = AIMessage(content=json.dumps({"summary": "Some facts.",
+                    "observations": [{"statement": "A service exists.", "source_ids": refs}],
+                    "hypotheses": [], "gaps": [], "insufficient_evidence": False}))
+                self.assertTrue(ai_agent._parse_final(message, evidence, "explain_application")["insufficient_evidence"])
+
+    def test_incident_diagnosis_still_requires_hypotheses_not_only_observations(self):
+        message = AIMessage(content=json.dumps({"summary": "A service exists.",
+            "observations": [{"statement": "A service exists.", "source_ids": ["E1"]}],
+            "hypotheses": [], "gaps": [], "insufficient_evidence": False}))
+        result = ai_agent._parse_final(message, [{"id": "E1", "state": "applied"}], "investigate_incident")
+        self.assertTrue(result["insufficient_evidence"])
+
     def test_missing_or_foreign_citation_abstains(self):
         model = _Model([_answer("certain root cause", ["foreign-source"])])
         outcome = ai_agent.run("investigate_incident", "run-2", model, [])
