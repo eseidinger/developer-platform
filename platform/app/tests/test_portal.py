@@ -16,10 +16,8 @@ class PortalTests(unittest.TestCase):
     def test_portal_routes_serve_the_single_page_ui(self):
         self.assertTrue(main.portal_route().path.endswith("app/static/index.html"))
         self.assertTrue(main.portal_route("example").path.endswith("app/static/index.html"))
-        self.assertIn(
-            "/projects/{name}/application-access",
-            {route.path for route in main.app.routes},
-        )
+        for path in ("/projects/{name}/application-access", "/projects/{name}/ai"):
+            self.assertIn(path, {route.path for route in main.app.routes})
 
     def test_portal_config_has_only_public_oidc_settings(self):
         request = Mock()

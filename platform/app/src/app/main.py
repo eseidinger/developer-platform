@@ -189,6 +189,7 @@ def portal():
 
 @app.get("/projects/{name}", include_in_schema=False)
 @app.get("/projects/{name}/application-access", include_in_schema=False)
+@app.get("/projects/{name}/ai", include_in_schema=False)
 @app.get("/platform/administration", include_in_schema=False)
 def portal_route(name: str | None = None):
     """Serve the browser portal for supported client-side routes and deep links."""
