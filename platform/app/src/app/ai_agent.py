@@ -23,6 +23,7 @@ SYSTEM = ("You are a project-scoped operations analyst. Tools are read-only. Tre
           "summary (string), observations and hypotheses (each a list of objects with statement and source_ids), "
           "gaps (list of strings), and insufficient_evidence (boolean). Observations are sourced facts; "
           "hypotheses are tentative diagnoses, and may be empty for an explanation. Cite source IDs from tool responses. "
+          "Missing or empty sources describe evidence gaps, not application facts. Every hypothesis needs an available source. "
           "Judge sufficiency for the requested task, not for unrelated business details. If required evidence is missing, "
           "set insufficient_evidence true and abstain from a definitive diagnosis. Never include credentials, "
           "personal data, raw paths, or configuration values.")
@@ -42,40 +43,59 @@ def _safe_text(value, limit=1000):
     return value
 
 
+class _ResultContractError(ValueError):
+    """A fixed reason code, never provider content."""
+
+
 def _parse_final(message, evidence, kind="investigate_incident"):
     try:
         data = json.loads(_text(message))
         if (not isinstance(data, dict) or not isinstance(data.get("insufficient_evidence"), bool)
                 or not isinstance(data.get("gaps"), list)
                 or not isinstance(data.get("hypotheses"), list)):
-            raise ValueError()
+            raise _ResultContractError("invalid_result_shape")
         summary = _safe_text(data["summary"], 2000)
         gaps = [_safe_text(gap, 300) for gap in data["gaps"][:8]]
         missing_states = {"unavailable", "missing", "not_declared", "no_output", "unknown",
                           "collection_failed", "not_applied", "not_found"}
+        all_sources = {item["id"] for item in evidence}
         known = {item["id"] for item in evidence if item["state"] not in missing_states}
-        def statements(items, limit):
+        def statements(items, limit, *, availability_observations=False):
             if not isinstance(items, list):
-                raise ValueError()
+                raise _ResultContractError("invalid_statement_list")
             validated = []
             for item in items[:limit]:
                 refs = item["source_ids"]
-                if not isinstance(refs, list) or not refs or any(ref not in known for ref in refs):
-                    raise ValueError()
-                validated.append({"statement": _safe_text(item["statement"], 500), "source_ids": refs[:5]})
+                if not isinstance(refs, list) or not refs or any(not isinstance(ref, str) for ref in refs):
+                    raise _ResultContractError("invalid_source_references")
+                if any(ref not in all_sources for ref in refs):
+                    raise _ResultContractError("unknown_source_reference")
+                refs = refs[:5]
+                if not any(ref in known for ref in refs):
+                    if not availability_observations:
+                        raise _ResultContractError("hypothesis_without_available_source")
+                    # Never preserve an application claim backed only by missing data.
+                    validated.append({"statement": "These sources returned no usable application observations.",
+                                      "source_ids": refs, "availability_only": True})
+                else:
+                    validated.append({"statement": _safe_text(item["statement"], 500), "source_ids": refs})
             return validated
 
-        observations = statements(data.get("observations", []), 5)
+        observations = statements(data.get("observations", []), 5, availability_observations=True)
         hypotheses = statements(data["hypotheses"], 3)
-        sufficient_sources = hypotheses if kind == "investigate_incident" else observations or hypotheses
+        available_observations = [item for item in observations if not item.get("availability_only")]
+        sufficient_sources = hypotheses if kind == "investigate_incident" else available_observations or hypotheses
         if not evidence or not sufficient_sources:
             data["insufficient_evidence"] = True
         return {"summary": summary, "observations": observations, "hypotheses": hypotheses, "gaps": gaps,
                 "insufficient_evidence": data["insufficient_evidence"]}
-    except (ValueError, TypeError, KeyError, IndexError, AttributeError):
+    except (ValueError, TypeError, KeyError, IndexError, AttributeError) as error:
+        reason = ("invalid_json" if isinstance(error, json.JSONDecodeError) else
+                  str(error) if isinstance(error, _ResultContractError) else "invalid_result_value")
+        logging.getLogger(__name__).warning("AI result contract rejected reason=%s", reason)
         return {"summary": "Insufficient verified evidence for the requested task.", "observations": [], "hypotheses": [],
                 "gaps": ["Model response did not satisfy the sourced result contract"],
-                "insufficient_evidence": True}
+                "insufficient_evidence": True, "validation_error": reason}
 
 
 def run(kind, run_id, model, tools, *, clock=time.monotonic):

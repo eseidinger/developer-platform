@@ -152,6 +152,31 @@ class AIOperationsTests(unittest.TestCase):
         result = ai_agent._parse_final(message, [{"id": "E1", "state": "applied"}], "investigate_incident")
         self.assertTrue(result["insufficient_evidence"])
 
+    def test_missing_logs_can_be_cited_as_availability_without_erasing_supported_diagnosis(self):
+        message = AIMessage(content=json.dumps({"summary": "The rollout has failed; logs are absent.",
+            "observations": [{"statement": "The database is healthy.", "source_ids": ["E2"]}],
+            "hypotheses": [{"statement": "A startup failure is suspected; logs do not explain why.",
+                            "source_ids": ["E1", "E2"]}],
+            "gaps": ["No logs were returned."], "insufficient_evidence": False}))
+        evidence = [{"id": "E1", "state": "failed"}, {"id": "E2", "state": "no_output"}]
+        result = ai_agent._parse_final(message, evidence)
+        self.assertFalse(result["insufficient_evidence"])
+        self.assertEqual(len(result["hypotheses"]), 1)
+        self.assertTrue(result["observations"][0]["availability_only"])
+        self.assertNotIn("database is healthy", str(result))
+
+    def test_missing_evidence_alone_cannot_support_a_diagnosis(self):
+        message = _answer("Unsupported diagnosis", ["E1"])
+        result = ai_agent._parse_final(message, [{"id": "E1", "state": "no_output"}])
+        self.assertTrue(result["insufficient_evidence"])
+        self.assertEqual(result["validation_error"], "hypothesis_without_available_source")
+
+    def test_validation_reason_is_safe_and_distinguishes_malformed_output(self):
+        with self.assertLogs("app.ai_agent", level="WARNING") as logs:
+            result = ai_agent._parse_final(AIMessage(content='{"secret-provider-payload":'), [])
+        self.assertEqual(result["validation_error"], "invalid_json")
+        self.assertNotIn("secret-provider-payload", str(result) + str(logs.output))
+
     def test_missing_or_foreign_citation_abstains(self):
         model = _Model([_answer("certain root cause", ["foreign-source"])])
         outcome = ai_agent.run("investigate_incident", "run-2", model, [])
