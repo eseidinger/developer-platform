@@ -1054,6 +1054,19 @@ an executed amendment, and EU project/model/endpoint eligibility have not been
 verified. Keep external model calls disabled until those checks are recorded;
 the policy decision alone is not provider account activation. See [ADR-008](../../architecture/decisions/ADR-008-ai-assisted-operations.md).
 
+**Global OpenAI project policy update (October 16, 2026):** The owner explicitly
+accepted their Global project, superseding the preceding EU-only installation
+policy. Explicit Global mode now selects the official global endpoint and requires
+`OPENAI_GLOBAL_PROCESSING_ACCEPTED=true` plus a key. The previously accepted
+standard abuse-monitoring retention applies; no EU residency, Zero Data Retention
+or executed regional amendment is claimed. Scoped minimized Public/Internal
+context, redaction, `store=false`, tool budgets and human change approval remain
+in force. EU mode retains its independent verification gates and never silently
+falls back. Sixteen AI tests passed, including explicit Global acceptance, missing
+key/acceptance rejection, unchanged EU gating, fixed endpoint selection and
+regional cost estimates. Deployment and real model evaluation remain pending.
+See [ADR-008](../../architecture/decisions/ADR-008-ai-assisted-operations.md).
+
 - [ ] **PLAN-010 · 5.1** — Expose bounded read-only Platform API tools and authorized/redacted application/revision/configuration/document context; produce sourced explanations and test project denial and untrusted-input handling. Prerequisites: Phase 4 gate; scoped data/audit evidence.
 
   **Source progress (October 15, 2026; `77d3c1d`–`2f3fa82`):** Added classified, human-requested AI runs, project-bound read tools, safe documentation references, sourced result validation and fail-closed regional model configuration. Targeted unit and OpenAPI tests pass. Deployed project-denial and real-model explanation evidence remains open.

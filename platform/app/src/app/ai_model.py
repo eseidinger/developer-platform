@@ -22,20 +22,32 @@ class OpenAIModelAdapter:
     name = "openai:gpt-6.1-sol"
 
     def __init__(self):
-        # The endpoint alone cannot prove account eligibility or contractual terms.
-        checks = ("OPENAI_EU_PROJECT_VERIFIED", "OPENAI_EU_PROCESSING_VERIFIED",
-                  "OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED")
-        if any(os.environ.get(key) != "true" for key in checks):
-            raise ModelUnavailable("EU model eligibility and retention terms are not verified")
+        # Explicit global acceptance never implies verified EU eligibility.
+        region = os.environ.get("OPENAI_DATA_REGION", "eu")
+        if region == "global":
+            if os.environ.get("OPENAI_GLOBAL_PROCESSING_ACCEPTED") != "true":
+                raise ModelUnavailable("Global model processing is not accepted")
+            base_url = "https://api.openai.com/v1"
+            self.regional_cost_multiplier = 1.0
+        elif region == "eu":
+            checks = ("OPENAI_EU_PROJECT_VERIFIED", "OPENAI_EU_PROCESSING_VERIFIED",
+                      "OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED")
+            if any(os.environ.get(key) != "true" for key in checks):
+                raise ModelUnavailable("EU model eligibility and retention terms are not verified")
+            base_url = "https://eu.api.openai.com/v1"
+            self.regional_cost_multiplier = 1.1
+        else:
+            raise ModelUnavailable("Configured OpenAI data region is unsupported")
         key = os.environ.get("OPENAI_API_KEY", "")
         if not key:
             raise ModelUnavailable("OpenAI API key is not configured")
         from langchain_openai import ChatOpenAI
         self.model = ChatOpenAI(
             model="gpt-6.1-sol", api_key=key,
-            base_url="https://eu.api.openai.com/v1", use_responses_api=True,
+            base_url=base_url, use_responses_api=True,
             store=False, use_previous_response_id=False,
             reasoning_effort="low", max_tokens=1024,
+            service_tier="default",
             timeout=10, max_retries=0,
         )
 
@@ -43,8 +55,8 @@ class OpenAIModelAdapter:
         return self.model.bind_tools(tools, parallel_tool_calls=False)
 
     def estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float:
-        # GPT-6.1 Sol Standard list prices plus 10% EU regional uplift.
-        return (input_tokens * 2.2 + output_tokens * 11.0) / 1_000_000
+        # GPT-6.1 Sol Standard prices; EU processing adds a 10% uplift.
+        return (input_tokens * 2.0 + output_tokens * 10.0) * self.regional_cost_multiplier / 1_000_000
 
     def reserve_cost_usd(self, input_tokens: int) -> float:
         return self.estimate_cost_usd(input_tokens, 1024)

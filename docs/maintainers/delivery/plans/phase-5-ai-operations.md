@@ -4,18 +4,24 @@ Status: source implementation in progress. Read-only investigations and a narrow
 rollback approval workflow are implemented; deployed acceptance evidence and the
 full evaluation corpus remain open. Covers [F-11 and F-12](../../../product/requirements.md).
 
-The source implementation uses LangChain `ChatOpenAI` through the EU API endpoint
+The source implementation uses LangChain `ChatOpenAI` through an explicitly selected OpenAI API endpoint
 with Responses API `store=false`, a project-bound tool set, and durable run records.
 The `development_assistance` run uses fixed, committed documentation and the
 caller's authorized project observations for a bounded template and change-impact
 explanation. It does not read arbitrary repository files.
-External calls fail closed until the API key and explicit EU project, processing,
-and Modified Retention amendment verification flags are set. The October 16, 2026
-owner decision accepts OpenAI's additional abuse-monitoring controls and Modified
-Retention amendment for EU data residency, superseding default-retention acceptance.
-OpenAI's approval, an executed amendment, and EU project/model/endpoint eligibility
-still need operator verification before setting the flags. See the current
-[data controls](https://developers.openai.com/api/docs/guides/your-data).
+The owner explicitly accepted their **Global** OpenAI project on October 16,
+2026, superseding this installation's initial EU-only policy. Global mode uses
+`https://api.openai.com/v1` and requires `OPENAI_DATA_REGION=global`,
+`OPENAI_GLOBAL_PROCESSING_ACCEPTED=true` and an API key. Authorized minimized
+Public and Internal context remains the only permitted external project data.
+Standard provider abuse-monitoring retention (up to 30 days) remains accepted;
+`store=false` does not mean Zero Data Retention. No EU residency or provider
+amendment approval is claimed. See the [data controls](https://developers.openai.com/api/docs/guides/your-data).
+
+EU remains the compatibility default and optional mode, requiring all three
+existing EU eligibility/processing/amendment verification flags. It never falls
+back to Global. Global acceptance does not set those flags. Account/model access
+and live evaluation still require verification.
 
 The initial write path proposes only rollback from a failed latest deployment to
 a retained, previously successful revision. Its reviewable diff lists changed
@@ -25,7 +31,7 @@ revision under transaction and queues the existing rollback operation. The
 proposal view links the operation and reports readiness plus available application
 metrics. Additional fix types and a live recovery demonstration remain open.
 
-After regional model eligibility is verified, run
+After the selected model/account configuration is verified, run
 `UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python scripts/evaluate-ai.py`
 with the deployment's model environment. The synthetic corpus covers an incorrect
 database host, pool exhaustion, resource pressure, missing evidence, untrusted
@@ -56,6 +62,25 @@ Execution tracking: use the [phase task index and acceptance checkboxes](../back
 
 Development support follows using project knowledge from documentation, ADRs, API contracts, and repositories. Examples include appropriate service templates, change-impact analysis, and reviews with runtime context. General code completion is not a separate product goal.
 
+## Initial Global project configuration
+
+Create a project API key and enter it directly in the protected server `.env`;
+do not paste it into chat or commit it. Configure:
+
+```dotenv
+AI_MODEL_PROVIDER=openai
+OPENAI_DATA_REGION=global
+OPENAI_GLOBAL_PROCESSING_ACCEPTED=true
+OPENAI_API_KEY=<project API key entered on the server>
+```
+
+Keep `OPENAI_EU_PROJECT_VERIFIED`, `OPENAI_EU_PROCESSING_VERIFIED` and
+`OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED` false unless independently verified.
+Deploy the updated API/Compose configuration after the key is installed, then
+run a bounded synthetic evaluation and a human-requested, project-scoped
+read-only explanation before the approved-recovery demonstration. Source/mock
+checks do not demonstrate real model access.
+
 ## Tool contract
 
 The operations/AI implementation is a Python responsibility. Read-only tools
@@ -69,12 +94,10 @@ its time window and size.
 The accepted initial external-model policy in [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md)
 permits only authorized, minimized, redacted Public and Internal project context;
 Confidential and Restricted data are excluded. Start evaluation with an OpenAI
-API model, provisionally `gpt-6.1-sol`, using an eligible EU-resident API project
-and EU regional processing. Verify account, model, endpoint, and tier eligibility
-and fail closed if EU processing is unavailable. Do not opt in to provider
-training; set `store: false` on OpenAI Responses API calls. The owner accepts
-the additional provider controls and amendment required for EU data residency;
-provider approval and execution must be verified before activation.
+API model, provisionally `gpt-6.1-sol`, using the owner's accepted Global project
+and explicit Global processing opt-in. Verify model/account access, keep provider
+training opt-in disabled and set `store: false` on OpenAI Responses API calls.
+Use EU mode only with the separately verified controls described above.
 
 Use LangChain for model integration and the bounded read-only investigation
 loop, behind platform-owned typed tool and response contracts. Keep

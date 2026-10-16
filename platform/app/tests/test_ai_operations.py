@@ -61,6 +61,43 @@ def _answer(summary, references, insufficient=False):
 
 
 class AIOperationsTests(unittest.TestCase):
+    def test_explicit_global_acceptance_uses_global_endpoint_without_eu_claims(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "OPENAI_DATA_REGION": "global",
+                                    "OPENAI_GLOBAL_PROCESSING_ACCEPTED": "true"}, clear=True), \
+                patch("langchain_openai.ChatOpenAI") as client:
+            model = ai_model.configured_model()
+        args = client.call_args.kwargs
+        self.assertEqual(args["base_url"], "https://api.openai.com/v1")
+        self.assertFalse(args["store"])
+        self.assertFalse(args["use_previous_response_id"])
+        self.assertEqual(args["service_tier"], "default")
+        self.assertAlmostEqual(model.estimate_cost_usd(1000, 1000), .012)
+
+    def test_global_region_requires_acceptance_and_api_key(self):
+        for values in ({"OPENAI_API_KEY": "test-key"}, {"OPENAI_GLOBAL_PROCESSING_ACCEPTED": "true"}):
+            with self.subTest(values=tuple(values)), patch.dict(os.environ, {"OPENAI_DATA_REGION": "global", **values}, clear=True):
+                with self.assertRaises(ai_model.ModelUnavailable):
+                    ai_model.configured_model()
+
+    def test_eu_and_unknown_regions_never_fall_back_to_global(self):
+        for region in ("eu", "unknown"):
+            with self.subTest(region=region), patch.dict(os.environ, {
+                "OPENAI_API_KEY": "test-key", "OPENAI_DATA_REGION": region,
+                "OPENAI_GLOBAL_PROCESSING_ACCEPTED": "true"}, clear=True), \
+                    patch("langchain_openai.ChatOpenAI") as client:
+                with self.assertRaises(ai_model.ModelUnavailable):
+                    ai_model.configured_model()
+                client.assert_not_called()
+
+    def test_verified_eu_region_keeps_eu_endpoint_and_cost(self):
+        with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key", "OPENAI_DATA_REGION": "eu",
+            "OPENAI_EU_PROJECT_VERIFIED": "true", "OPENAI_EU_PROCESSING_VERIFIED": "true",
+            "OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED": "true"}, clear=True), \
+                patch("langchain_openai.ChatOpenAI") as client:
+            model = ai_model.configured_model()
+        self.assertEqual(client.call_args.kwargs["base_url"], "https://eu.api.openai.com/v1")
+        self.assertAlmostEqual(model.estimate_cost_usd(1000, 1000), .0132)
+
     def test_model_fails_closed_without_verified_terms(self):
         with patch.dict(os.environ, {"OPENAI_API_KEY": "test-key",
              "OPENAI_EU_PROJECT_VERIFIED": "true", "OPENAI_EU_PROCESSING_VERIFIED": "true"}, clear=True):
