@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 
 from langchain_core.tools import StructuredTool
 
-from . import application_metrics, trace_read, ai_startup
+from . import application_metrics, trace_read, ai_startup, ai_diagnostics
 from .readiness import observe_deployment
 from .retained_logs import observe_retained_logs
 
@@ -46,6 +46,14 @@ def component_change_summary(current, previous):
         if fields:
             changes.append({"component": name, "fields": fields})
     return {"component_changes": changes[:10], "component_changes_truncated": len(changes) > 10}
+
+
+def logs_view(retained, diagnostics):
+    counts = Counter(json.loads(line["message"])["event"] for line in retained["lines"])
+    return {"source": "project-logs", "state": "ok" if diagnostics.get("failure_codes") else retained["state"],
+            "retained_state": retained["state"], "window_seconds": 3600,
+            "observed_at": retained["observed_at"], "event_counts": dict(counts),
+            "truncated": retained["truncated"], "diagnostics": diagnostics}
 
 
 def make_tools(project, current_spec, connect, runtime=None):
@@ -95,12 +103,13 @@ def make_tools(project, current_spec, connect, runtime=None):
             "components": sorted({s["component"] for s in result["spans"]})}
 
     def get_logs() -> dict:
-        """Count recent safe operational log events for this project."""
+        """Read recent event counts and revision-scoped database/pool failure codes; never raw logs."""
         result = observe_retained_logs(project, logging.getLogger(__name__), tail=50, since_seconds=3600)
-        counts = Counter(json.loads(line["message"])["event"] for line in result["lines"])
-        return {"source": "retained-operational-logs", "state": result["state"],
-                "window_seconds": 3600, "observed_at": result["observed_at"],
-                "event_counts": dict(counts), "truncated": result["truncated"]}
+        current = _current()
+        service = next((c for c in current[1].get("components", []) if c["type"] == "service"), None) if current else None
+        diagnostics = (ai_diagnostics.observe_failure_signals(runtime, project, service["name"], current[0])
+                       if service else {"state": "not_applicable", "failure_codes": []})
+        return logs_view(result, diagnostics)
 
     def get_events() -> dict:
         """Count recent deployment outcomes without exposing audit details."""
