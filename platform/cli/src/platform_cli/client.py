@@ -134,6 +134,10 @@ class PlatformClient:
         if not path.startswith("/") or path.startswith("//") or parsed.scheme or parsed.netloc or "\\" in path or parsed.fragment or parsed.query:
             raise ApiError(503, "The platform returned an unsafe API path.")
         attempts = 3 if method == "GET" else 1
+        if (method == "POST" and len(parsed.path.split("/")) == 5
+                and parsed.path.startswith("/projects/") and parsed.path.endswith("/ai/runs")):
+            # Synchronous AI investigations have a 90-second server budget.
+            kwargs["timeout"] = httpx.Timeout(120.0, connect=5.0)
         for attempt in range(attempts):
             started = time.monotonic()
             try:

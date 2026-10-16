@@ -13,8 +13,11 @@ class _Bound:
     def __init__(self, replies):
         self.replies = iter(replies)
 
-    def invoke(self, messages):
-        return next(self.replies)
+    def invoke(self, messages, **kwargs):
+        reply = next(self.replies)
+        if isinstance(reply, Exception):
+            raise reply
+        return reply
 
 
 class _Model:
@@ -154,6 +157,31 @@ class AIOperationsTests(unittest.TestCase):
         outcome = ai_agent.run("investigate_incident", "run-2", model, [])
         self.assertEqual(outcome["state"], "abstained")
         self.assertEqual(outcome["result"]["hypotheses"], [])
+
+    def test_model_failure_preserves_prior_evidence_usage_and_does_not_retry(self):
+        tool = StructuredTool.from_function(func=lambda: {"source": "project-runtime", "state": "ready"},
+                                            name="get_runtime_status", description="Read readiness")
+        reply = AIMessage(content="", tool_calls=[{"name": "get_runtime_status", "args": {}, "id": "c1"}],
+                          usage_metadata={"input_tokens": 100, "output_tokens": 20, "total_tokens": 120})
+        model = _Model([reply, TimeoutError("secret provider diagnostics must not escape")])
+        with self.assertLogs("app.ai_agent", level="ERROR") as logs:
+            result = ai_agent.run("investigate_incident", "run-timeout", model, [tool])
+        self.assertEqual(result["state"], "failed")
+        self.assertEqual(result["tool_calls"], 1)
+        self.assertEqual(result["evidence"][0]["source"], "project-runtime")
+        self.assertAlmostEqual(result["estimated_cost_usd"], .00012)
+        self.assertFalse(result["result"]["usage_complete"])
+        self.assertNotIn("secret provider diagnostics", str(result) + str(logs.output))
+
+    def test_model_timeout_is_bounded_by_remaining_run_budget(self):
+        from unittest.mock import Mock
+        model = _Model([])
+        bound = Mock()
+        bound.invoke.return_value = _answer("Missing data", [], True)
+        model.bind_tools = lambda tools: bound
+        ticks = iter([0, 80, 85])
+        ai_agent.run("investigate_incident", "run-deadline", model, [], clock=lambda: next(ticks))
+        self.assertEqual(bound.invoke.call_args.kwargs["timeout"], 5)
 
     def test_unknown_tool_cannot_execute(self):
         model = _Model([AIMessage(content="", tool_calls=[{

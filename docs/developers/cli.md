@@ -76,7 +76,10 @@ accepts `classification`, run creation accepts `kind`, proposal creation accepts
 replacement, approval, and execution also require `--confirm-project orders`.
 Execution returns a durable operation ID; use `operations get` or `operations watch`
 to inspect deployment readiness. AI eligibility, authority, and stale approval
-checks remain enforced by the API.
+checks remain enforced by the API. AI-run creation allows a 120-second read
+timeout for the server's 90-second investigation budget and is never retried
+automatically. If a model request fails, the saved result preserves prior
+evidence and known costs and marks unavailable provider usage as incomplete.
 
 Use `--output json` for machine output on stdout. Progress, recovery IDs, and
 warnings go to stderr. `logs --follow` emits successive JSON objects while it

@@ -48,7 +48,7 @@ class OpenAIModelAdapter:
             store=False, use_previous_response_id=False,
             reasoning_effort="low", max_tokens=1024,
             service_tier="default",
-            timeout=10, max_retries=0,
+            timeout=30, max_retries=0,
         )
 
     def bind_tools(self, tools):

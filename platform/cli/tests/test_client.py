@@ -52,3 +52,24 @@ def test_wait_requires_apply_success_and_readiness():
 
     assert completed.readiness.state == "ready"
     assert len(updates) == 2
+
+
+def test_ai_run_waits_for_server_budget_and_never_retries_post():
+    from platform_cli.errors import ApiError
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        raise httpx.ReadTimeout('fixture timeout', request=request)
+
+    config = runtime_config({'PLATFORM_API_URL': 'https://platform.example', 'PLATFORM_ACCESS_TOKEN': 'fixture-token'})
+    client = PlatformClient(config, httpx.Client(transport=httpx.MockTransport(handler), timeout=30))
+    try:
+        client.request_json('POST', '/projects/demo/ai/runs', body={'kind': 'investigate_incident'})
+    except ApiError:
+        pass
+    else:
+        raise AssertionError('Expected timeout error')
+    assert len(requests) == 1
+    assert requests[0].extensions['timeout']['read'] == 120
+    assert requests[0].extensions['timeout']['connect'] == 5
