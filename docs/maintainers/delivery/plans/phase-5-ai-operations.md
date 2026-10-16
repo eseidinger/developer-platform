@@ -91,6 +91,16 @@ and runtime observations; a future service split does not authorize direct AI
 access to shared telemetry stores. Scope every result to the caller and bound
 its time window and size.
 
+Revision comparison reports fixed component field names that changed, including
+startup `command` and `args`, with current/previous revision IDs and explicit
+comparison availability. It never exports field values. Runtime evidence may
+include up to ten application-container status summaries: readiness, bounded
+restart counts, fixed waiting/termination reason codes and numeric exit codes.
+Sidecars, Kubernetes messages, pod/container names and termination output are
+excluded. Pod diagnostics remain available alongside a rollout deadline failure;
+they do not establish which revision a surviving ready replica serves or prove
+the exact cause of an exit code.
+
 The accepted initial external-model policy in [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md)
 permits only authorized, minimized, redacted Public and Internal project context;
 Confidential and Restricted data are excluded. Start evaluation with an OpenAI
