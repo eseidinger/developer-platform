@@ -3,7 +3,8 @@
 Status: source implementation in progress. Read-only investigations and a narrow
 rollback approval workflow are implemented; the controlled live startup diagnosis
 and approved recovery journey passed. Remaining deployed acceptance and the full
-evaluation corpus remain open. Covers [F-11 and F-12](../../../product/requirements.md).
+evaluation corpus remain open. Bounded live documentation selection and
+change-impact assistance also passed. Covers [F-11 and F-12](../../../product/requirements.md).
 
 The source implementation uses LangChain `ChatOpenAI` through an explicitly selected OpenAI API endpoint
 with Responses API `store=false`, a project-bound tool set, and durable run records.
@@ -225,5 +226,14 @@ rejection safeguards, full evaluation/security gates and development assistance
 remain open. No request-metric recovery is claimed for this uninstrumented fixture.
 
 The demonstration introduces a traceable regression using test resources, shows the investigation, an approvable fix, and the observed recovery state. Prompt-injection, secret-handling, and project-boundary tests are acceptance criteria.
+
+Human development-assistance run `b65ecbd8-7547-4133-a459-ab46a44dae8c`
+completed on recovered revision 3 on October 16, 2026. It selected the committed
+deployment API reference and gave sourced, tentative startup-change impact
+guidance using catalog, documentation summaries, deployment history, revision
+comparison and readiness evidence. Five read tools cost an estimated $0.017550.
+The bounded live demonstration passed; full document/repository retrieval is
+not implemented or established by this result. Authorization/security, approval
+rejection, audit/trace and multi-provider evaluation gates remain open.
 
 [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md) and [Observability](../../../architecture/observability.md) describe boundaries and data sources.

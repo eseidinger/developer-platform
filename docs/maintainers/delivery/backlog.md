@@ -1141,7 +1141,9 @@ See [ADR-008](../../architecture/decisions/ADR-008-ai-assisted-operations.md).
 
 - [ ] **PLAN-015 · 5 (after 5.5)** — Demonstrate development assistance grounded in authorized docs, ADRs, contracts and repository context: template selection, change impact or review with runtime evidence; retain source references and project/secret boundaries. Prerequisites: PLAN-014.
 
-  **Source progress (October 15, 2026):** A bounded `development_assistance` run can cite curated committed template, API and ADR references alongside project-scoped observations. A live demonstration remains open.
+  **Owner-executed bounded development assistance passed (October 16, 2026):** Human run `b65ecbd8-7547-4133-a459-ab46a44dae8c` completed on `ai-acceptance` revision 3 with five sourced observations, two tentative change-impact hypotheses, five read tools and estimated cost $0.017550. It selected the committed deployment API reference, correlated the revision 2-to-3 startup-argument field change with deployment history and current ready runtime, and explicitly distinguished startup/readiness from functional correctness, performance and sustained health. It acknowledged that documentation tools expose committed reference summaries rather than full schemas/example contents. Record this bounded live documentation-selection/change-impact demonstration as passed. It does not establish arbitrary repository retrieval, full documentation analysis, adversarial project/secret boundaries or completion of the prerequisite PLAN-014 safeguards; those broader gates remain open.
+
+  **Source progress (October 15, 2026):** A bounded `development_assistance` run can cite curated committed template, API and ADR references alongside project-scoped observations. The later owner-executed demonstration above supplies live evidence for this bounded flow; broader task criteria remain open.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No development assistant using project docs/contracts/repository/runtime context.
 
