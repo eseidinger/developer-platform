@@ -195,7 +195,7 @@ def component_resources(name, components, database_ip, password, configuration=N
             spec["volumes"].append({"name": "telemetry-token", "projected": {"sources": [{
                 "serviceAccountToken": {"path": "token", "audience": "platform-telemetry",
                                         "expirationSeconds": 600}}]}})
-            spec["containers"].append({
+            forwarder = {
                 "name": "telemetry-forwarder", "image": "developer-platform-telemetry-forwarder:local",
                 "imagePullPolicy": "IfNotPresent",
                 "command": ["python", "/forwarder.py"],
@@ -205,7 +205,13 @@ def component_resources(name, components, database_ip, password, configuration=N
                     "readOnlyRootFilesystem": True, "capabilities": {"drop": ["ALL"]}},
                 "volumeMounts": [{"name": "telemetry-token", "mountPath": "/var/run/platform-telemetry",
                                   "readOnly": True}],
-            })
+            }
+            if component["type"] == "scheduled":
+                # A regular sidecar keeps Jobs active after the application exits.
+                # Native sidecars stop automatically when all main containers finish.
+                spec["initContainers"] = [{**forwarder, "restartPolicy": "Always"}]
+            else:
+                spec["containers"].append(forwarder)
         if restart_policy:
             spec["restartPolicy"] = restart_policy
         return spec

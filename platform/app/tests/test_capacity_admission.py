@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import Mock
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from app.capacity_admission import _proposed, assess, snapshot
+from app.capacity_admission import _pod_requests, _proposed, assess, snapshot
 
 
 class CapacityAdmissionTests(unittest.TestCase):
@@ -103,6 +103,28 @@ class CapacityAdmissionTests(unittest.TestCase):
         traced = _proposed({"components": [{**component, "tracing": {"enabled": True}}]})
         self.assertEqual(traced["cpu"] - plain["cpu"], 50)
         self.assertEqual(traced["memory"] - plain["memory"], 128)
+
+    def test_native_sidecar_and_sequential_init_requests_are_accounted(self):
+        sidecar = {"restartPolicy": "Always", "resources": {"requests": {"cpu": "25m", "memory": "64Mi"}}}
+        application = {"resources": {"requests": {"cpu": "100m", "memory": "128Mi"}}}
+        initializer = {"resources": {"requests": {"cpu": "500m", "memory": "256Mi"}}}
+        self.assertEqual(_pod_requests({"containers": [application], "initContainers": [sidecar]}),
+                         {"cpu": 125, "memory": 192})
+        self.assertEqual(_pod_requests({"containers": [application], "initContainers": [sidecar, initializer]}),
+                         {"cpu": 525, "memory": 320})
+        self.assertEqual(_pod_requests({"containers": [application], "initContainers": [initializer, sidecar]}),
+                         {"cpu": 500, "memory": 256})
+
+    def test_snapshot_includes_running_native_sidecar_requests(self):
+        runtime = Mock()
+        values = {"Node": [{"status": {"allocatable": {"cpu": "2", "memory": "2Gi"}}}],
+                  "Pod": [{"status": {"phase": "Running"}, "spec": {
+                      "containers": [{"resources": {"requests": {"cpu": "100m", "memory": "128Mi"}}}],
+                      "initContainers": [{"restartPolicy": "Always",
+                                          "resources": {"requests": {"cpu": "25m", "memory": "64Mi"}}}]}}]}
+        runtime.resources.get.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
+        self.assertEqual(snapshot(runtime, logging.getLogger("test"))["requested"],
+                         {"cpu_millicores": 125, "memory_mib": 192})
 
 
 if __name__ == "__main__":

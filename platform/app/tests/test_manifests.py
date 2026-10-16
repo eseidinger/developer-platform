@@ -156,6 +156,20 @@ class WorkloadContract(unittest.TestCase):
                       doc["metadata"]["name"] == "api-telemetry")
         self.assertEqual(policy["spec"]["egress"][0]["ports"][0]["port"], 4318)
 
+    def test_scheduled_tracing_forwarder_does_not_keep_jobs_alive(self):
+        docs = component_resources("shop", [{"name": "worker", "type": "scheduled",
+            "resolved_image": "example/worker:1", "schedule": "* * * * *",
+            "tracing": {"enabled": True}}], "172.30.80.10", "secret")
+        pod = next(doc for doc in docs if doc["kind"] == "CronJob")["spec"]["jobTemplate"]["spec"]["template"]["spec"]
+        self.assertEqual([container["name"] for container in pod["containers"]], ["worker"])
+        forwarder, = pod["initContainers"]
+        self.assertEqual(forwarder["name"], "telemetry-forwarder")
+        self.assertEqual(forwarder["restartPolicy"], "Always")
+        self.assertEqual(pod["restartPolicy"], "Never")
+        self.assertEqual(forwarder["resources"]["requests"]["memory"], "64Mi")
+        self.assertIn("telemetry-token", [mount["name"] for mount in forwarder["volumeMounts"]])
+        self.assertNotIn("telemetry-token", [mount["name"] for mount in pod["containers"][0]["volumeMounts"]])
+
     def test_component_http_readiness_and_job_deadline(self):
         docs = component_resources("shop", [
             {"name": "web", "type": "service", "resolved_image": "registry/web@sha256:one",

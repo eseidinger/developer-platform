@@ -54,6 +54,22 @@ def _proposed(spec):
     return total
 
 
+def _pod_requests(spec):
+    """Account for restartable init sidecars throughout startup and steady state."""
+    sidecars = {"cpu": 0, "memory": 0}
+    startup_peak = {"cpu": 0, "memory": 0}
+    for container in _get(spec, "initContainers", []) or []:
+        values = _request_total([container])
+        if _get(container, "restartPolicy") == "Always":
+            sidecars = {key: sidecars[key] + values[key] for key in sidecars}
+            values = sidecars
+        else:
+            values = {key: sidecars[key] + values[key] for key in sidecars}
+        startup_peak = {key: max(startup_peak[key], values[key]) for key in sidecars}
+    application = _request_total(_get(spec, "containers", []) or [])
+    return {key: max(application[key] + sidecars[key], startup_peak[key]) for key in sidecars}
+
+
 def snapshot(runtime, log):
     """Return the request-based admission inputs using explicit CPU/memory units."""
     if os.environ.get("CAPACITY_ADMISSION_ENABLED", "false").lower() != "true":
@@ -74,7 +90,7 @@ def snapshot(runtime, log):
         requested = {"cpu": 0, "memory": 0}
         for pod in pods:
             if _get(_get(pod, "status", {}), "phase") not in {"Succeeded", "Failed"}:
-                values = _request_total(_get(_get(pod, "spec", {}), "containers", []) or [])
+                values = _pod_requests(_get(pod, "spec", {}))
                 for key in requested:
                     requested[key] += values[key]
     except (ArithmeticError, TypeError, ValueError) as exc:

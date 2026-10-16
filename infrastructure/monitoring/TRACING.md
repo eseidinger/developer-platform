@@ -74,3 +74,8 @@ the Platform API starts. It adds 25m CPU/64 MiB requests and 100m CPU/128 MiB
 limits per opted-in Pod; project quota and optional cluster admission include
 these amounts. The local endpoint is trace-only; application metric scraping
 uses the separate declaration and private proxy.
+
+Scheduled components run the forwarder as a native sidecar (`initContainers`
+with `restartPolicy: Always`) on the pinned Kubernetes version. Kubernetes stops
+it when the main job container finishes, allowing successful jobs to complete
+and failed jobs to report their exit status without waiting for the deadline.
