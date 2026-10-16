@@ -254,7 +254,9 @@ the requested replica count plus rolling-update surge capacity.
 
 `spec.configuration.values` is a map of up to 50 non-secret environment values.
 Names use `[A-Za-z_][A-Za-z0-9_]{0,62}` and must not start with `PG`,
-`KUBERNETES_`, or `PLATFORM_`. Values are strings of at most 1024 characters with
+`KUBERNETES_`, `PLATFORM_`, or `OTEL_`. The platform owns OpenTelemetry settings;
+use `telemetry.tracing.enabled` to opt in and configure the application exporter
+using the injected endpoint. Values are strings of at most 1024 characters with
 no NUL byte or key material. Names that look like passwords, tokens, API keys, or
 other secrets are rejected; use the platform secrets API or UI for secret values.
 
