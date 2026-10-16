@@ -343,7 +343,8 @@ class AIOperationsTests(unittest.TestCase):
 
     def test_evaluation_scoring_requires_sourced_diagnosis_and_abstention(self):
         known = ai_evaluation.CASES[0]
-        outcome = {"result": {"hypotheses": [{"statement": "Database host is suspect",
+        outcome = {"state": "completed", "evidence": [{"id": "E1", "tool": "get_logs", "state": "ok"}],
+                   "result": {"hypotheses": [{"statement": "Database host is suspect",
                     "source_ids": ["E1"]}], "insufficient_evidence": False},
                    "tool_calls": 2, "estimated_cost_usd": 0.01}
         self.assertTrue(ai_evaluation.score(known, outcome)["passed"])
@@ -351,6 +352,7 @@ class AIOperationsTests(unittest.TestCase):
         self.assertFalse(ai_evaluation.score(known, outcome)["passed"])
         unknown = ai_evaluation.CASES[3]
         outcome["result"] = {"hypotheses": [], "insufficient_evidence": True}
+        outcome["state"] = "abstained"
         self.assertTrue(ai_evaluation.score(unknown, outcome)["passed"])
 
     def test_manage_authority_excludes_developer_and_deployment_credential(self):

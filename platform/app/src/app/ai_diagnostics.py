@@ -15,6 +15,9 @@ UNKNOWN_FLAG = re.compile(r"flag provided but not defined: -{1,2}[A-Za-z][A-Za-z
 HOST_RESOLUTION = re.compile(
     r'could not translate host name "[^"\r\n]{1,253}" to address: '
     r'(?:Name or service not known|Temporary failure in name resolution|nodename nor servname provided, or not known)\Z')
+PSYCOPG_RESOLUTION = re.compile(
+    r"failed to resolve host '[^'\r\n]{1,253}': \[Errno -[23]\] "
+    r"(?:Name or service not known|Temporary failure in name resolution)\Z")
 QUEUE_POOL = re.compile(
     r"QueuePool limit of size [0-9]{1,7} overflow [0-9]{1,7} reached, connection timed out, timeout [0-9]{1,7}(?:\.[0-9]{1,6})?"
     r"(?: \(Background on this error at: https://sqlalche\.me/e/[0-9]{1,2}/[a-z0-9]{1,12}\))?\Z")
@@ -52,7 +55,7 @@ def failure_codes(raw):
                 break
         if UNKNOWN_FLAG.fullmatch(line):
             codes.add("unrecognized_startup_option")
-        if HOST_RESOLUTION.fullmatch(line):
+        if HOST_RESOLUTION.fullmatch(line) or PSYCOPG_RESOLUTION.fullmatch(line):
             codes.add("database_hostname_resolution_failed")
         if QUEUE_POOL.fullmatch(line):
             codes.add("database_pool_capacity_timeout")

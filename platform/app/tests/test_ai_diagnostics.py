@@ -6,6 +6,17 @@ from app import ai_diagnostics, ai_tools
 
 
 class DiagnosticSignatureTests(unittest.TestCase):
+    def test_installed_psycopg_dns_error_format_is_recognized_without_network(self):
+        import socket
+        import psycopg
+        from psycopg import _conninfo_attempts
+        with patch.object(_conninfo_attempts, "_resolve_hostnames",
+                          side_effect=socket.gaierror(-2, "Name or service not known")):
+            with self.assertRaises(psycopg.OperationalError) as error:
+                _conninfo_attempts.conninfo_attempts({"host": "private-host.invalid"})
+        self.assertEqual(ai_diagnostics.failure_codes(str(error.exception).encode()),
+                         ["database_hostname_resolution_failed"])
+
     def test_postgres_resolution_messages_export_no_host_or_credentials(self):
         for prefix in ("", "psycopg.OperationalError: ", "psycopg2.OperationalError: ",
                        "sqlalchemy.exc.OperationalError: (psycopg2.OperationalError) "):
