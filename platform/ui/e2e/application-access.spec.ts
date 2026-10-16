@@ -157,7 +157,19 @@ test('group creation works with the keyboard and restores focus after the dialog
   await page.keyboard.press('Enter')
   await expect(page.getByRole('dialog')).toHaveCount(0)
   await expect(page.getByText('Keyboard users (keyboard-users)', { exact: true })).toBeVisible()
-  expect(await page.evaluate(() => document.activeElement !== document.body)).toBe(true)
+  await expect(page.getByRole('heading', { name: 'Application access', exact: true })).toBeFocused()
+})
+
+test('cancelling a group dialog restores focus to its connected trigger', async ({ page }) => {
+  await accessFixture(page)
+  await page.goto('/e2e/access-harness.html?view=groups')
+  const trigger = page.getByRole('button', { name: 'Create application group' })
+  await trigger.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel('Group name', { exact: true })).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toHaveCount(0)
+  await expect(trigger).toBeFocused()
 })
 
 test('overlapping route rules cannot pass policy review', async ({ page }) => {

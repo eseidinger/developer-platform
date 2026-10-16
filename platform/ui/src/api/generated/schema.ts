@@ -368,6 +368,143 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{name}/ai/policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Policy */
+        get: operations["get_ai_policy_projects__name__ai_policy_get"];
+        /** Set Ai Policy */
+        put: operations["set_ai_policy_projects__name__ai_policy_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{name}/ai/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Ai Proposal */
+        post: operations["create_ai_proposal_projects__name__ai_proposals_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{name}/ai/proposals/{proposal_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Proposal */
+        get: operations["get_ai_proposal_projects__name__ai_proposals__proposal_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{name}/ai/proposals/{proposal_id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Ai Proposal */
+        post: operations["approve_ai_proposal_projects__name__ai_proposals__proposal_id__approval_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{name}/ai/proposals/{proposal_id}/execute": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Execute Ai Proposal */
+        post: operations["execute_ai_proposal_projects__name__ai_proposals__proposal_id__execute_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{name}/ai/runs": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Ai Run */
+        post: operations["create_ai_run_projects__name__ai_runs_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{name}/ai/runs/{run_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Ai Run */
+        get: operations["get_ai_run_projects__name__ai_runs__run_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/projects/{name}/application-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project Application Metrics */
+        get: operations["project_application_metrics_projects__name__application_metrics_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/projects/{name}/components": {
         parameters: {
             query?: never;
@@ -898,6 +1035,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/projects/{name}/traces/{trace_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Project Trace */
+        get: operations["project_trace_projects__name__traces__trace_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/readyz": {
         parameters: {
             query?: never;
@@ -1391,6 +1545,35 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** AIApprovalRequest */
+        AIApprovalRequest: {
+            /** Diff Sha256 */
+            diff_sha256: string;
+        };
+        /** AIProjectPolicy */
+        AIProjectPolicy: {
+            /**
+             * Classification
+             * @enum {string}
+             */
+            classification: "public" | "internal" | "confidential" | "restricted";
+        };
+        /** AIProposalRequest */
+        AIProposalRequest: {
+            /**
+             * Run Id
+             * Format: uuid
+             */
+            run_id: string;
+        };
+        /** AIRunRequest */
+        AIRunRequest: {
+            /**
+             * Kind
+             * @enum {string}
+             */
+            kind: "explain_application" | "investigate_incident" | "development_assistance";
+        };
         /** Application */
         Application: {
             /** Endpoints */
@@ -1669,6 +1852,13 @@ export interface components {
             /** Project */
             project?: string | null;
         };
+        /** MetricsDeclaration */
+        MetricsDeclaration: {
+            /** Path */
+            path: string;
+            /** Port */
+            port: string;
+        };
         /**
          * OutboundDestination
          * @description One operator-approved TCP egress exception for any component.
@@ -1862,6 +2052,7 @@ export interface components {
             runtime: components["schemas"]["ComponentRuntime"];
             /** Schedule */
             schedule: string;
+            telemetry?: components["schemas"]["ScheduledTelemetry"] | null;
             /**
              * Timezone
              * @default UTC
@@ -1873,6 +2064,10 @@ export interface components {
              * @constant
              */
             type: "scheduled";
+        };
+        /** ScheduledTelemetry */
+        ScheduledTelemetry: {
+            tracing?: components["schemas"]["TracingDeclaration"] | null;
         };
         /** ServiceComponent */
         ServiceComponent: {
@@ -1899,6 +2094,7 @@ export interface components {
                 [key: string]: unknown;
             } | null;
             runtime: components["schemas"]["ComponentRuntime"];
+            telemetry?: components["schemas"]["ServiceTelemetry"] | null;
             /**
              * Type
              * @constant
@@ -1918,6 +2114,11 @@ export interface components {
             projectWideCredential: true;
             /** Providerproject */
             providerProject: string;
+        };
+        /** ServiceTelemetry */
+        ServiceTelemetry: {
+            metrics?: components["schemas"]["MetricsDeclaration"] | null;
+            tracing?: components["schemas"]["TracingDeclaration"] | null;
         };
         /** Spec */
         Spec: {
@@ -1954,6 +2155,14 @@ export interface components {
             expires_in_days: number;
             /** Name */
             name: string;
+        };
+        /** TracingDeclaration */
+        TracingDeclaration: {
+            /**
+             * Enabled
+             * @default false
+             */
+            enabled: boolean;
         };
         /** ValidationError */
         ValidationError: {
@@ -2654,6 +2863,311 @@ export interface operations {
                 "application/json": components["schemas"]["ApplicationEnvelopeV1Alpha2"] | components["schemas"]["ApplicationEnvelope"] | components["schemas"]["Project"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_policy_projects__name__ai_policy_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_ai_policy_projects__name__ai_policy_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIProjectPolicy"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ai_proposal_projects__name__ai_proposals_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIProposalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_proposal_projects__name__ai_proposals__proposal_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_ai_proposal_projects__name__ai_proposals__proposal_id__approval_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    execute_ai_proposal_projects__name__ai_proposals__proposal_id__execute_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                proposal_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIApprovalRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_ai_run_projects__name__ai_runs_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AIRunRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_ai_run_projects__name__ai_runs__run_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                run_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_application_metrics_projects__name__application_metrics_get: {
+        parameters: {
+            query: {
+                component: string;
+            };
+            header?: never;
+            path: {
+                name: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             200: {
@@ -3748,6 +4262,38 @@ export interface operations {
             path: {
                 name: string;
                 secret: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    project_trace_projects__name__traces__trace_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                name: string;
+                trace_id: string;
             };
             cookie?: never;
         };

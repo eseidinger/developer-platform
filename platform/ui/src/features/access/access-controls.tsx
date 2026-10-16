@@ -68,7 +68,7 @@ export function AccessDialog({ title, description, submitLabel, resource, reload
     finally { setReloading(false) }
   }
   return <Dialog open onOpenChange={(open) => { if (!open && !mutation.isPending && !reloading) onClose() }}>
-    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl" showCloseButton={!mutation.isPending && !reloading} finalFocus={() => returnFocus.current}>
+    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl" showCloseButton={!mutation.isPending && !reloading} finalFocus={() => returnFocus.current?.isConnected ? returnFocus.current : document.getElementById('application-access-title')}>
       <DialogHeader><DialogTitle>{title}</DialogTitle><DialogDescription>{description}</DialogDescription></DialogHeader>
       <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); if (canSubmit && !reloadRequired && !reloading && !submitting.current) { submitting.current = true; mutation.mutate() } }}>
         <fieldset disabled={mutation.isPending || reloading} className="space-y-4">{children}</fieldset>
