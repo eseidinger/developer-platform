@@ -22,6 +22,14 @@ flowchart TB
 
 `scripts/up.sh` renders the k3d configuration, creates or starts cluster `workloads`, writes `.runtime/admin.kubeconfig`, applies the controller and metrics manifests, and refreshes the load balancer after Compose networking is ready. The server enables secrets encryption and has a TLS SAN for its Docker-network name.
 
+Bootstrap also records `PLATFORM_METRICS_PROXY_CIDRS` in `.env` from the control-plane
+Node's PodCIDR. In the pinned k3s/flannel setup, a service-proxy request to a worker
+Pod uses the control-plane flannel address (the PodCIDR's network address). Metrics
+opt-in adds an ingress policy for that single `/32` or `/128` source and the
+declared metrics port. It does not allow the whole node or Pod network. Bootstrap
+refreshes the addresses on deployment; reapply metrics-enabled applications after
+a control-plane PodCIDR change.
+
 ## Runtime inventory
 
 | Component | Default operator endpoint | State and responsibility |

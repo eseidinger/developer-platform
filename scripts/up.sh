@@ -47,6 +47,10 @@ for attempt in $(seq 1 24); do
 done
 echo "Waiting for Kubernetes nodes to become Ready (up to 180 seconds)..."
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
+kubectl get nodes -o json | python3 scripts/metrics-proxy-network.py
+# Refresh generated operator settings before Compose creates the API container.
+unset PLATFORM_METRICS_PROXY_CIDRS
+eval "$(python3 scripts/env.py)"
 kubectl apply -f infrastructure/kubernetes/controller.yaml
 kubectl apply -f infrastructure/kubernetes/metrics.yaml
 kubectl apply -f infrastructure/kubernetes/log-reader.yaml

@@ -115,6 +115,25 @@ class WorkloadContract(unittest.TestCase):
         binding = next(doc for doc in docs if doc["kind"] == "RoleBinding")
         self.assertEqual(binding["subjects"][0]["name"], "workload-metrics-reader")
 
+    @patch.dict("os.environ", {"PLATFORM_METRICS_PROXY_CIDRS": "10.42.2.0/32"})
+    def test_metrics_ingress_allows_only_proxy_host_on_declared_port(self):
+        components = [{"name": "api", "type": "service", "resolved_image": "example/api:1",
+                       "exposure": "public", "ports": [{"name": "http", "port": 8080},
+                                                         {"name": "management", "port": 9000}],
+                       "metrics": {"port": "management", "path": "/metrics"}},
+                      {"name": "other", "type": "service", "resolved_image": "example/other:1",
+                       "ports": [{"name": "http", "port": 8080}]}]
+        docs = component_resources("shop", components, "172.30.80.10", "secret", domain="apps.localhost")
+        policies = [d for d in docs if d["kind"] == "NetworkPolicy" and d["metadata"]["name"].endswith("-metrics")]
+        self.assertEqual(len(policies), 1)
+        self.assertEqual(policies[0]["spec"], {
+            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "shop", "platform.example/component": "api"}},
+            "policyTypes": ["Ingress"], "ingress": [{"from": [{"ipBlock": {"cidr": "10.42.2.0/32"}}],
+                                                       "ports": [{"protocol": "TCP", "port": 9000}]}]})
+        with patch.dict("os.environ", {"PLATFORM_METRICS_PROXY_CIDRS": "10.42.2.0/24"}):
+            with self.assertRaisesRegex(ValueError, "individual host"):
+                component_resources("shop", components, "172.30.80.10", "secret", domain="apps.localhost")
+
     def test_tracing_opt_in_projects_pod_bound_token_without_automatic_mount(self):
         docs = component_resources("shop", [{"name": "api", "type": "service",
             "resolved_image": "example/api:1", "ports": [{"name": "http", "port": 8080}],

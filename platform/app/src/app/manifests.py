@@ -237,6 +237,18 @@ def component_resources(name, components, database_ip, password, configuration=N
                  "ports": [{"protocol": "TCP", "port": 5432}]}]})]
     for component in components:
         component_labels = {"app.kubernetes.io/name": name, "platform.example/component": component["name"]}
+        if component["type"] == "service" and component.get("metrics"):
+            sources = []
+            for value in filter(None, os.environ.get("PLATFORM_METRICS_PROXY_CIDRS", "").split(",")):
+                network = ipaddress.ip_network(value)
+                if network.prefixlen != network.max_prefixlen:
+                    raise ValueError("Metrics proxy sources must be individual host addresses")
+                sources.append({"ipBlock": {"cidr": str(network)}})
+            if sources:
+                port = next(p["port"] for p in component["ports"] if p["name"] == component["metrics"]["port"])
+                manifests.append(obj("networking.k8s.io/v1", "NetworkPolicy", component["name"] + "-metrics",
+                    spec={"podSelector": {"matchLabels": component_labels}, "policyTypes": ["Ingress"],
+                          "ingress": [{"from": sources, "ports": [{"protocol": "TCP", "port": port}]}]}))
         if component.get("tracing", {}).get("enabled"):
             manifests.append(obj("v1", "ServiceAccount", "telemetry-" + component["name"],
                                  automountServiceAccountToken=False))
