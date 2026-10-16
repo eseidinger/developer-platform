@@ -1,4 +1,28 @@
 services:
+  postgres-exporter:
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATA_SOURCE_URI: postgres:5432/platform?sslmode=disable&connect_timeout=3
+      DATA_SOURCE_USER: platform_monitor
+      DATA_SOURCE_PASS_FILE: /run/secrets/postgres-monitor.password
+      PG_EXPORTER_COLLECTION_TIMEOUT: 5s
+    # No per-user, per-table, query-text, query-ID or replication-client labels.
+    command: ["--extend.query-path=/etc/postgres-exporter/queries.yaml", "--no-collector.roles", "--no-collector.settings", "--no-collector.stat_activity", "--no-collector.stat_user_tables", "--no-collector.statio_user_tables", "--no-collector.stat_statements", "--no-collector.replication", "--no-collector.replication_slots", "--no-collector.stat_replication", "--no-collector.stat_progress_vacuum", "--no-collector.stat_archiver", "--no-collector.stat_bgwriter", "--no-collector.wal", "--collector.postmaster"]
+    volumes:
+      - ../../.runtime/postgres-monitor.password:/run/secrets/postgres-monitor.password:ro
+      - ./postgres-queries.yaml:/etc/postgres-exporter/queries.yaml:ro
+    networks:
+      platform:
+        ipv4_address: ${POSTGRES_EXPORTER_IP:-172.30.80.30}
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.27.0
     restart: unless-stopped

@@ -19,6 +19,7 @@ jobs:
       - run: python3 -m unittest discover -s operations/heartbeat/tests -v
       - run: uv run --project platform/app python scripts/check-monitoring.py
       - run: uv run --project platform/app python scripts/check-application-metrics.py
+      - run: uv run --project platform/app python scripts/check-postgres-monitoring.py
       - run: uv run --project platform/app python scripts/check-workload-logs.py
       - run: python3 scripts/check-doc-links.py
       - run: python3 -m compileall -q scripts operations

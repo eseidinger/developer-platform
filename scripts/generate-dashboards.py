@@ -23,7 +23,7 @@ def panel(index, title, expr, *, unit="short", description="", kind="timeseries"
 
 DASHBOARDS = [
     ("platform-health-delivery", "Platform health and delivery", [
-        ("Core scrape availability", 'up{job=~"prometheus|host|kubernetes-state|kubernetes-cadvisor|blackbox-exporter|alloy"}', "short",
+        ("Core scrape availability", 'up{job=~"prometheus|postgres|host|kubernetes-state|kubernetes-cadvisor|blackbox-exporter|alloy"}', "short",
          "Prometheus target availability (1 = scrape succeeded); this does not prove application health."),
         ("Public access boundary probes", 'probe_success{job="applications"}', "short",
          "A successful protected probe proves access boundary denial, not backend readiness."),
@@ -181,6 +181,67 @@ def augment_capacity(dashboard):
             dashboard["panels"].append(current)
     dashboard["panels"].append(panel(len(dashboard["panels"]) + 1, "Container usage collection", 'up{job="kubernetes-cadvisor"}',
                                       description="TLS-verified kubelet cAdvisor scrape by node; zero means usage collection failed.", legend="{{node}}"))
+    disk = 'job="host",device=~"/dev/.+",fstype!~"tmpfs|devtmpfs|overlay|squashfs"'
+    size = f'node_filesystem_size_bytes{{{disk}}}'
+    available = f'node_filesystem_avail_bytes{{{disk}}}'
+    dashboard["panels"].append(panel(len(dashboard["panels"]) + 1, "Host storage used", f'1 - ({available} / ({size} > 0))', unit="percentunit",
+                                      description="Filesystem space unavailable to an unprivileged process, including reserved blocks. Disk filesystems only; independent of project selection.", legend="{{instance}} {{mountpoint}}"))
+    current = panel(len(dashboard["panels"]) + 1, "Host storage capacity and available space", "", unit="bytes",
+                    description="Disk filesystem total capacity and space available to an unprivileged process. Independent of project selection.")
+    current["targets"] = [{"refId": "A", "expr": size, "legendFormat": "{{mountpoint}} — Capacity"},
+                          {"refId": "B", "expr": available, "legendFormat": "{{mountpoint}} — Available"}]
+    dashboard["panels"].append(current)
+    dashboard["panels"].append(panel(len(dashboard["panels"]) + 1, "Host inode usage",
+                                      f'1 - (node_filesystem_files_free{{{disk}}} / (node_filesystem_files{{{disk}}} > 0))', unit="percentunit",
+                                      description="Fraction of inodes used on disk filesystems reporting inode capacity. Independent of project selection.", legend="{{instance}} {{mountpoint}}"))
+
+
+def postgres_dashboard():
+    selected = 'job="postgres",datname="$database"'
+    panels = []
+
+    def add(title, definitions, unit="short", description=""):
+        current = panel(len(panels) + 1, title, "", unit=unit, description=description)
+        current["targets"] = [{"refId": chr(65 + i), "expr": expr, "legendFormat": label}
+                              for i, (label, expr) in enumerate(definitions)]
+        panels.append(current)
+
+    add("Collection and database availability", [("Exporter scrape", 'up{job="postgres"}'), ("Database connection", 'pg_up{job="postgres"}'),
+                                                ("Collection error (1 = error)", 'pg_exporter_last_scrape_error{job="postgres"}')],
+        description="Shared exporter and database health. Zero collection errors is healthy; missing series is not success.")
+    add("Server connection usage", [("Connections", 'sum(pg_stat_database_numbackends{job="postgres"})'),
+                                    ("Server limit", 'max(pg_platform_settings_max_connections{job="postgres"})')],
+        description="Shared PostgreSQL server across all databases. The limit includes reserved connection slots; it is not a project quota.")
+    add("Server connection-limit utilization", [("Shared utilization", 'sum(pg_stat_database_numbackends{job="postgres"}) / (max(pg_platform_settings_max_connections{job="postgres"}) > 0)')], "percentunit",
+        "Shared server utilization against max_connections, including reserved capacity.")
+    add("Server uptime", [("Uptime", 'time() - pg_postmaster_start_time_seconds{job="postgres"}')], "s", "Shared server time since postmaster start.")
+    add("Database connections", [("{{state}}", f'pg_platform_activity_connections{{{selected}}}')],
+        description="Selected database client connections by state, excluding the monitoring query.")
+    add("Database configured connection limit", [("Positive database limit", f'pg_database_connection_limit{{{selected}}} > 0')],
+        description="Only a positive per-database limit is shown. PostgreSQL -1 means no separate database limit; the server limit still applies.")
+    add("Database size", [("{{datname}}", f'pg_database_size_bytes{{{selected}}}')], "bytes", "Selected database on-disk size; not the host's free space.")
+    add("Transactions and rollbacks", [(label, f'rate(pg_stat_database_{metric}{{{selected}}}[5m])')
+                                      for label, metric in [("Commits", "xact_commit"), ("Rollbacks", "xact_rollback")]], "ops",
+        "Five-minute transaction rates for the selected database.")
+    hits = f'rate(pg_stat_database_blks_hit{{{selected}}}[5m])'
+    reads = f'rate(pg_stat_database_blks_read{{{selected}}}[5m])'
+    add("Database buffer cache hit ratio", [("Hit ratio", f'{hits} / (({hits} + {reads}) > 0)')], "percentunit",
+        "PostgreSQL shared-buffer hit ratio; excludes the OS cache. No ratio until block activity exists.")
+    add("Database block reads", [("Disk reads", reads), ("Buffer hits", hits)], "ops", "Five-minute block read rates.")
+    add("Temporary data written", [("Temporary bytes/s", f'rate(pg_stat_database_temp_bytes{{{selected}}}[5m])')], "Bps", "Selected database temporary-file write rate.")
+    add("Deadlocks and temporary files", [(label, f'rate(pg_stat_database_{metric}{{{selected}}}[5m])')
+                                         for label, metric in [("Deadlocks/s", "deadlocks"), ("Temporary files/s", "temp_files")]], "ops", "Five-minute database counter rates.")
+    add("Database locks", [("{{mode}}", f'pg_locks_count{{{selected}}}')], description="Current locks by lock mode, including granted and waiting locks.")
+    add("Database lock waits", [("{{state}}", f'pg_platform_activity_lock_waits{{{selected}}}')], description="Client connections waiting for a lock; no SQL text or session identities are collected.")
+    add("Oldest open transaction", [("{{state}}", f'pg_platform_activity_max_transaction_seconds{{{selected}}}')], "s", "Age by client connection state; zero means no open transaction in that state.")
+    dashboard = {"uid": "postgresql", "title": "PostgreSQL", "schemaVersion": 41, "version": 1,
+                 "editable": False, "timezone": "browser", "refresh": "30s",
+                 "time": {"from": "now-1h", "to": "now"}, "tags": ["developer-platform", "operator", "postgresql"], "panels": panels}
+    dashboard["templating"] = {"list": [{"name": "database", "label": "Database", "type": "query",
+        "datasource": {"type": "prometheus", "uid": "prometheus"},
+        "query": {"query": 'label_values(pg_database_size_bytes{job="postgres"}, datname)', "refId": "PrometheusVariableQueryEditor-VariableQuery"},
+        "refresh": 1, "sort": 1, "multi": False, "includeAll": False, "current": {"text": "platform", "value": "platform"}}]}
+    return dashboard
 
 
 def generate(check=False):
@@ -199,7 +260,7 @@ def generate(check=False):
         if uid == "workloads-capacity":
             augment_capacity(dashboard)
         expected[uid] = dashboard
-    for dashboard in (application_dashboard(), micrometer_dashboard()):
+    for dashboard in (application_dashboard(), micrometer_dashboard(), postgres_dashboard()):
         expected[dashboard["uid"]] = dashboard
     stale = []
     for uid, dashboard in expected.items():

@@ -369,6 +369,116 @@
           "placement": "bottom"
         }
       }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Host storage used",
+      "description": "Filesystem space unavailable to an unprivileged process, including reserved blocks. Disk filesystems only; independent of project selection. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - (node_filesystem_avail_bytes{job=\"host\",device=~\"/dev/.+\",fstype!~\"tmpfs|devtmpfs|overlay|squashfs\"} / (node_filesystem_size_bytes{job=\"host\",device=~\"/dev/.+\",fstype!~\"tmpfs|devtmpfs|overlay|squashfs\"} > 0))",
+          "legendFormat": "{{instance}} {{mountpoint}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Host storage capacity and available space",
+      "description": "Disk filesystem total capacity and space available to an unprivileged process. Independent of project selection. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 40
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "node_filesystem_size_bytes{job=\"host\",device=~\"/dev/.+\",fstype!~\"tmpfs|devtmpfs|overlay|squashfs\"}",
+          "legendFormat": "{{mountpoint}} \u2014 Capacity"
+        },
+        {
+          "refId": "B",
+          "expr": "node_filesystem_avail_bytes{job=\"host\",device=~\"/dev/.+\",fstype!~\"tmpfs|devtmpfs|overlay|squashfs\"}",
+          "legendFormat": "{{mountpoint}} \u2014 Available"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Host inode usage",
+      "description": "Fraction of inodes used on disk filesystems reporting inode capacity. Independent of project selection. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 40
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 - (node_filesystem_files_free{job=\"host\",device=~\"/dev/.+\",fstype!~\"tmpfs|devtmpfs|overlay|squashfs\"} / (node_filesystem_files{job=\"host\",device=~\"/dev/.+\",fstype!~\"tmpfs|devtmpfs|overlay|squashfs\"} > 0))",
+          "legendFormat": "{{instance}} {{mountpoint}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
     }
   ],
   "templating": {

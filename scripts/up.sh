@@ -19,6 +19,7 @@ chmod 700 .runtime
 python3 scripts/generate-dashboards.py
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 docker compose up -d --wait --wait-timeout 120 postgres
+python3 scripts/setup-postgres-monitoring.py
 python3 scripts/cluster_config.py > .runtime/k3d.yaml
 if ! k3d cluster list -o json | python3 -c 'import json,sys; sys.exit(not any(c["name"] == "workloads" for c in json.load(sys.stdin)))'; then
   k3d cluster create --config .runtime/k3d.yaml

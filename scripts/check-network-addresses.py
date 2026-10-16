@@ -11,6 +11,7 @@ from env import settings
 
 NETWORK = "developer-platform"
 FIXED_SERVICES = {
+    "postgres-exporter": ("POSTGRES_EXPORTER_IP", "172.30.80.30"),
     "postgres": ("POSTGRES_IP", "172.30.80.10"),
     "platform-api": ("PLATFORM_API_IP", "172.30.80.11"),
     "keycloak": ("KEYCLOAK_IP", "172.30.80.12"),

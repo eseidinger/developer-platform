@@ -327,3 +327,54 @@ combine these metrics with kube-state-metrics resource and ownership data.
 `scripts/check-monitoring.py` validates the configuration and executes
 `tests/capacity.test.yaml`: it covers namespace isolation, rolling ReplicaSets,
 sidecars, ordinary init exclusion, completed jobs, and incomplete limits.
+
+## PostgreSQL and host storage
+
+The operator-only **PostgreSQL** dashboard selects one database for connections,
+transactions/rollbacks, size, cache hits, temporary files, deadlocks, locks and
+oldest transactions. Shared connection usage/limit, uptime and collection health
+are explicitly server-wide and independent of the database selector. A database
+limit of `-1` means no separate limit and is not plotted as zero capacity. Idle
+databases can have no cache-hit ratio until block activity occurs.
+
+`postgres-exporter` is pinned to v0.20.1, has no published host port, and runs
+read-only with all capabilities dropped, 128 MiB memory and 0.25 CPU limits.
+Prometheus keeps only reviewed aggregate metrics and database/state/lock-mode
+labels, with a 5,000-sample, 2 MB scrape budget. Table, user, application-name,
+query-text, query-ID and replication-client collectors are disabled. The fixed
+`postgres-queries.yaml` aggregates connection states, lock waits and transaction
+ages in SQL before export, avoiding collisions and sensitive session labels from
+the stock activity collector. It uses the pinned exporter's deprecated custom
+query option; revalidate compatibility before upgrading. No per-table
+vacuum/dead-tuple statistics are collected across project databases in this scope.
+
+Bootstrap runs `scripts/setup-postgres-monitoring.py` after PostgreSQL is healthy.
+It reconciles `platform_monitor` with `pg_monitor`, five connections maximum,
+read-only default transactions and a five-second statement timeout. It receives
+no application-table grants, superuser, role/database creation, replication or
+RLS bypass privileges. It connects only to `platform` to read shared catalog
+statistics; it does not need project application credentials or per-project
+connection grants. `pg_monitor` is a trusted operator role able to read cluster
+statistics; never expose its credential to projects or AI tools.
+
+Run `python3 scripts/init.py` to generate `POSTGRES_MONITOR_PASSWORD` in `.env`,
+including on an existing installation. Setup writes
+`.runtime/postgres-monitor.password` with a UID 65534 read ACL, mounted only into
+the exporter; the password is neither a Compose environment variable nor a DSN
+argument. `.env` remains part of the existing protected configuration backup;
+the runtime file is regenerated. To rotate, replace the configured secret,
+rerun setup and recreate only `postgres-exporter`. To revoke, disable the
+`platform_monitor` login and stop the exporter. The private Docker connection
+uses the existing PostgreSQL transport (`sslmode=disable`); it adds no public
+PostgreSQL or exporter route.
+
+**Workloads and capacity** also displays host disk-space utilization, total and
+available bytes, and inode utilization. These panels use node exporter, exclude
+virtual filesystems, and are independent of project selection. Space utilization
+uses capacity minus space available to an unprivileged process, including reserved
+blocks. Filesystems without inode capacity have no inode ratio.
+
+`scripts/check-postgres-monitoring.py` creates disposable PostgreSQL 18, exporter
+and Prometheus containers. It verifies repeatable role setup, denied application
+reads/writes, aggregate privacy, database selection, absent/unlimited values and
+dashboard query readback using production collectors, SQL and metric filters.

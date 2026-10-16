@@ -9,6 +9,21 @@ scrape_configs:
   - job_name: prometheus
     static_configs:
       - targets: ["localhost:9090"]
+  - job_name: postgres
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    sample_limit: 5000
+    body_size_limit: 2MB
+    label_limit: 10
+    label_value_length_limit: 128
+    static_configs:
+      - targets: ["postgres-exporter:9187"]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'pg_up|pg_exporter_last_scrape_error|pg_postmaster_start_time_seconds|pg_platform_settings_max_connections|pg_platform_activity_(connections|lock_waits|max_transaction_seconds)|pg_database_(size_bytes|connection_limit)|pg_stat_database_(numbackends|xact_commit|xact_rollback|blks_read|blks_hit|tup_returned|tup_fetched|tup_inserted|tup_updated|tup_deleted|conflicts|temp_files|temp_bytes|deadlocks|blk_read_time|blk_write_time)|pg_locks_count'
+        action: keep
+      - action: labelkeep
+        regex: '__name__|job|instance|datname|state|mode'
   - job_name: host
     static_configs:
       - targets: ["node-exporter:9100"]

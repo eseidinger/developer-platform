@@ -33,7 +33,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "up{job=~\"prometheus|host|kubernetes-state|kubernetes-cadvisor|blackbox-exporter|alloy\"}",
+          "expr": "up{job=~\"prometheus|postgres|host|kubernetes-state|kubernetes-cadvisor|blackbox-exporter|alloy\"}",
           "legendFormat": "{{job}} {{instance}} {{project}} {{component}}"
         }
       ],
