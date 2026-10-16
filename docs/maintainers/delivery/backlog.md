@@ -1104,11 +1104,15 @@ the policy decision alone is not provider account activation. See [ADR-008](../.
 
 - [ ] **PLAN-022 · 4.2** — Provision versioned, operator-only Grafana dashboards for platform health/delivery, workloads/capacity, and telemetry/security. Validate panel queries, meaningful missing-data states, safe trace/log links, restart/reconciliation, failure diagnosis, redaction and deployed evidence. Prerequisites: PLAN-021 and existing scoped metrics/logs. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md).
 
+  **Owner-verified dashboard acceptance (October 16, 2026):** The owner confirmed that the dashboards were already verified using VEF (the Quarkus application deployed as `vareng`) and ODIP (Spring Boot). Record the performed live dashboard checks as **passed** for PLAN-022 and the dashboard portion of PLAN-023. This supplements the automated live query, provisioning, JVM and workload-capacity evidence below; repeating functional dashboard verification with disposable JVM applications is not an outstanding requirement. This confirmation does not claim FastAPI runtime coverage, injected collector/backend failures, trace/log-link verification, or retention/security checks; those unperformed acceptance items remain tracked separately.
+
   **Source progress (October 15, 2026; `c7aed4e`):** Added three generated operator dashboards and provisioning source. Live panels, restart and failure drills remain unverified.
 
   **Planning baseline (October 14, 2026):** Grafana data sources are provisioned but dashboards are not. No dashboard implementation or deployed acceptance is claimed.
 
 - [ ] **PLAN-023 · 4.3** — Add a versioned, opt-in application metrics declaration and private scrape discovery for deployed service components; expose bounded project-scoped reads and provision one shared HTTP application dashboard plus a Micrometer JVM dashboard. Prove metric/label limits, missing-data behavior, cross-project denial, retirement cleanup, resource cost, and deployed readback with instrumented neutral fixtures. Prerequisites: PLAN-022's operator dashboard provisioning path and the existing authorized Platform API observation boundary. See the [Phase 4 plan](plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023) and [N-10](../../product/requirements.md).
+
+  **Accepted dashboard scope (October 16, 2026):** Live dashboard verification with VEF/vareng and ODIP is owner-confirmed **passed**, as recorded under PLAN-022. Remaining framework-runtime coverage concerns FastAPI; the already performed JVM dashboard checks do not need a repeat acceptance run. Project authorization, target retirement and collection-failure acceptance remain separate from dashboard functionality.
 
   **Source progress (October 15, 2026; `4c170d5`):** Added an opt-in `v1alpha2` metrics declaration, private discovery/proxy, scoped fixed reads, and generated Spring, Quarkus and FastAPI dashboards. Framework fixture readback remains unverified.
 

@@ -16,6 +16,17 @@ telemetry needed for Phase 4 must be verified within this phase.
 Execution tracking: [PLAN-021 through PLAN-024](../backlog.md#additional-phase-tasks).
 The [backlog](../backlog.md) remains the evidence and task-status register.
 
+## Accepted dashboard checks
+
+On October 16, 2026, the owner confirmed live dashboard verification with VEF
+(Quarkus, deployed as `vareng`) and ODIP (Spring Boot). These functional dashboard
+checks are **passed** for PLAN-022 and the dashboard portion of PLAN-023, alongside
+the recorded automated query and provisioning checks. Do not require a repeat
+JVM dashboard acceptance run using disposable applications. FastAPI runtime
+coverage, unperformed failure/recovery drills, trace/log links, project-access
+and retirement checks, and storage/retention evidence remain separate open items.
+This accepts the performed checks without closing all four Phase 4 tasks.
+
 ## Goal and boundaries
 
 Correlate an authorized request, its durable operation, provider calls, and
