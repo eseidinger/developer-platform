@@ -2,8 +2,9 @@
 
 Status: source implementation in progress. Read-only investigations and a narrow
 rollback approval workflow are implemented; the controlled live startup diagnosis
-and approved recovery journey passed. Remaining deployed acceptance and the full
-evaluation corpus remain open. Bounded live documentation selection and
+and approved recovery journey passed. The primary-provider diagnostics-v2 corpus
+also passed; cross-provider/adversarial evaluation and remaining deployed
+acceptance remain open. Bounded live documentation selection and
 change-impact assistance also passed. Covers [F-11 and F-12](../../../product/requirements.md).
 
 The source implementation uses LangChain `ChatOpenAI` through an explicitly selected OpenAI API endpoint
@@ -23,7 +24,8 @@ amendment approval is claimed. See the [data controls](https://developers.openai
 EU remains the compatibility default and optional mode, requiring all three
 existing EU eligibility/processing/amendment verification flags. It never falls
 back to Global. Global acceptance does not set those flags. Global account/model connectivity
-is verified; diagnosis quality and live workflow acceptance remain open.
+is verified. Controlled live startup diagnosis/recovery and the primary-provider
+diagnostics-v2 synthetic gate passed; broader and cross-provider acceptance remain open.
 
 The initial write path proposes only rollback from a failed latest apply or a server-confirmed failed runtime to
 a retained, previously successful revision. Its reviewable diff lists changed
@@ -43,12 +45,14 @@ abstention, tool calls, and estimated cost without persisting model content.
 The corpus is a gate, not a substitute for the deployed regression and recovery
 demonstration or the required second-provider run.
 
-The October 16 post-finalization rerun remains below that gate: one of three
-known-cause cases passed (resource pressure); the database-host and pool cases
-abstained. All three abstention cases passed, with eight reads per case and
-$0.103454 total estimated cost. The next quality work is bounded database/pool
-diagnostics and production-contract-aligned evaluation evidence; thresholds and
-historical failed results remain unchanged. The second-provider run is also open.
+The legacy-v1 October 16 post-finalization rerun scored one of three known-cause
+cases and cost an estimated $0.103454; that historical failed result is unchanged.
+After adding producible database/pool diagnostics, the versioned diagnostics-v2
+run passed three of three known causes and all five abstention cases. Each case
+used 5–8 reads, 17.851–22.131 seconds and less than $0.024 estimated cost; total
+estimated cost was $0.153910. No result-contract errors occurred. This establishes
+the primary-provider synthetic gate, not live database fault recovery or complete
+adversarial assurance. The second-provider run remains open.
 
 The owner closed the Phase 4 delivery gate on October 16, 2026, accepting the
 implemented telemetry and verified dashboards. Remaining Phase 4 acceptance and
@@ -122,6 +126,31 @@ text, option names, paths and values are discarded before model context. This
 is a reported log signature, not execution of model instructions or proof of
 request impact. Missing reads, unmatched signatures and truncation remain
 explicit. The retained operational-envelope contract is unchanged.
+
+`get_logs` combines retained operational-event counts with fixed diagnostic
+codes from the first declared service's current revision. The additional reader
+uses the same namespace/project/component/revision checks and two-container,
+20-line, 8 KiB, one-hour bounds as the startup reader. It also handles running
+containers: readiness does not rule out connection-pool failures. Previous
+output is read only when restart/termination metadata indicates a prior instance.
+Raw lines, hostnames, credentials, pool names, SQL and arbitrary JSON fields
+never enter model context. Only recognized English error formats are covered;
+unmatched, unavailable and truncated samples do not establish health.
+
+Initial codes are `database_hostname_resolution_failed` (Psycopg/libpq),
+`database_pool_capacity_timeout` (SQLAlchemy QueuePool), and
+`database_pool_acquisition_timeout` (HikariCP/Agroal). These represent reported
+error signatures, not proof of every underlying cause. In particular, an
+acquisition timeout does not by itself prove capacity exhaustion. Formats were
+checked against the installed Psycopg source and upstream
+[PostgreSQL](https://github.com/postgres/postgres/blob/master/src/interfaces/libpq/fe-connect.c),
+[SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/errors.html#queuepool-limit-of-size-x-overflow-y-reached-connection-timed-out-timeout-z),
+[HikariCP](https://github.com/brettwooldridge/HikariCP/blob/dev/src/main/java/com/zaxxer/hikari/pool/HikariPool.java)
+and [Agroal](https://github.com/agroal/agroal/blob/master/agroal-pool/src/main/java/io/agroal/pool/ConnectionPool.java).
+`scripts/verify-ai-database-diagnostics.py` additionally verifies a real
+SQLAlchemy in-memory pool timeout and Psycopg's error formatting with a
+synthetic resolver failure. It uses no project data or network access;
+SQLAlchemy remains a verification-only dependency.
 
 The accepted initial external-model policy in [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md)
 permits only authorized, minimized, redacted Public and Internal project context;
@@ -205,6 +234,19 @@ These checks preserve the recovered application and do not replace the remaining
 full adversarial corpus and second-provider evaluation.
 
 ## Evaluation and demonstration
+
+The default corpus is now `diagnostics-v2`: three known-cause cases and five
+abstention cases, including paired database-key-change cases without diagnostic
+signals. Positive log fixtures exercise the production scoped reader and log
+projection over synthetic I/O. Evaluation tools reuse production argument
+schemas and descriptions. Known-cause hypotheses must cite the relevant
+diagnostic tool and match the cause concepts; provider failures cannot count as
+successful abstention. Reports include elapsed time, validation outcome and
+estimated cost, with the same 80% accuracy, complete abstention and time/read/cost
+gates. This is a versioned evidence improvement, not a relabeling of old results.
+The original six observation sets remain available with `--corpus legacy`.
+Use `--progress` for score-only case updates and `--report-file PATH` to retain
+score-only JSON. Historical v1 results stay unchanged.
 
 A corpus starts with an incorrect database host, an exhausted connection pool,
 resource pressure, and a case with insufficient data. Expand it with known-cause
