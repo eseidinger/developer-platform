@@ -27,6 +27,10 @@ coverage, unperformed failure/recovery drills, trace/log links, project-access
 and retirement checks, and storage/retention evidence remain separate open items.
 This accepts the performed checks without closing all four Phase 4 tasks.
 
+The owner also confirmed the **PostgreSQL** dashboard and new host storage panels
+working after deployment through `b347e92` on October 16, 2026. Their live functional
+checks are **passed** for PLAN-022 and do not need repeating.
+
 ## Goal and boundaries
 
 Correlate an authorized request, its durable operation, provider calls, and
