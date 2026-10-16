@@ -72,7 +72,7 @@ flowchart LR
 | [4](plans/phase-4-tracing-and-dashboards.md) | Complete October 16, 2026 by owner direction | Implemented tracing, application/JVM/PostgreSQL metrics and verified operator dashboards; remaining acceptance/fixes deferred to Phase 7 package 7.9 |
 | [5](plans/phase-5-ai-operations.md) | Owner-accepted Phase 4 delivery gate; deferred checks in Phase 7 are non-gating | Python-based evidence assistance and controlled actions through the Platform API |
 | [6](../../architecture/evolution.md) | Optional owner decision after Phase 5; demonstrated need for another compute provider or service boundary | Optional Docker compute adapter and/or polyglot service extraction, each gated by parity, migration, rollback, and operational evidence |
-| [7 anytime leftovers](plans/phase-7-anytime-leftovers.md) | Phase 2C foundation; schedule independently when capacity allows | Finish the remaining PLAN-016/009/017/018/019/006/007/008, deployed PLAN-020 acceptance and deferred PLAN-021–024 follow-ups (7.9) without gating Phases 3–5 or optional 6 |
+| [7 anytime leftovers](plans/phase-7-anytime-leftovers.md) | Phase 2C foundation; schedule independently when capacity allows | Finish the remaining PLAN-016/009/017/018/019/006/007/008, deployed PLAN-020 acceptance and deferred PLAN-021–024 follow-ups (7.9) and second AI provider evaluation (7.10) without gating Phases 3–5 or optional 6 |
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their acceptance minimum by that phase’s exit; later extensions do not defer it.
 

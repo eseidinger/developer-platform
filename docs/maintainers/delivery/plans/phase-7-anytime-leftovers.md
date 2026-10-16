@@ -7,7 +7,8 @@ This plan collects the remaining work in
 `PLAN-016`, `PLAN-009`, `PLAN-017`, `PLAN-018`, `PLAN-019`, `PLAN-006`,
 `PLAN-007`, and `PLAN-008`, plus the deferred deployed portal acceptance for
 owner-accepted `PLAN-020`, and all deferred acceptance/fixes from owner-completed
-Phase 4 (`PLAN-021`–`PLAN-024`, package 7.9). It does not replace their acceptance criteria or
+Phase 4 (`PLAN-021`–`PLAN-024`, package 7.9), and deferred second AI model
+provider evaluation (`PLAN-012` follow-up, package 7.10). It does not replace their acceptance criteria or
 create a new task ID. The
 [delivery backlog](../backlog.md) remains the authoritative task and evidence
 register.
@@ -17,7 +18,8 @@ register.
 Close the generic hosted-application use-case enablement slice with reproducible
 deployed evidence. This phase finishes the neutral platform contract,
 identity/access behavior, component-aware monitoring, the authenticated
-provider/consumer integration gate, and recovery, plus the deferred Phase 4 telemetry acceptance. It must remain
+provider/consumer integration gate, and recovery, plus deferred Phase 4 telemetry
+acceptance and second AI model-provider evaluation. It must remain
 provider-neutral: concrete energy-system declarations and domain assertions are
 owned and tested outside this repository.
 
@@ -29,8 +31,8 @@ are accepted.
 
 Exit: every acceptance criterion for `PLAN-016`, `PLAN-009`, `PLAN-017`,
 `PLAN-018`, `PLAN-019`, `PLAN-006`, `PLAN-007`, and `PLAN-008`, and the
-deferred deployed portal journeys in `PLAN-020`, and the Phase 4 follow-ups in
-package 7.9, has dated source, local, and
+deferred deployed portal journeys in `PLAN-020`, Phase 4 follow-ups in package 7.9,
+and second AI model-provider evaluation in package 7.10, has dated source, local, and
 deployed evidence (or a new explicit owner-directed exception). The generic and
 externally owned versioned results are recorded together. Only then may Phase 7
 be closed; incomplete work here remains visible without blocking the other
@@ -238,9 +240,37 @@ sequencing; these outcomes remain unverified until executed. Run this package
 when capacity allows, before the final human-database reviews in 7.8; its number
 preserves existing package references rather than imposing numeric execution order.
 
+<a id="ai-model-provider-leftovers"></a>
+
+### 7.10 — Verify a second AI model provider (`PLAN-012` follow-up)
+
+**Unscheduled, lowest priority; non-gating for Phase 5.** On October 16, 2026,
+the owner moved second-provider setup, adapter work and evaluation here. No
+second account, endpoint or credential is required for the current Phase 5 gate.
+The implemented provider-neutral boundary remains; interoperability with another
+provider has not been demonstrated. Existing primary-provider synthetic and live
+acceptance evidence remains valid, and this deferral is not a passing test.
+
+1. Select an available second provider/account or local endpoint. Verify its
+   model access, data-handling eligibility and applicable terms before use;
+   configure credentials through protected operator storage.
+2. Implement any required adapter while preserving project scope, classification,
+   redaction, tools-disabled finalization, approval separation and error handling.
+3. Run the same versioned corpus and thresholds, including known diagnoses,
+   insufficient evidence, untrusted input and project boundaries. Record cost,
+   latency, tool budgets and safe trace coverage without raw model content.
+4. Record provider/model/adapter versions and compare outcomes with the accepted
+   primary-provider baseline. Fix contract or safety regressions and rerun the
+   affected checks.
+
+**Exit evidence:** a second provider passes the unchanged quality, abstention,
+budget and safety contracts, with dated reproducible evidence and documented
+limits, or a new explicit owner-directed exception. Schedule independently when
+capacity and a provider setup are available, before the final reviews in 7.8.
+
 ### 7.8 — Complete the lowest-priority human database leftovers (`PLAN-008`)
 
-Schedule this **last**, after all other Phase 7 work packages, including 7.9. EV-47's
+Schedule this **last**, after all other Phase 7 work packages, including 7.9 and 7.10. EV-47's
 automated and manual core tests are accepted as passed and need no repeat solely
 for the later clean deployment. The following reviews remain unverified:
 
@@ -276,9 +306,11 @@ not turn an unperformed check into a passing result.
 `PLAN-016` → `PLAN-009` → `PLAN-017` → `PLAN-018` → `PLAN-019`, with portal
 acceptance package 7.6 run after the identity/access API is available. Package
 7.7 runs after the Phase 3 source capabilities are ready. Run 7.8 last,
-after 7.1–7.7 and 7.9; its reviews or an explicit owner-directed exception remain
+after 7.1–7.7, 7.9 and 7.10; its reviews or an explicit owner-directed exception remain
 required before Phase 7 exit. Package 7.9 can run independently once the
 implemented Phase 4 telemetry is available and does not gate Phase 5.
+Package 7.10 runs once a second model-provider setup is available and also does
+not gate Phase 5; primary-provider acceptance does not depend on its completion.
 
 `PLAN-018` requires the implemented and accepted identity, contract, and
 monitoring outcomes. `PLAN-019` requires the completed deployed integration

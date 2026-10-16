@@ -35,4 +35,10 @@ Tool access, retrieval, and telemetry must respect project boundaries. Minimize 
 
 Expand the incident corpus beyond the initial four scenarios with known-cause and insufficient-evidence variants. Require zero cross-project disclosures, secret disclosures, and unapproved writes; at least 80% correct, sourced diagnosis on known-cause cases; and safe abstention on every insufficient-evidence case. Measure latency, tool use, model cost, and trace coverage. Re-run the same corpus against a second provider adapter to prove that the platform contracts are provider-neutral.
 
+
+**Owner-directed scheduling update, October 16, 2026:** Second-provider setup,
+adapter work and evaluation are deferred to [Phase 7 package 7.10](../../maintainers/delivery/plans/phase-7-anytime-leftovers.md#ai-model-provider-leftovers),
+unscheduled and non-gating for Phase 5. The provider-neutral contract remains;
+this deferral does not claim second-provider interoperability passed.
+
 Details: [Phase 5](../../maintainers/delivery/plans/phase-5-ai-operations.md), [Security](../../maintainers/delivery/history/security-design.md).
