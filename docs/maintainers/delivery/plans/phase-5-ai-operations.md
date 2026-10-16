@@ -20,8 +20,8 @@ amendment approval is claimed. See the [data controls](https://developers.openai
 
 EU remains the compatibility default and optional mode, requiring all three
 existing EU eligibility/processing/amendment verification flags. It never falls
-back to Global. Global acceptance does not set those flags. Account/model access
-and live evaluation still require verification.
+back to Global. Global acceptance does not set those flags. Global account/model connectivity
+is verified; diagnosis quality and live workflow acceptance remain open.
 
 The initial write path proposes only rollback from a failed latest deployment to
 a retained, previously successful revision. Its reviewable diff lists changed
@@ -122,6 +122,16 @@ Write tools such as `deploy`, `rollback`, `restart`, `scale`, and `update_config
   revision at execution; reject stale, expired, reused, or changed approvals
   and audit the result.
 - Check health and relevant metrics after execution; do not infer success solely from a successful API request.
+
+### Sourced explanation results
+
+AI results distinguish `observations` (facts with validated evidence IDs) from
+`hypotheses` (tentative diagnoses with validated evidence IDs). A catalog
+explanation may complete with sourced observations and no hypothesis. Missing
+business functionality or runtime health is a scope gap, not a reason to reject
+an otherwise supported catalog explanation. Missing or foreign sources still
+force abstention; incident diagnosis still requires supported hypotheses.
+Historical saved results remain unchanged.
 
 ## Agent observability
 
