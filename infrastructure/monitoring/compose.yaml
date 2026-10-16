@@ -5,7 +5,9 @@ services:
     command: ["--config.file=/etc/blackbox/blackbox.yaml"]
     volumes:
       - ./blackbox.yaml:/etc/blackbox/blackbox.yaml:ro
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${BLACKBOX_EXPORTER_IP:-172.30.80.21}
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
@@ -23,7 +25,9 @@ services:
       - ../../.runtime/metrics-reader.token:/run/prometheus/metrics-reader.token:ro
       - ../../.runtime/metrics-reader-ca.crt:/run/prometheus/metrics-reader-ca.crt:ro
     ports: ["127.0.0.1:9090:9090"]
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${PROMETHEUS_IP:-172.30.80.22}
     mem_limit: 1g
   grafana:
     image: grafana/grafana:13.2.2
@@ -37,7 +41,9 @@ services:
       - ./dashboards.yaml:/etc/grafana/provisioning/dashboards/default.yaml:ro
       - ./dashboards:/var/lib/grafana/provisioned-dashboards:ro
     ports: ["127.0.0.1:3000:3000"]
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${GRAFANA_IP:-172.30.80.23}
     mem_limit: 512m
   tempo:
     image: grafana/tempo@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd
@@ -46,7 +52,9 @@ services:
     volumes:
       - ./tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/lib/developer-platform/tempo:/data/tempo
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${TEMPO_IP:-172.30.80.24}
     user: "10001:10001"
     mem_limit: 2g
     read_only: true
@@ -59,7 +67,9 @@ services:
     volumes:
       - ./loki.yaml:/etc/loki/config.yaml:ro
       - loki:/loki
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${LOKI_IP:-172.30.80.25}
     mem_limit: 768m
   alloy:
     image: grafana/alloy:v1.19.2
@@ -99,7 +109,9 @@ services:
     volumes:
       - ${ALERTMANAGER_CONFIG_DIR:-.}:/etc/alertmanager:ro
       - alertmanager:/alertmanager
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${ALERTMANAGER_IP:-172.30.80.26}
     mem_limit: 128m
   node-exporter:
     depends_on: [platform-api]
@@ -108,5 +120,7 @@ services:
     pid: host
     command: ["--path.rootfs=/host", "--path.procfs=/host/proc", "--path.sysfs=/host/sys", "--collector.textfile.directory=/discovery"]
     volumes: ["/:/host:ro", "monitoring_discovery:/discovery:ro"]
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${NODE_EXPORTER_IP:-172.30.80.27}
     mem_limit: 128m

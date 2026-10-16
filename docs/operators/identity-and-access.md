@@ -134,9 +134,12 @@ The supported `scripts/up.sh` installation now builds and imports the authorizer
 image, installs two authorizer replicas in `platform-access`, and applies their
 restricted network policies. `PLATFORM_API_IP` and `KEYCLOAK_IP` default to
 `172.30.80.11` and `172.30.80.12`. Bootstrap starts the fixed-address core before
-the remaining Compose services and checks live address ownership. The shared
-network still has a dynamic pool: do not attach unrelated containers to it or
-assign its fixed addresses elsewhere. A conflict owned by an old Compose service
+the remaining Compose services and checks live address ownership. All Compose
+services now have stable addresses in the `.10`–`.14` and `.20`–`.29` ranges;
+this prevents a monitoring container from taking the reserved telemetry gateway
+address after restart. The shared network still has a dynamic pool for k3d:
+do not attach unrelated containers to it or assign its fixed addresses elsewhere.
+A conflict owned by an old Compose service
 is recovered using `ansible/deploy.yml`, which removes Compose containers without
 removing data volumes or the k3d network; a conflicting k3d or unrelated container
 requires operator review. Validate custom fixed addresses with

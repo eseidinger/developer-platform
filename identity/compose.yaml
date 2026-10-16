@@ -18,7 +18,9 @@ services:
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
       KEYCLOAK_DB_PASSWORD: ${KEYCLOAK_DB_PASSWORD:?Run scripts/init.py}
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${KEYCLOAK_DB_INIT_IP:-172.30.80.28}
     depends_on:
       postgres:
         condition: service_healthy
@@ -96,7 +98,9 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run scripts/init.py}
       KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
-    networks: [platform]
+    networks:
+      platform:
+        ipv4_address: ${KEYCLOAK_REALM_INIT_IP:-172.30.80.29}
     depends_on:
       keycloak:
         condition: service_started

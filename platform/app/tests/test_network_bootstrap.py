@@ -26,13 +26,12 @@ class NetworkBootstrapTests(unittest.TestCase):
     def test_defaults_and_custom_addresses(self):
         self.assertEqual(str(self.fixed["platform-api"]), "172.30.80.11")
         self.assertEqual(str(self.fixed["keycloak"]), "172.30.80.12")
-        subnet, fixed = network_addresses.addresses({
-            "PLATFORM_SUBNET": "192.0.2.0/24", "POSTGRES_IP": "192.0.2.10",
-            "PLATFORM_API_IP": "192.0.2.11", "KEYCLOAK_IP": "192.0.2.12",
-            "TELEMETRY_GATEWAY_IP": "192.0.2.13", "ALLOY_IP": "192.0.2.14",
-        })
+        custom = {key: "192.0.2." + default.rsplit(".", 1)[1]
+                  for key, default in network_addresses.FIXED_SERVICES.values()}
+        subnet, fixed = network_addresses.addresses({"PLATFORM_SUBNET": "192.0.2.0/24", **custom})
         self.assertEqual(subnet, ipaddress.IPv4Network("192.0.2.0/24"))
         self.assertEqual(str(fixed["postgres"]), "192.0.2.10")
+        self.assertEqual(str(fixed["alertmanager"]), "192.0.2.26")
 
     def test_invalid_addresses_fail_without_echoing_values(self):
         for config in ({"KEYCLOAK_IP": "secret-value"}, {"PLATFORM_SUBNET": "secret-value"},
@@ -75,6 +74,15 @@ class NetworkBootstrapTests(unittest.TestCase):
         self.assertEqual(len(errors), 2)
         self.assertIn("platform-api: 172.30.80.11 is occupied by developer-platform-loki-1", errors)
         self.assertIn("keycloak: 172.30.80.12 is occupied by developer-platform-proxy-1", errors)
+
+    def test_monitoring_container_cannot_occupy_gateway_address(self):
+        self.network["Containers"] = {
+            "alertmanager": {"IPv4Address": "172.30.80.13/24", "Name": "developer-platform-alertmanager-1"},
+        }
+        errors = network_addresses.conflicts(self.subnet, self.fixed, self.network,
+                                            lambda _: {"com.docker.compose.project": "developer-platform",
+                                                       "com.docker.compose.service": "alertmanager"})
+        self.assertEqual(errors, ["telemetry-gateway: 172.30.80.13 is occupied by developer-platform-alertmanager-1"])
 
     def test_foreign_owner_and_gateway_are_rejected(self):
         self.network["Containers"] = {"foreign": {"IPv4Address": "172.30.80.12/24", "Name": "foreign"}}
