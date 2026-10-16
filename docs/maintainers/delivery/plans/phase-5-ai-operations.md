@@ -83,8 +83,59 @@ acceptance requirements remain in scope.
 | 5.3 Investigate | Select read-only tools and test hypotheses | Tool budgets, error handling, evaluation |
 | 5.4 Recommend a fix | Propose a concrete configuration/deployment diff | Versioned desired state |
 | 5.5 Apply fix | Execute after approval and observe the effect | Authorization, revision checks, audit, and rollback plan |
+| 5.6 Use AI through the portal | Project AI workspace for explanations, investigations, development assistance, policy and approved changes | PLAN-010–015 API flows and portal authorization |
 
 Development support follows using project knowledge from documentation, ADRs, API contracts, and repositories. Examples include appropriate service templates, change-impact analysis, and reviews with runtime context. General code completion is not a separate product goal.
+
+<a id="ai-portal-integration"></a>
+
+## 5.6 — Integrate AI into the project portal (`PLAN-025`)
+
+**Planned, required for Phase 5; not implemented or accepted.** On October 16,
+2026, inspection found generated API types for AI endpoints but no portal routes,
+screens or controls. Existing CLI/API acceptance does not establish UI behavior.
+Add an **AI assistance** area to the existing project workspace and navigation,
+using the same authenticated Platform API and established portal components.
+
+- **Policy:** Show classification and external-model eligibility. Human project
+  managers can update policy with explicit project confirmation. Explain
+  ineligible/unclassified projects and provider-unavailable states without
+  exposing credentials or suggesting that browser controls authorize a request.
+- **Read-only assistance:** Offer explicit actions for application explanation,
+  incident investigation and development assistance. Show running/completed/
+  abstained/failed states, sourced observations, tentative hypotheses, gaps,
+  evidence timestamps, tool counts and estimated cost. Keep missing evidence
+  visible and do not equate abstention with a diagnosed cause.
+- **History and resumption:** Discover and reopen project-scoped runs/proposals
+  after navigation or reload; add bounded, paginated list endpoints if needed.
+  Handle the existing synchronous run duration. Do not start runs on page load
+  or automatically retry a creation POST after a timeout; reconcile durable
+  history before offering a retry when the outcome is unknown.
+- **Proposal review:** From eligible completed sourced investigations, create and
+  display the exact rollback action, project, base/target revisions, changed
+  paths, diff hash and rollback plan. Validate investigation kind, current
+  revision/evidence applicability and project scope server-side; keep
+  unsupported or stale proposals explicit.
+- **Approval and execution:** Separate review, exact-hash approval and execution
+  into explicit human actions. Display approval state/expiry and disable
+  ineligible controls. Preserve server permission, revision, expiry, changed-hash
+  and single-use checks. Follow the resulting operation and observed readiness;
+  show available metrics or an explicit missing-data state.
+- **Role and data boundaries:** Human viewers can use eligible read assistance
+  according to API permissions; management actions require current human
+  `manage` authority. Test direct API denial independently of hidden controls.
+  Keep provider keys, bearer tokens, raw provider payloads, raw logs and
+  operator-only traces out of portal content and persisted browser state.
+
+**Acceptance:** UI/component tests cover states and authorization affordances;
+API tests cover any added discovery endpoints and eligibility checks. Run a
+dated deployed browser journey on disposable resources: policy, explanation,
+investigation, proposal review, approval, execution, observed recovery and
+development assistance. Cover reload/resumption, timeout/unknown outcomes,
+stale/expired/reused approvals, unauthorized requests and cross-project denial,
+with keyboard/focus checks and redacted browser/audit evidence. Keep source,
+local and deployed results distinct. Second-provider work remains independently
+deferred to Phase 7 package 7.10.
 
 ## Initial Global project configuration
 
