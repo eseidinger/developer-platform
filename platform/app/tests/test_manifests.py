@@ -111,7 +111,7 @@ class WorkloadContract(unittest.TestCase):
         ], "172.30.80.10", "secret")
         role = next(doc for doc in docs if doc["kind"] == "Role")
         self.assertEqual(role["rules"], [{"apiGroups": [""], "resources": ["services/proxy"],
-                                          "resourceNames": ["api"], "verbs": ["get"]}])
+                                          "resourceNames": ["http:api:http"], "verbs": ["get"]}])
         binding = next(doc for doc in docs if doc["kind"] == "RoleBinding")
         self.assertEqual(binding["subjects"][0]["name"], "workload-metrics-reader")
 

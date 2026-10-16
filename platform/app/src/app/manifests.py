@@ -279,7 +279,8 @@ def component_resources(name, components, database_ip, password, configuration=N
                               "ports": [{"protocol": "TCP", "port": item["port"]}]} for cidr in cidrs)
             manifests.append(obj("networking.k8s.io/v1", "NetworkPolicy", component["name"] + "-egress", spec={
                 "podSelector": {"matchLabels": component_labels}, "policyTypes": ["Egress"], "egress": rules}))
-    metrics_services = [c["name"] for c in components if c["type"] == "service" and c.get("metrics")]
+    metrics_services = ["http:" + c["name"] + ":" + c["metrics"]["port"]
+                        for c in components if c["type"] == "service" and c.get("metrics")]
     if metrics_services:
         manifests.append(obj("rbac.authorization.k8s.io/v1", "Role", "metrics-reader", rules=[{
             "apiGroups": [""], "resources": ["services/proxy"],
