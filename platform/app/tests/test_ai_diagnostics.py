@@ -66,7 +66,17 @@ class DiagnosticSignatureTests(unittest.TestCase):
         self.assertEqual(result["unavailable_reads"], 0)
         api.read_namespaced_pod_log.assert_called_once()
         self.assertNotIn("private", json.dumps(result))
+        # Kubernetes dynamic ResourceField objects are truthy even for {}.
+        # An empty lastState must not trigger a nonexistent previous-log read.
+        from kubernetes.dynamic.resource import ResourceInstance
+        pod["apiVersion"], pod["kind"] = "v1", "Pod"
+        pod["status"]["containerStatuses"][0]["lastState"] = {}
+        runtime.resources.get.return_value.get.return_value = {"items": [ResourceInstance(None, pod)]}
+        api.read_namespaced_pod_log.reset_mock()
+        self.assertEqual(ai_diagnostics.observe_failure_signals(runtime, "lab", "web", 3, api=api)["unavailable_reads"], 0)
+        api.read_namespaced_pod_log.assert_called_once()
         pod["metadata"]["annotations"]["platform.example/revision"] = "2"
+        runtime.resources.get.return_value.get.return_value = {"items": [pod]}
         self.assertEqual(ai_diagnostics.observe_failure_signals(runtime, "lab", "web", 3, api=api)["checked_containers"], 0)
 
     def test_missing_retained_logs_do_not_erase_positive_diagnostics(self):

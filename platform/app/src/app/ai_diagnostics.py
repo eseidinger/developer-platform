@@ -99,7 +99,8 @@ def observe_failure_signals(runtime, project, component, revision, *, api=None,
                 running = _field(_field(status, "state", {}), "running") is not None
                 if failed or not require_nonzero_exit and running:
                     restarts = _field(status, "restartCount", 0)
-                    has_previous = bool(_field(status, "lastState", {})) or type(restarts) is int and restarts > 0
+                    has_previous = (_field(_field(status, "lastState", {}), "terminated") is not None
+                                    or type(restarts) is int and restarts > 0)
                     pods.append((pod, has_previous))
                     break
         api = api or CoreV1Api(runtime.client)
