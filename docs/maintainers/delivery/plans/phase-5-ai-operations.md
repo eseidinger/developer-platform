@@ -160,6 +160,14 @@ every insufficient-evidence case. Measure unnecessary calls, latency, cost,
 and trace coverage. Re-run the corpus with a second provider adapter to verify
 that model portability preserves the platform's tool and safety contracts.
 
+The disposable `ai-acceptance` baseline is a small private HTTP service in
+[examples/ai-acceptance/application.json](../../../../examples/ai-acceptance/application.json).
+It uses a digest-pinned image, bounded resources and a readiness probe, with no
+database or public route. The owner created the empty project on October 16,
+2026; baseline deployment, fault injection and recovery still need live results.
+The declaration passed API model validation, and the image served HTTP 200 locally
+as UID 10001 with a read-only filesystem and dropped capabilities.
+
 The demonstration introduces a traceable regression using test resources, shows the investigation, an approvable fix, and the observed recovery state. Prompt-injection, secret-handling, and project-boundary tests are acceptance criteria.
 
 [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md) and [Observability](../../../architecture/observability.md) describe boundaries and data sources.

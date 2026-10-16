@@ -1,0 +1,30 @@
+{
+  "apiVersion": "platform.example/v1alpha2",
+  "kind": "Application",
+  "metadata": {
+    "name": "ai-acceptance",
+    "project": "ai-acceptance",
+    "environment": "default"
+  },
+  "spec": {
+    "components": [
+      {
+        "name": "web",
+        "type": "service",
+        "runtime": {
+          "type": "container",
+          "image": "docker.io/hashicorp/http-echo@sha256:fcb75f691c8b0414d670ae570240cbf95502cc18a9ba57e982ecac589760a186",
+          "args": ["-listen=:5678", "-text=AI acceptance baseline"]
+        },
+        "ports": [{"name": "http", "protocol": "http", "port": 5678}],
+        "replicas": 1,
+        "exposure": "private",
+        "health": {"readiness": {"path": "/"}},
+        "resources": {
+          "requests": {"cpu": "100m", "memory": "64Mi"},
+          "limits": {"cpu": "250m", "memory": "128Mi"}
+        }
+      }
+    ]
+  }
+}
