@@ -180,6 +180,23 @@ Use the Phase 4 configurable root sample rate for normal runs and temporary
 100% sampling for controlled evaluation; approval and outcome records remain
 durable outside the 24-hour trace store.
 
+On October 16, 2026, a sampled synthetic agent-loop probe passed deployed
+Alloy/Tempo readback: one run span, two model spans and one tool span, with
+validated parent links and allowlisted metadata only. It used no external model
+and changed no production sampling settings. The specific live human diagnosis
+was not found under 10% sampling; full trace coverage is not claimed. Use
+`scripts/review-ai-agent-trace.py TRACE_ID` inside the API environment for a
+bounded operator-only review with an explicit 24-hour query window. The script
+prints checks/counts rather than trace content.
+
+Automated approval safeguards also passed endpoint regression tests and deployed
+PostgreSQL checks using rollback-only temporary tables; see
+`scripts/verify-ai-approval-guards.py`. Restricted audit-reader review confirmed
+the six expected events for the human diagnosis/development/proposal/approval/
+execution/reuse-rejection journey, including exactly one successful execution.
+These checks preserve the recovered application and do not replace the remaining
+full adversarial corpus and second-provider evaluation.
+
 ## Evaluation and demonstration
 
 A corpus starts with an incorrect database host, an exhausted connection pool,
