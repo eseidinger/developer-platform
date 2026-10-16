@@ -99,7 +99,19 @@ restart counts, fixed waiting/termination reason codes and numeric exit codes.
 Sidecars, Kubernetes messages, pod/container names and termination output are
 excluded. Pod diagnostics remain available alongside a rollout deadline failure;
 they do not establish which revision a surviving ready replica serves or prove
-the exact cause of an exit code.
+the exact cause of an exit code. Pod summaries include a validated numeric
+platform revision annotation or explicit missing provenance.
+
+For a failed/progressing service, the runtime tool also checks at most two
+nonzero-exit application containers whose namespace, project/component labels
+and platform revision annotation match the authorized current declaration.
+Bounded Kubernetes log reads inspect current/previous output (20 lines, 8 KiB
+per read, one-hour window, fixed request timeouts). An exact allowlisted Go
+flag-parser error signature becomes `unrecognized_startup_option`; arbitrary
+text, option names, paths and values are discarded before model context. This
+is a reported log signature, not execution of model instructions or proof of
+request impact. Missing reads, unmatched signatures and truncation remain
+explicit. The retained operational-envelope contract is unchanged.
 
 The accepted initial external-model policy in [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md)
 permits only authorized, minimized, redacted Public and Internal project context;
@@ -146,6 +158,13 @@ requires at least one available source. Unknown source IDs force abstention.
 Contract rejections expose a fixed validation reason code without retaining or
 logging model output. Incident diagnosis still requires supported hypotheses.
 Historical saved results remain unchanged.
+
+Incident investigation assesses whether evidence supports a likely deployment
+or runtime failure cause. It keeps that causal hypothesis tentative and reports
+unknown request impact separately. Missing impact metrics alone do not invalidate
+a revision-linked startup diagnosis; failure symptoms without cause evidence
+still require abstention. This task scope does not reduce the known-cause
+accuracy, citation or security gates.
 
 ## Agent observability
 

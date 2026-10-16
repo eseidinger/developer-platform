@@ -106,7 +106,11 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
             "no hypothesis is required. A populated catalog is sufficient even if business functionality, "
             "component interactions or runtime health are not described. State those limitations as gaps "
             "without declaring the catalog explanation insufficient. If the catalog is unavailable, abstain.",
-        "investigate_incident": "Investigate the current project incident using read-only evidence. State missing data.",
+        "investigate_incident": "Investigate the current project's deployment/runtime failure using read-only evidence. "
+            "Assess sufficiency for a supported likely failure cause, using revision-linked diagnostic evidence when available. "
+            "Keep hypotheses tentative: a sufficient investigation need not prove every contributing factor or user impact. "
+            "Report missing request-impact telemetry separately as gaps; it does not invalidate a supported startup diagnosis. "
+            "If evidence shows only failure symptoms without supporting a cause, set insufficient_evidence true and abstain.",
         "development_assistance": "Select a suitable committed example or API reference for this application, "
             "and explain likely change impact using the current revision and deployment evidence. "
             "Use read-only project and documentation tools. Cite sources and state gaps.",
