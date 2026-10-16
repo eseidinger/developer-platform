@@ -1107,6 +1107,8 @@ See [ADR-008](../../architecture/decisions/ADR-008-ai-assisted-operations.md).
 
 - [ ] **PLAN-014 · 5.5** — Apply only an exactly approved diff through authorized Platform API calls; reject stale approvals, audit execution and verify observed health/metrics. Demonstrate regression, investigation, approval and recovery in test resources. Prerequisites: PLAN-013; DEV-007-T02; OPS-001-T01.
 
+  **Disposable baseline passed (October 16, 2026; fixture `77bf91e`):** The owner created project `ai-acceptance` and deployed its digest-pinned private HTTP baseline through the human CLI. Operation `a911869f-bf6d-44e1-bad8-35f7f9fd9e56` succeeded at revision 1, with desired/ready replicas 1/1 and the expected `hashicorp/http-echo` digest active. Record this as the retained successful rollback baseline. No fault injection, AI proposal, approval, execution or recovery is established yet.
+
   **Source progress (October 15, 2026):** Human project-manager approval binds the diff hash for 15 minutes and one execution. Execution rechecks authority and revision and queues the existing rollback operation; proposal reads expose operation readiness and available metrics. The deployed regression/recovery proof remains open.
 
   **Task evidence (B-2026-09-26):** Source absent; local acceptance unverified. No revision-bound AI approvals, execution integration or observed-recovery demonstration (F-12).

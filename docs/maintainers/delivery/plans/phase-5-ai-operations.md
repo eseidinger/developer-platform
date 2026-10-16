@@ -164,7 +164,9 @@ The disposable `ai-acceptance` baseline is a small private HTTP service in
 [examples/ai-acceptance/application.json](../../../../examples/ai-acceptance/application.json).
 It uses a digest-pinned image, bounded resources and a readiness probe, with no
 database or public route. The owner created the empty project on October 16,
-2026; baseline deployment, fault injection and recovery still need live results.
+2026. Human CLI baseline deployment passed as operation
+`a911869f-bf6d-44e1-bad8-35f7f9fd9e56`, revision 1, with readiness 1/1
+on October 16, 2026. Fault injection and recovery still need live results.
 The declaration passed API model validation, and the image served HTTP 200 locally
 as UID 10001 with a read-only filesystem and dropped capabilities.
 
