@@ -1317,8 +1317,10 @@ def create_ai_run(name: str, body: AIRunRequest,
     with connect() as conn:
         ai_store.finish_run(conn, run_id, outcome["state"], outcome["result"],
                             outcome["evidence"], outcome["tool_calls"], outcome["estimated_cost_usd"])
-    required_audit(actor_for(principal), "ai.run", "ai-run", str(run_id), outcome["state"],
-                   {"project": name}, {"kind": body.kind, "tool_calls": outcome["tool_calls"]})
+    audit_result = "failed" if outcome["state"] == "failed" else "succeeded"
+    required_audit(actor_for(principal), "ai.run", "ai-run", str(run_id), audit_result,
+                   {"project": name}, {"kind": body.kind, "state": outcome["state"],
+                                       "tool_calls": outcome["tool_calls"]})
     return {"run_id": str(run_id), "project": name, **outcome}
 
 
