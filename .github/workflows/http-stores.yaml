@@ -2,9 +2,9 @@ name: HTTP data stores
 on: [push, pull_request]
 
 jobs:
-  qdrant-console:
+  http-consoles:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
@@ -18,7 +18,8 @@ jobs:
       - run: npm ci --prefix platform/ui
       - run: npx playwright install --with-deps chromium
         working-directory: platform/ui
-      - run: STORE_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify-shared-store-compose.py
+      - run: docker build --target store-console-export --output type=local,dest=/tmp/platform-store-consoles platform
+      - run: STORE_CONSOLE_FIXTURE=1 STORE_RUSTFS_CONSOLE_DIR=/tmp/platform-store-consoles/rustfs uv run --project platform/app python scripts/verify-shared-store-compose.py
 
   installation:
     runs-on: ubuntu-latest

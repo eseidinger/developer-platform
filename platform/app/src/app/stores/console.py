@@ -12,6 +12,7 @@ import ipaddress
 import os
 import time
 import re
+from pathlib import Path
 from datetime import datetime, timezone
 from xml.etree import ElementTree
 from urllib.parse import parse_qs
@@ -21,11 +22,11 @@ import httpx2 as httpx
 import h11
 import jwt
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from . import catalog, recovery
 
 COOKIE = '__Host-store-console'
-PROVIDERS = {'qdrant'}  # RustFS native-key → STS session binding is not yet accepted.
+PROVIDERS = {'s3', 'qdrant'}
 ISSUER = 'developer-platform-store-console'
 HOP = {'host', 'cookie', 'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
        'te', 'trailer', 'transfer-encoding', 'upgrade', 'forwarded', 'x-forwarded-host',
@@ -227,6 +228,20 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
                 raise HTTPException(400)
             if request.method not in {'GET', 'HEAD'}:
                 raise HTTPException(405)
+            if row['provider'] == 's3':
+                root = Path(os.environ.get('STORE_RUSTFS_CONSOLE_DIR', '/app/store-consoles/rustfs')).resolve()
+                target = (root / path.removeprefix('rustfs/console').lstrip('/')).resolve()
+                if not target.is_relative_to(root):
+                    raise HTTPException(400)
+                if target.is_dir():
+                    target = target / 'index.html'
+                if not target.is_file():
+                    target = root / 'index.html'
+                if not target.is_file():
+                    raise HTTPException(503, 'Pinned console assets are unavailable')
+                return FileResponse(target, headers={'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+                    'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY',
+                    'Content-Security-Policy': "frame-ancestors 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'"})
         address, backend_port = destination(row, static)
         address = str(ipaddress.IPv4Address(address))
         raw = request.scope['raw_path'] + (b'?' + request.scope['query_string'] if request.scope['query_string'] else b'')

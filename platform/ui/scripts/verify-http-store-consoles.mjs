@@ -48,9 +48,9 @@ try {
       const value = document.createElement('input'); value.name = 'launch'; value.value = launch; form.append(value)
       document.body.append(form); form.submit()
     }, provider)
-    await page.waitForURL(name === 's3' ? '**/rustfs/console/**' : '**/dashboard/**')
+    await page.waitForURL(provider.provider === 's3' ? '**/rustfs/console/**' : '**/dashboard/**')
     stage = name + '-native-login'
-    if (name === 's3') {
+    if (provider.provider === 's3') {
       await page.getByPlaceholder('Please enter account').fill(provider.connection.RUSTFS_CONSOLE_ACCESS_KEY)
       await page.getByPlaceholder('Please enter key').fill(provider.connection.RUSTFS_CONSOLE_SECRET_KEY)
       await page.getByRole('button', { name: 'Login', exact: true }).click()
@@ -64,7 +64,20 @@ try {
       stage = 's3-scoped-bucket-browser'
       await page.goto(provider.origin + '/rustfs/console/browser/')
       await page.getByText(provider.connection.S3_BUCKET, { exact: true }).first().waitFor({ timeout: 10000 })
-      console.log('PASS official RustFS scoped console identity, native STS exchange, relay-acknowledged child session and own bucket browser')
+      // A forced policy refresh used to unmount/remount this page indefinitely.
+      await page.reload()
+      await page.getByText(provider.connection.S3_BUCKET, { exact: true }).first().waitFor()
+      const own = '/' + provider.connection.S3_BUCKET
+      const read = await signedS3(page, provider.origin, session, 'GET', own + '/fixture.txt')
+      if (read.status !== 200 || read.text !== 'console fixture') throw Error()
+      const write = await signedS3(page, provider.origin, session, 'PUT', own + '/written.txt', 'browser fixture')
+      if (write.status !== (provider.mode === 'read-write' ? 200 : 403)) throw Error()
+      const removed = await signedS3(page, provider.origin, session, 'DELETE', own + '/written.txt')
+      if (removed.status !== (provider.mode === 'read-write' ? 204 : 403)) throw Error()
+      const foreign = await signedS3(page, provider.origin, session, 'GET', '/' + provider.foreign + '/fixture.txt')
+      const destroy = await signedS3(page, provider.origin, session, 'DELETE', own)
+      if (foreign.status !== 403 || destroy.status !== 403) throw Error()
+      console.log('PASS RustFS ' + provider.mode + ' official console login, STS binding, refresh, object permissions and foreign/admin denial')
     } else {
       await page.locator('input[type="password"]').fill(provider.connection.QDRANT_API_KEY)
       await page.getByRole('button', { name: 'Apply', exact: true }).click()
@@ -75,19 +88,30 @@ try {
         return response.status === 200 && result.result.collections.length === 1 && result.result.collections[0].name === connection.QDRANT_COLLECTION
       }, provider.connection)
       if (!checked) throw Error()
-      console.log('PASS official Qdrant console native JWT login and scoped collection listing')
+      const denied = await page.evaluate(async ({ connection, foreign, mode }) => {
+        const headers = { 'api-key': connection.QDRANT_API_KEY, 'Content-Type': 'application/json' }
+        const write = await fetch('/collections/' + connection.QDRANT_COLLECTION + '/points?wait=true', {
+          method: 'PUT', headers, body: JSON.stringify({ points: [{ id: 1, vector: [1, 0, 0] }] }) })
+        const other = await fetch('/collections/' + foreign, { headers })
+        const drop = await fetch('/collections/' + connection.QDRANT_COLLECTION, { method: 'DELETE', headers })
+        return write.status === (mode === 'read-write' ? 200 : 403) && other.status === 403 && drop.status === 403
+      }, provider)
+      if (!denied) throw Error()
+      console.log('PASS Qdrant ' + provider.mode + ' official console login, scoped collection, point permissions and foreign/admin denial')
     }
     stage = name + '-active-console-revocation'
-    await context.request.post(config.gateway + '/expire/' + provider.port)
+    const end = provider.mode === 'read-write' ? 'expire' : 'revoke'
+    await context.request.post(config.gateway + '/' + end + '/' + provider.port)
+    if (end === 'expire') await new Promise(resolve => setTimeout(resolve, 400))
     const expired = await page.evaluate(async () => (await fetch('/')).status)
     if (expired !== 401) throw Error()
     await page.reload()
     if (!(await page.textContent('body')).includes('Open an active console lease')) throw Error()
-    console.log('PASS ' + name + ' already-open console revocation, cookie/storage cleanup and expired reload denial')
+    console.log('PASS ' + name + ' already-open console ' + end + ', cookie/storage cleanup and reload denial')
     await context.close()
   }
 } catch {
-  if (activePage && stage.startsWith('s3')) {
+  if (activePage && activeProvider.provider === 's3') {
     let text = await activePage.innerText('body', { timeout: 3000 })
     for (const value of Object.values(activeProvider.connection)) text = text.replaceAll(value, '[redacted]')
     console.log('Scoped synthetic console view: ' + new URL(activePage.url()).pathname + ' ' + text.slice(0, 700))

@@ -1,4 +1,6 @@
 import os
+from pathlib import Path
+import tempfile
 from datetime import datetime, timedelta, timezone
 from unittest import TestCase
 from unittest.mock import Mock, patch
@@ -128,3 +130,22 @@ class ConsoleBoundaryTests(TestCase):
         auth = f'AWS4-HMAC-SHA256 Credential={access_key(self.row["credential_id"])}/20261017/us-east-1/s3/aws4_request, SignedHeaders=host, Signature=' + 'a' * 64
         self.assertEqual(self.client.get('/', headers={'Authorization': auth}).status_code, 401)
         self.assertEqual(self.client.get('/rustfs/console/', headers={'Authorization': auth}).status_code, 401)
+
+    def test_pinned_rustfs_assets_require_a_live_session_and_cannot_escape_asset_root(self):
+        with tempfile.TemporaryDirectory() as directory, patch.dict(os.environ, {'STORE_RUSTFS_CONSOLE_DIR': directory}):
+            root = Path(directory)
+            (root / 'index.html').write_text('reviewed console')
+            (root / 'browser').mkdir()
+            (root / 'browser/index.html').write_text('bucket browser')
+            (root / 'escape').symlink_to(root.parent)
+            self.assertEqual(self.client.get('/rustfs/console/').status_code, 401)
+            self.launch()
+            response = self.client.get('/rustfs/console/browser/')
+            self.assertEqual(response.text, 'bucket browser')
+            self.assertEqual(response.headers['cache-control'], 'no-store')
+            self.assertEqual(self.client.get('/rustfs/console/escape/private').status_code, 400)
+            self.assertEqual(self.client.post('/rustfs/console/', headers={'Origin': console.origin(20000)}).status_code, 405)
+            (root / 'index.html').unlink()
+            self.assertEqual(self.client.get('/rustfs/console/').status_code, 503)
+            self.current = None
+            self.assertEqual(self.client.get('/rustfs/console/browser/').status_code, 401)

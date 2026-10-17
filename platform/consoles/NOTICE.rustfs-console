@@ -1,0 +1,9 @@
+RustFS Console v0.1.37, upstream commit ec3ddbe8121bfa8376bcb35781a6d4e703bca607
+https://github.com/rustfs/console
+Copyright RustFS contributors. Licensed under Apache License 2.0; see LICENSE.rustfs-console.
+
+Modified by Developer Platform: dashboard-auth-guard.tsx keeps an already
+authorized page mounted during a permission refresh. Initial authorization,
+route checks and native server authorization remain enforced. See the included
+platform-console-pin.json and platform/consoles/patch-rustfs.cjs in the platform
+source for the exact upstream source pin and modification.

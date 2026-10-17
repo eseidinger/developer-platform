@@ -36,8 +36,11 @@ async def run(providers, endpoints, static_ports):
     os.environ.update({'DATABASE_KEY': secrets.token_hex(32), 'STORE_CONSOLE_HTTP_ENABLED': 'true',
         'STORE_ENABLED_PROVIDERS': 's3,qdrant', 'APPS_DOMAIN': 'apps.fixture.test',
         'PLATFORM_DOMAIN': 'platform.fixture.test', 'PROXY_IP': '127.0.0.1'})
-    rows, resources, credentials = {}, {}, {}
-    for index, (name, provider) in enumerate(providers.items()):
+    rows, resources, credentials, issued = {}, {}, {}, {}
+    variants = [(name, provider, mode) for name, provider in providers.items()
+                for mode in ('read-write', 'read-only')]
+    for index, (name, provider, mode) in enumerate(variants):
+        variant = name + '-' + mode
         resource = {'resource_id': str(uuid4()), 'quota_bytes': 16 * 1024 * 1024,
                     'configuration': {'vector_size': 3, 'distance': 'Cosine'}}
         for attempt in range(100):
@@ -47,15 +50,19 @@ async def run(providers, endpoints, static_ports):
             except Exception:
                 if attempt == 99: raise
                 await asyncio.sleep(.25)
-        credential = {'credential_id': str(uuid4()), 'mode': 'read-write', 'kind': 'human',
+        credential = {'credential_id': str(uuid4()), 'mode': mode, 'kind': 'human',
             'expires_at': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
         await asyncio.to_thread(provider.issue, resource, credential)
         row = {**credential, 'expires_at': datetime.fromisoformat(credential['expires_at']),
                'relay_port': 20000 + index, 'issuer': 'https://identity.fixture.test', 'subject': 'human',
                'provider': name, 'resource_id': resource['resource_id'], 'created_at': datetime.now(timezone.utc), 's3_sessions': {}}
         rows[row['relay_port']] = row
-        resources[name] = resource
-        credentials[name] = provider.credentials(resource, credential)
+        resources[variant] = resource
+        credentials[variant] = provider.credentials(resource, credential)
+        issued[variant] = (provider, resource, credential)
+        if name == 's3':
+            from app.stores.s3 import bucket
+            await asyncio.to_thread(provider.root.put_object, Bucket=bucket(resource), Key='fixture.txt', Body=b'console fixture')
     relay = Relay(load=lambda: {port: {**row, 's3_sessions': dict(row['s3_sessions'])} for port, row in rows.items()}, backend=lambda row: ('127.0.0.1', endpoints[row['provider']]), host='127.0.0.1')
     async def refresh():
         while True:
@@ -83,6 +90,10 @@ async def run(providers, endpoints, static_ports):
         register=register, acknowledge=acknowledge)))
     @app.post('/expire/{port}')
     def expire(port: int):
+        rows[port]['expires_at'] = datetime.now(timezone.utc) + timedelta(milliseconds=200)
+        return {}
+    @app.post('/revoke/{port}')
+    def revoke(port: int):
         rows.pop(port, None)
         return {}
     @app.post('/launch/{port}')
@@ -134,9 +145,12 @@ async def run(providers, endpoints, static_ports):
         else: raise RuntimeError('Disposable console gateway did not start')
         config = {'gateway': f'https://127.0.0.1:{gateway_port}', 'proxy': f'http://127.0.0.1:{proxy_port}', 'providers': {}}
         for port, row in rows.items():
-            config['providers'][row['provider']] = {'origin': console.origin(port),
+            variant = row['provider'] + '-' + row['mode']
+            other = row['provider'] + '-' + ('read-only' if row['mode'] == 'read-write' else 'read-write')
+            config['providers'][variant] = {'origin': console.origin(port), 'provider': row['provider'], 'mode': row['mode'],
+                'foreign': credentials[other].get('S3_BUCKET', credentials[other].get('QDRANT_COLLECTION')),
                 'launch': console.assertion(row, 'launch', 30), 'port': port,
-                'connection': credentials[row['provider']]}
+                'connection': credentials[variant]}
         try:
             result = await asyncio.to_thread(subprocess.run, ['node', str(ROOT / 'platform/ui/scripts/verify-http-store-consoles.mjs')],
             input=json.dumps(config), text=True, capture_output=True, timeout=120)
@@ -146,6 +160,10 @@ async def run(providers, endpoints, static_ports):
             raise RuntimeError('Synthetic console fixture timed out at: ' + output[-2000:]) from None
         if result.returncode:
             raise RuntimeError('Official console fixture failed: ' + result.stdout.strip()[:1200])
+        # Native 24-hour keys remain valid: the previous denials must come from
+        # the authoritative lease boundary, not native deletion or fixture routing.
+        for provider, resource, credential in issued.values():
+            await asyncio.to_thread(provider.probe, resource, credential)
         print(result.stdout.strip())
     finally:
         server.should_exit = True

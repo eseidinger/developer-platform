@@ -1,0 +1,10 @@
+{
+  "version": "v0.1.37",
+  "commit": "ec3ddbe8121bfa8376bcb35781a6d4e703bca607",
+  "url": "https://github.com/rustfs/console/releases/download/v0.1.37/rustfs-console-v0.1.37.zip",
+  "sha256": "e6ff2c7e7695de824ec4cda91d8611d1aba5d8462e6809592c92a50b23f5b9ab",
+  "license": "Apache-2.0",
+  "source_url": "https://github.com/rustfs/console/archive/ec3ddbe8121bfa8376bcb35781a6d4e703bca607.tar.gz",
+  "source_sha256": "a9ba3df8555df4d4f73598250e14cd5d773cef1307528aa58a1317cf1d46adc0",
+  "patch": "keep-authorized-page-mounted-during-policy-refresh"
+}

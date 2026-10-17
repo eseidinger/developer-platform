@@ -5,8 +5,8 @@ portal and private lease relay are implemented in source and disposable tests.
 The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
 Disposable console SSO/connection and encrypted empty-server restore fixtures pass;
 RustFS, OpenSearch and Qdrant have native providers and opt-in Compose services
-with local isolation/recovery evidence. Qdrant browser access passes a local native-login/revocation fixture; RustFS and
-OpenSearch consoles and deployed acceptance remain incomplete. No existing installation has been reset.
+with local isolation/recovery evidence. RustFS and Qdrant browser access pass local native-login, mode/isolation and
+revocation fixtures; OpenSearch Dashboards and deployed acceptance remain incomplete. No existing installation has been reset.
 
 ## Selecting shared services
 
@@ -180,16 +180,21 @@ The outer relay binds requests to that lease identity, streams bounded chunks
 and closes connections at expiry/revocation. OpenSearch backend TLS remains
 verified with the operator CA; private HTTP on the tunnel/relay segment relies
 on SSH transport encryption. Applications receive the private lease endpoint
-directly through their explicit binding. Only accepted console adapters advertise browser launch links. RustFS and
-OpenSearch currently offer the native-client path.
+directly through their explicit binding. Only accepted console adapters advertise browser launch links. OpenSearch currently offers the native-client path.
 
-## Qdrant browser console
+## RustFS and Qdrant browser consoles
 
-With Qdrant selected, use **Open Qdrant console** on an active human credential.
+Use **Open RustFS console** or **Open Qdrant console** on an active human credential.
 The portal posts a 30-second launch assertion to a lease hostname under the existing
 `APPS_DOMAIN`; it never puts a credential in a launch URL. The gateway sets a
 Secure, HttpOnly, host-only session cookie bounded by the human lease deadline.
-Sign in to the official bundled Web UI using your `QDRANT_API_KEY`. The gateway
+Sign in to the Qdrant Web UI using your `QDRANT_API_KEY`, or to RustFS Key Login
+using `RUSTFS_CONSOLE_ACCESS_KEY` and `RUSTFS_CONSOLE_SECRET_KEY`.
+RustFS uses a separate human-only, bucket-scoped IAM identity for the official
+console's native STS exchange. Child access keys and token hashes are bound to the
+exact human generation before login completes; no child secret/token is stored
+in the platform catalog. Applications and private native clients continue to
+use expiring service-account keys. The gateway
 checks the current human grant/generation for every request; native data requests
 still use that JWT through the private relay. It never injects an operator key.
 A platform administrator still needs an explicit human grant. Static assets and
@@ -214,14 +219,16 @@ issuance capacity before deployed acceptance; new lease hostnames also consume
 issuer rate limits. A local real-browser fixture uses a synthetic TLS certificate
 and controlled portal launch; it does not accept deployed DNS/OIDC/TLS or recovery.
 
-RustFS's pinned official Key Login currently does not complete with the selected
-expiring service-account credentials, despite successful native signed bucket
-listing. Its login requests an STS exchange; service accounts cannot assume roles.
-A verified resource-scoped console identity/session adapter is still needed.
-RustFS console launch stays disabled; no broader native permissions or shared
-administrator credentials are supplied as a workaround. OpenSearch Dashboards
-also remains unadvertised until server-account and per-human session integration
-is verified.
+RustFS console assets are built into the API image from source v0.1.37 at the
+checksum-verified commit in `platform/consoles/rustfs.json`. The upstream
+permission-refresh loop is fixed by the one-line `patch-rustfs.cjs`; this keeps
+an authorized page mounted while policy refreshes, preserving initial and native
+authorization checks. The image includes the Apache-2.0 license and modification
+notice. No browser-time downloads or updates occur. A console lists only its
+catalog-authorized bucket; this metadata adapter grants no global bucket-list
+permission. All object operations remain native-authorized. OpenSearch Dashboards
+remains unadvertised until server-account and per-human session integration is
+verified.
 
 ## PostgreSQL browser console
 
