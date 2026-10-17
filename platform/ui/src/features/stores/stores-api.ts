@@ -6,6 +6,7 @@ import type { components } from '@/api/generated/schema'
 const resource = z.object({ resource_id: z.uuid(), owner_project: z.string(), name: z.string(), provider: z.string(),
   state: z.string(), observed_state: z.string(), version: z.number(), quota_bytes: z.number(),
   used_bytes: z.number().nullable().optional(), usage_measured_at: z.string().nullable().optional(), usage_error: z.boolean().optional(),
+  configuration: z.object({ vector_size: z.number().optional(), distance: z.string().optional() }).optional(),
   extensions: z.array(z.string()), console_url: z.string().nullable().optional(), error_code: z.string().nullable() })
 const grant = z.object({ grant_id: z.uuid(), resource_id: z.uuid(), kind: z.enum(['human', 'binding']), issuer: z.string().nullable(), subject: z.string().nullable(),
   consumer_project: z.string().nullable(), component: z.string().nullable(), mode: z.enum(['read-only', 'read-write']),
@@ -47,3 +48,4 @@ export const key = async (public_key: string) => checked(await apiClient.PUT('/v
 export const issue = async (grant_id: string) => leaseMetadata.parse(checked(await apiClient.POST('/v1/store-access/{grant_id}/credentials', { params: { path: { grant_id } } })))
 export const reveal = async (credential_id: string) => credential.parse(checked(await apiClient.GET('/v1/store-access/credentials/{credential_id}', { params: { path: { credential_id } } })))
 export const leases = async (grant_id: string) => z.object({ credentials: z.array(leaseMetadata) }).parse(checked(await apiClient.GET('/v1/store-access/{grant_id}/credentials', { params: { path: { grant_id } } }))).credentials
+export const launchConsole = async (credential_id: string) => z.object({ url: z.url().startsWith('https://'), launch: z.string() }).parse(checked(await apiClient.POST('/v1/store-access/credentials/{credential_id}/console', { params: { path: { credential_id } } })))

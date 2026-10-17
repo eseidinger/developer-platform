@@ -72,7 +72,8 @@ function Workspace({ project, identity }: { project?: string; identity: string }
         <p>{resource.resource_id}</p><p>Desired: {resource.state} · observed: {resource.observed_state} · allocation: {resource.quota_bytes / 1048576} MiB{resource.error_code ? ` · ${resource.error_code}` : ''}</p>
         <p>Last measured usage: {resource.used_bytes == null ? 'unknown' : `${(resource.used_bytes / 1048576).toFixed(1)} MiB`}{resource.usage_measured_at ? ` at ${resource.usage_measured_at}` : ''}{resource.usage_error ? ' · latest measurement failed; previous reading may be stale' : ''}</p>
         {resource.state === 'purging' && <p>Permanent deletion waits until its intent is in a verified off-host backup. An operator can run the scheduled backup early; retained backup copies expire normally.</p>}
-        {resource.provider === 'postgresql' && <p>PostgreSQL byte quotas are advisory; monitoring and admission controls cannot guarantee a hard limit.</p>}
+        {['postgresql', 'opensearch', 'qdrant'].includes(resource.provider) && <p>{resource.provider} byte quotas are advisory; monitoring and admission controls cannot guarantee a hard limit.</p>}
+        {resource.provider === 'qdrant' && <p>Vector dimensions: {resource.configuration?.vector_size ?? 384} · distance: {resource.configuration?.distance ?? 'Cosine'}. This collection configuration is immutable.</p>}
         {resource.state === 'active' && <div className="space-y-3"><Form disabled={disabled} submit={d => action(() => api.renameResource(resource.resource_id, { name: text(d, 'name'), version: resource.version }))}><label>New name<input className={field} name="name" defaultValue={resource.name} required maxLength={32} /></label><Button type="submit" variant="outline">Rename</Button></Form>
           {context.data?.platform_admin && <Form disabled={disabled} submit={d => action(() => api.quota(resource.resource_id, { quota_bytes: Number(text(d, 'quota')) * 1048576, version: resource.version }))}><label>Approved allocation (MiB)<input className={field} name="quota" type="number" min={1} defaultValue={resource.quota_bytes / 1048576} required /></label><Button type="submit" variant="outline">Approve quota change</Button></Form>}
           <Button disabled={disabled} variant="outline" onClick={() => setConfirm({ title: 'Retire resource', detail: `${resource.name}: revoke every human and application grant and retain data.`, work: () => api.retireResource(resource.resource_id, resource.version) })}>Retire resource</Button></div>}
@@ -113,16 +114,27 @@ function HumanAccess({ grant, resource, prefix, action, disabled }: { grant: api
     return () => window.clearTimeout(timeout)
   }, [credential])
   const history = useQuery({ queryKey: [...prefix, 'leases', grant.grant_id], queryFn: () => api.leases(grant.grant_id) })
+  async function openConsole(id: string) {
+    const launch = await api.launchConsole(id)
+    if (!alive.current) return
+    const form = document.createElement('form')
+    form.method = 'POST'; form.action = launch.url; form.target = '_blank'; form.rel = 'noopener noreferrer'
+    const input = document.createElement('input')
+    input.type = 'hidden'; input.name = 'launch'; input.value = launch.launch
+    form.append(input); document.body.append(form)
+    try { form.submit() } finally { input.value = ''; form.remove() }
+  }
   async function reveal(id: string) { const value = await api.reveal(id); if (alive.current) { setCredential(value); setShown(false) } }
   return <div className="space-y-3 border-t pt-3"><h3 className="font-semibold">{resource.owner_project} / {resource.name} · {grant.mode}</h3><p>{resource.provider} · {resource.resource_id}</p>
     <Button disabled={disabled} onClick={() => void action(async () => { const issued = await api.issue(grant.grant_id); if (alive.current) setCredential(issued); await client.invalidateQueries({ queryKey: [...prefix, 'leases', grant.grant_id] }) })}>Issue 24-hour credential</Button>
     {history.isError && <p role="alert">{history.error.message}</p>}{history.data?.filter(c => c.state !== 'revoked').map(c => <div key={c.credential_id}><p>{c.credential_id} · {c.state} · expires {c.expires_at}</p><Button disabled={disabled} variant="outline" onClick={() => void action(() => reveal(c.credential_id))}>Inspect this lease</Button></div>)}
     {credential && <div className="space-y-3 rounded border p-3"><p>Lease {credential.credential_id} · {credential.state} · expires {credential.expires_at}</p>
       {!credential.connection ? <><p>Credential provisioning is pending. Inspect this lease again; do not issue another one.</p><Button disabled={disabled} onClick={() => void action(() => reveal(credential.credential_id))}>Check credential readiness</Button></> : <>
-        {!credential.ssh && <p>The operator has not advertised a remote SSH bastion. Use console access, or ask the operator for the private native-client entry point.</p>}
-        {credential.ssh && <><p>Start a private tunnel, then connect your native client to localhost:15432.</p><code className="block break-all">ssh -N -p {credential.ssh.port} -L 15432:{credential.ssh.destination}:{credential.ssh.destination_port} {credential.ssh.user}@{credential.ssh.host}</code></>}
+        {!credential.ssh && <p>The operator has not advertised a remote SSH bastion. {resource.console_url ? 'Use the available console or ask for a private native-client entry point.' : 'Ask the operator for the private native-client entry point.'}</p>}
+        {credential.ssh && <><p>Start a private tunnel, then connect your native client to localhost:15432. For HTTP stores, replace the endpoint host and port with http://127.0.0.1:15432; retain the scoped credential and resource identifier.</p><code className="block break-all">ssh -N -p {credential.ssh.port} -L 15432:{credential.ssh.destination}:{credential.ssh.destination_port} {credential.ssh.user}@{credential.ssh.host}</code></>}
         {Object.entries(credential.connection).map(([key, value]) => <label className="block" key={key}>{key}<input className={field} readOnly type={!shown && /PASS|SECRET|TOKEN|KEY/.test(key) ? 'password' : 'text'} value={value} autoComplete="off" /></label>)}
         <Button variant="outline" onClick={() => setShown(!shown)}>{shown ? 'Hide credential values' : 'Reveal credential values'}</Button>
+        {['s3', 'qdrant'].includes(resource.provider) && resource.console_url && <><p>Open the official console, then use this human credential for its separate native login. The console is limited to this lease and closes data access at expiry. Saved values belong to this browser profile; clear the console's site data when finished on a shared device.</p><Button disabled={disabled} variant="outline" onClick={() => void action(() => openConsole(credential.credential_id))}>Open {resource.provider === 's3' ? 'RustFS' : 'Qdrant'} console</Button></>}
         {resource.provider === 'postgresql' && resource.console_url && <><p>For browser access, sign in to pgAdmin, register host store-access and the PGPORT lease port shown above. Set Maintenance database to PGDATABASE, Username to PGUSER, and SSL mode to Disable; use your own PGPASSWORD. Do not register the raw PostgreSQL host. Native SSL is disabled inside the encrypted SSH tunnel or isolated console network.</p><a className="underline" href={resource.console_url} target="_blank" rel="noopener noreferrer">Open PostgreSQL console</a></>}
       </>}
       <Button variant="outline" onClick={() => { setCredential(null); setShown(false) }}>Close and discard credential</Button></div>}

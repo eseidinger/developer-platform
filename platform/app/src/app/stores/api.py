@@ -18,6 +18,19 @@ def reply(body, status=200):
 
 def install(app, control):
     caller = Depends(control.current_principal)
+    from starlette.routing import Host
+    from . import console
+
+    def console_lease(credential_id):
+        with control.connect() as conn:
+            return console.lease(conn, credential_id)
+
+    def console_port(port):
+        with control.connect() as conn:
+            return console.lease_at_port(conn, port)
+
+    app.router.routes.insert(0, Host('console-{port:int}.' + os.environ.get('APPS_DOMAIN', 'apps.localhost'),
+        app=console.create_gateway(console_lease, find=console_port)))
 
     def human(conn, principal):
         # Known automation records are insufficient: an unregistered service
@@ -285,3 +298,16 @@ def install(app, control):
             return reply({**cred, "provider": res["provider"], "connection": connection,
                 "transport": "private SSH tunnel or isolated console; relay closes at credential expiry",
                 **({"ssh": providers.ssh_connection(cred)} if os.environ.get("STORE_SSH_HOST") else {})})
+
+    @app.post('/v1/store-access/credentials/{credential_id}/console')
+    def launch_console(credential_id: UUID, principal: Principal = caller):
+        with mutation(principal) as conn:
+            cred = catalog._object(conn, 'store_credentials', 'credential_id', credential_id)
+            own_human(conn, cred['grant_id'], principal)
+            row = console.lease(conn, credential_id)
+            if row is None:
+                raise HTTPException(409, 'An active supported console lease is required')
+            control.required_audit(control.actor_for(principal), 'store.console-launch', 'store-credential',
+                str(credential_id), 'succeeded')
+            return reply({'url': console.origin(row['relay_port']) + '/__platform/start',
+                'launch': console.assertion(row, 'launch', 30)})

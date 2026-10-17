@@ -7,7 +7,7 @@ services:
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-}
       RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-}
       RUSTFS_VOLUMES: /data
-      RUSTFS_CONSOLE_PREFIX: /store-console/s3
+      RUSTFS_CONSOLE_PREFIX: /rustfs/console
       RUSTFS_OBS_LOG_DIRECTORY: /logs
       RUSTFS_OBS_LOGGER_LEVEL: error
     volumes: [rustfs_data:/data]

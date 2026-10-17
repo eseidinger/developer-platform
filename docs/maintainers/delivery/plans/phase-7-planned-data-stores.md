@@ -12,8 +12,8 @@ Native RustFS, OpenSearch and Qdrant adapters now pass real isolation, credentia
 query and empty-volume recovery fixtures. Opt-in pinned Compose services,
 configuration/capacity-gated provider registration and non-demo OpenSearch TLS
 initialization are implemented. The actual production Compose definitions pass
-disposable health/administration checks. Authenticated HTTP-store consoles and
-combined deployed acceptance remain open; PostgreSQL is the default selection.
+disposable health/administration checks. Qdrant native browser login and active-session revocation now pass a local TLS
+fixture. RustFS/OpenSearch console adapters and combined deployed acceptance remain open; PostgreSQL is the default selection.
 See the [RustFS](../../../../persistence/compatibility/rustfs-2026-10-17.md),
 [OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md) and
 [Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) records.
@@ -36,7 +36,7 @@ queries and denial of graph writes/extension removal. A disposable real
 Keycloak → pgAdmin fixture passes SSO, scoped connection/query, password-saving
 denial, expired reconnect and anonymous denial. Production console network/TLS
 and deployed access acceptance remain open. The backend suite ran
-473 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
+497 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
 explicit issuance and secret-cache exclusion. No live resources were changed.
 Source now includes bounded usage measurements/alerts, the named-store dashboard,
 restore quarantine, and version-pinned purge acknowledgment after verified

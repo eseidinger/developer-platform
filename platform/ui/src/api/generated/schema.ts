@@ -1807,6 +1807,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/store-access/credentials/{credential_id}/console": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Launch Console */
+        post: operations["launch_console_v1_store_access_credentials__credential_id__console_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/store-access/me": {
         parameters: {
             query?: never;
@@ -6437,6 +6454,37 @@ export interface operations {
         };
     };
     get_credential_v1_store_access_credentials__credential_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    launch_console_v1_store_access_credentials__credential_id__console_post: {
         parameters: {
             query?: never;
             header?: never;

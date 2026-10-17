@@ -5,8 +5,8 @@ portal and private lease relay are implemented in source and disposable tests.
 The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
 Disposable console SSO/connection and encrypted empty-server restore fixtures pass;
 RustFS, OpenSearch and Qdrant have native providers and opt-in Compose services
-with local isolation/recovery evidence. Their browser consoles and deployed
-acceptance remain incomplete. No existing installation has been reset.
+with local isolation/recovery evidence. Qdrant browser access passes a local native-login/revocation fixture; RustFS and
+OpenSearch consoles and deployed acceptance remain incomplete. No existing installation has been reset.
 
 ## Selecting shared services
 
@@ -180,8 +180,48 @@ The outer relay binds requests to that lease identity, streams bounded chunks
 and closes connections at expiry/revocation. OpenSearch backend TLS remains
 verified with the operator CA; private HTTP on the tunnel/relay segment relies
 on SSH transport encryption. Applications receive the private lease endpoint
-directly through their explicit binding. HTTP-store browser launch links are
-not advertised until their authenticated console adapters are implemented.
+directly through their explicit binding. Only accepted console adapters advertise browser launch links. RustFS and
+OpenSearch currently offer the native-client path.
+
+## Qdrant browser console
+
+With Qdrant selected, use **Open Qdrant console** on an active human credential.
+The portal posts a 30-second launch assertion to a lease hostname under the existing
+`APPS_DOMAIN`; it never puts a credential in a launch URL. The gateway sets a
+Secure, HttpOnly, host-only session cookie bounded by the human lease deadline.
+Sign in to the official bundled Web UI using your `QDRANT_API_KEY`. The gateway
+checks the current human grant/generation for every request; native data requests
+still use that JWT through the private relay. It never injects an operator key.
+A platform administrator still needs an explicit human grant. Static assets and
+backend data become unavailable after expiry, downgrade, retirement or revocation;
+renew and launch a fresh session to continue.
+
+The API proxies at most 32 concurrent console requests with bounded streaming.
+Only fixed operator endpoints and the selected lease port are reachable. Writes
+require the exact console Origin; cross-origin response sharing, backend cookies,
+WebSockets and upgrades are rejected. This adapter's verified UI path uses ordinary
+HTTP requests. Each launch and an invalidated session clear the console site's
+browser storage/cache; server responses are not cached. The native UI can save
+its key in browser storage during the active session, so clear site data when
+finishing on a shared browser. The platform cookie is not exposed to the provider.
+Raw URL access logging is disabled in the API image; traces retain route/status
+metadata without native queries, headers, bodies or credentials.
+
+The existing Caddy edge routes `console-20000` through `console-20511` hostnames
+under `APPS_DOMAIN` to this gateway. On-demand certificates require a current human
+lease on that port. Verify wildcard application DNS, trusted HTTPS and certificate
+issuance capacity before deployed acceptance; new lease hostnames also consume
+issuer rate limits. A local real-browser fixture uses a synthetic TLS certificate
+and controlled portal launch; it does not accept deployed DNS/OIDC/TLS or recovery.
+
+RustFS's pinned official Key Login currently does not complete with the selected
+expiring service-account credentials, despite successful native signed bucket
+listing. Its login requests an STS exchange; service accounts cannot assume roles.
+A verified resource-scoped console identity/session adapter is still needed.
+RustFS console launch stays disabled; no broader native permissions or shared
+administrator credentials are supplied as a workaround. OpenSearch Dashboards
+also remains unadvertised until server-account and per-human session integration
+is verified.
 
 ## PostgreSQL browser console
 

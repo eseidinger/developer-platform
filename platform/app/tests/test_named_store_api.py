@@ -100,6 +100,24 @@ class StoreApiTests(TestCase):
             self.assertNotEqual(first, catalog.secret_for(uuid4()))
         self.assertNotIn("alpha", catalog.identifier(self.resource_id))
 
+    def test_console_launch_requires_the_callers_human_grant_even_for_admin(self):
+        credential_id = uuid4()
+        with patch.object(catalog, '_object', return_value={'grant_id': self.grant_id}), \
+                patch.object(catalog, 'grant', return_value={'kind': 'human', 'issuer': self.principal.issuer, 'subject': 'someone-else'}), \
+                patch('app.stores.console.lease') as lookup:
+            response = self.client.post(f'/v1/store-access/credentials/{credential_id}/console')
+        self.assertEqual(response.status_code, 404)
+        lookup.assert_not_called()
+
+    def test_console_launch_fails_in_quarantine_and_for_inactive_native_lease(self):
+        credential_id = uuid4()
+        with patch('app.stores.recovery.required', return_value=True):
+            self.assertEqual(self.client.post(f'/v1/store-access/credentials/{credential_id}/console').status_code, 503)
+        with patch.object(catalog, '_object', return_value={'grant_id': self.grant_id}), \
+                patch.object(catalog, 'grant', return_value={'kind': 'human', 'issuer': self.principal.issuer, 'subject': self.principal.subject}), \
+                patch('app.stores.console.lease', return_value=None):
+            self.assertEqual(self.client.post(f'/v1/store-access/credentials/{credential_id}/console').status_code, 409)
+
 
 if __name__ == "__main__":
     main()

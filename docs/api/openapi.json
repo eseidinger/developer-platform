@@ -8103,6 +8103,49 @@
         "summary": "Get Credential"
       }
     },
+    "/v1/store-access/credentials/{credential_id}/console": {
+      "post": {
+        "operationId": "launch_console_v1_store_access_credentials__credential_id__console_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Launch Console"
+      }
+    },
     "/v1/store-access/me": {
       "get": {
         "operationId": "my_resources_v1_store_access_me_get",

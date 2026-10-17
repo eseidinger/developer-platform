@@ -63,3 +63,23 @@ test('credential issuance is explicit and pending provisioning never retries the
   await user.click(screen.getByRole('button', { name: 'Close and discard credential' }))
   expect(screen.queryByDisplayValue('seed-private-password')).not.toBeInTheDocument()
 })
+test('console launch sends an ephemeral POST assertion without caching it or placing it in a URL', async () => {
+  vi.mocked(api.getMine).mockResolvedValue([{ grant, resource: { ...resource, provider: 'qdrant', console_url: '/store-access' } }])
+  vi.mocked(api.leases).mockResolvedValue([{ ...pending, state: 'active' }])
+  vi.mocked(api.reveal).mockResolvedValue({ ...pending, state: 'active', connection: { QDRANT_API_KEY: 'seed-private-password' } })
+  vi.mocked(api.launchConsole).mockResolvedValue({ url: 'https://console-20000.apps.fixture.invalid/__platform/start', launch: 'seed-ephemeral-assertion' })
+  const submitted: { action: string; method: string; value: string }[] = []
+  const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(function (this: HTMLFormElement) {
+    submitted.push({ action: this.action, method: this.method, value: (this.elements.namedItem('launch') as HTMLInputElement).value })
+  })
+  try {
+    const { user, client } = setup()
+    await user.click(await screen.findByRole('button', { name: 'Inspect this lease' }))
+    await user.click(await screen.findByRole('button', { name: 'Open Qdrant console' }))
+    await waitFor(() => expect(submitted).toHaveLength(1))
+    expect(submitted[0]).toEqual({ action: 'https://console-20000.apps.fixture.invalid/__platform/start', method: 'post', value: 'seed-ephemeral-assertion' })
+    expect(document.querySelector('input[name="launch"]')).toBeNull()
+    expect(JSON.stringify(client.getQueryCache().getAll().map(q => q.state.data))).not.toContain('seed-ephemeral-assertion')
+    expect(JSON.stringify(client.getQueryCache().getAll().map(q => q.state.data))).not.toContain('seed-private-password')
+  } finally { submit.mockRestore() }
+})

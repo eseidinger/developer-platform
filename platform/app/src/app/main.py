@@ -2782,6 +2782,17 @@ def allow_certificate(domain: str = Query(max_length=253)):
     if not domain.endswith(suffix):
         raise HTTPException(403)
     host = domain[:-len(suffix)]
+    if host.startswith('console-') and host.removeprefix('console-').isdigit():
+        from .stores.console import enabled, lease_at_port
+        import re
+        if not re.fullmatch(r'console-(200\d\d|20[1-4]\d\d|2050\d|2051[01])', host):
+            raise HTTPException(403)
+        port = int(host.removeprefix('console-'))
+        with connect() as conn:
+            current = lease_at_port(conn, port)
+        if current and enabled(current['provider']):
+            return {'allowed': True}
+        raise HTTPException(403)
     with connect() as conn:
         projects = conn.execute("SELECT name, spec FROM projects WHERE status='applied'").fetchall()
     for name, spec in projects:

@@ -91,6 +91,9 @@ def connection(resource, credential):
 def console_url(provider):
     if provider == "postgresql" and os.environ.get("STORE_CONSOLE_POSTGRES_ENABLED") == "true":
         return "/store-console/postgresql/"
+    from .console import enabled
+    if enabled(provider):
+        return '/store-access'
     return None
 
 

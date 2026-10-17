@@ -3,7 +3,7 @@ import sys
 import unittest
 from contextlib import nullcontext
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from app import main
@@ -55,6 +55,25 @@ class TlsGateTests(unittest.TestCase):
         with self.assertRaises(main.HTTPException) as error:
             self.allow("web-odip.apps.example.test", [])
         self.assertEqual(error.exception.status_code, 403)
+
+    def test_console_certificate_requires_an_active_human_lease_in_the_bounded_port_range(self):
+        connection = Mock()
+        connection.execute.return_value.fetchone.return_value = ('credential-id',)
+        with patch.object(main, 'connect', return_value=nullcontext(connection)), \
+                patch('app.stores.console.lease', return_value={'provider': 's3'}) as lookup, \
+                patch('app.stores.console.enabled', return_value=True):
+            for port in (20000, 20099, 20100, 20499, 20500, 20511):
+                self.assertEqual(main.allow_certificate(f'console-{port}.apps.example.test'), {'allowed': True})
+            for port in (19999, 20512, 20999):
+                with self.assertRaises(main.HTTPException):
+                    main.allow_certificate(f'console-{port}.apps.example.test')
+            lookup.return_value = None
+            with self.assertRaises(main.HTTPException):
+                main.allow_certificate('console-20000.apps.example.test')
+
+    def test_console_component_name_still_uses_normal_application_certificate_rules(self):
+        self.assertEqual(self.allow('console-project.apps.example.test', [('project', {'components': [
+            {'name': 'console', 'type': 'service', 'exposure': 'public'}]})]), {'allowed': True})
 
 
 if __name__ == "__main__":
