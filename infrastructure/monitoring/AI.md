@@ -133,3 +133,9 @@ The trace-filesystem panel is unavailable because node-exporter reports
 access fix; missing storage data is not a healthy free-space reading.
 This smoke check does not establish collector-failure/recovery isolation,
 elapsed 24-hour retention, sustained capacity or full PLAN-034/035 acceptance.
+
+**Owner confirmation, October 17, 2026:** The owner confirmed that AI
+instrumentation, tracing and dashboards work on the deployed installation.
+This records the functional journey as owner-verified; the filesystem-metric
+access issue and the unexecuted operational checks above remain open. No second
+run's token totals or trace counts are inferred from that confirmation.

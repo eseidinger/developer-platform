@@ -363,8 +363,9 @@ full adversarial corpus. Second-provider evaluation is deferred to Phase 9 packa
 
 ## 5.7 — Add OpenLIT instrumentation (`PLAN-034`)
 
-Status: source implementation and local pipeline verification completed as of October 17, 2026;
-deployed acceptance remains open. EV-49 records actual 100/100 root trace readback,
+Status: source/local verification and deployed functional smoke checks completed
+as of October 17, 2026; the owner confirmed instrumentation, tracing and dashboards
+work. Broader operational acceptance remains open. EV-49 records actual 100/100 root trace readback,
 focused model/tool parentage and privacy, direct metrics and all 20 AI dashboard queries. See the [signal contract](../../../../infrastructure/monitoring/AI.md).
 Accountable role: AI / observability. Prerequisites: existing Phase 4 telemetry
 and Phase 5 run/model/tool boundaries.
@@ -460,8 +461,11 @@ export. Validate the chosen release against the acceptance criteria above.
 
 ## 5.8 — Provision AI Grafana dashboards (`PLAN-035`)
 
-Status: source dashboards generated as of October 17, 2026; deployed acceptance
-remains open. Accountable role: observability / AI.
+Status: dashboards deployed and functionally owner-verified as of October 17,
+2026. The metric-queue selector is corrected; trace-filesystem metric access,
+collector-failure/recovery and sustained capacity/retention checks remain open.
+See the [deployed evidence](../../../../infrastructure/monitoring/AI.md#deployed-smoke-check--october-17-2026).
+Accountable role: observability / AI.
 Prerequisites: PLAN-034 signal contract and existing operator Grafana provisioning.
 Generate versioned dashboard JSON through `scripts/generate-dashboards.py`, using
 the existing provisioned Prometheus and Tempo data sources.
