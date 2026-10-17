@@ -39,7 +39,7 @@ Unauthorized administrator controls are hidden on API `403`; no personal grant
 is shown as a separate `404` empty state. Other API failures remain visible.
 All authorization and audit decisions remain server-side. These controls have
 local UI tests but no deployed role, tunnel, or revocation acceptance yet;
-those checks belong to Phase 7.
+those checks belong to Phase 9.
 
 ## Define and approve application access
 

@@ -123,7 +123,7 @@ restore. The Ansible wrapper `ansible/test-platform-hosted-access.yml` defaults
 to an offline plan and consumes already prepared host-side inputs.
 [EV-45](access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026)
 records all 39 live core checks passed with timed expiry, but nine checks remain
-deferred and the full hosted-access/Phase 7 gate remains open.
+deferred and the full hosted-access/Phase 9 gate remains open.
 
 ## 5. Create a real empty project for later CI deployment
 

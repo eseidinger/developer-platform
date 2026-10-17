@@ -7,10 +7,12 @@ Only unfinished, owned implementation plans belong here:
 - [Energy-system use-case enablement priority](energy-system-integration.md)
 - [Generic use-case enablement increment](use-case-enablement-increment.md)
 - [Phase 4 tracing and Grafana dashboards](phase-4-tracing-and-dashboards.md)
-- [Phase 5 AI operations](phase-5-ai-operations.md)
+- [Phase 5 AI operations](phase-5-ai-operations.md) — in progress; portal package 5.6 owner-accepted
 - [CLI implementation and complete project administration](cli.md)
 - [UI implementation](ui.md)
-- [Phase 7 anytime leftovers — lowest priority](phase-7-anytime-leftovers.md)
+- [Phase 7 planned data stores](phase-7-planned-data-stores.md) — baseline/integration, analytics/object storage, search, graphs and vectors
+- [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) — workload-triggered time series/OLAP, caching and documents
+- [Phase 9 anytime leftovers — lowest priority](phase-9-anytime-leftovers.md)
 
 **PLAN-020** [UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)
 is owner-accepted for lab sequencing under the exception recorded in the

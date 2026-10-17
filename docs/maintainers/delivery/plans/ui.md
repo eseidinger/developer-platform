@@ -329,7 +329,7 @@ closes this increment for lab sequencing without those checks; see the
   cannot hide 404, 401, 403, 409, 422, 429, or 5xx API responses.
 
 The complete deployed portal journey and operator smoke journey, with accessibility
-and rollback evidence, remain Phase 7 acceptance outcomes.
+and rollback evidence, remain Phase 9 acceptance outcomes.
 
 ## Query and mutation rules
 
@@ -363,7 +363,7 @@ and rollback evidence, remain Phase 7 acceptance outcomes.
 
 ## Completion criteria
 
-The UI's full acceptance remains in Phase 7 until the journey runs reproducibly against the
+The UI's full acceptance remains in Phase 9 until the journey runs reproducibly against the
 deployed Platform API; every UI action maps to a public API contract; the documented
 persona matrix passes allowed and denied cases; failure diagnosis works without
 Grafana or cluster access; accessibility and secret-handling checks pass; and the

@@ -1,4 +1,4 @@
-# Phase 7 — Anytime Leftovers
+# Phase 9 — Anytime Leftovers
 
 Status: unscheduled, lowest-priority phase. It is listed last in the delivery
 plan and may be worked on whenever capacity allows; it does not gate Phases 3,
@@ -7,8 +7,8 @@ This plan collects the remaining work in
 `PLAN-016`, `PLAN-009`, `PLAN-017`, `PLAN-018`, `PLAN-019`, `PLAN-006`,
 `PLAN-007`, and `PLAN-008`, plus the deferred deployed portal acceptance for
 owner-accepted `PLAN-020`, and all deferred acceptance/fixes from owner-completed
-Phase 4 (`PLAN-021`–`PLAN-024`, package 7.9), and deferred second AI model
-provider evaluation (`PLAN-012` follow-up, package 7.10). It does not replace their acceptance criteria or
+Phase 4 (`PLAN-021`–`PLAN-024`, package 9.9), and deferred second AI model
+provider evaluation (`PLAN-012` follow-up, package 9.10). It does not replace their acceptance criteria or
 create a new task ID. The
 [delivery backlog](../backlog.md) remains the authoritative task and evidence
 register.
@@ -31,10 +31,10 @@ are accepted.
 
 Exit: every acceptance criterion for `PLAN-016`, `PLAN-009`, `PLAN-017`,
 `PLAN-018`, `PLAN-019`, `PLAN-006`, `PLAN-007`, and `PLAN-008`, and the
-deferred deployed portal journeys in `PLAN-020`, Phase 4 follow-ups in package 7.9,
-and second AI model-provider evaluation in package 7.10, has dated source, local, and
+deferred deployed portal journeys in `PLAN-020`, Phase 4 follow-ups in package 9.9,
+and second AI model-provider evaluation in package 9.10, has dated source, local, and
 deployed evidence (or a new explicit owner-directed exception). The generic and
-externally owned versioned results are recorded together. Only then may Phase 7
+externally owned versioned results are recorded together. Only then may Phase 9
 be closed; incomplete work here remains visible without blocking the other
 phases.
 
@@ -44,7 +44,7 @@ suite outcomes below.
 
 ## Ordered work packages
 
-### 7.1 — Close the neutral contract (`PLAN-016`)
+### 9.1 — Close the neutral contract (`PLAN-016`)
 
 1. Add or verify neutral digest-pinned `provider` and `consumer` `v1alpha2`
    declarations with a public API, private worker, readiness checks, bounded
@@ -63,7 +63,7 @@ suite outcomes below.
 default is energy-application-specific; every unsupported capability remains an
 explicit rejection or accepted ADR-020 limitation.
 
-### 7.2 — Complete hosted-application identity acceptance (`PLAN-009`)
+### 9.2 — Complete hosted-application identity acceptance (`PLAN-009`)
 
 1. Use the generic access resources to run the remaining browser and machine
    authentication/authorization cases against the deployed reference boundary.
@@ -83,7 +83,7 @@ explicit rejection or accepted ADR-020 limitation.
 restored-access behavior; platform/project/deployment roles never grant an
 application group implicitly.
 
-### 7.3 — Complete monitoring and retention acceptance (`PLAN-017`)
+### 9.3 — Complete monitoring and retention acceptance (`PLAN-017`)
 
 1. Keep component-aware protected-boundary probes, workload semantic readiness,
    and central Kubernetes log collection under the neutral fixtures.
@@ -100,9 +100,9 @@ application group implicitly.
 correlation, post-restart/retirement reads, and elapsed seven-day retention all
 pass.
 
-### 7.4 — Complete the generic integration gate (`PLAN-018`)
+### 9.4 — Complete the generic integration gate (`PLAN-018`)
 
-1. Run the neutral digest-pinned provider/consumer harness after 7.1–7.3.
+1. Run the neutral digest-pinned provider/consumer harness after 9.1–9.3.
    Capture image digests, revisions, routes, readiness, resource bounds, safe
    correlation, TLS, and resolved egress addresses.
 2. Verify allowed browser and pre-authorized service flows and the full denied
@@ -118,7 +118,7 @@ pass.
 **Exit evidence:** the complete generic deployed gate and separately owned
 external result are both recorded, versioned, and reproducible.
 
-### 7.5 — Complete durability and recovery (`PLAN-019`)
+### 9.5 — Complete durability and recovery (`PLAN-019`)
 
 1. Take a verified backup after the neutral integration state is active and
    record the snapshot, platform revision, fixture/image digests, and contract
@@ -138,11 +138,11 @@ external result are both recorded, versioned, and reproducible.
 alone—reproduces generic and external reference results with the required
 authorization and isolation checks.
 
-### 7.6 — Accept the deployed portal (`PLAN-020` follow-up)
+### 9.6 — Accept the deployed portal (`PLAN-020` follow-up)
 
 The portal source is implemented; this package replaces the prior owner waiver
 with executable, deployed acceptance. Run it against the same versioned portal,
-Platform API, and reference identity deployment used for the relevant Phase 7 checks.
+Platform API, and reference identity deployment used for the relevant Phase 9 checks.
 
 1. Sign in through the real OIDC flow and exercise viewer, developer,
    project-administrator, and platform-administrator views. Verify direct API
@@ -170,7 +170,7 @@ journeys above, identify the deployed portal/API revisions, and distinguish UI
 behavior from the server-side access enforcement already established by the
 generic harness.
 
-### 7.7 — Accept general self-service delivery (`PLAN-006`–`PLAN-008`)
+### 9.7 — Accept general self-service delivery (`PLAN-006`–`PLAN-008`)
 
 Source implementation for the portal/CLI, reusable web/PostgreSQL template, and
 human database access belongs to Phase 3. This package owns all deployed
@@ -197,7 +197,7 @@ no-rerun decision. This evidence, rather than a source build or UI fixture,
 establishes the functional portion of `PLAN-006`–`PLAN-008`; the final reviews
 or an explicit owner-directed exception are still required to close `PLAN-008`.
 
-### 7.9 — Complete deferred Phase 4 acceptance
+### 9.9 — Complete deferred Phase 4 acceptance
 
 **Unscheduled, lowest priority; non-gating for Phase 5.** On October 16, 2026,
 the owner closed Phase 4 at baseline `4681e56` and moved all remaining checks
@@ -231,18 +231,18 @@ because acceptance moved phases.
   backend, collector, dashboard and fixture revisions. Measure resource cost and
   confirm ingestion/cardinality limits, 24-hour trace retention, the 4 GiB trace
   filesystem and shared monitoring storage budgets, recording elapsed checks
-  separately from configuration. Keep the existing seven-day Loki check in 7.3.
+  separately from configuration. Keep the existing seven-day Loki check in 9.3.
 
 **Exit evidence:** each unchecked outcome has dated source/local/deployed results
 and limits, or a new explicit owner exception. Repair defects discovered during
 these checks and rerun affected verification. Phase 4 stays closed for delivery
 sequencing; these outcomes remain unverified until executed. Run this package
-when capacity allows, before the final human-database reviews in 7.8; its number
+when capacity allows, before the final human-database reviews in 9.8; its number
 preserves existing package references rather than imposing numeric execution order.
 
 <a id="ai-model-provider-leftovers"></a>
 
-### 7.10 — Verify a second AI model provider (`PLAN-012` follow-up)
+### 9.10 — Verify a second AI model provider (`PLAN-012` follow-up)
 
 **Unscheduled, lowest priority; non-gating for Phase 5.** On October 16, 2026,
 the owner moved second-provider setup, adapter work and evaluation here. No
@@ -266,11 +266,11 @@ acceptance evidence remains valid, and this deferral is not a passing test.
 **Exit evidence:** a second provider passes the unchanged quality, abstention,
 budget and safety contracts, with dated reproducible evidence and documented
 limits, or a new explicit owner-directed exception. Schedule independently when
-capacity and a provider setup are available, before the final reviews in 7.8.
+capacity and a provider setup are available, before the final reviews in 9.8.
 
-### 7.8 — Complete the lowest-priority human database leftovers (`PLAN-008`)
+### 9.8 — Complete the lowest-priority human database leftovers (`PLAN-008`)
 
-Schedule this **last**, after all other Phase 7 work packages, including 7.9 and 7.10. EV-47's
+Schedule this **last**, after all other Phase 9 work packages, including 9.9 and 9.10. EV-47's
 automated and manual core tests are accepted as passed and need no repeat solely
 for the later clean deployment. The following reviews remain unverified:
 
@@ -295,27 +295,27 @@ not turn an unperformed check into a passing result.
   faults. Follow the existing lab policy; do not create an additional
   environment merely for this phase.
 - A failed check returns work to its owning `PLAN-xxx` follow-up; owner-completed
-  Phase 4 delivery tasks remain closed while their fixes stay in package 7.9. Record the remediation
+  Phase 4 delivery tasks remain closed while their fixes stay in package 9.9. Record the remediation
   and rerun dependent packages in order.
-- `PLAN-020` remains accepted for lab sequencing, but package 7.6 closes its
-  waived deployed browser/audit evidence before Phase 7 exit or a
+- `PLAN-020` remains accepted for lab sequencing, but package 9.6 closes its
+  waived deployed browser/audit evidence before Phase 9 exit or a
   production-like portal claim.
 
 ## Dependencies
 
 `PLAN-016` → `PLAN-009` → `PLAN-017` → `PLAN-018` → `PLAN-019`, with portal
-acceptance package 7.6 run after the identity/access API is available. Package
-7.7 runs after the Phase 3 source capabilities are ready. Run 7.8 last,
-after 7.1–7.7, 7.9 and 7.10; its reviews or an explicit owner-directed exception remain
-required before Phase 7 exit. Package 7.9 can run independently once the
+acceptance package 9.6 run after the identity/access API is available. Package
+9.7 runs after the Phase 3 source capabilities are ready. Run 9.8 last,
+after 9.1–9.7, 9.9 and 9.10; its reviews or an explicit owner-directed exception remain
+required before Phase 9 exit. Package 9.9 can run independently once the
 implemented Phase 4 telemetry is available and does not gate Phase 5.
-Package 7.10 runs once a second model-provider setup is available and also does
+Package 9.10 runs once a second model-provider setup is available and also does
 not gate Phase 5; primary-provider acceptance does not depend on its completion.
 
 `PLAN-018` requires the implemented and accepted identity, contract, and
 monitoring outcomes. `PLAN-019` requires the completed deployed integration
 gate. Source implementation for `PLAN-006` through `PLAN-008` may proceed in
-Phase 3; their remaining acceptance belongs to packages 7.7 and 7.8.
+Phase 3; their remaining acceptance belongs to packages 9.7 and 9.8.
 
 Foundations: [energy-system priority plan](energy-system-integration.md),
 [generic use-case enablement increment](use-case-enablement-increment.md),

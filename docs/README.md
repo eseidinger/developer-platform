@@ -56,6 +56,7 @@ For architects and reviewers:
 - [Use cases](product/use-cases.md)
 - [Requirements](product/requirements.md)
 - [Roadmap](product/roadmap.md)
+- [Data store roadmap](product/data-store-roadmap.md)
 
 ## Document status
 

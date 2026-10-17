@@ -443,7 +443,7 @@ schema power than a future least-privilege runtime role would. A separate
 read-only human role and restricted SSH forwarding path are implemented in
 source; [human database access](../developers/database-access.md) describes the
 grant and revocation model. Deployed isolation and session-revocation checks
-remain Phase 7 work. A distinct migration/owner role is not implemented.
+remain Phase 9 work. A distinct migration/owner role is not implemented.
 Project retirement retains the database and workload role, but disables human
 database logins; permanent purge removes those human roles.
 

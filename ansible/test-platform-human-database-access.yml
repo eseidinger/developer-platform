@@ -45,4 +45,4 @@
 
     - name: Locate private evidence without disclosing credentials
       ansible.builtin.debug:
-        msg: "{{ 'Offline plan completed; no resources created.' if human_database_command == 'plan' else 'Private report: ' + human_database_install_dir + '/.runtime/human-database-access/' + human_database_run_id + '/report.json. The two fixture projects remain; this does not close Phase 7 acceptance.' }}"
+        msg: "{{ 'Offline plan completed; no resources created.' if human_database_command == 'plan' else 'Private report: ' + human_database_install_dir + '/.runtime/human-database-access/' + human_database_run_id + '/report.json. The two fixture projects remain; this does not close Phase 9 acceptance.' }}"

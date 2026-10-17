@@ -620,7 +620,7 @@ read-only commands or fails clearly.
 
 ## Completion criteria
 
-The CLI's full acceptance remains in Phase 7 until the create/deploy/observe/diagnose/recover/retire
+The CLI's full acceptance remains in Phase 9 until the create/deploy/observe/diagnose/recover/retire
 journey is reproducible against the deployed Platform API; human and automation
 authentication remain separate; machine-readable output and exit codes are tested;
 the role/denial matrix passes through direct CLI commands; secrets are absent from
