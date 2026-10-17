@@ -254,7 +254,8 @@ class AIOperationsTests(unittest.TestCase):
         self.assertEqual(result["state"], "failed")
         self.assertEqual(result["tool_calls"], 1)
         self.assertEqual(result["evidence"][0]["source"], "project-runtime")
-        self.assertAlmostEqual(result["estimated_cost_usd"], .00012)
+        self.assertIsNone(result["estimated_cost_usd"])
+        self.assertAlmostEqual(result["result"]["known_estimated_cost_usd"], .00012)
         self.assertFalse(result["result"]["usage_complete"])
         self.assertNotIn("secret provider diagnostics", str(result) + str(logs.output))
 

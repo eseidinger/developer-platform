@@ -16,11 +16,11 @@ const contextSchema = z.object({
 const summarySchema = z.object({
   run_id: z.uuid(), project: z.string(), kind: z.enum(['explain_application', 'investigate_incident', 'development_assistance']),
   state: z.enum(['running', 'completed', 'abstained', 'failed']), model: z.string().nullable(),
-  tool_calls: z.number(), estimated_cost_usd: z.number(), created_at: z.string(), completed_at: z.string().nullable(), base_revision: z.number().nullable(),
+  tool_calls: z.number(), estimated_cost_usd: z.number().nullable(), created_at: z.string(), completed_at: z.string().nullable(), base_revision: z.number().nullable(),
 })
 const statement = z.object({ statement: z.string(), source_ids: z.array(z.string()) })
 const runSchema = summarySchema.extend({
-  result: z.object({ summary: z.string(), observations: z.array(statement).optional(), hypotheses: z.array(statement), gaps: z.array(z.string()), insufficient_evidence: z.boolean() }).nullable(),
+  result: z.object({ summary: z.string(), observations: z.array(statement).optional(), hypotheses: z.array(statement), gaps: z.array(z.string()), insufficient_evidence: z.boolean(), usage_complete: z.boolean().optional(), pricing_version: z.string().optional() }).nullable(),
   evidence: z.array(z.object({ id: z.string(), tool: z.string(), source: z.string(), state: z.string(), at: z.string() })),
 })
 const proposalSchema = z.object({

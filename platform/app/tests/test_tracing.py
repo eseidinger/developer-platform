@@ -25,7 +25,8 @@ class TraceBoundaryTests(unittest.TestCase):
                     patch.object(tracing, "_provider"), patch.object(tracing, "_tracer"), \
                     patch.object(tracing, "TracerProvider") as provider, \
                     patch.object(tracing, "BatchSpanProcessor"), \
-                    patch.object(tracing, "OTLPSpanExporter"):
+                    patch.object(tracing, "OTLPSpanExporter"), \
+                    patch("app.ai_observability.configure"):
                 tracing.configure()
                 sampler = provider.call_args.kwargs["sampler"]
                 for trace_id in (1, 2**64, 2**128 - 1):

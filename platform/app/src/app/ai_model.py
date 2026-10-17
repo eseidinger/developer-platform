@@ -1,6 +1,8 @@
 """Provider-neutral model boundary; the initial OpenAI path fails closed."""
 
 import os
+
+from . import ai_pricing
 from typing import Protocol, Any
 
 
@@ -56,8 +58,11 @@ class OpenAIModelAdapter:
         return self.model.bind_tools(tools, parallel_tool_calls=False, **options)
 
     def estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float:
-        # GPT-6.1 Sol Standard prices; EU processing adds a 10% uplift.
-        return (input_tokens * 2.0 + output_tokens * 10.0) * self.regional_cost_multiplier / 1_000_000
+        return ai_pricing.estimate(self.name, {"input_tokens": input_tokens,
+            "output_tokens": output_tokens}, self.regional_cost_multiplier).usd
+
+    def estimate_usage(self, usage):
+        return ai_pricing.estimate(self.name, usage, self.regional_cost_multiplier)
 
     def reserve_cost_usd(self, input_tokens: int) -> float:
         return self.estimate_cost_usd(input_tokens, 1024)

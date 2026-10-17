@@ -20,6 +20,8 @@ def initialize(conn):
         tool_calls INTEGER NOT NULL DEFAULT 0, estimated_cost_usd NUMERIC(8,6) NOT NULL DEFAULT 0,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(), completed_at TIMESTAMPTZ)""")
     conn.execute("ALTER TABLE ai_runs ADD COLUMN IF NOT EXISTS base_revision BIGINT")
+    conn.execute("ALTER TABLE ai_runs ALTER COLUMN estimated_cost_usd DROP NOT NULL")
+    conn.execute("ALTER TABLE ai_runs ALTER COLUMN estimated_cost_usd DROP DEFAULT")
     conn.execute("CREATE INDEX IF NOT EXISTS ai_runs_history_idx ON ai_runs(project,created_at DESC,run_id DESC)")
     conn.execute("CREATE INDEX IF NOT EXISTS ai_runs_project_created_idx ON ai_runs(project,created_at DESC)")
     conn.execute("ALTER TABLE ai_runs DROP CONSTRAINT IF EXISTS ai_runs_kind_check")

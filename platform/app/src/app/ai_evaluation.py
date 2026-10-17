@@ -174,10 +174,11 @@ def evaluate(model, cases=CASES, *, on_case=None):
     unknown = [item for item, case in zip(results, cases) if case.must_abstain]
     return {"corpus": "diagnostics-v2" if cases is CASES else "legacy-v1" if cases is LEGACY_CASES else "custom",
             "cases": results,
-            "estimated_cost_usd": round(sum(item["estimated_cost_usd"] for item in results), 6),
+            "estimated_cost_usd": (round(sum(item["estimated_cost_usd"] for item in results), 6)
+                if all(item["estimated_cost_usd"] is not None for item in results) else None),
             "known_cause_accuracy": sum(item["passed"] for item in known) / len(known) if known else 1,
             "insufficient_evidence_abstention": all(item["passed"] for item in unknown),
             "budget_compliant": all(item["tool_calls"] <= ai_agent.MAX_TOOLS and
-                                    item["estimated_cost_usd"] <= ai_agent.MAX_COST_USD and
+                                    item["estimated_cost_usd"] is not None and item["estimated_cost_usd"] <= ai_agent.MAX_COST_USD and
                                     item["duration_seconds"] <= ai_agent.MAX_SECONDS
                                     for item in results)}

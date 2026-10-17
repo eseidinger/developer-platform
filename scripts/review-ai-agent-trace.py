@@ -15,7 +15,9 @@ ALLOWED = {
     "platform.step", "platform.resource_kind", "platform.error_type",
     "platform.ai.run_id", "platform.ai.kind", "platform.ai.model", "platform.ai.tool",
     "platform.ai.input_tokens", "platform.ai.output_tokens", "platform.ai.outcome",
-    "platform.ai.tool_error_count",
+    "platform.ai.tool_error_count", "platform.project", "gen_ai.operation.name",
+    "gen_ai.provider.name", "gen_ai.request.model", "gen_ai.response.model",
+    "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens",
 }
 
 

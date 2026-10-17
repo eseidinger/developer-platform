@@ -8,7 +8,7 @@ from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.export import BatchSpanProcessor, SpanExporter, SpanExportResult
 from opentelemetry.sdk.trace.sampling import ParentBased, TraceIdRatioBased
 from opentelemetry.trace import Link, SpanContext, TraceFlags, TraceState
 
@@ -28,6 +28,30 @@ def sample_rate(value: str) -> float:
     return rate
 
 
+class _ObservedExporter(SpanExporter):
+    def __init__(self, delegate):
+        self.delegate = delegate
+
+    def export(self, spans):
+        from . import ai_observability
+        try:
+            result = self.delegate.export(spans)
+        except Exception:
+            result = SpanExportResult.FAILURE
+        counts = {}
+        for item in spans:
+            if item.name in {"platform.ai.run", "platform.ai.model", "platform.ai.tool"}:
+                kind = item.name.rsplit(".", 1)[-1]
+                counts[kind] = counts.get(kind, 0) + 1
+        for kind, count in counts.items():
+            ai_observability._emit("platform_ai_spans_exported", count, operation=kind,
+                outcome="accepted" if result == SpanExportResult.SUCCESS else "failed")
+        return result
+
+    def shutdown(self):
+        self.delegate.shutdown()
+
+
 def configure() -> None:
     """Called before workers start; exporter failures never enter request handling."""
     global _provider, _tracer
@@ -45,17 +69,22 @@ def configure() -> None:
         sampler=ParentBased(TraceIdRatioBased(rate)),
     )
     _provider.add_span_processor(BatchSpanProcessor(
-        OTLPSpanExporter(endpoint=endpoint, timeout=2),
+        _ObservedExporter(OTLPSpanExporter(endpoint=endpoint, timeout=2)),
         max_queue_size=512, max_export_batch_size=128, schedule_delay_millis=2000,
     ))
     _tracer = _provider.get_tracer("developer-platform")
+    if service_name == "platform-api":
+        from . import ai_observability
+        ai_observability.configure(_provider)
 
 
 def shutdown() -> None:
+    from . import ai_observability
     global _provider
     if _provider is not None:
         _provider.shutdown()
         _provider = None
+    ai_observability.shutdown()
 
 
 def trace_id() -> str | None:
@@ -95,6 +124,10 @@ def origin_link(value: str | None) -> list[Link]:
 def span(name: str, *, links=None, **safe_attributes):
     with _tracer.start_as_current_span(name, links=links or [],
                                        record_exception=False, set_status_on_exception=False) as active:
+        if name in {"platform.ai.run", "platform.ai.model", "platform.ai.tool"}:
+            from . import ai_observability
+            for key, value in ai_observability._scope.get().items():
+                active.set_attribute("platform.project" if key == "project" else "platform.ai.kind", value)
         for key, value in safe_attributes.items():
             if isinstance(value, (str, int, bool, float)):
                 active.set_attribute(key, value)

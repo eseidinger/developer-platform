@@ -65,7 +65,7 @@ from . import tracing
 from . import application_metrics
 from . import telemetry_catalog
 from . import trace_read
-from . import ai_store, ai_model, ai_tools, ai_agent, ai_changes
+from . import ai_store, ai_model, ai_tools, ai_agent, ai_changes, ai_observability
 
 log = logging.getLogger(__name__)
 auth = HTTPBearer(auto_error=False)
@@ -1311,7 +1311,7 @@ def list_ai_runs(name: str, limit: int = Query(20, ge=1, le=50), before: UUID | 
     with connect() as conn:
         rows = ai_store.history(conn, name, limit, before)
     items = [{"run_id": str(r[0]), "project": name, "kind": r[1], "state": r[2],
-              "model": r[3], "tool_calls": r[4], "estimated_cost_usd": float(r[5]),
+              "model": r[3], "tool_calls": r[4], "estimated_cost_usd": float(r[5]) if r[5] is not None else None,
               "created_at": r[6], "completed_at": r[7], "base_revision": r[8]} for r in rows[:limit]]
     return {"items": items, "next_cursor": str(rows[limit-1][0]) if len(rows) > limit else None}
 
@@ -1347,13 +1347,13 @@ def create_ai_run(name: str, body: AIRunRequest,
         run_id = ai_store.create_run(conn, name, principal, body.kind, model.name, base_revision)
     try:
         tools = ai_tools.make_tools(name, lambda _: snapshot, connect, runtime)
-        outcome = ai_agent.run(body.kind, run_id, model, tools)
+        outcome = ai_agent.run(body.kind, run_id, model, tools, project=name)
     except Exception as exc:
         log.error("AI run failed run_id=%s error_type=%s", run_id, type(exc).__name__)
         outcome = {"state": "failed", "result": {"summary": "Investigation unavailable",
                    "hypotheses": [], "gaps": ["Model or read tool failed"],
-                   "insufficient_evidence": True}, "evidence": [], "tool_calls": 0,
-                   "estimated_cost_usd": 0}
+                   "insufficient_evidence": True, "usage_complete": False}, "evidence": [], "tool_calls": 0,
+                   "estimated_cost_usd": None}
     with connect() as conn:
         ai_store.finish_run(conn, run_id, outcome["state"], outcome["result"],
                             outcome["evidence"], outcome["tool_calls"], outcome["estimated_cost_usd"])
@@ -1373,7 +1373,7 @@ def get_ai_run(name: str, run_id: UUID, principal: Principal = Depends(current_p
         raise HTTPException(404, "Unknown project AI run")
     return {"run_id": str(row[0]), "project": name, "kind": row[1], "state": row[2],
             "model": row[3], "result": row[4], "evidence": row[5],
-            "tool_calls": row[6], "estimated_cost_usd": float(row[7]),
+            "tool_calls": row[6], "estimated_cost_usd": float(row[7]) if row[7] is not None else None,
             "created_at": row[8], "completed_at": row[9], "base_revision": row[10]}
 
 
@@ -1464,6 +1464,8 @@ def approve_ai_proposal(name: str, proposal_id: UUID, body: AIApprovalRequest,
             raise HTTPException(409, str(exc)) from None
     required_audit(actor_for(principal), "ai.proposal.approve", "ai-proposal", str(proposal_id),
                    "succeeded", {"project": name}, {"diff_sha256": body.diff_sha256})
+    with ai_observability.scope(name, "other"):
+        ai_observability._emit("platform_ai_changes", 1, operation="approval", outcome="completed")
     return get_ai_proposal(name, proposal_id, principal)
 
 
@@ -1489,6 +1491,8 @@ def execute_ai_proposal(name: str, proposal_id: UUID, body: AIApprovalRequest,
     required_audit(actor_for(principal), "ai.proposal.execute", "ai-proposal", str(proposal_id),
                    "succeeded", {"project": name}, {"operation_id": str(operation_id),
                    "revision": revision, "state": state})
+    with ai_observability.scope(name, "other"):
+        ai_observability._emit("platform_ai_changes", 1, operation="execution", outcome="queued")
     return {"proposal_id": str(proposal_id), "operation_id": str(operation_id),
             "state": state, "revision": revision,
             "operation_status_url": f"/v1/operations/{operation_id}"}

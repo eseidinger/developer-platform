@@ -8,7 +8,10 @@ from datetime import datetime, timezone
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 
-from . import tracing
+from . import tracing, ai_observability, ai_pricing
+from contextvars import ContextVar
+
+_estimates = ContextVar("ai_run_estimates", default=None)
 from .audit import redact
 
 MAX_TOOLS = 8
@@ -98,7 +101,29 @@ def _parse_final(message, evidence, kind="investigate_incident"):
                 "insufficient_evidence": True, "validation_error": reason}
 
 
-def run(kind, run_id, model, tools, *, clock=time.monotonic):
+def run(kind, run_id, model, tools, *, clock=time.monotonic, project="other"):
+    estimates = []
+    token = _estimates.set(estimates)
+    try:
+        with ai_observability.scope(project, kind), ai_observability.operation("run"):
+            try:
+                result = _run(kind, run_id, model, tools, clock=clock)
+            except Exception:
+                ai_observability.outcome("failed", 0)
+                raise
+            complete = bool(estimates) and all(e.complete for e in estimates) and result["state"] != "failed"
+            result["result"]["usage_complete"] = complete
+            result["result"]["pricing_version"] = ai_pricing.VERSION
+            if not complete:
+                result["result"]["known_estimated_cost_usd"] = result["estimated_cost_usd"]
+                result["estimated_cost_usd"] = None
+            ai_observability.outcome(result["state"], result["tool_calls"])
+            return result
+    finally:
+        _estimates.reset(token)
+
+
+def _run(kind, run_id, model, tools, *, clock=time.monotonic):
     deadline = clock() + MAX_SECONDS
     requests = {
         "explain_application": "Explain only the current catalog revision, deployment state, components and telemetry opt-ins. "
@@ -121,6 +146,7 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
     evidence = []
     calls = 0
     cost = 0.0
+    reserved_unknown = 0.0
     finalizing = False
     with tracing.span("platform.ai.run", **{"platform.ai.run_id": str(run_id), "platform.ai.kind": kind}):
         for _ in range(MAX_MODEL_CALLS):
@@ -132,18 +158,20 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                 finalizing = True
             estimated_input = sum(len(str(message.content)) for message in messages) / 3
             reserved = model.reserve_cost_usd(int(estimated_input))
-            if clock() >= deadline or cost + reserved > MAX_COST_USD:
+            if clock() >= deadline or cost + reserved_unknown + reserved > MAX_COST_USD:
                 break
             try:
-                with tracing.span("platform.ai.model", **{"platform.ai.model": model.name}):
+                with ai_observability.operation("model"):
                     remaining = deadline - clock()
                     if remaining <= 0:
                         break
                     answer = bound.invoke(messages, timeout=min(MAX_MODEL_SECONDS, remaining))
                     usage = answer.usage_metadata or {}
-                    tracing.annotate("platform.ai.input_tokens", int(usage.get("input_tokens", 0)))
-                    tracing.annotate("platform.ai.output_tokens", int(usage.get("output_tokens", 0)))
+
             except Exception as error:
+                missing_usage = ai_pricing.Estimate(None, False, None, None, None)
+                _estimates.get().append(missing_usage)
+                ai_observability.usage(missing_usage)
                 # Provider errors may include request content; retain only their type.
                 logging.getLogger(__name__).error("AI model request failed run_id=%s error_type=%s", run_id, type(error).__name__)
                 tracing.annotate("platform.ai.outcome", "failed")
@@ -153,9 +181,20 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                              "Failed request usage is unavailable; estimated cost covers successful responses only."],
                     "insufficient_evidence": True, "usage_complete": False},
                     "evidence": evidence, "tool_calls": calls, "estimated_cost_usd": round(cost, 6)}
-            cost += model.estimate_cost_usd(usage.get("input_tokens", 0),
-                                            usage.get("output_tokens", 0))
-            if cost > MAX_COST_USD:
+            if hasattr(model, "estimate_usage"):
+                estimate = model.estimate_usage(usage)
+            else:
+                estimate = ai_pricing.Estimate(model.estimate_cost_usd(usage.get("input_tokens", 0),
+                    usage.get("output_tokens", 0)), bool(usage), usage.get("input_tokens"), 0,
+                    usage.get("output_tokens"))
+            _estimates.get().append(estimate)
+            ai_observability.usage(estimate)
+            if estimate.usd is None:
+                # Reserve conservatively for subsequent budget admission.
+                reserved_unknown += reserved
+            else:
+                cost += estimate.usd
+            if cost + reserved_unknown > MAX_COST_USD:
                 break
             messages.append(answer)
             requests = answer.tool_calls if isinstance(answer, AIMessage) else []
@@ -178,7 +217,8 @@ def run(kind, run_id, model, tools, *, clock=time.monotonic):
                 evidence_id = "E" + str(calls)
                 observation = None
                 try:
-                    with tracing.span("platform.ai.tool", **{"platform.ai.tool": name}):
+                    with ai_observability.operation("tool", tool=name), \
+                            tracing.span("platform.ai.tool", **{"platform.ai.tool": name}):
                         observation = tool_map[name].invoke(arguments)
                         tracing.annotate("platform.ai.outcome", "ok")
                     content = json.dumps(observation, default=str, separators=(",", ":"))

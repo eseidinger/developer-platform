@@ -154,8 +154,8 @@ function Pagination({ before, next, onChange, label }: { before?: string; next: 
 }
 function RunResult({ run }: { run: Run }) {
   return <div className="space-y-4"><h2 className="text-xl font-semibold">{kinds[run.kind]} · {run.state}</h2><p>Run: {run.run_id} · revision: {run.base_revision ?? 'unbound historical run'}</p>
-    <p>Model: {run.model ?? 'unavailable'} · tools: {run.tool_calls} · estimated cost: ${run.estimated_cost_usd.toFixed(6)}</p><p>Created: {run.created_at} · completed: {run.completed_at ?? 'not completed'}</p>
-    {run.result && <><p>{run.result.summary}</p>{run.result.insufficient_evidence && <p role="status">Insufficient evidence: this result does not establish a diagnosis.</p>}
+    <p>Model: {run.model ?? 'unavailable'} · tools: {run.tool_calls} · estimated cost: {run.estimated_cost_usd == null ? 'unknown / incomplete' : `$${run.estimated_cost_usd.toFixed(6)}`}</p><p>Created: {run.created_at} · completed: {run.completed_at ?? 'not completed'}</p>
+    {run.result && <>{run.result.pricing_version && <p>Estimate pricing: {run.result.pricing_version} · usage {run.result.usage_complete ? 'complete' : 'unknown / incomplete'}</p>}<p>{run.result.summary}</p>{run.result.insufficient_evidence && <p role="status">Insufficient evidence: this result does not establish a diagnosis.</p>}
       {(['observations', 'hypotheses'] as const).map((kind) => <div key={kind}><h3 className="font-semibold capitalize">{kind === 'hypotheses' ? 'Tentative hypotheses' : kind}</h3><ul className="list-disc space-y-2 pl-5">{run.result?.[kind]?.map((item, i) => <li key={i}>{item.statement} <span>{item.source_ids.map((id) => <a key={id} className="mr-2 underline" href={`#evidence-${run.run_id}-${id}`}>{id}</a>)}</span></li>)}</ul></div>)}
       <div><h3 className="font-semibold">Evidence gaps</h3><ul className="list-disc pl-5">{run.result.gaps.map((gap, i) => <li key={i}>{gap}</li>)}</ul></div></>}
     <div><h3 className="font-semibold">Evidence sources</h3><ul className="space-y-2">{run.evidence.map((e) => <li key={e.id} id={`evidence-${run.run_id}-${e.id}`} tabIndex={-1}>{e.id}: {e.tool} · {e.source} · {e.state} · {e.at}</li>)}</ul></div></div>
