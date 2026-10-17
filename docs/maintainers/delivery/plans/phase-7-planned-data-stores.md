@@ -36,7 +36,7 @@ queries and denial of graph writes/extension removal. A disposable real
 Keycloak → pgAdmin fixture passes SSO, scoped connection/query, password-saving
 denial, expired reconnect and anonymous denial. Production console network/TLS
 and deployed access acceptance remain open. The backend suite ran
-504 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
+509 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
 explicit issuance and secret-cache exclusion. No live resources were changed.
 Source now includes bounded usage measurements/alerts, the named-store dashboard,
 restore quarantine, and version-pinned purge acknowledgment after verified
@@ -189,6 +189,19 @@ recovery/rebuild as part of PLAN-026/029. Live services remain unchanged.
 ### 7.2 — Analytics and S3-Compatible Object Storage
 
 **Task:** PLAN-027. **Source:** phase 1. **Entry:** package 7.1 integration acceptance.
+
+**Source/local increment (October 17):** The
+[application artifact example](../../../../examples/analytics-artifacts/README.md)
+publishes exact-version, checksum-verified Parquet snapshots in a bound RustFS
+bucket and verifies them before DuckDB reads local data. Its manifest/reference
+contract survives later writes at the same keys and empty-volume restore with
+fresh scoped approval. Opt-in fixtures compare scoped PostgreSQL tables, DuckDB
+tables and local/versioned-S3 Parquet against a deterministic Python oracle for
+daily/monthly aggregation, weather joins, windows and scenario costs. Engine
+timings and transfer/checksum cost are separate observations without adoption
+thresholds. DuckDB is confined to applications and the optional fixture group.
+The 180-row synthetic fixture is not ODIP domain/large-volume acceptance; application
+metadata/outbox integration and deployed recovery remain open.
 
 - ODIP compares PostgreSQL and DuckDB on the same versioned energy data:
   daily/monthly aggregation, generation/weather joins, windows, scenario costs,

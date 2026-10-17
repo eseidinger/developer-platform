@@ -182,6 +182,18 @@ verified with the operator CA; private HTTP on the tunnel/relay segment relies
 on SSH transport encryption. Applications receive the private lease endpoint
 directly through their explicit binding. Only accepted console adapters advertise browser launch links. OpenSearch currently offers the native-client path.
 
+## DuckDB/Parquet application artifacts
+
+The [application example](../../examples/analytics-artifacts/README.md) uses bound
+S3 credentials to publish exact-version Parquet manifests and stream/checksum
+snapshots before local DuckDB queries. No additional shared service or API runtime
+dependency is introduced. Back up application reference metadata as well as the
+retained bucket versions. Logical snapshot immutability does not prevent an
+authorized writer from deleting versions; recovery still requires the encrypted
+bucket/catalog backups and fresh access approval. Synthetic SQL comparisons and
+empty-volume snapshot recovery pass locally; external domain benchmarks and
+deployed off-host recovery remain open.
+
 ## RustFS and Qdrant browser consoles
 
 Use **Open RustFS console** or **Open Qdrant console** on an active human credential.

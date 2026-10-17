@@ -25,3 +25,8 @@ dependencies = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/app"]
+
+[dependency-groups]
+analytics-fixtures = [
+    "duckdb==1.5.6",
+]

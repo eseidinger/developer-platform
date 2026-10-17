@@ -156,6 +156,10 @@ def main():
         rw.put_object(Bucket=bucket_name, Key='after-approved-increase.bin', Body=b'q' * (17 * 1024 * 1024))
         assert provider.usage(first) > 0
         provider.validate_recovery(first)
+        analytics_reference = None
+        if os.environ.get('STORE_ANALYTICS_FIXTURE') == '1':
+            from store_analytics_fixture import publish
+            analytics_reference = publish(rw, ro, bucket_name)
         with restored(name, volume, '/data', IMAGE, ['--memory', '768m', '--cpus', '1',
                 '--tmpfs', '/logs:rw,uid=10001,gid=10001,size=16m', '-e', 'RUSTFS_ACCESS_KEY', '-e', 'RUSTFS_SECRET_KEY',
                 '-e', 'RUSTFS_VOLUMES=/data', '-e', 'RUSTFS_OBS_LOG_DIRECTORY=/logs',
@@ -180,6 +184,9 @@ def main():
             fresh_reader = client(recovered.endpoint, access_key(fresh['credential_id']), catalog.secret_for(fresh['credential_id']))
             assert fresh_reader.get_object(Bucket=bucket_name, Key='source.parquet', VersionId=first_version)['Body'].read() == b'first-version'
             assert fresh_reader.get_object(Bucket=bucket_name, Key='after-approved-increase.bin')['ContentLength'] == 17 * 1024 * 1024
+            if analytics_reference:
+                from store_analytics_fixture import recovered as recovered_analytics
+                recovered_analytics(fresh_reader, bucket_name, analytics_reference)
             denied(lambda: fresh_reader.list_objects_v2(Bucket=bucket(other)))
             recovered.validate_recovery(other)
         print('PASS RustFS stopped-volume capture and empty-volume restore: versions/data/IAM retained; recovered keys revoked; fresh scoped approval reads retained data')

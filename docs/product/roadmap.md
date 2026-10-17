@@ -30,7 +30,7 @@ Phase 1 already includes a minimal API/CLI. Phase 2A evolves it for named and sc
 
 The sequence follows the selected hybrid topology. A direct Docker workload adapter remains an optional Phase 6 expansion in [ADR-002](../architecture/decisions/ADR-002-docker-vs-kubernetes.md).
 
-The [data store roadmap](data-store-roadmap.md) is incorporated into Phase 7 for planned stores and Phase 8 for deferred stores. PostgreSQL remains the reference. DuckDB is an application analytical engine; the platform supplies generic provider lifecycle and recovery while ODIP, VEF, Energy and Bot Social own domain experiments. Only specifically required integration/recovery checks gate a store package. Phase 9 remains last, anytime and lowest priority; optional Phase 6 is independent.
+The [data store roadmap](data-store-roadmap.md) is incorporated into Phase 7 for planned stores and Phase 8 for deferred stores. PostgreSQL remains the reference. DuckDB is an application analytical engine; the [Parquet artifact example](../../examples/analytics-artifacts/README.md) supplies exact-version S3 manifests, verified local reads and synthetic SQL comparison/recovery fixtures. The platform supplies generic provider lifecycle and recovery while ODIP, VEF, Energy and Bot Social own domain experiments. Only specifically required integration/recovery checks gate a store package. Phase 9 remains last, anytime and lowest priority; optional Phase 6 is independent.
 
 Phase 5 now plans content-free OpenLIT instrumentation and operator Grafana dashboards for AI operations, token usage/estimated cost and telemetry health. Tracing source defaults select 100% root sampling as of October 17; rollout/readback remains to be verified, and collection/storage limits still apply.
 

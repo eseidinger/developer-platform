@@ -44,9 +44,9 @@ jobs:
         with:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
-      - run: uv sync --project platform/app --locked
+      - run: uv sync --project platform/app --group analytics-fixtures --locked
       - run: docker pull rustfs/rustfs:1.0.2@sha256:7e948dad4748bda48f8985fda7195f8cf2e4259427011f6120acc2c9acf51587
-      - run: uv run --project platform/app python scripts/verify-rustfs.py
+      - run: STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group analytics-fixtures python scripts/verify-rustfs.py
 
   qdrant-lifecycle:
     runs-on: ubuntu-latest

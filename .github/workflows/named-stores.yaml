@@ -16,7 +16,7 @@ jobs:
           node-version: "24"
           cache: npm
           cache-dependency-path: platform/ui/package-lock.json
-      - run: uv sync --project platform/app --locked
+      - run: uv sync --project platform/app --group analytics-fixtures --locked
       - run: npm ci --prefix platform/ui
       - run: npx playwright install --with-deps chromium
         working-directory: platform/ui
@@ -33,4 +33,5 @@ jobs:
           NAMED_POSTGRES_EXTENSIONS: "1"
           NAMED_POSTGRES_CONSOLE: "1"
           RESTIC_TEST_BINARY: /usr/bin/restic
-        run: uv run --project platform/app python scripts/verify-named-postgres.py
+          STORE_ANALYTICS_FIXTURE: "1"
+        run: uv run --project platform/app --group analytics-fixtures python scripts/verify-named-postgres.py

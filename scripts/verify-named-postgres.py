@@ -75,6 +75,9 @@ def main():
                     password=catalog.secret_for(credential["credential_id"]), autocommit=True, connect_timeout=2)
             a, b, reader = credentials
             with login(a) as writer:
+                if os.environ.get('STORE_ANALYTICS_FIXTURE') == '1':
+                    from store_analytics_fixture import postgres as analytics_comparison
+                    analytics_comparison(writer)
                 reference = Path(__file__).resolve().parents[1] / "examples/postgresql-reference/baseline.sql"
                 writer.execute(reference.read_text())
                 try:
