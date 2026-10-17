@@ -12,6 +12,9 @@ from app.stores import api, catalog
 
 class StoreApiTests(TestCase):
     def setUp(self):
+        guard = patch("app.stores.recovery.required", return_value=False)
+        guard.start()
+        self.addCleanup(guard.stop)
         self.principal = Principal("https://fixture.invalid", "admin")
         self.conn = Mock()
         self.conn.transaction.return_value = nullcontext()
@@ -24,6 +27,15 @@ class StoreApiTests(TestCase):
         self.client = TestClient(app)
         self.resource_id = uuid4()
         self.grant_id = uuid4()
+
+    def test_recovery_quarantine_blocks_reveal_and_issuance_before_provider_access(self):
+        with patch("app.stores.recovery.required", return_value=True), \
+                patch.object(catalog, "issue") as issue, patch.object(catalog, "_object") as credential:
+            issued = self.client.post(f"/v1/store-access/{self.grant_id}/credentials")
+            revealed = self.client.get(f"/v1/store-access/credentials/{uuid4()}")
+        self.assertEqual(issued.status_code, 503)
+        self.assertEqual(revealed.status_code, 503)
+        issue.assert_not_called(); credential.assert_not_called()
 
     def test_foreign_resource_administration_checks_owning_project(self):
         self.control.require_permission.side_effect = HTTPException(403, "Denied")

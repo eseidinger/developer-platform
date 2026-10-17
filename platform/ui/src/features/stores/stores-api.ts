@@ -5,6 +5,7 @@ import type { components } from '@/api/generated/schema'
 
 const resource = z.object({ resource_id: z.uuid(), owner_project: z.string(), name: z.string(), provider: z.string(),
   state: z.string(), observed_state: z.string(), version: z.number(), quota_bytes: z.number(),
+  used_bytes: z.number().nullable().optional(), usage_measured_at: z.string().nullable().optional(), usage_error: z.boolean().optional(),
   extensions: z.array(z.string()), console_url: z.string().nullable().optional(), error_code: z.string().nullable() })
 const grant = z.object({ grant_id: z.uuid(), resource_id: z.uuid(), kind: z.enum(['human', 'binding']), issuer: z.string().nullable(), subject: z.string().nullable(),
   consumer_project: z.string().nullable(), component: z.string().nullable(), mode: z.enum(['read-only', 'read-write']),

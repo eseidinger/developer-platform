@@ -109,3 +109,42 @@ groups:
         annotations:
           summary: 'Alertmanager notification delivery has failed'
           description: 'Inspect Alertmanager logs and alertmanager_notifications_failed_total; this alert can be affected by the same broken destination.'
+  - name: named-stores
+    rules:
+      - alert: StoreQuotaWarning
+        expr: platform_store_used_bytes / platform_store_quota_bytes >= 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Named store {{ $labels.resource_id }} is near or above its approved quota"
+          description: "Inspect hard-quota support and measurement freshness. PostgreSQL byte quotas are advisory; only an administrator may approve capacity growth."
+      - alert: StoreUsageUnavailable
+        expr: (time() - platform_store_usage_measured_timestamp_seconds > 300) or (platform_store_usage_error == 1)
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Named store {{ $labels.resource_id }} usage is unknown or stale"
+      - alert: StoreAccessCleanupPending
+        expr: platform_store_credentials_cleanup_pending > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Named store {{ $labels.resource_id }} provider credential cleanup is delayed"
+          description: "The private relay fails closed independently; inspect provider health and retries."
+      - alert: StoreReconciliationPending
+        expr: platform_store_reconcile_pending > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Named store {{ $labels.resource_id }} has not reached its requested state"
+      - alert: StoreControllerStale
+        expr: (time() - platform_store_worker_last_success_timestamp_seconds > 90) or absent(platform_store_worker_last_success_timestamp_seconds)
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Named-store controller or metrics publication is unavailable"

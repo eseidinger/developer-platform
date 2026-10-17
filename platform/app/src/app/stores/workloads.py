@@ -4,7 +4,7 @@ import hashlib
 import ipaddress
 import json
 import os
-from . import catalog, providers
+from . import catalog, providers, recovery
 
 MARKER = "platform.example/store-credentials"
 
@@ -18,6 +18,8 @@ def _pod(manifest):
 
 
 def resolve(conn, project, components, strict=True):
+    if any(c.get("bindings") for c in components) and recovery.required(conn):
+        raise catalog.Conflict("Named-store recovery reconciliation is required")
     result = {}
     for component in components:
         entries, names = [], set()

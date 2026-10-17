@@ -23,9 +23,12 @@ def budget(name):
 
 
 def check_capacity(conn, provider, quota, resource_id=None):
-    used = conn.execute("""SELECT COALESCE(sum(quota_bytes),0) FROM store_resources
+    used = conn.execute("""SELECT COALESCE(sum(GREATEST(quota_bytes,COALESCE(used_bytes,0))),0) FROM store_resources
         WHERE provider=%s AND state<>'purged' AND (%s::uuid IS NULL OR resource_id<>%s)""",
         (provider, resource_id, resource_id)).fetchone()[0]
+    if resource_id is not None:
+        measured = conn.execute("SELECT used_bytes FROM store_resources WHERE resource_id=%s", (resource_id,)).fetchone()
+        quota = max(quota, (measured[0] if measured else 0) or 0)
     if used + quota > budget(provider):
         from .catalog import Conflict
         raise Conflict("Requested allocation exceeds operator-owned store capacity")

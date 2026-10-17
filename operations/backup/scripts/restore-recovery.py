@@ -74,6 +74,12 @@ def check_import_errors(stderr):
 def quarantine_hosted_access(compose):
     """A restored authorization catalog must not activate routes before explicit reconciliation."""
     statement = b"""DO $$ BEGIN
+        IF to_regclass('public.store_resources') IS NOT NULL THEN
+            CREATE TABLE IF NOT EXISTS store_control (singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK(singleton), recovery_required BOOLEAN NOT NULL DEFAULT false);
+            INSERT INTO store_control(singleton,recovery_required) VALUES(true,true)
+                ON CONFLICT(singleton) DO UPDATE SET recovery_required=true;
+            UPDATE store_credentials SET expires_at=LEAST(expires_at,now()) WHERE state<>'revoked';
+        END IF;
         IF to_regclass('public.hosted_access_metadata') IS NOT NULL THEN
             INSERT INTO hosted_access_metadata(key,value) VALUES ('recovery-required','true')
                 ON CONFLICT(key) DO UPDATE SET value='true';

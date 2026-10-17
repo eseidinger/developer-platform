@@ -1,5 +1,5 @@
 """Reconcile resources and every credential generation after restart or interruption."""
-from . import catalog, providers
+from . import catalog, providers, recovery
 
 
 def _attempt(conn, table, field, identity, operation):
@@ -23,6 +23,14 @@ def _deny(conn, credential, resource):
 
 def reconcile(conn, control=None):
     """Caller holds the common lifecycle lock. Relay enforces deadlines independently."""
+    if recovery.required(conn):
+        recovered = conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
+            JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
+            WHERE c.state<>'revoked' LIMIT 256""").fetchall()
+        for credential, resource in recovered:
+            _attempt(conn, "store_credentials", "credential_id", credential["credential_id"],
+                lambda c=credential, r=resource: _deny(conn, c, r))
+        return
     conn.execute("""UPDATE store_resources r SET state='retired',observed_state='pending',version=version+1
         FROM projects p WHERE p.name=r.owner_project AND p.status='retired' AND r.state='active'""")
     conn.execute("""UPDATE store_grants g SET state='revoked',observed_state='pending',version=version+1
@@ -122,6 +130,13 @@ def loop(stop, control):
                     stop.wait(1)
                     continue
                 reconcile(conn, control)
+                from .monitoring import sample
+                sample(conn)
+            # Export only after the catalog transaction commits. Failure leaves
+            # the previous file and heartbeat to become visibly stale.
+            from .monitoring import publish
+            with control.connect() as conn:
+                publish(conn)
         except Exception as exc:
             control.log.error("Store reconciliation failed error_type=%s", type(exc).__name__)
         stop.wait(2)

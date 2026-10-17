@@ -300,6 +300,26 @@ def ai_dashboards():
     return dashboards
 
 
+def store_dashboard():
+    entries = [
+        ("Logical usage / approved quota", 'platform_store_used_bytes / platform_store_quota_bytes', "percentunit", "Logical resource allocation. PostgreSQL byte quotas are advisory, not hard write limits. Missing usage is unknown."),
+        ("Measured logical usage", 'platform_store_used_bytes', "bytes", "Last successful sample; retained values may be stale. Not physical volume size or backup usage."),
+        ("Usage measurement age", 'time() - platform_store_usage_measured_timestamp_seconds', "s", "Zero timestamp means no successful reading. Sampling is bounded to eight resources per pass."),
+        ("Usage measurement errors", 'platform_store_usage_error', "short", "One means the latest attempt failed; last successful usage remains visible."),
+        ("Verified hard quota support", 'platform_store_hard_quota', "short", "Zero means advisory enforcement. Monitoring and capacity admission do not enforce a hard provider byte limit."),
+        ("Desired state pending", 'platform_store_reconcile_pending', "short", "Provisioning, retirement, purge or configuration has not reached observed state."),
+        ("Active credential generations", 'platform_store_credentials_active', "short", "Includes bounded rotation overlap and early human renewal. No principal or credential IDs are labels."),
+        ("Provider access cleanup pending", 'platform_store_credentials_cleanup_pending', "short", "Expired or stale provider identities awaiting cleanup; relay denies them independently."),
+        ("Store controller heartbeat age", 'time() - platform_store_worker_last_success_timestamp_seconds', "s", "Committed worker pass and successful metrics publication. Missing/stale is unavailable, not idle."),
+    ]
+    return {"uid": "named-data-stores", "title": "Named data-store resources", "schemaVersion": 41,
+        "version": 1, "editable": False, "timezone": "browser", "refresh": "30s",
+        "time": {"from": "now-1h", "to": "now"}, "tags": ["developer-platform", "operator", "stores"],
+        "panels": [panel(i, title, expr, unit=unit, description=description,
+            legend="{{project}} {{resource_id}} {{provider}}")
+            for i, (title, expr, unit, description) in enumerate(entries, 1)]}
+
+
 def generate(check=False):
     ROOT.mkdir(parents=True, exist_ok=True)
     expected = {}
@@ -316,7 +336,7 @@ def generate(check=False):
         if uid == "workloads-capacity":
             augment_capacity(dashboard)
         expected[uid] = dashboard
-    for dashboard in (application_dashboard(), micrometer_dashboard(), postgres_dashboard(), *ai_dashboards()):
+    for dashboard in (application_dashboard(), micrometer_dashboard(), postgres_dashboard(), store_dashboard(), *ai_dashboards()):
         expected[dashboard["uid"]] = dashboard
     stale = []
     for uid, dashboard in expected.items():

@@ -7,7 +7,7 @@ import os
 import secrets
 import subprocess
 import time
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 import psycopg
@@ -235,6 +235,34 @@ def main():
                         server.close(); control.close()
                         await server.wait_closed(); await control.wait_closed()
                 asyncio.run(console_check())
+            from app.stores import monitoring as store_monitoring, recovery
+            from app.stores.relay import snapshot
+            with patch("app.stores.providers.get", return_value=provider):
+                with conn.transaction():
+                    store_monitoring.sample(conn)
+                measured = catalog.resource(conn, alpha["resource_id"])
+                assert measured["used_bytes"] > 0 and measured["usage_measured_at"] and not measured["usage_error"]
+                with patch.object(provider, "usage", side_effect=RuntimeError("synthetic measurement outage")):
+                    conn.execute("UPDATE store_resources SET usage_attempt_at=now()-interval '2 minutes'")
+                    with conn.transaction():
+                        store_monitoring.sample(conn)
+                failed = catalog.resource(conn, alpha["resource_id"])
+                assert failed["used_bytes"] == measured["used_bytes"] and failed["usage_error"]
+                with conn.transaction():
+                    recovery.quarantine(conn)
+                    assert recovery.required(conn)
+                    try:
+                        catalog.issue(conn, catalog.grant(conn, binding["grant_id"]))
+                    except catalog.Conflict:
+                        pass
+                    else:
+                        raise AssertionError("Recovered catalog issued credentials before reconciliation")
+                with patch("app.stores.relay.connect", return_value=nullcontext(conn)):
+                    assert snapshot() == {}
+                with conn.transaction():
+                    worker.reconcile(conn)
+                assert conn.execute("SELECT count(*) FROM store_credentials WHERE state<>'revoked'").fetchone()[0] == 0
+            print("PASS measured nonzero usage; retained stale reading on failure; recovered issuance/relay denial and provider cleanup")
             # Retiring/purging one resource must not touch the other database.
             all_credentials = conn.execute("SELECT row_to_json(c) FROM store_credentials c JOIN store_grants g USING(grant_id) WHERE g.resource_id=%s", (alpha["resource_id"],)).fetchall()
             for (cred,) in all_credentials:

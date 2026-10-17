@@ -20,6 +20,11 @@ class NotFound(Exception):
 
 
 def initialize(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS store_control (
+        singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK(singleton),
+        recovery_required BOOLEAN NOT NULL DEFAULT false)""")
+    conn.execute("INSERT INTO store_control(singleton) VALUES(true) ON CONFLICT DO NOTHING")
+    conn.execute("REVOKE ALL ON store_control FROM PUBLIC")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_resources (
         resource_id UUID PRIMARY KEY, owner_project TEXT NOT NULL REFERENCES projects(name),
         name TEXT NOT NULL, provider TEXT NOT NULL CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant')),
@@ -27,7 +32,13 @@ def initialize(conn):
         state TEXT NOT NULL CHECK(state IN ('active','retired','purging','purged')),
         observed_state TEXT NOT NULL DEFAULT 'pending', error_code TEXT,
         version BIGINT NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), used_bytes BIGINT,
+        usage_measured_at TIMESTAMPTZ, usage_attempt_at TIMESTAMPTZ,
+        usage_error BOOLEAN NOT NULL DEFAULT false)""")
+    conn.execute("""ALTER TABLE store_resources ADD COLUMN IF NOT EXISTS used_bytes BIGINT,
+        ADD COLUMN IF NOT EXISTS usage_measured_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS usage_attempt_at TIMESTAMPTZ,
+        ADD COLUMN IF NOT EXISTS usage_error BOOLEAN NOT NULL DEFAULT false""")
     conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_resource_names
         ON store_resources(owner_project,name) WHERE state<>'purged'""")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_grants (
@@ -175,6 +186,9 @@ def request_purge(conn, row, body):
 
 
 def issue(conn, row):
+    from . import recovery
+    if recovery.required(conn):
+        raise Conflict("Named-store recovery reconciliation is required")
     res = resource(conn, row["resource_id"], lock=True)
     if row["state"] != "active" or res["state"] != "active" or res["observed_state"] != "active":
         raise Conflict("Grant and resource must be active and provisioned")

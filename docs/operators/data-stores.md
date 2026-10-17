@@ -155,10 +155,26 @@ the reserved project identity; it never implicitly purges named stores.
 
 The initial operator PostgreSQL allocation is 16 GiB of logical reservations,
 with a default 1 GiB per resource. `STORE_CAPACITY_BYTES` supplies reviewed provider
-budgets. These are admission allocations, not measured host capacity or physical
-volume quotas. PostgreSQL byte enforcement is advisory; reads/cleanup remain
+budgets. Capacity admission counts the greater of each approved allocation and its last
+measured use. Stale measurements cannot guarantee current physical headroom.
+These are logical admission allocations, not physical volume quotas. PostgreSQL byte enforcement is advisory; reads/cleanup remain
 available, and monitoring/admission must be distinguished from a hard quota.
 Platform administrators approve quota changes within operator-owned capacity.
+
+The controller measures up to eight resources per pass, with a one-minute minimum
+interval per resource. Measurement failures retain the last reading, its original
+timestamp and an explicit error; unknown usage is not emitted as zero. The portal
+shows these fields. The **Named data-store resources** operator dashboard and
+alerts cover quota pressure, stale/unknown usage, delayed state reconciliation,
+provider credential cleanup and the controller heartbeat. Byte enforcement is
+reported separately from reservations; PostgreSQL remains advisory.
+
+Read-only lab inspection on October 17 found 31,337 MiB total memory, 25,792 MiB
+available and 259 GiB free on the 301 GiB root disk. Tempo's separate 3.9 GiB
+filesystem had 3.6 GiB available. This is idle/current-load evidence, not simultaneous
+shared-store peak, backup/restore or full-sampling capacity acceptance. No service
+was changed. Keep the 8 GiB host reserve and account for configured container limits
+as additional providers are introduced.
 
 The source catalog caps 128 resources and 64 active/pending grants per resource.
 Do not expand allocations or add services without measuring total host reserves,
@@ -195,3 +211,10 @@ uses installed Playwright Chromium to verify real SSO, scoped connection/query,
 denied password saving, expiry reconnect denial and anonymous denial. It uses
 loopback-only HTTP/host networking for its disposable IdP/console, not production
 HTTPS/isolated-network evidence. All fixture containers and volumes are removed.
+
+Restore now sets an explicit named-store quarantine before services start.
+The API denies credential/admin changes, the relay exposes no leases, and the
+worker only revokes recovered credentials until reconciliation completes. Unbound
+applications can still deploy. Older snapshots do not automatically reactivate
+old grants. The provider-specific reconciliation/rebuild and verified off-host
+purge-intent workflow is being completed; do not manually clear this guard.

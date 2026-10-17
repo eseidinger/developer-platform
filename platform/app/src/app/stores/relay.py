@@ -12,7 +12,7 @@ import struct
 import time
 from datetime import datetime, timezone
 import psycopg
-from . import catalog
+from . import catalog, recovery
 
 log = logging.getLogger(__name__)
 MAX_CONNECTIONS = 128
@@ -26,6 +26,8 @@ def connect():
 
 def snapshot():
     with connect() as conn:
+        if recovery.required(conn):
+            return {}
         rows = conn.execute("""SELECT c.relay_port,c.credential_id,c.expires_at,r.resource_id,r.provider
             FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
             JOIN projects p ON p.name=r.owner_project
@@ -48,7 +50,7 @@ def initialize_identity(conn):
     conn.execute(sql.SQL("ALTER ROLE platform_store_relay PASSWORD {}").format(sql.Literal(password)))
     conn.execute("GRANT CONNECT ON DATABASE platform TO platform_store_relay")
     conn.execute("GRANT USAGE ON SCHEMA public TO platform_store_relay")
-    conn.execute("GRANT SELECT ON store_credentials,store_grants,store_resources TO platform_store_relay")
+    conn.execute("GRANT SELECT ON store_control,store_credentials,store_grants,store_resources TO platform_store_relay")
     conn.execute("GRANT SELECT(name,status) ON projects TO platform_store_relay")
 
 

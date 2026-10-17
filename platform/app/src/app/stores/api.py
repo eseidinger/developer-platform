@@ -7,7 +7,7 @@ from fastapi import Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from psycopg.errors import UniqueViolation
-from . import catalog, providers
+from . import catalog, providers, recovery
 from .contract import (ResourceCreate, ResourceRename, Version, Purge, HumanGrant,
                        BindingRequest, Approval, GrantUpdate, QuotaChange, PublicKey)
 from ..identity import Principal
@@ -29,6 +29,8 @@ def install(app, control):
         try:
             with control.connect() as conn, conn.transaction():
                 catalog.lock(conn)
+                if recovery.required(conn):
+                    raise HTTPException(503, "Named-store recovery reconciliation is required")
                 yield conn
         except catalog.NotFound:
             raise HTTPException(404, "Unknown resource or grant") from None
