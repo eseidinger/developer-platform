@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Capture, verify and retain one platform recovery bundle. Run via systemd as root."""
 import argparse
+from contextlib import contextmanager
+import selectors
 import fcntl
 import gzip
 import hashlib
@@ -134,10 +136,46 @@ class Job:
         finally:
             self.resume()
 
+    def postgres_argv(self, *arguments):
+        return [self.docker, 'compose', 'exec', '-T', 'postgres', *arguments]
+
+    @contextmanager
+    def catalog_snapshot(self):
+        """Freeze resource/grant lifecycle across database enumeration and intent capture.
+
+        Data queries continue. Relay deadlines remain independent of this lock.
+        Closing the psql stdin releases the session lock even after interruption.
+        """
+        process = subprocess.Popen(self.postgres_argv('psql','-X','-qAt','-v','ON_ERROR_STOP=1',
+            '-U','postgres','-d','platform'), cwd=self.root, stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
+        try:
+            process.stdin.write(b"SET lock_timeout='30s'; SET idle_session_timeout='35min'; SELECT pg_advisory_lock(731904);\n\\echo STORE_CATALOG_SNAPSHOT\n")
+            process.stdin.flush()
+            with selectors.DefaultSelector() as selector:
+                selector.register(process.stdout, selectors.EVENT_READ)
+                for _ in range(10):
+                    if not selector.select(timeout=40):
+                        raise BackupError('catalog snapshot lock timed out')
+                    line = process.stdout.readline()
+                    if line.strip() == b'STORE_CATALOG_SNAPSHOT':
+                        break
+                    if not line:
+                        raise BackupError('catalog snapshot lock unavailable')
+                else:
+                    raise BackupError('catalog snapshot lock handshake failed')
+            yield
+        finally:
+            try:
+                process.communicate(b'SELECT pg_advisory_unlock(731904);\n\\q\n', timeout=5)
+            except Exception:
+                process.kill(); process.wait(timeout=5)
+            if process.returncode:
+                raise BackupError('catalog snapshot connection failed')
+
     def dump(self, bundle):
         with (bundle / 'postgres.sql.gz').open('wb') as output:
-            with subprocess.Popen([self.docker, 'compose', 'exec', '-T', 'postgres',
-                                   'pg_dumpall', '-U', 'postgres'], cwd=self.root,
+            with subprocess.Popen(self.postgres_argv('pg_dumpall', '-U', 'postgres'), cwd=self.root,
                                   stdout=subprocess.PIPE, stderr=subprocess.DEVNULL) as process:
                 try:
                     with gzip.GzipFile(fileobj=output, mode='wb') as compressed:
@@ -148,6 +186,26 @@ class Job:
                     raise
                 if process.wait() != 0:
                     raise BackupError('database capture failed')
+
+    def check_graph_sources(self):
+        """A retained AGE graph must have a protected source before backup succeeds."""
+        arguments = ('exec','-T','postgres','psql','-X','-A','-t','-v','ON_ERROR_STOP=1','-U','postgres','-d')
+        exists = self.compose(*arguments, 'platform', '-c', "SELECT to_regclass('public.store_resources') IS NOT NULL").strip()
+        if exists == b'f':
+            return
+        if exists != b't':
+            raise BackupError('store catalog unavailable')
+        resources = json.loads(self.compose(*arguments, 'platform', '-c',
+            "SELECT COALESCE(jsonb_agg(resource_id),'[]'::jsonb) FROM store_resources WHERE state IN ('active','retired') AND extensions ? 'age'"))
+        for identity in resources:
+            database = 'resource_' + uuid.UUID(identity).hex
+            valid = self.compose(*arguments, database, '-c', """WITH sources AS (
+                SELECT DISTINCT ON(graph_name) graph_name,payload->>'state' AS state
+                FROM platform_control.graph_sources ORDER BY graph_name,ordinal DESC)
+                SELECT NOT EXISTS(SELECT 1 FROM ag_catalog.ag_graph g LEFT JOIN sources s ON s.graph_name=g.name::text
+                    WHERE s.graph_name IS NULL OR s.state IS DISTINCT FROM 'active')""").strip()
+            if valid != b't':
+                raise BackupError('AGE graph has no active protected source')
 
     def store_recovery_manifest(self, bundle):
         """Purge intent becomes durable off-host BEFORE the data is deleted."""
@@ -218,9 +276,11 @@ class Job:
 
     def capture(self, bundle):
         self.stage = 'database capture'
-        self.dump(bundle)
-        self.stage = 'store recovery intent capture'
-        self.store_recovery_manifest(bundle)
+        with self.catalog_snapshot():
+            self.check_graph_sources()
+            self.dump(bundle)
+            self.stage = 'store recovery intent capture'
+            self.store_recovery_manifest(bundle)
         self.stage = 'project secret capture'
         self.project_secrets(bundle)
         self.stage = 'configuration capture'

@@ -498,6 +498,12 @@ OID values and repair results are in the
 These observations match the mechanism reported in
 [upstream #2503](https://github.com/apache/age/issues/2503).
 
+A later [source-projection recovery fixture](../../../../persistence/compatibility/projection-rebuild-2026-10-17.md)
+now reproduces this failure and rebuilds two graphs from protected source snapshots
+using normal AGE graph/label APIs. Ordinary SQL, pgvector data and declared graph
+indexes survive. No manual OID catalog repair is used. This is local implementation
+evidence; deployed recovery/reconnection and RPO/RTO acceptance remain open.
+
 ### Apache AGE rebuild policy
 
 **Owner-selected policy (October 17, 2026):** Initially use AGE graphs only as

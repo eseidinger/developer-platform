@@ -148,6 +148,8 @@ class Catalog:
             self.result = [("developer", 1)]
         elif query.startswith("SELECT status, count(*) FROM deployment_credentials"):
             self.result = [("active", 1)]
+        elif "FROM store_resources" in query or "FROM store_grants" in query:
+            self.result = []
         elif "FROM deployment_credentials WHERE issuer=" in query:
             self.result = []
         return self
@@ -529,7 +531,8 @@ class LifecycleTests(unittest.TestCase):
                          ("Secret", "database")} <= kinds)
         self.assertEqual(body["retains"]["database"], "project_smoke")
         self.assertEqual(body["access"], {"grants_by_role": {"developer": 1},
-                                           "credentials_by_status": {"active": 1}})
+                                           "credentials_by_status": {"active": 1},
+                                           "named_store_resources": [], "named_store_grants": []})
         self.assertNotIn("PGPASSWORD", json.dumps(body))
         self.assertEqual(self.preview().json()["scope_token"], body["scope_token"])
 
@@ -580,7 +583,12 @@ class LifecycleTests(unittest.TestCase):
         self.complete_operations()
         token = self.preview().json()["scope_token"]
         namespaces = self.runtime.resources.get.return_value
-        namespaces.delete.side_effect = ApiException(status=500)
+        def unavailable(**kwargs):
+            fence = next(i for i, event in enumerate(self.catalog.events)
+                         if isinstance(event, str) and event.startswith("INSERT INTO store_project_retirements"))
+            self.assertIn("transaction.commit", self.catalog.events[fence:])
+            raise ApiException(status=500)
+        namespaces.delete.side_effect = unavailable
         self.assertEqual(self.confirmed_retire(token).status_code, 503)
         self.assertNotEqual(self.catalog.rows["smoke"][1], "retired")
         namespaces.delete.side_effect = None

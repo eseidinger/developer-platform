@@ -90,6 +90,8 @@ def reconcile(conn, manifest, apply=False):
             provider.purge(row)
             state = 'purged'
         else:
+            if row['provider'] == 'postgresql' and 'age' in row['extensions']:
+                provider.rebuild_projections(row)
             provider.validate_recovery(row)
             state = row['state']
         if identity in current:

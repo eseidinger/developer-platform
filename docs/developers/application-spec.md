@@ -92,10 +92,7 @@ explains exporter authentication and framework setup.
     ],
     "configuration": {
       "values": {"LOG_LEVEL": "info"}
-    },
-    "resources": [
-      {"name": "database", "type": "postgres", "profile": "shared-dev", "deletionPolicy": "retain"}
-    ]
+    }
   }
 }
 ```
@@ -117,7 +114,7 @@ approved it.
 | `metadata.environment` | No | Only `default`. |
 | `spec.components` | Yes | Array of 1–5 service or scheduled components. Names must be unique. |
 | `spec.configuration` | No | Object containing only `values`; described below. |
-| `spec.resources` | No | At most one PostgreSQL declaration; described below. A project database is provisioned by the current platform profile regardless. |
+| `spec.resources` | Rejected | Stores have an independent named-resource lifecycle; bind them explicitly on the consuming component. |
 
 ### Fields shared by all components
 
@@ -130,6 +127,7 @@ approved it.
 | `runtime.command` | No | Array of up to 20 strings; replaces the image command. |
 | `runtime.args` | No | Array of up to 50 strings; supplies command arguments. |
 | `resources` | No | Resource requests and limits; see [Resource limits](#resource-limits). |
+| `bindings` | No | Up to eight approved resource references: `bindingId` UUID and optional `envPrefix` (empty, or uppercase letters/digits/underscores ending in an underscore). |
 
 ### `service` component fields
 
@@ -283,29 +281,37 @@ other secrets are rejected; use the platform secrets API or UI for secret values
 Application secrets are project-scoped in the current profile and may be mounted
 into every service and scheduled component in that project. Do not use the
 project secret mechanism when a credential requires component-level isolation;
-that capability is not supported. Classification is project governance metadata,
+use a named-store component binding for managed store credentials instead. Classification is project governance metadata,
 not part of this deployment declaration.
 
-`spec.resources`, if declared, may contain one object only:
+Stores are independent resources, created before an application and retained
+when it is removed. There is no implicit project database or database Secret.
+An administrator requests a resource binding for the exact project/component;
+cross-project requests need the resource owner's approval. After the binding is
+observed active, add its UUID to that component:
 
 ```json
-{"name": "database", "type": "postgres", "profile": "shared-dev", "deletionPolicy": "retain"}
+"bindings": [{"bindingId": "11111111-1111-1111-1111-111111111111", "envPrefix": ""}]
 ```
 
-No other resource type, PostgreSQL profile, or deletion policy is accepted. The
-current profile always provisions the project PostgreSQL database and injects its
-connection values through `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and
-`PGPASSWORD`.
+Replace the sample UUID with the actual approved binding. Only that component
+receives its store Secret and private lease-port egress. Multiple PostgreSQL
+resources need distinct prefixes such as `PRIMARY_` and `REPORTING_` to avoid
+variable collisions. Unbound components receive no database credentials/access.
+Explicit configuration cannot shadow binding variables. Application credentials
+rotate every 30 days with controlled restarts and at most one-hour overlap;
+applications must reconnect/retry. Read-write includes application-schema DDL.
 
-In the initial lab profile, application-to-PostgreSQL traffic is not TLS-protected;
-the cross-project encrypted-channel requirement covers public HTTPS instead.
-See the [generic integration profile](../architecture/application-contract.md#generic-cross-project-integration-profile)
-for this limit and the separate governance/retention responsibilities.
+The initial PostgreSQL relay profile uses private plaintext PostgreSQL inside
+SSH or the isolated network; the raw store port is not public. See the
+[named-store workflow](../operators/data-stores.md) and
+[human resource access](database-access.md). The old `shared-dev`/`retain` objects
+in `spec.resources` are rejected; recreate declarations against this contract.
 
 ## Earlier accepted forms
 
-Do not choose these forms for new applications. They remain accepted for existing
-projects and map to the same desired-state deployment behavior.
+Do not choose these forms for new applications. They remain accepted for unbound applications. Store consumers must use
+`v1alpha2` component bindings; these forms do not provision an implicit database.
 
 ### `platform.example/v1alpha1`
 
@@ -325,8 +331,7 @@ rules, but `spec` contains a single `application` object instead of `components`
       "resources": {"requests": {"cpu": "250m", "memory": "256Mi"}, "limits": {"cpu": "500m", "memory": "512Mi"}},
       "health": {"readiness": {"profile": "status"}}
     },
-    "configuration": {"values": {"LOG_LEVEL": "info"}},
-    "resources": [{"name": "database", "type": "postgres", "profile": "shared-dev", "deletionPolicy": "retain"}]
+    "configuration": {"values": {"LOG_LEVEL": "info"}}
   }
 }
 ```

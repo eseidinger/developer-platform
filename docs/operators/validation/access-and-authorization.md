@@ -24,10 +24,17 @@ wrapper automates the Phase 9.7 core tunnel and SQL checks. It does **not**
 deploy the platform, install the bastion, publish the neutral fixture, or close
 the full acceptance gate. Its default `plan` validates the run scope without
 contacting the platform API. A live `run` creates two private, run-scoped fixture
-projects (`hd-<run-id>-a` and `hd-<run-id>-b`) with separate managed databases.
+projects (`hd-<run-id>-a` and `hd-<run-id>-b`) with separate named resources
+and explicit read-write component bindings.
 Their data and projects are retained for explicit owner-reviewed retirement;
 the runner revokes its temporary human grant and test persona. Never run it
 against real application data.
+
+The current runner uses expiring named-resource credentials. Use a dedicated
+human administrator with no existing named-store grants or registered SSH key;
+it refuses to replace an operator's existing key or disrupt their leases. Historical
+evidence below describes the earlier implicit project-database model and does not
+establish acceptance for this replacement. See the [current workflow](../data-stores.md).
 
 First deploy the platform and the restricted bastion using
 [`install-human-database-access.yml`](../../../ansible/install-human-database-access.yml).

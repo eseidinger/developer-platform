@@ -310,6 +310,7 @@ def store_dashboard():
         ("Desired state pending", 'platform_store_reconcile_pending', "short", "Provisioning, retirement, purge or configuration has not reached observed state."),
         ("Active credential generations", 'platform_store_credentials_active', "short", "Includes bounded rotation overlap and early human renewal. No principal or credential IDs are labels."),
         ("Provider access cleanup pending", 'platform_store_credentials_cleanup_pending', "short", "Expired or stale provider identities awaiting cleanup; relay denies them independently."),
+        ("Recovery quarantine", 'platform_store_recovery_required', "short", "One means restored access remains blocked until verified purge intents, source rebuild and credential cleanup complete. Old grants are never automatically reactivated."),
         ("Store controller heartbeat age", 'time() - platform_store_worker_last_success_timestamp_seconds', "s", "Committed worker pass and successful metrics publication. Missing/stale is unavailable, not idle."),
     ]
     return {"uid": "named-data-stores", "title": "Named data-store resources", "schemaVersion": 41,

@@ -60,7 +60,9 @@ manage each other's tables/indexes and future schemas. They do not own the
 PostgreSQL database, cannot purge it, manage global roles or install extensions.
 Credential logins do not inherit schema authority after `SET ROLE NONE`; normal
 connections use the shared resource role. New functions have no PUBLIC execute
-grant, preventing accidental reader writes through writer SECURITY DEFINER code.
+grant. Data writers cannot change grants/default ACLs or create security-definer
+routines; those are operator privileges. This preserves managed read-only access
+while ordinary application-schema create/alter/drop remains available.
 Readers receive future-object access without data/schema write rights. An
 operator-owned event trigger prevents data identities from installing even
 trusted extensions; extension objects live outside writer-owned schemas.
@@ -118,7 +120,8 @@ use SSH transport encryption for remote clients or the isolated console network.
 Startup `options`, cancellation packets and protocols other than PostgreSQL 3.0
 are currently rejected. Ordinary data/query traffic is opaque and not logged.
 The initial relay accepts 128 concurrent connections, 20 per credential, and 512 live credential
-ports (20000–20511). A human key may authorize at most 64 leases per SSH login.
+ports (20000–20511). A human can hold at most 64 current credential leases across resources, matching
+the SSH key authorization limit. Each grant also caps outstanding generations at 24.
 No Docker socket is exposed to the API/relay.
 
 ## PostgreSQL browser console
@@ -152,6 +155,32 @@ ordinary data identities; neither extension is installed in unselected databases
 TimescaleDB remains deferred and is absent from this runtime image. pgvector
 objects are in the operator-owned `platform_extensions` schema. AGE uses its
 operator-owned `ag_catalog`; application graphs remain resource-scoped.
+
+## AGE authoritative snapshots and rebuild
+
+Use the [scoped snapshot loader/example](../../examples/postgresql-graph/README.md)
+for durable AGE projections. Complete source snapshots, stable source keys,
+explicit labels and reviewed GIN/source-key index definitions are stored in an
+operator-owned append-only table inside the resource database. Writers may append
+sources but cannot change/delete history. A server-generated ordinal orders
+versions; clock changes cannot select an older snapshot as latest. The helper and
+recovery path bound each resource to 64 graph identities and read one source at
+a time. Each source is bounded to eight MiB, 10,000 vertices, 50,000 edges and
+64 labels/index definitions. These are operational limits, not adoption gates.
+
+Root recovery validates all source checksums before replacing graphs, using AGE's
+normal graph/label APIs. It restores source-defined indexes/constraints and scoped
+ownership. AGE internal IDs are rebuilt; external references must use stable
+source keys. Native Cypher edits, labels and indexes must also be represented in
+protected sources/definitions to survive recovery. Arbitrary SQL dependencies on
+generated graph objects require separate protected loaders; the generic loader
+refuses to cascade into them. Unregistered retained graphs fail backup preflight.
+
+The real local [dump/restore and rebuild evidence](../../persistence/compatibility/projection-rebuild-2026-10-17.md)
+covers two graphs, multiple labels, a cycle, updated/escaped properties, declared
+indexes, readers and preserved ordinary SQL/pgvector data. It closes the local
+source-rebuild implementation gap; deployed recovery/reconnection and RPO/RTO
+acceptance remain open.
 
 ## Retention and capacity
 
@@ -254,3 +283,11 @@ verification before purge, latest-intent replay after a simulated older catalog/
 restore, all-grant revocation, and fresh approval before access. This does not use
 the real off-host repository, send notifications or demonstrate a full data restore.
 The backup suite also exercises real encrypted roundtrip/retention locally.
+Database dumping and intent capture hold the shared lifecycle lock. Application
+data queries and relay expiry checks continue, while resource/grant/deployment
+mutations wait. The lock is released on interruption and has a bounded idle timeout;
+a lost lock makes the capture fail instead of verifying an inconsistent point.
+
+Personal credential issuance requires an end-user token issued to the platform portal or CLI, plus the caller’s explicit human grant. Service-account administration does not confer personal store access. Each human can hold at most 64 current private-access leases; each grant allows at most 24 outstanding generations.
+
+Project retirement confirmation pins named resource and grant versions. The platform commits the store access fence before requesting namespace deletion. After a partial retirement, request a fresh preview before retrying; the portal refreshes it when namespace deletion is still in progress. Data remains retained throughout. Recovery operators must review platform/project administrative roles against current authority before releasing quarantine; restoring store data never reactivates recovered data grants.

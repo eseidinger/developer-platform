@@ -2350,7 +2350,8 @@ def retirement_access_inventory(conn, name):
     grants = conn.execute("SELECT role, count(*) FROM platform_grants WHERE scope_kind='project' AND scope_id=%s GROUP BY role", (name,)).fetchall()
     credentials = conn.execute("SELECT status, count(*) FROM deployment_credentials WHERE project=%s GROUP BY status", (name,)).fetchall()
     return {"grants_by_role": {role: count for role, count in grants},
-            "credentials_by_status": {state: count for state, count in credentials}}
+            "credentials_by_status": {state: count for state, count in credentials},
+            **store_catalog.retirement_inventory(conn, name)}
 
 
 def project_database_name(name: str) -> str:
@@ -2607,6 +2608,10 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                         return JSONResponse(status_code=409, content={
                             "detail": "The project changed since the preview; request a new preview",
                             "code": "scope_changed"})
+                    # Commit the access fence before the external deletion: a
+                    # lost Kubernetes response must never leave store access live.
+                    with conn.transaction():
+                        store_catalog.retire_project(conn, name)
                     try:
                         runtime.resources.get(api_version="v1", kind="Namespace").delete(name="project-" + name)
                     except ApiException as exc:

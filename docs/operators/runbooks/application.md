@@ -106,11 +106,17 @@ ansible-playbook -i ansible/inventory.yml ansible/retire-platform-project.yml \
   -e platform_retire_verify_credential_revocation=true
 ```
 
-Before retirement, record the project database/role, the latest **verified** backup snapshot identifier and its
+Before retirement, record owned resource UUIDs, consumer bindings and credential cleanup state, the latest **verified** backup snapshot identifier and its
 independent restore evidence, and the chosen decision (`retain` or separately approved deletion). The Platform API
 does not infer project-level backup coverage from a retained database: the backup bundle is platform-wide and no
 project-addressable snapshot index exists. If that evidence is unavailable, retain the data and record the decision
 as `backup coverage unverified`; do not perform a destructive database action as part of retirement.
+
+Named resource retirement revokes affected access and retains data. Removing a
+consumer application/binding leaves shared resources and other consumers intact.
+Named-store purge is a separate UUID/owner/version-confirmed action after cleanup;
+it waits for verified off-host purge intent. Project-catalog purge never implicitly
+drops named resources. See the [named-store lifecycle](../data-stores.md).
 
 ## Restart an application
 

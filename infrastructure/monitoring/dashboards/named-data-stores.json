@@ -299,6 +299,41 @@
     {
       "id": 9,
       "type": "timeseries",
+      "title": "Recovery quarantine",
+      "description": "One means restored access remains blocked until verified purge intents, source rebuild and credential cleanup complete. Old grants are never automatically reactivated. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform_store_recovery_required",
+          "legendFormat": "{{project}} {{resource_id}} {{provider}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
       "title": "Store controller heartbeat age",
       "description": "Committed worker pass and successful metrics publication. Missing/stale is unavailable, not idle. Missing data means collection or target discovery needs checking.",
       "datasource": {
@@ -308,7 +343,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 32
       },
       "targets": [

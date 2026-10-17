@@ -39,22 +39,36 @@ class Postgres:
                 .format(sql.Identifier(name), sql.Identifier(owner)))
             conn.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}")
                 .format(sql.Identifier(name), sql.Identifier(reader)))
-        with self.connection(name) as conn:
+        with self.connection(name) as conn, conn.transaction():
             conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS public AUTHORIZATION {}").format(sql.Identifier(owner)))
             conn.execute("REVOKE ALL ON SCHEMA public FROM PUBLIC")
             conn.execute("CREATE SCHEMA IF NOT EXISTS platform_control AUTHORIZATION postgres")
             conn.execute("REVOKE ALL ON SCHEMA platform_control FROM PUBLIC")
             conn.execute("""CREATE OR REPLACE FUNCTION platform_control.guard_extensions() RETURNS event_trigger
-                LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+                LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
                 BEGIN
                     IF session_user <> 'postgres' THEN
-                        RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='Extensions are managed by the platform';
+                        RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='Extensions and access permissions are managed by the platform';
                     END IF;
                 END $$""")
-            if not conn.execute("SELECT 1 FROM pg_event_trigger WHERE evtname='platform_store_extensions'").fetchone():
-                conn.execute("""CREATE EVENT TRIGGER platform_store_extensions ON ddl_command_start
-                    WHEN TAG IN ('CREATE EXTENSION','ALTER EXTENSION','DROP EXTENSION')
-                    EXECUTE FUNCTION platform_control.guard_extensions()""")
+            conn.execute("DROP EVENT TRIGGER IF EXISTS platform_store_extensions")
+            conn.execute("""CREATE EVENT TRIGGER platform_store_extensions ON ddl_command_start
+                WHEN TAG IN ('CREATE EXTENSION','ALTER EXTENSION','DROP EXTENSION','GRANT','REVOKE','ALTER DEFAULT PRIVILEGES')
+                EXECUTE FUNCTION platform_control.guard_extensions()""")
+            conn.execute("""CREATE OR REPLACE FUNCTION platform_control.guard_definer() RETURNS event_trigger
+                LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog,pg_temp AS $$
+                BEGIN
+                    IF session_user <> 'postgres' AND EXISTS(
+                        SELECT 1 FROM pg_catalog.pg_event_trigger_ddl_commands() d
+                        JOIN pg_catalog.pg_proc p ON d.classid='pg_catalog.pg_proc'::regclass AND p.oid=d.objid
+                        WHERE p.prosecdef) THEN
+                        RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='Security-definer routines are managed by the platform';
+                    END IF;
+                END $$""")
+            if not conn.execute("SELECT 1 FROM pg_event_trigger WHERE evtname='platform_store_definer'").fetchone():
+                conn.execute("""CREATE EVENT TRIGGER platform_store_definer ON ddl_command_end
+                    WHEN TAG IN ('CREATE FUNCTION','ALTER FUNCTION','CREATE PROCEDURE','ALTER PROCEDURE')
+                    EXECUTE FUNCTION platform_control.guard_definer()""")
             conn.execute(sql.SQL("ALTER SCHEMA public OWNER TO {}").format(sql.Identifier(owner)))
             conn.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(reader)))
             # PostgreSQL otherwise grants PUBLIC execution on new functions.
@@ -79,6 +93,10 @@ class Postgres:
                 else:
                     conn.execute(sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(sql.Identifier(extension)))
             if "age" in resource["extensions"]:
+                from . import projections
+                projections.initialize(conn, owner, reader)
+                conn.execute(sql.SQL("GRANT SELECT ON ag_catalog.ag_graph TO {}, {}")
+                    .format(sql.Identifier(owner), sql.Identifier(reader)))
                 conn.execute(sql.SQL("GRANT USAGE ON SCHEMA ag_catalog TO {}, {}")
                     .format(sql.Identifier(owner), sql.Identifier(reader)))
             for schema in conn.execute("SELECT nspname FROM pg_namespace WHERE nspowner=(SELECT oid FROM pg_roles WHERE rolname=%s)", (owner,)).fetchall():
@@ -172,3 +190,11 @@ class Postgres:
                 for (graph,) in conn.execute("SELECT name::text FROM ag_catalog.ag_graph").fetchall():
                     conn.execute(sql.SQL("SELECT * FROM ag_catalog.cypher({}, $$ MATCH (n) RETURN count(n) $$) AS (v ag_catalog.agtype)")
                         .format(sql.Literal(graph))).fetchone()
+
+    def rebuild_projections(self, resource):
+        if "age" not in resource["extensions"]:
+            return {"graphs": 0}
+        from . import projections
+        name = catalog.identifier(resource["resource_id"])
+        with self.connection(name) as conn:
+            return projections.rebuild(conn, name + "_owner")

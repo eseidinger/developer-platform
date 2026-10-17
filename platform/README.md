@@ -7,7 +7,8 @@ Implementation ownership and validation are summarized in the
 [Platform API maintainer guide](../docs/maintainers/platform-api.md).
 
 The platform API provisions applications on the lab's Kubernetes cluster and
-creates a PostgreSQL database for each project. The current interface includes a
+manages independent named PostgreSQL resources with explicit component bindings.
+Applications without bindings receive no database credentials. The current interface includes a
 small browser portal plus a REST API with interactive documentation. Both enforce
 individual OIDC identities and platform-owned project grants.
 

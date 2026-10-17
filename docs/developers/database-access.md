@@ -1,73 +1,69 @@
-# Human PostgreSQL access
+# Human access to named stores
 
-Status: source implementation, October 14, 2026. Live tunnel, isolation, and
-session-revocation acceptance remain in Phase 9.
+Status: source implementation with disposable PostgreSQL/pgAdmin acceptance,
+October 17, 2026. Live rollout and deployed recovery acceptance remain open.
 
-Application database credentials are not human credentials. A project
-administrator grants a named OIDC human a separate read-only PostgreSQL login
-and an SSH public key. The grant is scoped to the project, audited, and may be
-revoked without rotating the application's password. Only `ssh-ed25519` public
-keys are supported; submit the two fields before any comment.
+A project administrator creates an independent resource and explicitly grants a
+human read-only or read-write access. Platform administrators have those management
+powers across projects, but need their own human grant for direct data access.
+Application bindings use separate credentials. Removing an application retains data.
 
-The same grant, revocation, SSH-key replacement, and one-time password actions
-are also available in the project's **Human database access** portal section.
+Use **Data stores** in the project portal for resource/grant administration and
+**My store access** for your own leases and connection details. Personal credential
+operations require an interactive `platform-cli` or `platform-portal` login;
+automation tokens are not human identities, including unregistered service clients.
 
-For terminal workflows, use a human CLI session with automation environment
-credentials cleared:
-
-```bash
-ssh-keygen -t ed25519 -f ~/.ssh/devplat-db
-# grant.json contains issuer, subject, and public_key for the named human.
-devplat database-access grants create --project PROJECT --file grant.json
-devplat database-access grants list --project PROJECT --output json
-```
-
-The `issuer` and `subject` must match the target human's OIDC token exactly.
-The grantee may inspect their own access and rotate their SQL password. The
-password is returned once, so save it in a protected password manager. Do not
-pass it on a command line or include it in shell history or diagnostic logs.
+For terminal workflows:
 
 ```bash
-devplat database-access me --project PROJECT --output json
-devplat database-access credential issue --project PROJECT --output json
+# An administrator creates grant.json with issuer, subject and mode.
+devplat stores grants create RESOURCE_UUID --file grant.json
+devplat stores grants list RESOURCE_UUID --output json
+# The named human uses their own interactive CLI profile.
+devplat stores access me --output json
+devplat stores access issue GRANT_UUID --output json
+devplat stores access leases GRANT_UUID --output json
+devplat stores access credential CREDENTIAL_UUID --output json
 ```
 
-The operator installs the isolated tunnel using
-`ansible/install-human-database-access.yml`. It binds to `127.0.0.1:2222` by
-default; an operator must choose a specific protected management address and
-firewall policy before remote users can reach it. It permits only local TCP
-forwarding to the configured PostgreSQL address/port, with no shell, agent,
-remote forwarding, or PTY. The dynamic key lookup fails closed if the API is
-unavailable. Verify the SSH host key through an independent trusted channel.
+Use the current resource/grant UUIDs. Issuance returns pending metadata; inspect
+the same credential UUID until ready. Never repeat an issuance POST automatically
+after a timeout: inspect lease history first. Only the named human can reveal an
+active credential, including during its original 24-hour validity. Early renewal
+creates another independent 24-hour lease and does not extend the old one.
+Permission changes, revocation and retirement invalidate affected generations.
 
-```bash
-ssh -i ~/.ssh/devplat-db -N -L 127.0.0.1:15432:POSTGRES_IP:5432 \
-  -p 2222 platform-db@BASTION_HOST
-```
+For private SSH access, register an Ed25519 key using
+`devplat stores access key --file key.json`, with `{"public_key":"ssh-ed25519 ..."}`.
+Replacing a key ends your current leases. Register the key before issuing the
+lease you want to use. The operator must configure a reachable private bastion;
+the default installer listens on loopback. Follow the returned SSH instructions
+and independently verify the SSH host key. The key may forward only to your
+credential's private relay ports, with no shell, agent, remote forwarding or PTY.
 
-In another terminal, use the username and database returned by `me` and the
-one-time credential response. Let `psql` prompt for the password, or use an
-owner-only `PGPASSFILE`; avoid `PGPASSWORD` in shared process environments.
+After starting the tunnel, connect the native PostgreSQL client to its **local**
+forwarded address/port, using `PGUSER`/`PGDATABASE` from your lease. Let the client
+prompt for its password or use an owner-only `PGPASSFILE`. The relay closes the
+existing database connection at expiry; a still-open SSH tunnel does not extend it.
+An empty advertised SSH host means the operator has not configured remote access.
 
-```bash
-psql -h 127.0.0.1 -p 15432 -U HUMAN_USERNAME -d PROJECT_DATABASE -W
-```
+For browser access, open the console link in **My store access**, sign in to
+pgAdmin with your platform identity, and register host `store-access`, the lease's
+`PGPORT`, maintenance database `PGDATABASE`, username `PGUSER`, SSL mode `Disable`,
+and your own `PGPASSWORD`. Raw database ports stay private. Password saving is
+disabled. Renew and reconnect with the new lease port/username at expiry.
 
-Access is read-only for existing and future tables in the `public` schema
-created by the project database owner. Additional schemas or writers require a
-separate reviewed profile. The provisioner removes PostgreSQL's default
-`PUBLIC` database access for managed project databases. Revocation disables
-the human SQL login and terminates its active PostgreSQL backends; it also
-removes the key's SSH authorization if no other active grant uses that key.
-Existing SSH tunnels may stay connected, but cannot open a usable PostgreSQL
-session with a revoked role. To rotate a key, use `database-access key replace`
-with a JSON object containing `public_key`.
+Both application and human read-write access include application-schema
+create/alter/drop. Readers have existing/future table access. Server administration,
+extension installation, access grants/default ACL changes and security-definer
+routines remain operator privileges. Shared writer ownership permits startup
+migrations and changes to other approved writers' tables in the same resource.
 
-```bash
-devplat database-access grants revoke --project PROJECT \
-  --issuer ISSUER --subject SUBJECT --confirm-project PROJECT
-```
+Revoke through the portal or `stores grants revoke GRANT_UUID --file version.json`,
+where the file contains the current `version`. Revocation retains data and affects
+every credential generation. Resource purge is a separate confirmed action after
+retirement and cleanup, waiting for verified off-host purge intent before deletion.
+The old implicit-project `database-access` issuance commands now return HTTP 410.
 
-The API and CLI are not a database shell or an application-data export path.
-The deployed foreign-project denial, credential-separation, and revocation
-checks are tracked as Phase 9 acceptance.
+See the [resource, rotation and recovery workflow](../operators/data-stores.md)
+and [rebuildable AGE example](../../examples/postgresql-graph/README.md).

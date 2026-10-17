@@ -17,6 +17,7 @@ class Principal:
     issuer: str
     subject: str
     display_name: str | None = None
+    authorized_party: str | None = None
 
     @property
     def audit_id(self) -> str:
@@ -45,7 +46,9 @@ class OIDCVerifier:
             raise AuthenticationError("OIDC access token has no subject")
         display_name = next((claims.get(name) for name in ("preferred_username", "name", "email")
                              if isinstance(claims.get(name), str) and claims.get(name)), None)
-        return Principal(self.issuer, subject, display_name)
+        party = claims.get("azp")
+        return Principal(self.issuer, subject, display_name,
+                         party if isinstance(party, str) and 0 < len(party) <= 128 else None)
 
 
 def configured_verifier() -> OIDCVerifier:

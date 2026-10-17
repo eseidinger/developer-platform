@@ -48,12 +48,26 @@ try {
   await call('DELETE', path)
   const expired = await call('POST', path, { password: c.PGPASSWORD })
   if (expired.body.data?.connected === true || (expired.status === 200 && expired.body.success === 1)) throw Error()
+  stage = 'different-human-isolation'
+  const other = await browser.newContext()
+  const otherPage = await other.newPage()
+  await otherPage.goto(config.base + '/login')
+  await otherPage.getByRole('button', { name: /Platform sign-in/ }).click()
+  await otherPage.locator('#username').fill(config.otherUsername)
+  await otherPage.locator('#password').fill(config.otherPassword)
+  await otherPage.locator('#kc-login').click()
+  await otherPage.waitForURL(url => url.pathname.endsWith('/browser/'), { timeout: 30000 })
+  const foreign = await other.request.get(config.base + `/browser/server/obj/1/${sid}`)
+  const foreignBody = await foreign.json()
+  if ((!([400, 403, 404, 410].includes(foreign.status())) && foreignBody.success !== 0)
+      || JSON.stringify(foreignBody).includes(c.PGUSER)) throw Error()
+  await other.close()
   stage = 'anonymous-denial'
   const anonymous = await browser.newContext()
   const denied = await anonymous.request.get(config.base + `/browser/server/obj/1/${sid}`, { maxRedirects: 0 })
   if (![302, 401, 403].includes(denied.status())) throw Error()
   await anonymous.close()
-  console.log('PASS console: real Keycloak SSO; scoped pgAdmin connection/query; password saving denied; expired reconnect denied; anonymous denial')
+  console.log('PASS console: real Keycloak SSO; scoped pgAdmin connection/query; password saving denied; expired reconnect denied; other-human/anonymous isolation')
 } catch {
   console.log(stage)
   process.exitCode = 1

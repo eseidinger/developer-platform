@@ -10,6 +10,7 @@ import time
 from contextlib import contextmanager, nullcontext
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
+from pathlib import Path
 import psycopg
 from psycopg import sql
 from app.stores import catalog
@@ -20,7 +21,10 @@ from app.stores.postgres import Postgres
 
 
 def run(*args):
-    return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT, timeout=30).strip()
+    try:
+        return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT, timeout=30).strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        raise RuntimeError("Disposable PostgreSQL fixture operation failed") from None
 
 
 def main():
@@ -62,6 +66,7 @@ def main():
                     grant = catalog.create_human_grant(conn, alpha,
                         HumanGrant(issuer="https://fixture.invalid", subject=subject, mode=mode), "fixture-admin")
                     cred = catalog.issue(conn, grant)
+                    assert (datetime.fromisoformat(cred["expires_at"]) - datetime.fromisoformat(cred["issued_at"])).total_seconds() == 86400
                     credentials.append(cred)
                 provider.issue(alpha, cred)
             def login(credential, resource=alpha):
@@ -70,18 +75,48 @@ def main():
                     password=catalog.secret_for(credential["credential_id"]), autocommit=True, connect_timeout=2)
             a, b, reader = credentials
             with login(a) as writer:
+                reference = Path(__file__).resolve().parents[1] / "examples/postgresql-reference/baseline.sql"
+                writer.execute(reference.read_text())
+                try:
+                    with writer.transaction():
+                        writer.execute("INSERT INTO reference.datasets(id,title,metadata) VALUES(2,'rolled back','{}')")
+                        writer.execute("INSERT INTO reference.outbox(payload) VALUES('{}')")
+                        raise RuntimeError("synthetic transaction failure")
+                except RuntimeError:
+                    pass
+                assert writer.execute("SELECT count(*) FROM reference.datasets").fetchone()[0] == 1
+                assert writer.execute("SELECT count(*) FROM reference.outbox").fetchone()[0] == 1
                 writer.execute("CREATE TABLE public.shared(id INTEGER)")
                 writer.execute("INSERT INTO public.shared VALUES(1)")
                 writer.execute("CREATE SCHEMA another")
                 writer.execute("CREATE TABLE another.future(id INTEGER)")
                 writer.execute("INSERT INTO another.future VALUES(2)")
-                writer.execute("CREATE FUNCTION public.write_via_function() RETURNS void LANGUAGE sql SECURITY DEFINER AS $$ INSERT INTO public.shared(id) VALUES(44) $$")
+                try:
+                    writer.execute("CREATE FUNCTION public.privilege_bypass() RETURNS void LANGUAGE sql SECURITY DEFINER AS $$ INSERT INTO public.shared(id) VALUES(44) $$")
+                except psycopg.errors.InsufficientPrivilege:
+                    pass
+                else:
+                    raise AssertionError("Writer created a security-definer privilege bypass")
+                writer.execute("CREATE FUNCTION public.write_via_function() RETURNS void LANGUAGE sql AS $$ INSERT INTO public.shared(id) VALUES(44) $$")
+                for statement in ("GRANT INSERT ON public.shared TO PUBLIC", "ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO PUBLIC"):
+                    try:
+                        writer.execute(statement)
+                    except psycopg.errors.InsufficientPrivilege:
+                        pass
+                    else:
+                        raise AssertionError("Writer bypassed managed access permissions")
             with login(b) as writer:
                 writer.execute("ALTER TABLE public.shared ADD COLUMN note TEXT")
                 writer.execute("UPDATE public.shared SET note='changed by second writer'")
             with login(reader) as ro:
                 assert ro.execute("SELECT id FROM public.shared").fetchone()[0] == 1
                 assert ro.execute("SELECT id FROM another.future").fetchone()[0] == 2
+                assert ro.execute("SELECT id FROM reference.datasets WHERE metadata @> '{\"kind\":\"energy\"}'::jsonb").fetchone()[0] == 1
+                assert ro.execute("SELECT id FROM reference.datasets WHERE search @@ websearch_to_tsquery('english','solar')").fetchone()[0] == 1
+                assert ro.execute("WITH RECURSIVE reachable(id) AS (VALUES(1) UNION SELECT d.child FROM reference.dependencies d JOIN reachable r ON d.parent=r.id) SELECT count(*) FROM reachable").fetchone()[0] == 3
+                assert ro.execute("SELECT total FROM reference.monthly").fetchone()[0] == 6
+                assert ro.execute("SELECT count(*) FROM reference.measurements_2026").fetchone()[0] == 2
+
                 for query in ("SELECT public.write_via_function()", "INSERT INTO public.shared(id) VALUES(3)", "CREATE TABLE public.denied(id int)",
                               "ALTER TABLE public.shared ADD COLUMN denied int"):
                     try:
@@ -119,8 +154,21 @@ def main():
                     writer.execute("CREATE TABLE public.embeddings(id int, embedding vector(3))")
                     writer.execute("INSERT INTO public.embeddings VALUES(1,'[1,2,3]'),(2,'[4,5,6]')")
                     writer.execute("CREATE INDEX ON public.embeddings USING hnsw(embedding vector_l2_ops)")
-                    writer.execute("SELECT create_graph('fixture_graph')")
-                    writer.execute("SELECT * FROM cypher('fixture_graph', $$ CREATE (:Node {id: 1})-[:LINK]->(:Node {id: 2}) $$) AS (v agtype)")
+                    from app.stores import projections
+                    graph_source = {"format": 1, "graph": "fixture_graph", "indexes": [
+                        {"name": "node_properties", "label": "Node", "kind": "properties-gin"},
+                        {"name": "node_keys", "label": "Node", "kind": "source-key-unique"}], "vertices": [
+                        {"key": "first", "label": "Node", "properties": {"id": 1, "name": "quoted ' \" $$ marker", "zero": -0.0}},
+                        {"key": "second", "label": "Node", "properties": {"id": 2}}],
+                        "edges": [{"source": "first", "target": "second", "label": "LINK"}]}
+                    projections.append(writer, graph_source)
+                    for query in ("DELETE FROM platform_control.graph_sources", "DROP TABLE platform_control.graph_sources"):
+                        try:
+                            writer.execute(query)
+                        except psycopg.errors.InsufficientPrivilege:
+                            pass
+                        else:
+                            raise AssertionError("Writer altered protected source history")
                 with login(reader) as ro:
                     assert ro.execute("SELECT id FROM public.embeddings ORDER BY embedding <-> '[1,2,3]'::vector LIMIT 1").fetchone()[0] == 1
                     assert ro.execute("SELECT * FROM cypher('fixture_graph', $$ MATCH (n:Node) RETURN count(n) $$) AS (v agtype)").fetchone()[0] == '2'
@@ -132,6 +180,20 @@ def main():
                         raise AssertionError("AGE reader gained graph write rights")
                 with login(b) as writer:
                     writer.execute("SELECT * FROM cypher('fixture_graph', $$ MATCH (n:Node) SET n.changed = true RETURN n $$) AS (v agtype)")
+                    for vertex in graph_source["vertices"]:
+                        vertex["properties"]["changed"] = True
+                    projections.append(writer, graph_source)
+                    before = writer.execute("SELECT count(*) FROM platform_control.graph_sources").fetchone()[0]
+                    writer.execute('CREATE VIEW public.graph_dependent AS SELECT id FROM fixture_graph."Node"')
+                    try:
+                        projections.append(writer, graph_source)
+                    except ValueError:
+                        pass
+                    else:
+                        raise AssertionError("Projection replacement cascaded into an application view")
+                    assert writer.execute("SELECT count(*) FROM platform_control.graph_sources").fetchone()[0] == before
+                    assert writer.execute("SELECT count(*) FROM public.graph_dependent").fetchone()[0] == 2
+                    writer.execute("DROP VIEW public.graph_dependent")
                     for query in ("DROP EXTENSION vector CASCADE", "DROP EXTENSION age CASCADE"):
                         try:
                             writer.execute(query)
@@ -139,7 +201,66 @@ def main():
                             pass
                         else:
                             raise AssertionError("Writer removed a managed extension")
+                # A second graph covers different labels, directed cycles and
+                # independent protected snapshots in the same resource.
+                with login(b) as writer:
+                    cycle_source = {"graph": "dependency_cycle", "vertices": [
+                        {"key": "api", "label": "Component"}, {"key": "db", "label": "Store"},
+                        {"key": "worker", "label": "Component"}], "edges": [
+                        {"source": "api", "target": "db", "label": "DEPENDS"},
+                        {"source": "db", "target": "worker", "label": "DEPENDS"},
+                        {"source": "worker", "target": "api", "label": "DEPENDS"}]}
+                    projections.append(writer, cycle_source)
+                restored_name = "projection_restore_" + uuid4().hex[:12]
+                database = catalog.identifier(alpha["resource_id"])
+                data = subprocess.check_output(["docker","exec",name,"pg_dump","-U","postgres","-Fc",database], timeout=30)
+                conn.execute(sql.SQL("CREATE DATABASE {} TEMPLATE template0").format(sql.Identifier(restored_name)))
+                loaded = subprocess.run(["docker","exec","-i",name,"pg_restore","-U","postgres","--exit-on-error","-d",restored_name],
+                    input=data, capture_output=True, timeout=30)
+                assert loaded.returncode == 0, "Disposable projection pg_restore failed: " + loaded.stderr.decode()[-1800:]
+                # Single-database pg_dump excludes database ACLs. Reapply them
+                # for this renamed clone; pg_dumpall preserves original DB ACLs.
+                conn.execute(sql.SQL("GRANT CONNECT,CREATE,TEMPORARY ON DATABASE {} TO {}")
+                    .format(sql.Identifier(restored_name), sql.Identifier(database + "_owner")))
+                conn.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}")
+                    .format(sql.Identifier(restored_name), sql.Identifier(database + "_reader")))
+                restored_provider = Postgres(lambda target: connect(restored_name if target == database else target))
+                try:
+                    restored_provider.validate_recovery(alpha)
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError("Expected the recorded AGE logical-restore OID limitation")
+                result = restored_provider.rebuild_projections(alpha)
+                assert result == {"graphs": 2, "vertices": 5, "edges": 4}
+                restored_provider.validate_recovery(alpha)
+                with connect(restored_name) as restored:
+                    restored.execute(sql.SQL("SET ROLE {}").format(sql.Identifier(database + "_reader")))
+                    restored.execute("SET search_path=ag_catalog,public,platform_extensions")
+                    assert restored.execute("SELECT * FROM cypher('fixture_graph', $$ MATCH (n:Node) RETURN count(n) $$) AS (v agtype)").fetchone()[0] == '2'
+                    assert restored.execute("SELECT * FROM cypher('dependency_cycle', $$ MATCH (a)-[:DEPENDS]->(b) RETURN count(b) $$) AS (v agtype)").fetchone()[0] == '3'
+                    assert restored.execute("SELECT id FROM public.embeddings ORDER BY embedding <-> '[1,2,3]'::vector LIMIT 1").fetchone()[0] == 1
+                    assert restored.execute("SELECT id FROM public.shared").fetchone()[0] == 1
+                    assert restored.execute("SELECT count(*) FROM pg_indexes WHERE schemaname='fixture_graph' AND indexname IN ('projection_node_properties','projection_node_keys')").fetchone()[0] == 2
+                    text_value = restored.execute("SELECT * FROM cypher('fixture_graph', $$ MATCH (n:Node {id: 1}) RETURN n.name $$) AS (v agtype)").fetchone()[0]
+                    assert json.loads(text_value) == graph_source["vertices"][0]["properties"]["name"]
+                    assert restored.execute("SELECT * FROM cypher('fixture_graph', $$ MATCH (n:Node) WHERE n.changed=true RETURN count(n) $$) AS (v agtype)").fetchone()[0] == '2'
+                conn.execute(sql.SQL("DROP DATABASE {} WITH(FORCE)").format(sql.Identifier(restored_name)))
+                print("PASS real AGE logical restore reproduces stale OIDs; native graph rebuild from protected snapshots restores two graphs/five labels/cycle; SQL and pgvector retained")
                 print("PASS selected pgvector HNSW and AGE: both writers; reader queries; denied graph writes and extension removal")
+            old_reader_deadline = conn.execute("SELECT expires_at FROM store_credentials WHERE credential_id=%s",
+                (reader["credential_id"],)).fetchone()[0]
+            with login(reader) as existing_reader:
+                with conn.transaction():
+                    renewed_reader = catalog.issue(conn, catalog.grant(conn, reader["grant_id"]))
+                provider.issue(alpha, renewed_reader)
+                assert conn.execute("SELECT expires_at FROM store_credentials WHERE credential_id=%s",
+                    (reader["credential_id"],)).fetchone()[0] == old_reader_deadline
+                assert renewed_reader["credential_id"] != reader["credential_id"]
+                assert (datetime.fromisoformat(renewed_reader["expires_at"]) - datetime.fromisoformat(renewed_reader["issued_at"])).total_seconds() == 86400
+                assert existing_reader.execute("SELECT id FROM public.shared").fetchone()[0] == 1
+                with login(renewed_reader) as renewed:
+                    assert renewed.execute("SELECT id FROM public.shared").fetchone()[0] == 1
             held = login(a)
             held.execute("SELECT 1")
             provider.revoke(alpha, a)
@@ -216,7 +337,7 @@ def main():
             if os.environ.get("NAMED_POSTGRES_CONSOLE") == "1":
                 async def console_check():
                     from store_console_fixture import run as console_run
-                    lease = {"credential_id": active["credential_id"], "resource_id": alpha["resource_id"],
+                    lease = {"credential_id": reader["credential_id"], "resource_id": alpha["resource_id"],
                         "provider": "postgresql", "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5)}
                     relay = Relay(backend=lambda value: ("127.0.0.1", port))
                     relay.leases = {20000: lease}; relay.last_success = time.monotonic()
@@ -233,8 +354,8 @@ def main():
                             await asyncio.sleep(.5)
                     beat = asyncio.create_task(heartbeat())
                     connection = {"PGHOST": "127.0.0.1", "PGPORT": str(server.sockets[0].getsockname()[1]),
-                        "PGDATABASE": catalog.identifier(alpha["resource_id"]), "PGUSER": catalog.login(active["credential_id"]),
-                        "PGPASSWORD": catalog.secret_for(active["credential_id"])}
+                        "PGDATABASE": catalog.identifier(alpha["resource_id"]), "PGUSER": catalog.login(reader["credential_id"]),
+                        "PGPASSWORD": catalog.secret_for(reader["credential_id"])}
                     try:
                         await asyncio.to_thread(console_run, connection, f"http://127.0.0.1:{control.sockets[0].getsockname()[1]}/expire")
                     finally:
@@ -246,7 +367,6 @@ def main():
             if os.environ.get("RESTIC_TEST_BINARY"):
                 import importlib.util
                 import tempfile
-                from pathlib import Path
                 from app.stores.contract import Purge
                 location = Path(__file__).resolve().parents[1] / "operations/backup/scripts/backup-platform.py"
                 spec = importlib.util.spec_from_file_location("store_fixture_backup", location)
@@ -272,15 +392,53 @@ def main():
                     job = backup.Job({"platform_dir": directory, "state_dir": directory + "/state", "restic": binary,
                         "instance": "store-fixture", "watchdog_url": "https://fixture.invalid/unused", "watchdog_token": "unused"})
                     def psql(*arguments):
-                        cursor = conn.execute(arguments[-1])
-                        if cursor.description:
-                            value = cursor.fetchone()[0]
-                            return ("t" if value is True else "f" if value is False else json.dumps(value)).encode()
-                        return b""
+                        target = arguments[arguments.index("-d") + 1]
+                        def execute(connection):
+                            cursor = connection.execute(arguments[-1])
+                            if cursor.description:
+                                value = cursor.fetchone()[0]
+                                return ("t" if value is True else "f" if value is False else json.dumps(value)).encode()
+                            return b""
+                        if target == "platform":
+                            return execute(conn)
+                        with connect(target) as connection:
+                            return execute(connection)
+                    def postgres_argv(*arguments):
+                        return ["docker", "exec", "-i", name,
+                            *("postgres" if value == "platform" else value for value in arguments)]
+                    def capture_database_intent(bundle):
+                        with job.catalog_snapshot():
+                            with connect("postgres") as competitor:
+                                assert not competitor.execute("SELECT pg_try_advisory_lock(731904)").fetchone()[0]
+                            job.check_graph_sources()
+                            job.dump(bundle)
+                            job.store_recovery_manifest(bundle)
+                        assert conn.execute("SELECT pg_try_advisory_lock(731904)").fetchone()[0]
+                        conn.execute("SELECT pg_advisory_unlock(731904)")
                     with patch.dict(os.environ, {"RESTIC_REPOSITORY": directory + "/repo", "RESTIC_PASSWORD": secrets.token_urlsafe(32), "RESTIC_CACHE_DIR": directory + "/cache"}):
                         subprocess.run([binary, "init"], check=True, capture_output=True, timeout=30)
                         with patch.object(job, "compose", side_effect=psql), patch.object(job, "notify"), \
-                                patch.object(job, "capture", side_effect=job.store_recovery_manifest):
+                                patch.object(job, "postgres_argv", side_effect=postgres_argv), \
+                                patch.object(job, "capture", side_effect=capture_database_intent):
+                            try:
+                                with job.catalog_snapshot():
+                                    raise RuntimeError("synthetic interrupted capture")
+                            except RuntimeError:
+                                pass
+                            assert conn.execute("SELECT pg_try_advisory_lock(731904)").fetchone()[0]
+                            conn.execute("SELECT pg_advisory_unlock(731904)")
+                            if alpha["extensions"]:
+                                with connect(catalog.identifier(alpha["resource_id"])) as resource_conn:
+                                    resource_conn.execute("SET search_path=ag_catalog,public,platform_extensions")
+                                    resource_conn.execute("SELECT ag_catalog.create_graph('unprotected_fixture')")
+                                try:
+                                    job.check_graph_sources()
+                                except backup.BackupError:
+                                    pass
+                                else:
+                                    raise AssertionError("Backup accepted a retained AGE graph without protected sources")
+                                with connect(catalog.identifier(alpha["resource_id"])) as resource_conn:
+                                    resource_conn.execute("SELECT ag_catalog.drop_graph('unprotected_fixture',true)")
                             assert job.run() == 0
                     backed = catalog.resource(conn, doomed["resource_id"])
                     assert backed["purge_backup_version"] == backed["version"] and backed["purge_backup_snapshot"]
@@ -295,7 +453,7 @@ def main():
                 provider.provision(doomed)
                 conn.execute("UPDATE store_resources SET state='active',observed_state='active',version=1 WHERE resource_id=%s",
                     (doomed["resource_id"],))
-                print("PASS purge waits for encrypted restic upload/readback/verification before worker deletion (local intent-only repository)")
+                print("PASS purge waits for encrypted restic upload/readback/verification before worker deletion; catalog snapshot lock covers real SQL dump and intent capture (local repository)")
             from app.stores import monitoring as store_monitoring, recovery
             from app.stores.relay import snapshot
             with patch("app.stores.providers.get", return_value=provider):

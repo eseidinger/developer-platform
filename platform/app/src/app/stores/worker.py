@@ -32,11 +32,13 @@ def reconcile(conn, control=None):
                 lambda c=credential, r=resource: _deny(conn, c, r))
         return
     conn.execute("""UPDATE store_resources r SET state='retired',observed_state='pending',version=version+1
-        FROM projects p WHERE p.name=r.owner_project AND p.status='retired' AND r.state='active'""")
+        FROM projects p WHERE p.name=r.owner_project AND r.state='active' AND (p.status='retired'
+            OR EXISTS(SELECT 1 FROM store_project_retirements t WHERE t.project=p.name))""")
     conn.execute("""UPDATE store_grants g SET state='revoked',observed_state='pending',version=version+1
         WHERE g.state IN ('pending','active') AND (EXISTS(SELECT 1 FROM store_resources r
             WHERE r.resource_id=g.resource_id AND r.state<>'active') OR EXISTS(SELECT 1 FROM projects p
-            WHERE p.name=g.consumer_project AND p.status='retired'))""")
+            WHERE p.name=g.consumer_project AND (p.status='retired'
+                OR EXISTS(SELECT 1 FROM store_project_retirements t WHERE t.project=p.name))))""")
     stale = conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
         JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
         WHERE c.state<>'revoked' AND (c.expires_at<=now() OR g.state<>'active' OR r.state<>'active'

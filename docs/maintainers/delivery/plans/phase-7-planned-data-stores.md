@@ -14,7 +14,7 @@ The routes and workers are now wired into the source application. The portal
 and CLI manage named resources, grants/bindings and human credential leases;
 the private relay enforces credential identity and session deadlines. Browser
 consoles, provider expansion and deployed acceptance remain in progress. See the
-[operator workflow](../../../operators/data-stores.md). Six API
+[operator workflow](../../../operators/data-stores.md). Eight API
 boundary tests and a disposable real PostgreSQL fixture pass resource isolation,
 cross-writer schema ownership, future-object read access, read-only denials,
 expiry, session revocation, 30-day worker rotation/retry/deadline handling, real
@@ -23,14 +23,18 @@ queries and denial of graph writes/extension removal. A disposable real
 Keycloak → pgAdmin fixture passes SSO, scoped connection/query, password-saving
 denial, expired reconnect and anonymous denial. Production console network/TLS
 and deployed access acceptance remain open. The backend suite ran
-461 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
+473 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
 explicit issuance and secret-cache exclusion. No live resources were changed.
 Source now includes bounded usage measurements/alerts, the named-store dashboard,
 restore quarantine, and version-pinned purge acknowledgment after verified
 backup upload/readback. A real encrypted local restic intent fixture passes
 purge gating and latest-tombstone replay after an older-state simulation; recovery
 requires fresh explicit approval. This is not a full data restore or deployed
-RPO/RTO acceptance. AGE authoritative rebuild remains open.
+RPO/RTO acceptance. AGE authoritative rebuild is implemented and passes a real logical-restore
+fixture with two graphs, five labels, a cycle, source-defined indexes and preserved
+SQL/pgvector data. See the [dated evidence](../../../../persistence/compatibility/projection-rebuild-2026-10-17.md).
+Deployed rebuild/reconnection and recovery timing remain open.
+Retirement previews include named resource/grant versions; access fencing commits before namespace deletion. The PostgreSQL reference covers JSONB, full-text search, recursive CTEs, partitions, materialized views and transactional outbox rollback in the real database fixture.
 PLAN-026/036 and Phase 7 acceptance remain open.
 
 ## Goal and scope

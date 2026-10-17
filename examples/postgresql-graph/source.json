@@ -1,0 +1,20 @@
+{
+  "format": 1,
+  "graph": "dependencies",
+  "state": "active",
+  "vertex_labels": ["Component", "Store"],
+  "edge_labels": ["DEPENDS"],
+  "indexes": [
+    {"name": "component_properties", "label": "Component", "kind": "properties-gin"},
+    {"name": "component_source_key", "label": "Component", "kind": "source-key-unique"}
+  ],
+  "vertices": [
+    {"key": "api", "label": "Component", "properties": {"name": "API", "sourceVersion": "example-v1"}},
+    {"key": "worker", "label": "Component", "properties": {"name": "Worker"}},
+    {"key": "database", "label": "Store", "properties": {"name": "PostgreSQL"}}
+  ],
+  "edges": [
+    {"source": "api", "target": "database", "label": "DEPENDS"},
+    {"source": "worker", "target": "database", "label": "DEPENDS"}
+  ]
+}

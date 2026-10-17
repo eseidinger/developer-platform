@@ -1,7 +1,8 @@
 # Web + PostgreSQL starter
 
 This source template is a small public Python web service backed by the
-platform-managed project PostgreSQL database. The platform injects `PGHOST`,
+independently managed named PostgreSQL resource through an approved read-write
+binding for component `web`. The platform injects `PGHOST`,
 `PGPORT`, `PGDATABASE`, `PGUSER`, and `PGPASSWORD`; do not add database passwords
 to the image or declaration. The app emits only status-coded structured logs.
 Public ingress is **denied until a separate hosted-access policy is active**.
@@ -12,16 +13,21 @@ From the repository root, with a human CLI profile and a public image registry:
 docker build -t REGISTRY/web-postgres:1 examples/web-postgres
 docker push REGISTRY/web-postgres:1
 # Obtain the registry-reported sha256 digest for that pushed image.
-python3 examples/web-postgres/render.py --project demo --image REGISTRY/web-postgres@sha256:DIGEST > application.json
 devplat projects create --project demo
+# Create a named PostgreSQL resource and a read-write binding for component web.
+# Wait for both observed states to be active; use the returned binding UUID.
+python3 examples/web-postgres/render.py --project demo --image REGISTRY/web-postgres@sha256:DIGEST \
+  --binding-id BINDING_UUID > application.json
 devplat deploy apply --project demo --file application.json --wait
 devplat components list --project demo --output json
-devplat data-services list --project demo --output json
+devplat stores list --project demo --output json
 ```
 
 `DIGEST` means the actual 64-character hexadecimal image digest. Use a unique
 project slug and replace `REGISTRY` with a public registry under your control.
-The renderer rejects mutable tags. `projects create` requires platform authority;
+The renderer rejects mutable tags and requires `--binding-id`. See the
+[named-resource workflow](../../docs/operators/data-stores.md) to create the resource
+and binding. Unbound components receive no database credentials. `projects create` requires platform authority;
 if the project exists, skip it. The named project owner or administrator needs
 deployment permission. The declaration uses bounded resource requests and an
 HTTP readiness check that queries PostgreSQL.

@@ -37,7 +37,7 @@ a control-plane PodCIDR change.
 | Caddy | `127.0.0.1:80/443` locally; configured edge address remotely | TLS, Platform API route, and workload edge route; certificate data is in its Compose volume |
 | Platform API | `127.0.0.1:8000` | Public platform contract, durable operations, authorization, audit, and provider execution |
 | Keycloak | `identity.localhost` locally or `IDENTITY_DOMAIN` remotely | Reference OIDC identities and clients; state is in the Keycloak PostgreSQL database |
-| PostgreSQL | Docker network only | Platform catalog, audit, and per-project databases in persistent Compose storage |
+| PostgreSQL | Docker network only | Platform catalog, audit, and named-resource databases in persistent Compose storage |
 | k3d load balancer | `127.0.0.1:8081` behind Caddy | Routes workload HTTP to Traefik and project Services |
 | Prometheus | `127.0.0.1:9090` | Metrics, rules, and generated discovery targets |
 | Grafana | `127.0.0.1:3000` | Dashboards; administrator password comes from `.env` |
@@ -94,7 +94,7 @@ Ingress reaches pods only through Traefik. NetworkPolicies allow same-namespace 
 
 ## Persistence and failure domain
 
-Kubernetes objects are disposable desired-state projections. Platform catalog, grants, audit records, project databases, and identity data live in external PostgreSQL volumes. Recreating k3d requires catalog replay and is not a database restore.
+Kubernetes objects are disposable desired-state projections. Platform catalog, grants, audit records, named-resource databases, and identity data live in external PostgreSQL volumes. Recreating k3d requires catalog replay and is not a database restore.
 
 All local components share one host failure domain: Docker, k3d, edge, PostgreSQL, and local monitoring can fail together. The external watchdog is the independent host-outage signal. Use the Ansible acceptance playbooks for disposable live drills.
 

@@ -19,6 +19,7 @@ class StoreMonitoringTests(TestCase):
         self.assertIn('platform_store_credentials_cleanup_pending{project="alpha",resource_id="a",provider="postgresql"} 2', content)
         self.assertIn('platform_store_worker_last_success_timestamp_seconds 100', content)
         self.assertNotIn('password', content)
+        self.assertIn('platform_store_recovery_required 1', monitoring.exposition([], [], now=100, quarantined=True))
 
     def test_failed_measurement_retains_previous_usage_and_another_store_can_succeed(self):
         conn = Mock()

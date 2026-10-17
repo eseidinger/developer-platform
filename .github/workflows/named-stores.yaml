@@ -1,0 +1,36 @@
+name: named stores
+on: [push, pull_request]
+
+jobs:
+  postgres-access-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: platform/ui/package-lock.json
+      - run: uv sync --project platform/app --locked
+      - run: npm ci --prefix platform/ui
+      - run: npx playwright install --with-deps chromium
+        working-directory: platform/ui
+      - run: sudo apt-get update && sudo apt-get install -y restic
+      - name: Build reviewed PostgreSQL extension image
+        run: docker build -t developer-platform-postgres:18.6-vector0.8.7-age1.8.0 persistence
+      - name: Fetch pinned console fixture images
+        run: |
+          docker pull quay.io/keycloak/keycloak:26.4.1
+          docker pull dpage/pgadmin4:9.18@sha256:c332c5f6dfba995d9ebc4af261d93506d6876085d712eaaa3defc8dd1a3f26de
+      - name: Verify isolation, expiry, rotation, SSO, encrypted intent and AGE rebuild
+        env:
+          NAMED_POSTGRES_IMAGE: developer-platform-postgres:18.6-vector0.8.7-age1.8.0
+          NAMED_POSTGRES_EXTENSIONS: "1"
+          NAMED_POSTGRES_CONSOLE: "1"
+          RESTIC_TEST_BINARY: /usr/bin/restic
+        run: uv run --project platform/app python scripts/verify-named-postgres.py

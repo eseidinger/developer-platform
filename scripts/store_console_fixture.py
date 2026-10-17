@@ -25,7 +25,10 @@ def port():
 
 
 def docker(*args):
-    return subprocess.run(['docker', *args], capture_output=True, timeout=30, check=True)
+    result = subprocess.run(['docker', *args], capture_output=True, timeout=30)
+    if result.returncode:
+        raise RuntimeError('Disposable console container operation failed')
+    return result
 
 
 def ready(url, seconds=90):
@@ -43,17 +46,24 @@ def ready(url, seconds=90):
 
 def run(connection, expire_url):
     """connection is kept in memory/stdin and never printed or stored in reports."""
+    for candidate in ('quay.io/keycloak/keycloak:26.4.1', IMAGE):
+        inspected = subprocess.run(['docker', 'image', 'inspect', candidate], capture_output=True, timeout=15)
+        if inspected.returncode:
+            subprocess.run(['docker', 'pull', candidate], capture_output=True, check=True, timeout=300)
     identity_port, console_port = port(), port()
     issuer = f'http://127.0.0.1:{identity_port}/realms/platform'
     base = f'http://127.0.0.1:{console_port}/store-console/postgresql'
-    secret, password = secrets.token_urlsafe(32), secrets.token_urlsafe(24)
+    secret, password, other_password = secrets.token_urlsafe(32), secrets.token_urlsafe(24), secrets.token_urlsafe(24)
     containers = []
     with tempfile.TemporaryDirectory(prefix='store-console-') as directory:
         directory = Path(directory)
         realm = {'realm': 'platform', 'enabled': True, 'registrationAllowed': False,
             'users': [{'username': 'fixture', 'enabled': True, 'firstName': 'Store', 'lastName': 'Fixture',
                 'email': 'fixture@example.com', 'emailVerified': True,
-                'credentials': [{'type': 'password', 'value': password, 'temporary': False}]}],
+                'credentials': [{'type': 'password', 'value': password, 'temporary': False}]},
+                {'username': 'other', 'enabled': True, 'firstName': 'Other', 'lastName': 'Fixture',
+                 'email': 'other@example.com', 'emailVerified': True,
+                 'credentials': [{'type': 'password', 'value': other_password, 'temporary': False}]}],
             'clients': [{'clientId': 'platform-store-console', 'enabled': True, 'protocol': 'openid-connect',
                 'publicClient': False, 'secret': secret, 'standardFlowEnabled': True,
                 'directAccessGrantsEnabled': False, 'serviceAccountsEnabled': False,
@@ -86,7 +96,7 @@ def run(connection, expire_url):
             ready(base + '/misc/ping')
             result = subprocess.run(['node', str(ROOT / 'platform/ui/scripts/verify-store-console.mjs')],
                 input=json.dumps({'base': base, 'username': 'fixture', 'password': password,
-                    'connection': connection, 'expireUrl': expire_url}), text=True, capture_output=True, timeout=90)
+                    'connection': connection, 'expireUrl': expire_url, 'otherUsername': 'other', 'otherPassword': other_password}), text=True, capture_output=True, timeout=90)
             if result.returncode:
                 # Node prints fixed stage codes only; never forward browser/server errors.
                 raise RuntimeError('Console fixture failed at ' + result.stdout.strip()[:80])

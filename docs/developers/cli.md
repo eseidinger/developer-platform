@@ -62,8 +62,8 @@ authorized project state. `deploy apply` sends a complete declaration; `config`,
 lifecycle. `grants` and `credentials` manage project roles and CI identities.
 `governance` and `access` manage hosted application identity. Commands under
 `operator` require their corresponding privileged API role.
-`database-access` manages distinct, audited human PostgreSQL grants, SSH keys,
-and one-time passwords; see the [human database access guide](database-access.md).
+`stores` manages named resources, explicit component bindings, human grants,
+SSH keys and expiring credential leases; see the [human database access guide](database-access.md).
 `operator audit export --start TIMESTAMP --end TIMESTAMP --format csv` writes the
 bounded CSV response to stdout; the default JSON format uses normal output modes.
 

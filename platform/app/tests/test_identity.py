@@ -14,11 +14,12 @@ class IdentityTests(unittest.TestCase):
         jwk_client.return_value.get_signing_key_from_jwt.return_value = Mock(key="public-key")
         decode.return_value = {
             "iss": "https://issuer.example", "sub": "stable-subject", "exp": 2, "iat": 1,
-            "preferred_username": "display-only",
+            "preferred_username": "display-only", "azp": "platform-cli",
         }
         principal = OIDCVerifier("https://issuer.example", "platform-api", "https://issuer.example/jwks").verify("token")
         self.assertEqual((principal.issuer, principal.subject, principal.display_name),
                          ("https://issuer.example", "stable-subject", "display-only"))
+        self.assertEqual(principal.authorized_party, "platform-cli")
         self.assertEqual(decode.call_args.kwargs["audience"], "platform-api")
         self.assertEqual(decode.call_args.kwargs["issuer"], "https://issuer.example")
 

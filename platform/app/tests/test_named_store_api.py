@@ -15,7 +15,7 @@ class StoreApiTests(TestCase):
         guard = patch("app.stores.recovery.required", return_value=False)
         guard.start()
         self.addCleanup(guard.stop)
-        self.principal = Principal("https://fixture.invalid", "admin")
+        self.principal = Principal("https://fixture.invalid", "admin", authorized_party="platform-cli")
         self.conn = Mock()
         self.conn.transaction.return_value = nullcontext()
         self.control = SimpleNamespace(connect=lambda: nullcontext(self.conn),
@@ -62,6 +62,14 @@ class StoreApiTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.assertEqual(credential.status_code, 403)
         create.assert_not_called(); issue.assert_not_called()
+
+    def test_unregistered_service_client_is_not_treated_as_human(self):
+        self.principal = Principal("https://fixture.invalid", "service", authorized_party="custom-service")
+        self.control.access_scope.return_value = None
+        with patch.object(catalog, "issue") as issue, patch.object(catalog, "grant") as grant:
+            response = self.client.post(f"/v1/store-access/{self.grant_id}/credentials")
+        self.assertEqual(response.status_code, 403)
+        issue.assert_not_called(); grant.assert_not_called()
 
     def test_purge_requires_exact_version_resource_and_owner(self):
         row = {"resource_id": str(self.resource_id), "owner_project": "alpha", "state": "retired",

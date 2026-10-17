@@ -313,7 +313,14 @@ async function getRetirementPreview(name: string) {
   if (!record || !retains || !Array.isArray(record.removes) || !Array.isArray(record.blockers) || typeof record.scope_token !== 'string' || record.blockers.some((blocker) => typeof blocker !== 'string')) throw new Error('The platform returned an invalid retirement preview.')
   const removes = record.removes.map((resource) => { const item = asRecord(resource); if (!item || typeof item.kind !== 'string' || typeof item.name !== 'string') throw new Error('The platform returned an invalid retirement preview.'); return { kind: item.kind, name: item.name } })
   if (Object.values(retains).some((value) => value !== null && typeof value !== 'string' && typeof value !== 'boolean')) throw new Error('The platform returned an invalid retirement preview.')
-  return { removes, retains: retains as Record<string, string | boolean | null>, blockers: record.blockers as string[], scopeToken: record.scope_token }
+  const access = asRecord(record.access)
+  const stores = Array.isArray(access?.named_store_resources) ? access.named_store_resources.map((value) => {
+    const item = asRecord(value)
+    if (!item || typeof item.resource_id !== 'string' || typeof item.name !== 'string') throw new Error('The platform returned an invalid retirement preview.')
+    return { id: item.resource_id, name: item.name }
+  }) : []
+  const storeGrantCount = Array.isArray(access?.named_store_grants) ? access.named_store_grants.length : 0
+  return { removes, retains: retains as Record<string, string | boolean | null>, stores, storeGrantCount, blockers: record.blockers as string[], scopeToken: record.scope_token }
 }
 
 async function getDataServices(name: string) {

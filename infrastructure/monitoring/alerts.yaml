@@ -148,3 +148,12 @@ groups:
           severity: critical
         annotations:
           summary: "Named-store controller or metrics publication is unavailable"
+
+      - alert: StoreRecoveryRequired
+        expr: platform_store_recovery_required == 1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Restored named stores remain quarantined"
+          description: "Review latest verified purge intents, source rebuilds and credential cleanup before enabling fresh grants."

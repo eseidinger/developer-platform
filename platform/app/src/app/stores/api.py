@@ -20,8 +20,12 @@ def install(app, control):
     caller = Depends(control.current_principal)
 
     def human(conn, principal):
-        if control.access_scope(conn, principal) is not None:
-            raise HTTPException(403, "Personal data access requires a human identity")
+        # Known automation records are insufficient: an unregistered service
+        # client is still not a human. Only the supported interactive public
+        # clients (code+PKCE, no service accounts) can use personal data access.
+        if (principal.authorized_party not in {"platform-cli", "platform-portal"}
+                or control.access_scope(conn, principal) is not None):
+            raise HTTPException(403, "Personal data access requires an interactive platform CLI or portal identity")
 
     @contextmanager
     def mutation(principal):

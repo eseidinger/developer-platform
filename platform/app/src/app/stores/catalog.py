@@ -206,6 +206,13 @@ def issue(conn, row):
         AND state<>'revoked' AND expires_at>now()""", (row["grant_id"],)).fetchone()[0]
     if outstanding >= 24:
         raise Conflict("Too many outstanding credential generations; wait for expiry or revoke access")
+    if row["kind"] == "human":
+        leases = conn.execute("""SELECT count(*) FROM store_credentials c JOIN store_grants g USING(grant_id)
+            WHERE g.kind='human' AND g.issuer=%s AND g.subject=%s AND g.state='active'
+            AND c.state<>'revoked' AND c.grant_version=g.version AND c.expires_at>now()""",
+            (row["issuer"], row["subject"])).fetchone()[0]
+        if leases >= 64:
+            raise Conflict("The human's 64 private credential leases allocation is full; wait for expiry or revoke access")
     # Every credential uses a lease port, including application bindings.
     free = conn.execute("""SELECT port FROM generate_series(20000,20511) port WHERE NOT EXISTS(
         SELECT 1 FROM store_credentials c WHERE c.relay_port=port AND c.state<>'revoked')
@@ -266,6 +273,21 @@ def change_mode(conn, row, body, actor):
     conn.execute("""UPDATE store_grants SET mode=%s,approved_by=%s,version=version+1,
         observed_state='pending',updated_at=now() WHERE grant_id=%s""", (body.mode, actor, row["grant_id"]))
     return grant(conn, row["grant_id"])
+
+
+def retirement_inventory(conn, project):
+    """Versioned retirement scope without identities or credential material."""
+    resources = conn.execute("""SELECT resource_id::text,name,provider,state,version
+        FROM store_resources WHERE owner_project=%s AND state<>'purged' ORDER BY resource_id""",
+        (project,)).fetchall()
+    grants = conn.execute("""SELECT g.grant_id::text,g.resource_id::text,g.kind,g.mode,g.state,g.version,
+        g.consumer_project,g.component FROM store_grants g JOIN store_resources r USING(resource_id)
+        WHERE (r.owner_project=%s OR g.consumer_project=%s) AND g.state IN ('pending','active')
+        ORDER BY g.grant_id""", (project, project)).fetchall()
+    return {"named_store_resources": [dict(zip(("resource_id", "name", "provider", "state", "version"), row))
+                                     for row in resources],
+            "named_store_grants": [dict(zip(("grant_id", "resource_id", "kind", "mode", "state", "version",
+                                             "consumer_project", "component"), row)) for row in grants]}
 
 
 def retire_project(conn, project):

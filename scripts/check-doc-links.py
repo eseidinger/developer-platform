@@ -18,6 +18,7 @@ SEARCH_ROOTS = [
 ]
 IGNORED_PARTS = {"node_modules", ".git", ".pytest_cache", ".venv", "venv"}
 LINK = re.compile(r"!?\[[^\]]*\]\((?P<destination><[^>]+>|[^)\s]+)(?:\s+['\"][^)]*['\"])?\)")
+EXPLICIT_ANCHOR = re.compile(r"<a\b[^>]*\b(?:id|name)\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE)
 HEADING = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*#*\s*$")
 
 
@@ -53,6 +54,7 @@ def anchors(path: Path) -> set[str]:
             continue
         if in_fence:
             continue
+        result.update(match.group(1).lower() for match in EXPLICIT_ANCHOR.finditer(line))
         match = HEADING.match(line)
         if not match:
             continue

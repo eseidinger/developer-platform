@@ -26,7 +26,7 @@ def sample(conn):
                 usage_attempt_at=now(),usage_error=false WHERE resource_id=%s""", (used, resource['resource_id']))
 
 
-def exposition(resources, credentials, now=None):
+def exposition(resources, credentials, now=None, quarantined=False):
     """Only stable UUIDs, validated project names and finite provider IDs are labels."""
     lines = []
     def gauge(name, help_text):
@@ -62,6 +62,8 @@ def exposition(resources, credentials, now=None):
         for key, value in values.items():
             if value is not None:
                 lines.append(f'{series[key]}{labels} {value}')
+    guard = gauge('recovery_required', 'Restored access remains quarantined pending verified intent and source reconciliation.')
+    lines.append(f'{guard} {int(quarantined)}')
     heartbeat = gauge('worker_last_success_timestamp_seconds', 'Last committed successful store worker pass and metrics publication.')
     lines.append(f'{heartbeat} {time.time() if now is None else now}')
     return '\n'.join(lines) + '\n'
@@ -80,4 +82,5 @@ def publish(conn):
         GROUP BY g.resource_id) counts""").fetchall()]
     directory = Path(os.environ.get('MONITORING_DISCOVERY_DIR', '/var/lib/platform-monitoring'))
     directory.mkdir(parents=True, exist_ok=True)
-    atomic_write(directory / 'stores.prom', exposition(resources, credentials))
+    from . import recovery
+    atomic_write(directory / 'stores.prom', exposition(resources, credentials, quarantined=recovery.required(conn)))
