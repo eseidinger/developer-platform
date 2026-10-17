@@ -1,0 +1,143 @@
+#!/usr/bin/env python3
+"""Disposable native Security-plugin scope and search acceptance, not deployed TLS."""
+import asyncio
+from datetime import datetime, timedelta, timezone
+import os
+import json
+import secrets
+import subprocess
+import time
+from unittest.mock import patch
+from uuid import uuid4
+
+import httpx
+from app.stores.opensearch import OpenSearch, index, authorization
+from app.stores.relay import Relay
+from app.stores import catalog
+from app.stores.s3 import StoreError
+
+IMAGE = 'opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c'
+
+
+def command(*arguments, env=None):
+    result = subprocess.run(arguments, capture_output=True, timeout=60, env=env)
+    if result.returncode:
+        raise RuntimeError('Disposable OpenSearch command failed')
+    return result.stdout.decode().strip()
+
+
+def denied(operation):
+    try:
+        operation()
+    except StoreError as error:
+        assert str(error) in {'Provider request failed (401)', 'Provider request failed (403)'}, str(error)
+    else:
+        raise AssertionError('Scoped search credential exceeded its permissions')
+
+
+def main():
+    name = 'named-search-' + uuid4().hex[:12]
+    password = 'Aa9!' + secrets.token_hex(32)
+    os.environ['DATABASE_KEY'] = secrets.token_hex(32)
+    env = {**os.environ, 'OPENSEARCH_INITIAL_ADMIN_PASSWORD': password}
+    try:
+        # The image's demo certificates are used only for internal transport in
+        # this loopback-only fixture. Production requires an operator-owned CA.
+        command('docker', 'run', '-d', '--name', name, '--memory', '1536m', '--cpus', '1',
+            '--tmpfs', '/usr/share/opensearch/data:rw,uid=1000,gid=1000,size=128m',
+            '-e', 'OPENSEARCH_INITIAL_ADMIN_PASSWORD', '-e', 'discovery.type=single-node',
+            '-e', 'OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m', '-e', 'node.store.allow_mmap=false',
+            '-e', 'plugins.security.ssl.http.enabled=false', '-p', '127.0.0.1::9200', IMAGE, env=env)
+        port = int(command('docker', 'port', name, '9200/tcp').rsplit(':', 1)[1])
+        endpoint = f'http://127.0.0.1:{port}'
+        provider = OpenSearch(endpoint, password)
+        for _ in range(120):
+            try:
+                provider.root.request('GET', '/_cluster/health')
+                break
+            except Exception:
+                time.sleep(.4)
+        else:
+            # Fixed diagnostics only: container logs may include credentials.
+            raise AssertionError('Disposable OpenSearch did not become ready')
+        first, other = ({'resource_id': str(uuid4())} for _ in range(2))
+        for resource in (first, other):
+            provider.provision(resource)
+            provider.provision(resource)
+        credentials = []
+        for mode in ('read-write', 'read-only'):
+            credential = {'credential_id': str(uuid4()), 'mode': mode,
+                'expires_at': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
+            provider.issue(first, credential)
+            provider.issue(first, credential)
+            provider.probe(first, credential)
+            credentials.append(credential)
+        writer, reader = credentials
+        rw, ro = provider.scoped(writer), provider.scoped(reader)
+        prefix, foreign = '/' + index(first), '/' + index(other)
+        rw.request('PUT', prefix + '/_mapping', {'properties': {'title': {'type': 'text'}, 'kind': {'type': 'keyword'}}})
+        rw.request('PUT', prefix + '/_doc/one?refresh=true', {'title': 'renewable energy dataset', 'kind': 'reviewed'})
+        rw.request('PUT', prefix + '/_doc/two?refresh=true', {'title': 'unrelated fixture', 'kind': 'other'})
+        result = ro.request('POST', prefix + '/_search', {'query': {'bool': {
+            'must': [{'match': {'title': 'energy'}}], 'filter': [{'term': {'kind': 'reviewed'}}]}},
+            'aggs': {'kinds': {'terms': {'field': 'kind'}}}})
+        assert result['hits']['hits'][0]['_id'] == 'one'
+        denied(lambda: ro.request('PUT', prefix + '/_doc/three', {'title': 'denied'}))
+        denied(lambda: ro.request('PUT', prefix + '/_mapping', {'properties': {'denied': {'type': 'keyword'}}}))
+        denied(lambda: rw.request('GET', foreign + '/_search'))
+        denied(lambda: rw.request('DELETE', prefix))
+        denied(lambda: rw.request('PUT', prefix + '/_settings', {'index.blocks.write': False}))
+        denied(lambda: rw.request('PUT', '/rogue', {}))
+        denied(lambda: rw.request('GET', '/_plugins/_security/api/internalusers'))
+        denied(lambda: rw.request('PUT', '/_plugins/_security/api/internalusers/' + catalog.login(writer['credential_id']),
+            {'password': 'Aa9!synthetic-replacement', 'backend_roles': ['all_access']}))
+        denied(lambda: rw.request('POST', '/_aliases', {'actions': [{'add': {'index': index(other), 'alias': index(first) + '-foreign'}}]}))
+        mixed = '\n'.join(json.dumps(item) for item in [
+            {'index': {'_index': index(first), '_id': 'own-bulk'}}, {'title': 'authorized bulk'},
+            {'index': {'_index': index(other), '_id': 'foreign-bulk'}}, {'title': 'forbidden bulk'}]) + '\n'
+        with httpx.Client(trust_env=False) as http:
+            bulk = http.post(endpoint + '/_bulk', content=mixed, headers={
+                'Authorization': authorization(catalog.login(writer['credential_id']), catalog.secret_for(writer['credential_id'])),
+                'Content-Type': 'application/x-ndjson'}).json()
+        assert bulk['errors'] and bulk['items'][0]['index']['status'] in {200, 201}
+        assert bulk['items'][1]['index']['status'] == 403
+        assert provider.usage(first) > 0
+
+        async def relay_access():
+            lease = {**reader, 'resource_id': first['resource_id'], 'provider': 'opensearch',
+                'expires_at': datetime.now(timezone.utc) + timedelta(seconds=.8)}
+            relay = Relay(backend=lambda lease: ('127.0.0.1', port))
+            relay.leases = {20000: lease}
+            relay.last_success = time.monotonic()
+            with patch('app.stores.relay.http_tls', return_value=None):
+                server = await asyncio.start_server(lambda r, w: relay.handle(20000, r, w), '127.0.0.1', 0)
+                try:
+                    async with httpx.AsyncClient(base_url=f'http://127.0.0.1:{server.sockets[0].getsockname()[1]}',
+                            headers={'Authorization': authorization(catalog.login(reader['credential_id']), catalog.secret_for(reader['credential_id']))}, timeout=3) as http:
+                        assert (await http.get(prefix + '/_search')).status_code == 200
+                        relay.leases.clear()
+                        try:
+                            await http.get(prefix + '/_search')
+                        except httpx.TransportError:
+                            pass
+                        else:
+                            raise AssertionError('Revoked search relay lease accepted a request')
+                finally:
+                    relay.leases.clear()
+                    server.close()
+                    await server.wait_closed()
+        asyncio.run(relay_access())
+        for credential in credentials:
+            provider.revoke(first, credential)
+            provider.revoke(first, credential)
+            denied(lambda c=credential: provider.probe(first, c))
+        provider.purge(first)
+        provider.purge(first)
+        provider.validate_recovery(other)
+        print('PASS pinned OpenSearch: index-scoped readers/writers, mapping DDL, ranked/filter/facet queries, foreign/index-purge/admin/alias/settings denial, idempotent credentials/revocation, lease enforcement, measured usage and isolated purge')
+    finally:
+        subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True, timeout=30)
+
+
+if __name__ == '__main__':
+    main()

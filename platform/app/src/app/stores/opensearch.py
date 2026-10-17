@@ -1,0 +1,81 @@
+"""Index-scoped native OpenSearch roles, separate credential generations and TLS."""
+import base64
+import os
+from . import catalog
+from .http_client import PrivateJSON
+from .s3 import StoreError
+
+
+def index(resource):
+    return catalog.identifier(resource['resource_id'])
+
+
+def role(resource, mode):
+    return index(resource) + ('_writer' if mode == 'read-write' else '_reader')
+
+
+def authorization(user, password):
+    return 'Basic ' + base64.b64encode((user + ':' + password).encode()).decode()
+
+
+class OpenSearch:
+    def __init__(self, endpoint=None, password=None, ca_file=None):
+        self.endpoint = endpoint or 'https://' + os.environ['OPENSEARCH_IP'] + ':9200'
+        self.ca_file = ca_file or os.environ.get('OPENSEARCH_CA_FILE')
+        if self.endpoint.startswith('https://') and not self.ca_file:
+            raise StoreError('Operator-owned OpenSearch CA is required')
+        self.root = PrivateJSON(self.endpoint, {'Authorization': authorization('admin',
+            password or os.environ['OPENSEARCH_ADMIN_PASSWORD'])}, self.ca_file)
+
+    def provision(self, resource):
+        name = index(resource)
+        if self.root.request('GET', '/' + name, missing=True) is None:
+            self.root.request('PUT', '/' + name, {'settings': {'number_of_shards': 1, 'number_of_replicas': 0}})
+        for mode in ('read-only', 'read-write'):
+            privileges = ['read', 'indices:admin/get', 'indices:admin/mappings/get']
+            if mode == 'read-write':
+                privileges += ['write', 'indices:admin/mapping/put', 'indices:admin/refresh*']
+            identity = role(resource, mode)
+            self.root.request('PUT', '/_plugins/_security/api/roles/' + identity, {
+                'cluster_permissions': ['cluster_composite_ops_ro', *(['indices:data/write/bulk'] if mode == 'read-write' else [])],
+                'index_permissions': [{'index_patterns': [name], 'allowed_actions': privileges}],
+                'tenant_permissions': []})
+            self.root.request('PUT', '/_plugins/_security/api/rolesmapping/' + identity,
+                {'backend_roles': [identity], 'hosts': [], 'users': []})
+
+    def issue(self, resource, credential):
+        self.root.request('PUT', '/_plugins/_security/api/internalusers/' + catalog.login(credential['credential_id']),
+            {'password': catalog.secret_for(credential['credential_id']),
+             'backend_roles': [role(resource, credential['mode'])], 'attributes': {}, 'opendistro_security_roles': []})
+
+    def revoke(self, resource, credential):
+        self.root.request('DELETE', '/_plugins/_security/api/internalusers/' + catalog.login(credential['credential_id']), missing=True)
+
+    def credentials(self, resource, credential):
+        return {'OPENSEARCH_URL': self.endpoint, 'OPENSEARCH_INDEX': index(resource),
+                'OPENSEARCH_USERNAME': catalog.login(credential['credential_id']),
+                'OPENSEARCH_PASSWORD': catalog.secret_for(credential['credential_id'])}
+
+    def scoped(self, credential):
+        return PrivateJSON(self.endpoint, {'Authorization': authorization(catalog.login(credential['credential_id']),
+            catalog.secret_for(credential['credential_id']))}, self.ca_file)
+
+    def probe(self, resource, credential):
+        self.scoped(credential).request('GET', '/' + index(resource) + '/_search?size=0')
+
+    def usage(self, resource):
+        name = index(resource)
+        value = self.root.request('GET', '/' + name + '/_stats/store')['indices'][name]['total']['store']['size_in_bytes']
+        if type(value) is not int or value < 0:
+            raise StoreError('Index store usage unavailable')
+        return value
+
+    def validate_recovery(self, resource):
+        self.root.request('GET', '/' + index(resource))
+
+    def purge(self, resource):
+        self.root.request('DELETE', '/' + index(resource), missing=True)
+        for mode in ('read-only', 'read-write'):
+            identity = role(resource, mode)
+            self.root.request('DELETE', '/_plugins/_security/api/rolesmapping/' + identity, missing=True)
+            self.root.request('DELETE', '/_plugins/_security/api/roles/' + identity, missing=True)

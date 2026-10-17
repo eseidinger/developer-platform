@@ -27,3 +27,16 @@ jobs:
       - run: uv sync --project platform/app --locked
       - run: docker pull qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
       - run: uv run --project platform/app python scripts/verify-qdrant.py
+
+  opensearch-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: docker pull opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c
+      - run: uv run --project platform/app python scripts/verify-opensearch.py
