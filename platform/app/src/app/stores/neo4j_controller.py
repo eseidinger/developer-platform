@@ -9,6 +9,7 @@ import ipaddress
 import json
 import os
 import threading
+import time
 from uuid import UUID
 import httpx2 as httpx
 from fastapi import FastAPI, Request, HTTPException
@@ -17,6 +18,12 @@ from . import catalog
 
 LABEL = 'developer-platform.neo4j-resource'
 LOCK = threading.Lock()
+DEADLINE = threading.local()
+
+def remaining():
+    value = getattr(DEADLINE, "until", time.monotonic()+5)-time.monotonic()
+    if value<=0: raise ValueError("Operator request deadline exceeded")
+    return min(5,value)
 
 
 class Engine:
@@ -25,7 +32,7 @@ class Engine:
             base_url='http://docker', timeout=5, trust_env=False)
 
     def call(self, method, path, body=None, missing=False):
-        r = self.client.request(method, '/v1.47' + path, json=body)
+        r = self.client.request(method, '/v1.47' + path, json=body,timeout=remaining())
         if missing and r.status_code == 404: return None
         if r.status_code >= 400: raise ValueError('Operator daemon operation unavailable')
         return r.json() if r.content else {}
@@ -51,7 +58,7 @@ class Controller:
         return value
 
     def password(self, rid):
-        return hmac.new(os.environ['NEO4J_CONTROLLER_KEY'].encode(),
+        return hmac.new(os.environ['NEO4J_ADMIN_KEY'].encode(),
             ('neo4j-admin-v1:' + str(rid)).encode(), hashlib.sha256).hexdigest()
 
     def ensure(self, rid):
@@ -72,6 +79,7 @@ class Controller:
             self.engine.call('POST', '/containers/create?name=' + name, {
                 'Image': IMAGE, 'Labels': labels, 'User': '7474:7474',
                 'Env': ['NEO4J_AUTH=neo4j/' + self.password(rid),
+                    'NEO4J_server_jvm_additional=-javaagent:/opt/platform/jmx-agent.jar=9404:/opt/platform/jmx.yaml',
                     'NEO4J_server_memory_heap_initial__size=256m', 'NEO4J_server_memory_heap_max__size=512m',
                     'NEO4J_server_memory_pagecache_size=256m', 'NEO4J_server_bolt_tls__level=DISABLED',
                     'NEO4J_dbms_security_allow__csv__import__from__file__urls=false',
@@ -104,7 +112,7 @@ class Controller:
 
     def query(self, rid, statement, parameters=None, database='system', user=None, password=None):
         host = self.address(rid)['host']
-        with httpx.Client(timeout=3, trust_env=False, follow_redirects=False) as client:
+        with httpx.Client(timeout=min(3,remaining()), trust_env=False, follow_redirects=False) as client:
             response = client.post(f'http://{host}:7474/db/{database}/query/v2',
                 auth=(user or 'neo4j', password or self.password(rid)),
                 json={'statement': statement, 'parameters': parameters or {}})
@@ -112,6 +120,22 @@ class Controller:
         value = response.json()
         if value.get('errors'): raise ValueError('Native operation failed')
         return value
+
+    def purge_network(self,rid,info,apply=False):
+        network=names(rid)[2]
+        value=self.engine.call('GET','/networks/'+network,missing=True)
+        if value is None:return
+        if value.get('Labels',{}).get(LABEL)!=str(rid) or not value.get('Internal'):raise ValueError('Network ownership mismatch')
+        allowed={info['Id']} if info else set()
+        for member in os.environ.get('NEO4J_NETWORK_MEMBERS','developer-platform-neo4j-controller-1,developer-platform-platform-api-1,developer-platform-store-access-1').split(','):
+            if not member:continue
+            member_info=self.engine.call('GET','/containers/'+member+'/json',missing=True)
+            if member_info:allowed.add(member_info['Id'])
+        if set(value.get('Containers',{}))-allowed:raise ValueError('Unexpected dedicated network member')
+        if apply:
+            for member in value.get('Containers',{}):
+                self.engine.call('POST','/networks/'+network+'/disconnect',{'Container':member,'Force':True})
+            self.engine.call('DELETE','/networks/'+network)
 
     def container_metrics(self):
         services = {'postgres':'postgresql','rustfs':'s3','opensearch':'opensearch','qdrant':'qdrant'}
@@ -152,6 +176,7 @@ class Controller:
             return result
         info = self.info(rid)
         if action in {'retire', 'purge'}:
+            if action=='purge':self.purge_network(rid,info)
             if info and info['State']['Running']:
                 self.engine.call('POST', '/containers/' + names(rid)[0] + '/stop?t=30')
             if action == 'purge':
@@ -160,7 +185,7 @@ class Controller:
                 if volume:
                     if volume.get('Labels', {}).get(LABEL) != str(rid): raise ValueError('Volume ownership mismatch')
                     self.engine.call('DELETE', '/volumes/' + names(rid)[1])
-                # Network retained until infrastructure detach/reconciliation; no unrelated network mutation.
+                self.purge_network(rid,None,apply=True)
             return {}
         if info is None:
             if action == 'revoke': return {}
@@ -180,23 +205,41 @@ class Controller:
                 if action != 'probe': raise ValueError()
                 self.query(rid, 'RETURN 1', database='neo4j')
             return {}
+        if action == 'jvm':
+            host = self.address(rid)['host']
+            with httpx.Client(timeout=3,trust_env=False) as client:
+                response=client.get(f'http://{host}:9404/metrics')
+            if response.status_code!=200 or len(response.content)>262144: raise ValueError()
+            import re
+            values={}
+            for item in response.text.splitlines():
+                matched=re.fullmatch(r'(platform_jvm_heap_(?:used|max|committed)_bytes|platform_jvm_gc_seconds_total|platform_jvm_threads)(?:\{[^}]*\})? ([0-9.eE+\-]+)',item)
+                if matched:
+                    values[matched[1]]=values.get(matched[1],0)+float(matched[2])
+            if not {'platform_jvm_heap_used_bytes','platform_jvm_heap_max_bytes'} <= values.keys(): raise ValueError('JVM metrics unavailable')
+            return values
         if action == 'usage':
-            # Fixed command, never request-controlled shell text.
-            created = self.engine.call('POST', '/containers/' + names(rid)[0] + '/exec',
-                {'AttachStdout': True, 'Cmd': ['du', '-sb', '/data']})
-            # Engine returns a multiplexed stream; strip its fixed 8-byte header.
-            r = self.engine.client.post('/v1.47/exec/' + created['Id'] + '/start', json={'Detach': False, 'Tty': False})
-            if r.status_code != 200 or len(r.content) > 256: raise ValueError()
-            return {'used_bytes': int(r.content[8:].split()[0])}
+            for volume in self.engine.call('GET','/system/df').get('Volumes',[]):
+                if volume['Name']==names(rid)[1] and volume.get('Labels',{}).get(LABEL)==str(rid):
+                    value=volume.get('UsageData',{}).get('Size')
+                    if type(value) is not int or value<0: raise ValueError()
+                    return {'used_bytes':value}
+            raise ValueError('Retained volume usage unavailable')
         raise ValueError('Unsupported operation')
 
 
 def create_app(controller=None):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
+    for name in ('NEO4J_CONTROLLER_KEY','NEO4J_ADMIN_KEY'):
+        if len(os.environ.get(name,''))<32:raise ValueError('Operator controller secret configuration unavailable')
+    maximum=int(os.environ.get('NEO4J_MAX_INSTANCES','4'))
+    memory=int(os.environ.get('NEO4J_INSTANCE_MEMORY_BYTES','1610612736'))
+    if not 1<=maximum<=64 or not 1073741824<=memory<=17179869184:raise ValueError('Operator instance allocation invalid')
     control = controller or Controller()
 
     @app.post('/v1/instances/{rid}/{action}')
     async def operation(rid: UUID, action: str, request: Request):
+        received=time.monotonic()
         key = os.environ.get('NEO4J_CONTROLLER_KEY', '')
         if (len(key) < 32 or not hmac.compare_digest(request.headers.get('authorization', ''), 'Bearer ' + key)
                 or request.client.host != os.environ.get('PLATFORM_API_IP', '172.30.80.11')):
@@ -210,7 +253,12 @@ def create_app(controller=None):
             if not isinstance(values, dict) or set(values) - {'credential_id', 'password'}: raise ValueError()
             import asyncio
             def apply():
-                with LOCK: return control.apply(rid, action, values)
+                with LOCK:
+                    DEADLINE.until=received+4
+                    try:
+                        remaining()  # Stale queued calls cannot mutate after their caller timed out.
+                        return control.apply(rid, action, values)
+                    finally: del DEADLINE.until
             return await asyncio.to_thread(apply)
         except Exception:
             raise HTTPException(503, 'Dedicated instance operation unavailable') from None

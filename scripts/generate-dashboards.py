@@ -426,6 +426,11 @@ def performance_dashboards():
             for title,key,unit in [('Query CPU time','cpu_seconds','s'),('Peak buffer memory','peak_memory_bytes','bytes'),('Temporary spill usage','spill_bytes','bytes'),('Rows scanned','rows_scanned','short'),('Rows returned','rows_returned','short'),('Artifact bytes transferred','transfer_bytes','bytes')]:
                 add(title,f'platform_store_workload_{key}{{provider="duckdb",{selected}}}',unit,'Selected numeric fields from the last profiled job; plans, paths, SQL and contents are excluded. These gauges are not cumulative counters.')
         elif uid == 'neo4j-community':
+            add('JVM heap utilization',f'platform_native_neo4j_jvm_heap_used_bytes{{{selected}}} / (platform_native_neo4j_jvm_heap_max_bytes{{{selected}}} > 0)','percentunit','Standard JVM JMX agent in the pinned Community image; no Enterprise metrics plugin.')
+            add('JVM GC time',f'rate(platform_native_neo4j_jvm_gc_seconds_total{{{selected}}}[5m])','s','Standard JVM collector time, aggregated across garbage collectors.')
+            add('JVM live threads',f'platform_native_neo4j_jvm_threads{{{selected}}}',description='Standard JVM thread count.')
+            add('JVM collection health','platform_native_collection_up{provider="neo4j"}',description='Independent per-instance JVM collection; failures retain old values with their success timestamp.')
+            add('Relayed Bolt connections',f'platform_store_relay_connections{{provider="neo4j",resource_id=~"$resource"}}',description='Platform data-lease TCP connections; excludes operator-native maintenance connections.')
             add('Dedicated instance running',f'platform_native_container_running{{provider="neo4j",{selected}}}',description='Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting.')
         dashboard={'uid':uid,'title':title,'schemaVersion':41,'version':1,'editable':False,'timezone':'browser','refresh':'30s',
             'time':{'from':'now-1h','to':'now'},'tags':['developer-platform','operator','stores','performance'],'panels':entries,

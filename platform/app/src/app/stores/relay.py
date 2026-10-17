@@ -117,8 +117,9 @@ async def postgres_startup(reader, writer, lease):
 
 
 class Relay:
-    def __init__(self, load=snapshot, backend=None, host="0.0.0.0"):
+    def __init__(self, load=snapshot, backend=None, host="0.0.0.0", observe=None):
         self.load = load
+        self.observe = observe
         self.backend = backend or backend_endpoint
         self.host = host
         self.leases = {}
@@ -155,7 +156,7 @@ class Relay:
                 from .bolt_relay import exchange
                 async def guard_bolt():
                     while self.allowed(port, lease): await asyncio.sleep(.25)
-                tasks = [asyncio.create_task(exchange(reader, writer, lease, self.backend(lease))),
+                tasks = [asyncio.create_task(exchange(reader, writer, lease, self.backend(lease), observe=self.observe)),
                     asyncio.create_task(guard_bolt())]
                 remaining = max(0, (lease['expires_at'] - datetime.now(timezone.utc)).total_seconds())
                 await asyncio.wait_for(asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining)
@@ -229,6 +230,18 @@ class Relay:
             packet = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 2)
             if len(packet) > 4096:
                 raise ValueError('Invalid control request')
+            if packet.split(b'\r\n',1)[0] == b'GET /metrics HTTP/1.1':
+                counts={}
+                for lease in self.leases.values():
+                    pair=(lease['provider'],lease['resource_id'])
+                    counts[pair]=counts.get(pair,0)+self.by_credential.get(lease['credential_id'],0)
+                import json
+                content='\n'.join('platform_store_relay_connections{provider='+json.dumps(provider)+',resource_id='+json.dumps(resource)+'} '+str(count)
+                    for (provider,resource),count in sorted(counts.items()))+'\n'
+                body=content.encode()
+                writer.write(b'HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: '+str(len(body)).encode()+b'\r\nConnection: close\r\n\r\n'+body)
+                await writer.drain()
+                return
             ready = time.monotonic() - self.last_success < 3
             line = packet.split(b'\r\n', 1)[0]
             if line.startswith(b'GET /session/'):

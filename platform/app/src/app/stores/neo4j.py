@@ -7,7 +7,7 @@ from . import catalog
 from .http_client import PrivateJSON
 from .s3 import StoreError
 
-IMAGE = 'neo4j:2026.09.0-community@sha256:d6269a020149934597c8c3df926d080a612796dbbb48861ca9d5b1109cabf0d8'
+IMAGE = 'developer-platform-neo4j:2026.09.0-community-jmx1.6.0'
 
 
 def require_mode(provider, mode):
@@ -46,6 +46,11 @@ class Neo4j:
             password=catalog.secret_for(credential['credential_id']))
 
     def revoke(self, resource, credential):
+        if resource.get('state') in {'retired','purging','purged'}:
+            # Stopping the dedicated instance fences all native identities, even
+            # if a full-access user changed its native administrator password.
+            self.call('retire',resource)
+            return
         self.call('revoke', resource, credential_id=str(UUID(str(credential['credential_id']))))
 
     def probe(self, resource, credential):

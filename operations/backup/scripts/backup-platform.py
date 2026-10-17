@@ -142,12 +142,46 @@ class Job:
     def data_store_state(self, bundle):
         manifest = json.loads((bundle / 'store-recovery.json').read_text())
         providers = {row['provider'] for row in manifest['resources'] if row['state'] != 'purged'} - {'postgresql'}
+        if 'neo4j' in providers:
+            self.neo4j_state(bundle, manifest)
+            providers.remove('neo4j')
         volumes = {'s3': ('rustfs', ['/data']), 'qdrant': ('qdrant', ['/qdrant/storage']),
                    'opensearch': ('opensearch', ['/usr/share/opensearch/data'])}
         if providers - volumes.keys():
             raise BackupError('Data-store provider has no protected volume capture')
         if providers:
             self.volume_state(bundle, [volumes[p] for p in sorted(providers)])
+
+    def neo4j_state(self, bundle, manifest):
+        """Cleanly stop only catalog-owned dedicated instances; preserve retired volumes."""
+        containers, mounts = [], []
+        for row in manifest['resources']:
+            if row['provider']!='neo4j' or row['state']=='purged': continue
+            rid=str(uuid.UUID(row['resource_id']))
+            name='platform-neo4j-'+uuid.UUID(rid).hex
+            info=json.loads(self.command([self.docker,'inspect',name]))[0]
+            if info['Config']['Labels'].get('developer-platform.neo4j-resource')!=rid:
+                raise BackupError('Dedicated instance ownership mismatch')
+            found=[m for m in info['Mounts'] if m['Destination']=='/data' and m['Type']=='volume' and m['Name']==name+'-data']
+            if len(found)!=1: raise BackupError('Dedicated retained volume missing')
+            if info['State']['Running']: containers.append(info['Id'])
+            mounts.append((name,Path(found[0]['Source'])))
+        atomic_json(self.state/'resume.json',containers)
+        try:
+            if containers:self.command([self.docker,'stop','--time','60',*containers],timeout=180)
+            identities=[]
+            for name,source in mounts:
+                info=json.loads(self.command([self.docker,'inspect',name]))[0]
+                if info['State']['Running'] or info['State'].get('ExitCode')==137:
+                    raise BackupError('Dedicated instance did not stop cleanly')
+                identities.append({'resource_id':info['Config']['Labels']['developer-platform.neo4j-resource'],
+                    'image_id':info['Image'],'configured_image':info['Config']['Image']})
+                # Stopped physical volume preserves graph data and native system identities.
+                with tarfile.open(bundle/(name+'-data.tar.gz'),'w:gz') as archive:
+                    archive.add(source,arcname='.',recursive=True)
+            atomic_json(bundle/'neo4j-instances.json',identities)
+        finally:
+            self.resume()
 
     def postgres_argv(self, *arguments):
         return [self.docker, 'compose', 'exec', '-T', 'postgres', *arguments]

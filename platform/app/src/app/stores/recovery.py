@@ -100,6 +100,11 @@ def reconcile(conn, manifest, apply=False):
             if row['provider'] == 'postgresql' and 'age' in row['extensions']:
                 provider.rebuild_projections(row)
             provider.validate_recovery(row)
+            if row['provider']=='neo4j':
+                instance=provider.provision(row)
+                conn.execute("""INSERT INTO store_instances(resource_id,host,port) VALUES(%s,%s,7687)
+                    ON CONFLICT(resource_id) DO UPDATE SET host=excluded.host,port=excluded.port""",(identity,instance['host']))
+                if row['state']=='retired':provider.retire(row)
             state = row['state']
         if identity in current:
             conn.execute("""UPDATE store_resources SET name=%s,quota_bytes=%s,state=%s,

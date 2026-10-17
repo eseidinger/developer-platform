@@ -76,7 +76,7 @@ def store_volume_restore_targets(bundle):
     if not path.exists():
         return []
     manifest = json.loads(path.read_text())
-    providers = {row['provider'] for row in manifest['resources'] if row['state'] != 'purged'} - {'postgresql'}
+    providers = {row['provider'] for row in manifest['resources'] if row['state'] != 'purged'} - {'postgresql','neo4j'}
     mapping = {'s3': ('rustfs', 'rustfs_data', 'rustfs-data.tar.gz'),
         'qdrant': ('qdrant', 'qdrant_data', 'qdrant-storage.tar.gz'),
         'opensearch': ('opensearch', 'opensearch_data', 'opensearch-data.tar.gz')}
@@ -86,6 +86,64 @@ def store_volume_restore_targets(bundle):
     if any(not (bundle / filename).is_file() for _, _, filename in result):
         raise RuntimeError('A retained data-store volume is missing from this recovery bundle')
     return result
+
+
+def neo4j_restore_sources(bundle):
+    path=bundle/'store-recovery.json'
+    if not path.exists():return []
+    from uuid import UUID
+    result=[]
+    for row in json.loads(path.read_text())['resources']:
+        if row['provider']!='neo4j' or row['state']=='purged':continue
+        rid=str(UUID(row['resource_id']))
+        name='platform-neo4j-'+UUID(rid).hex+'-data'
+        source=bundle/(name+'.tar.gz')
+        if not source.is_file():raise RuntimeError('Retained dedicated instance archive missing')
+        result.append((rid,name,source))
+    if result:
+        inventory=bundle/'neo4j-instances.json'
+        if not inventory.is_file():raise RuntimeError('Dedicated instance version inventory missing')
+        rows=json.loads(inventory.read_text())
+        if (len(rows)!=len(result) or {r['resource_id'] for r in rows}!={r[0] for r in result}
+                or any(r.get('configured_image')!='developer-platform-neo4j:2026.09.0-community-jmx1.6.0' for r in rows)):
+            raise RuntimeError('Dedicated instance version inventory requires operator review')
+    return result
+
+
+def restore_neo4j_volumes(bundle):
+    identities=[]
+    for rid,name,source in neo4j_restore_sources(bundle):
+        run(['docker','volume','create','--label','developer-platform.neo4j-resource='+rid,name])
+        destination=Path(run(['docker','volume','inspect','--format','{{.Mountpoint}}',name]).decode().strip())
+        if any(destination.iterdir()):raise RuntimeError('Dedicated recovery volume is not empty')
+        with tarfile.open(source) as archive:
+            def owned(member,path):
+                safe=tarfile.data_filter(member,path)
+                if safe is not None:safe.uid,safe.gid=member.uid,member.gid
+                return safe
+            archive.extractall(destination,filter=owned,numeric_owner=True)
+        identities.append(rid)
+    return identities
+
+
+def start_recovered_neo4j(compose, identities):
+    if not identities:return
+    # Access remains quarantined. Recreate operator-managed instances before the
+    # API's recovered-identity cleanup; no recovered human lease is activated.
+    run(['docker','build','-t','developer-platform-neo4j:2026.09.0-community-jmx1.6.0','persistence/neo4j'],ROOT,timeout=600)
+    run(compose+['create','platform-api','store-access','neo4j-controller'],ROOT,timeout=900)
+    run(compose+['up','-d','--no-deps','neo4j-controller'],ROOT,timeout=120)
+    code="""from app.stores.neo4j_controller import Controller
+import json,sys,time
+c=Controller()
+for rid in json.loads(sys.stdin.read()):
+ c.ensure(rid)
+ for _ in range(120):
+  try: c.query(rid,'RETURN 1',database='neo4j'); break
+  except Exception: time.sleep(.5)
+ else: raise RuntimeError('Recovered dedicated instance readiness failed')
+"""
+    run(compose+['exec','-T','neo4j-controller','python','-c',code],ROOT,data=json.dumps(identities).encode(),timeout=900)
 
 
 def quarantine_hosted_access(compose):
@@ -199,6 +257,7 @@ https://*.apps.localhost {
             raise RuntimeError('Named-store restore requires quarantine-capable source before services may start')
         store_intents = latest_store_intents()
 
+    neo4j_restore_sources(bundle)
     store_volumes = store_volume_restore_targets(bundle)
     run(compose + ['create', 'proxy', 'grafana', *[service for service, _, _ in store_volumes]], ROOT, timeout=900)
     for volume, filename in [('caddy_data', 'proxy-data.tar.gz'), ('caddy_config', 'proxy-config.tar.gz'),
@@ -216,6 +275,8 @@ https://*.apps.localhost {
                 return safe
             archive.extractall(destination, filter=owned, numeric_owner=True)
     run(['python3', 'scripts/install-k3d.py'], ROOT, timeout=300)
+    recovered_neo4j=restore_neo4j_volumes(bundle)
+    start_recovered_neo4j(compose,recovered_neo4j)
     run(['bash', 'scripts/up.sh'], ROOT, timeout=1200)
     for _ in range(45):
         try:

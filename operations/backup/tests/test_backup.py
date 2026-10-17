@@ -89,10 +89,32 @@ class BackupTests(unittest.TestCase):
             self.job.data_store_state(bundle)
         self.assertEqual(volumes.call_args.args[1], [('opensearch', ['/usr/share/opensearch/data']),
             ('qdrant', ['/qdrant/storage']), ('rustfs', ['/data'])])
-        backup.atomic_json(path, {'resources': [{'provider': 'neo4j', 'state': 'active'}]})
+        backup.atomic_json(path, {'resources': [{'provider': 'unknown', 'state': 'active'}]})
         with patch.object(self.job, 'volume_state') as volumes, self.assertRaises(backup.BackupError):
             self.job.data_store_state(bundle)
         volumes.assert_not_called()
+
+    def test_dedicated_capture_failure_restarts_only_previously_running_instances(self):
+        from uuid import uuid4
+        rid=str(uuid4());name='platform-neo4j-'+rid.replace('-','')
+        data=self.root/'native-data';data.mkdir();(data/'value').write_text('synthetic graph')
+        running=True;calls=[]
+        def command(args,**kwargs):
+            nonlocal running
+            calls.append(args)
+            if args[1]=='inspect':return json.dumps([{'Id':name,'Image':'sha256:fixture',
+                'Config':{'Image':'developer-platform-neo4j:2026.09.0-community-jmx1.6.0','Labels':{'developer-platform.neo4j-resource':rid}},
+                'State':{'Running':running,'ExitCode':0},
+                'Mounts':[{'Destination':'/data','Type':'volume','Name':name+'-data','Source':str(data)}]}]).encode()
+            if args[1]=='stop':running=False
+            if args[1]=='start':running=True
+            return b''
+        bundle=self.root/'bundle';bundle.mkdir()
+        with patch.object(self.job,'command',side_effect=command),patch.object(backup.tarfile,'open',side_effect=OSError('disk full')):
+            with self.assertRaises(OSError):self.job.neo4j_state(bundle,{'resources':[{'resource_id':rid,'provider':'neo4j','state':'active'}]})
+        self.assertTrue(running)
+        self.assertIn([self.job.docker,'start',name],calls)
+        self.assertFalse((self.job.state/'resume.json').exists())
 
     def test_shared_data_capture_and_sql_dump_share_the_pause_and_lifecycle_lock(self):
         events = []

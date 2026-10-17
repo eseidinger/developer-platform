@@ -19,7 +19,8 @@ def get(name):
         if len(os.environ.get('NEO4J_CONTROLLER_KEY', '')) < 32:
             raise ProviderUnavailable('Dedicated instance controller is not configured')
         from .neo4j import Neo4j
-        return Neo4j()
+        try: return Neo4j()
+        except (ValueError,KeyError): raise ProviderUnavailable('Dedicated instance controller configuration is invalid') from None
     definitions = {'s3': ('RUSTFS_IP', ('RUSTFS_ACCESS_KEY', 'RUSTFS_SECRET_KEY')),
         'opensearch': ('OPENSEARCH_IP', ('OPENSEARCH_ADMIN_PASSWORD',)),
         'qdrant': ('QDRANT_IP', ('QDRANT_API_KEY',))}
@@ -68,6 +69,13 @@ def budget(name):
 
 
 def check_capacity(conn, provider, quota, resource_id=None):
+    if provider == 'neo4j' and resource_id is None:
+        try: limit=int(os.environ.get('NEO4J_MAX_INSTANCES','4'))
+        except ValueError: raise ProviderUnavailable('Dedicated instance allocation is invalid') from None
+        if not 1<=limit<=64: raise ProviderUnavailable('Dedicated instance allocation is invalid')
+        if conn.execute("SELECT count(*) FROM store_resources WHERE provider='neo4j' AND state<>'purged'").fetchone()[0]>=limit:
+            from .catalog import Conflict
+            raise Conflict('Operator dedicated instance allocation exhausted, including retained resources')
     used = conn.execute("""SELECT COALESCE(sum(GREATEST(quota_bytes,COALESCE(used_bytes,0))),0) FROM store_resources
         WHERE provider=%s AND state<>'purged' AND (%s::uuid IS NULL OR resource_id<>%s)""",
         (provider, resource_id, resource_id)).fetchone()[0]

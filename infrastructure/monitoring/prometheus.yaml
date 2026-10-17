@@ -30,6 +30,20 @@ scrape_configs:
         action: keep
       - action: labelkeep
         regex: '__name__|job|instance|datname|state|mode'
+  - job_name: store-relay
+    metrics_path: /metrics
+    scrape_timeout: 3s
+    sample_limit: 256
+    body_size_limit: 64KB
+    label_limit: 6
+    static_configs:
+      - targets: ["store-access:19999"]
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: platform_store_relay_connections
+        action: keep
+      - action: labelkeep
+        regex: '__name__|job|instance|provider|resource_id'
   - job_name: host
     static_configs:
       - targets: ["node-exporter:9100"]

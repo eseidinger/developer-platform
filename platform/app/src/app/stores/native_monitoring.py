@@ -166,6 +166,17 @@ def containers(resources):
     return result
 
 
+def neo4j(provider,resources):
+    result=[]
+    for resource in resources:
+        if resource['state']!='active':continue
+        labels={'provider':'neo4j','project':resource['owner_project'],'resource_id':str(resource['resource_id']),'scope':'resource'}
+        for name,value in provider.call('jvm',resource).items():
+            if name not in {'platform_jvm_heap_used_bytes','platform_jvm_heap_max_bytes','platform_jvm_heap_committed_bytes','platform_jvm_gc_seconds_total','platform_jvm_threads'}:raise ValueError()
+            result.append(line(name.replace('platform_jvm_','platform_native_neo4j_jvm_'),value,labels))
+    return result
+
+
 PG_CACHE = {}
 PG_OFFSET = 0
 
@@ -217,9 +228,9 @@ def loop(stop, control):
                 resources = [row[0] for row in conn.execute("SELECT row_to_json(r) FROM store_resources r WHERE state<>'purged' ORDER BY resource_id LIMIT 128").fetchall()]
             selected = set(os.environ.get('STORE_ENABLED_PROVIDERS', '').split(','))
             now, lines = time.time(), []
-            for native in ('s3','neo4j'):
+            for native in ('s3',):
                 lines.append(line('platform_native_selected', int(native in selected), {'provider':native}))
-            for name, collect in [('postgresql', postgres), ('opensearch', opensearch), ('qdrant', qdrant)]:
+            for name, collect in [('postgresql', postgres), ('opensearch', opensearch), ('qdrant', qdrant), ('neo4j', neo4j)]:
                 enabled = name == 'postgresql' or name in selected
                 lines.append(line('platform_native_selected', int(enabled), {'provider': name}))
                 if not enabled:

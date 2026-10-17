@@ -106,13 +106,15 @@ async def message(reader):
         wire.extend(chunk)
 
 
-async def exchange(reader, writer, lease, backend):
+async def exchange(reader, writer, lease, backend, observe=None):
     upstream = None
     tasks = []
+    phase = 'handshake'
     try:
         handshake = await asyncio.wait_for(reader.readexactly(20), 5)
         if handshake[:4] != b'\x60\x60\xb0\x17': raise ValueError('Plain Bolt required')
         offers = [handshake[i:i+4] for i in range(4, 20, 4)]
+        if observe: observe('version-offers',','.join(str(v[3])+'.'+str(v[2])+'-range'+str(v[1]) for v in offers))
         if not any(v[0] == 0 and v[3] == 5 and v[2] - v[1] <= 4 <= v[2] for v in offers):
             raise ValueError('Bolt 5.4 support required')
         remote, upstream = await asyncio.wait_for(asyncio.open_connection(*backend), 3)
@@ -121,6 +123,7 @@ async def exchange(reader, writer, lease, backend):
         if await asyncio.wait_for(remote.readexactly(4), 5) != VERSION: raise ValueError('Native version mismatch')
         writer.write(VERSION)
         await writer.drain()
+        phase = 'authenticated-messages'
         state = {'hello': False, 'auth': False}
         async def requests():
             while True:
@@ -133,7 +136,14 @@ async def exchange(reader, writer, lease, backend):
                 writer.write(chunk)
                 await writer.drain()
         tasks = [asyncio.create_task(requests()), asyncio.create_task(responses())]
-        await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        done,_=await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        if observe:
+            for task in done:
+                error=task.exception()
+                observe(phase,type(error).__name__ if error else 'Completed')
+    except Exception as error:
+        if observe: observe(phase,type(error).__name__)
+        raise
     finally:
         for task in tasks: task.cancel()
         await asyncio.gather(*tasks, return_exceptions=True)

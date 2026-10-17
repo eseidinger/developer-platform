@@ -226,6 +226,8 @@ def issue(conn, row):
     if recovery.required(conn):
         raise Conflict("Named-store recovery reconciliation is required")
     res = resource(conn, row["resource_id"], lock=True)
+    from .neo4j import require_mode
+    require_mode(res["provider"],row["mode"])
     if row["state"] != "active" or res["state"] != "active" or res["observed_state"] != "active":
         raise Conflict("Grant and resource must be active and provisioned")
     active_project(conn, res["owner_project"])

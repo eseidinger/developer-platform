@@ -139,11 +139,12 @@ services:
     build: ../platform
     user: "0:0"
     restart: unless-stopped
-    command: [uvicorn, "app.stores.neo4j_controller:create_app", --factory, --host, "0.0.0.0", --port, "8091", --no-access-log]
+    command: [uvicorn, "app.stores.neo4j_controller:create_app", --factory, --host, "0.0.0.0", --port, "8091", --limit-concurrency, "32", --timeout-keep-alive, "2", --no-access-log]
     environment:
       STORE_ENABLED_PROVIDERS: postgresql,${COMPOSE_PROFILES:-}
       PLATFORM_API_IP: ${PLATFORM_API_IP:-172.30.80.11}
       NEO4J_CONTROLLER_KEY: ${NEO4J_CONTROLLER_KEY:?Run scripts/init.py}
+      NEO4J_ADMIN_KEY: ${NEO4J_ADMIN_KEY:?Run scripts/init.py}
       NEO4J_MAX_INSTANCES: ${NEO4J_MAX_INSTANCES:-4}
       NEO4J_INSTANCE_MEMORY_BYTES: ${NEO4J_INSTANCE_MEMORY_BYTES:-1610612736}
     volumes: ["/var/run/docker.sock:/var/run/docker.sock"]

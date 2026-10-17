@@ -440,8 +440,8 @@
     {
       "id": 13,
       "type": "timeseries",
-      "title": "Dedicated instance running",
-      "description": "Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting. Missing data means collection or target discovery needs checking.",
+      "title": "JVM heap utilization",
+      "description": "Standard JVM JMX agent in the pinned Community image; no Enterprise metrics plugin. Missing data means collection or target discovery needs checking.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -451,6 +451,181 @@
         "w": 12,
         "x": 0,
         "y": 48
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform_native_neo4j_jvm_heap_used_bytes{project=~\"$project\",resource_id=~\"$resource\"} / (platform_native_neo4j_jvm_heap_max_bytes{project=~\"$project\",resource_id=~\"$resource\"} > 0)",
+          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "JVM GC time",
+      "description": "Standard JVM collector time, aggregated across garbage collectors. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 48
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(platform_native_neo4j_jvm_gc_seconds_total{project=~\"$project\",resource_id=~\"$resource\"}[5m])",
+          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "JVM live threads",
+      "description": "Standard JVM thread count. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 56
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform_native_neo4j_jvm_threads{project=~\"$project\",resource_id=~\"$resource\"}",
+          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "JVM collection health",
+      "description": "Independent per-instance JVM collection; failures retain old values with their success timestamp. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 56
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform_native_collection_up{provider=\"neo4j\"}",
+          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "Relayed Bolt connections",
+      "description": "Platform data-lease TCP connections; excludes operator-native maintenance connections. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform_store_relay_connections{provider=\"neo4j\",resource_id=~\"$resource\"}",
+          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "Dedicated instance running",
+      "description": "Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 64
       },
       "targets": [
         {

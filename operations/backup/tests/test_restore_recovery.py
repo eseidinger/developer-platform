@@ -28,10 +28,26 @@ class RestoreRecoveryTests(unittest.TestCase):
                 ('opensearch', 'opensearch_data', 'opensearch-data.tar.gz'),
                 ('qdrant', 'qdrant_data', 'qdrant-storage.tar.gz'),
                 ('rustfs', 'rustfs_data', 'rustfs-data.tar.gz')])
-            manifest['resources'].append({'provider': 'neo4j', 'state': 'active'})
+            manifest['resources'].append({'provider': 'unknown', 'state': 'active'})
             (bundle / 'store-recovery.json').write_text(json.dumps(manifest))
             with self.assertRaisesRegex(RuntimeError, 'No protected restore adapter'):
                 restore.store_volume_restore_targets(bundle)
+
+    def test_dedicated_archive_and_image_inventory_preflight_before_docker_mutation(self):
+        from uuid import uuid4
+        with tempfile.TemporaryDirectory() as directory:
+            bundle=Path(directory);rid=str(uuid4())
+            (bundle/'store-recovery.json').write_text(json.dumps({'resources':[{'provider':'neo4j','state':'retired','resource_id':rid}]}))
+            with patch.object(restore,'run') as run,self.assertRaisesRegex(RuntimeError,'archive missing'):
+                restore.restore_neo4j_volumes(bundle)
+            run.assert_not_called()
+            name='platform-neo4j-'+rid.replace('-','')+'-data'
+            (bundle/(name+'.tar.gz')).write_bytes(b'synthetic archive identity')
+            with self.assertRaisesRegex(RuntimeError,'inventory missing'):restore.neo4j_restore_sources(bundle)
+            (bundle/'neo4j-instances.json').write_text(json.dumps([{'resource_id':rid,'configured_image':'enterprise-unreviewed'}]))
+            with self.assertRaisesRegex(RuntimeError,'operator review'):restore.neo4j_restore_sources(bundle)
+            (bundle/'neo4j-instances.json').write_text(json.dumps([{'resource_id':rid,'configured_image':'developer-platform-neo4j:2026.09.0-community-jmx1.6.0'}]))
+            self.assertEqual(restore.neo4j_restore_sources(bundle),[(rid,name,bundle/(name+'.tar.gz'))])
 
     def test_restored_access_is_quarantined_before_services_start(self):
         with patch.object(restore, 'run') as run:
