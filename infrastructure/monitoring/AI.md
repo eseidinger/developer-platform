@@ -13,6 +13,17 @@ Environment capture/export overrides are not read. SDK diagnostic loggers are
 suppressed because their exception messages can contain provider payloads.
 Ordinary platform and hosted-application instrumentation remains independent.
 
+`scripts/verify-ai-trace-pipeline.py` exercises the actual platform HTTP middleware
+and focused OpenLIT wrapper with synthetic provider responses through disposable
+production-pinned Alloy/Tempo containers. The October 17 local fixture reads back
+100 of 100 root request traces and exactly ten model spans, including provider
+failure, with correct run/tool/model parentage. It verifies rejection of incoming
+public trace context/baggage, private attribute/content removal and preservation
+of trusted internal unsampled-parent behavior. This is local delivery evidence;
+it does not establish deployed sustained capacity or elapsed 24-hour retention.
+The [AI observability workflow](../../.github/workflows/ai-observability.yaml)
+also verifies the direct metric pipeline and all provisioned AI dashboard queries.
+
 ## Metric ownership and limits
 
 Direct OTLP metrics go to private Alloy `/v1/metrics`, then through an explicit

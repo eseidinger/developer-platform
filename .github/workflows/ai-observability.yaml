@@ -1,0 +1,23 @@
+name: AI observability
+on: [push, pull_request]
+
+jobs:
+  telemetry-pipelines:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - name: Fetch reviewed collector and storage images
+        run: |
+          docker pull grafana/alloy:v1.19.2
+          docker pull prom/prometheus:v3.14.0
+          docker pull grafana/tempo@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd
+      - name: Verify direct metrics and every AI dashboard query
+        run: uv run --project platform/app python scripts/verify-ai-metric-pipeline.py
+      - name: Verify every root trace, focused model spans and private-content removal
+        run: uv run --project platform/app python scripts/verify-ai-trace-pipeline.py

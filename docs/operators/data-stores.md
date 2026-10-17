@@ -3,10 +3,13 @@
 Phase 7 implementation is in progress. PostgreSQL named resources, the API/CLI,
 portal and private lease relay are implemented in source and disposable tests.
 The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
-Disposable console SSO/connection acceptance passes; provider expansion,
-backup/restore and deployed acceptance are still being completed. No existing installation has been reset.
+Disposable console SSO/connection and encrypted empty-server restore fixtures pass;
+provider expansion and deployed acceptance are still being completed. No existing installation has been reset.
 
 ## Resource and binding workflow
+
+Follow the [shared-store upgrade runbook](runbooks/store-upgrades.md) for reviewed
+image/extension changes and the release-specific encrypted recovery fixture.
 
 A project administrator creates resources owned by their project. Platform
 administrators have these capabilities across projects; direct data access still

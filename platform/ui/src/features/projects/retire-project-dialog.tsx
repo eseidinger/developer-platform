@@ -25,6 +25,10 @@ function RetireProjectDialog({ name }: { name: string }) {
         await preview.refetch()
       }
     },
+    onError: async () => {
+      setConfirmation('')
+      await preview.refetch()
+    },
   })
 
   function handleOpenChange(nextOpen: boolean) {

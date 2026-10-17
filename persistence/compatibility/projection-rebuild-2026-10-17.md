@@ -37,7 +37,14 @@ resource intents while holding the shared lifecycle lock. It verifies exclusion
 of concurrent lifecycle mutation, lock release after interrupted capture, refusal
 of a retained graph without protected sources, encrypted readback before purge,
 and replay of current purge intent after an older-state simulation. It uses a
-local repository and sends no notifications.
+local repository and sends no notifications. It additionally restores that real
+encrypted backup into an empty second temporary server, using `pg_dumpall`'s
+original database/role identities. The restore remains quarantined, replays the
+verified purge disposition, revokes every recovered credential/grant, rebuilds
+the graphs, preserves SQL/outbox/vector rows, and admits only fresh explicit
+reader approval. The old key remains denied. The October 17 local run completed
+this small empty-server restore/reconciliation/access check in 2.9 seconds; this
+is not a deployed throughput or RTO measurement.
 
 Run from the root after building the runtime image:
 
@@ -52,7 +59,8 @@ uv run --project platform/app python scripts/verify-named-postgres.py
 SSO and a scoped connection/query through the expiry relay. The
 [named-store CI job](../../.github/workflows/named-stores.yaml) repeats these checks.
 
-This is a same-server disposable database clone plus local encrypted backup test.
+This covers a same-server database clone and an empty-server encrypted restore
+using two disposable containers and a local repository.
 It does not establish deployed application/Kubernetes reconnection, off-host
 recovery throughput, the four-hour RTO, the 24-hour RPO, physical recovery, arbitrary
 graph dependencies, or full AGE regression coverage. Those acceptance items stay open.

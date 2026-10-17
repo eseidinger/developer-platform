@@ -440,6 +440,10 @@ def main():
                                 with connect(catalog.identifier(alpha["resource_id"])) as resource_conn:
                                     resource_conn.execute("SELECT ag_catalog.drop_graph('unprotected_fixture',true)")
                             assert job.run() == 0
+                        from store_recovery_fixture import verify as verify_encrypted_restore
+                        verify_encrypted_restore(binary, job.read('status.json', {})['last_verified_snapshot'],
+                            os.environ.get('NAMED_POSTGRES_IMAGE', 'postgres:18.6-trixie'),
+                            alpha, beta, doomed, renewed_reader)
                     backed = catalog.resource(conn, doomed["resource_id"])
                     assert backed["purge_backup_version"] == backed["version"] and backed["purge_backup_snapshot"]
                 with patch("app.stores.providers.get", return_value=provider):

@@ -29,8 +29,13 @@ Source now includes bounded usage measurements/alerts, the named-store dashboard
 restore quarantine, and version-pinned purge acknowledgment after verified
 backup upload/readback. A real encrypted local restic intent fixture passes
 purge gating and latest-tombstone replay after an older-state simulation; recovery
-requires fresh explicit approval. This is not a full data restore or deployed
-RPO/RTO acceptance. AGE authoritative rebuild is implemented and passes a real logical-restore
+requires fresh explicit approval. The fixture additionally restores the real encrypted
+SQL/catalog backup into an empty second disposable server, replays purge intent,
+rebuilds graphs, retains SQL/vector/outbox data and verifies old-key denial/fresh
+read-only approval. This is local evidence, not deployed off-host RPO/RTO acceptance.
+The [upgrade runbook](../../../operators/runbooks/store-upgrades.md) covers pinned
+release checks, verified pre-upgrade backups, extension upgrades and recovery limits.
+AGE authoritative rebuild is implemented and passes a real logical-restore
 fixture with two graphs, five labels, a cycle, source-defined indexes and preserved
 SQL/pgvector data. See the [dated evidence](../../../../persistence/compatibility/projection-rebuild-2026-10-17.md).
 Deployed rebuild/reconnection and recovery timing remain open.
@@ -214,6 +219,16 @@ quality or benchmark results do not gate selection.
 
 **Task:** PLAN-029. **Source:** phase 3. **Entry:** package 7.3 foundation and
 versioned VEF dependency fixtures; Bot Social experiments additionally require Core.
+
+**Implementation constraint verified October 17, 2026:** The current Neo4j
+[edition comparison](https://neo4j.com/docs/cypher-manual/25/introduction/cypher-neo4j/)
+limits Community Edition to one user database and gives every user full access.
+It therefore cannot satisfy the selected shared-service named-resource isolation
+and independent read-only/read-write grant contract. Keep the managed Neo4j
+provider unavailable unless a compatible edition/resource mapping is explicitly
+selected and verified. Community Edition remains a graph comparison target;
+do not weaken grants, filter arbitrary Cypher as a substitute for native
+authorization, or silently introduce a commercial license.
 
 - Compare relational PostgreSQL/recursive CTEs, Apache AGE, and Neo4j Community
   Edition for transitive dependencies, cycles, and change-impact analysis in VEF.

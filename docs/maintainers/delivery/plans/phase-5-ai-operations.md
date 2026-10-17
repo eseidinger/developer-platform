@@ -363,8 +363,9 @@ full adversarial corpus. Second-provider evaluation is deferred to Phase 9 packa
 
 ## 5.7 — Add OpenLIT instrumentation (`PLAN-034`)
 
-Status: source implementation and local verification in progress as of October 17, 2026;
-deployed acceptance remains open. See the [signal contract](../../../../infrastructure/monitoring/AI.md).
+Status: source implementation and local pipeline verification completed as of October 17, 2026;
+deployed acceptance remains open. EV-49 records actual 100/100 root trace readback,
+focused model/tool parentage and privacy, direct metrics and all 20 AI dashboard queries. See the [signal contract](../../../../infrastructure/monitoring/AI.md).
 Accountable role: AI / observability. Prerequisites: existing Phase 4 telemetry
 and Phase 5 run/model/tool boundaries.
 
