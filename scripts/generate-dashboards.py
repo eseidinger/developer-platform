@@ -342,7 +342,7 @@ def performance_dashboards():
         ('duckdb-parquet', 'DuckDB / Parquet analytics', 's3', None),
     ]
     result = []
-    for uid,title,provider,collector in definitions:
+    for uid,dashboard_title,provider,collector in definitions:
         entries = []
         def add(title, expr, unit='short', description=''):
             entries.append(panel(len(entries)+1,title,expr,unit=unit,description=description,
@@ -434,7 +434,7 @@ def performance_dashboards():
             add('JVM collection age','time()-platform_native_last_success_timestamp_seconds{provider="neo4j"}','s','Original success time for the JVM batch; retained samples do not become fresh when Docker collection succeeds.')
             add('Relayed Bolt connections',f'platform_store_relay_connections{{provider="neo4j",resource_id=~"$resource"}}',description='Platform data-lease TCP connections; excludes operator-native maintenance connections.')
             add('Dedicated instance running',f'platform_native_container_running{{provider="neo4j",{selected}}}',description='Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting.')
-        dashboard={'uid':uid,'title':title,'schemaVersion':41,'version':1,'editable':False,'timezone':'browser','refresh':'30s',
+        dashboard={'uid':uid,'title':dashboard_title,'schemaVersion':41,'version':1,'editable':False,'timezone':'browser','refresh':'30s',
             'time':{'from':'now-1h','to':'now'},'tags':['developer-platform','operator','stores','performance'],'panels':entries,
             'links':[{'title':'Named resources','type':'link','url':'/d/named-data-stores','keepTime':True}]}
         dashboard['templating']={'list':[

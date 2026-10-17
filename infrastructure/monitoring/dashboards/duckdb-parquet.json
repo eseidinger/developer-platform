@@ -1,6 +1,6 @@
 {
   "uid": "duckdb-parquet",
-  "title": "Artifact bytes transferred",
+  "title": "DuckDB / Parquet analytics",
   "schemaVersion": 41,
   "version": 1,
   "editable": false,
