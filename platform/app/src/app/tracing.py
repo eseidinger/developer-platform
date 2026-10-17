@@ -31,7 +31,7 @@ def sample_rate(value: str) -> float:
 def configure() -> None:
     """Called before workers start; exporter failures never enter request handling."""
     global _provider, _tracer
-    rate = sample_rate(os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "0.1"))
+    rate = sample_rate(os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "1.0"))
     endpoint = os.environ.get("PLATFORM_OTLP_ENDPOINT")
     if not endpoint:
         return

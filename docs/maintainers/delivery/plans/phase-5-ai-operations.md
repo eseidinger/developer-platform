@@ -84,6 +84,8 @@ acceptance requirements remain in scope.
 | 5.4 Recommend a fix | Propose a concrete configuration/deployment diff | Versioned desired state |
 | 5.5 Apply fix | Execute after approval and observe the effect | Authorization, revision checks, audit, and rollback plan |
 | 5.6 Use AI through the portal | Project AI workspace for explanations, investigations, development assistance, policy and approved changes | PLAN-010–015 API flows and portal authorization |
+| 5.7 OpenLIT instrumentation | Content-free model/tool traces and bounded GenAI metrics in existing backends | Existing Phase 4 telemetry and Phase 5 boundaries; PLAN-034 |
+| 5.8 AI Grafana dashboards | Operator AI operations, usage/cost and telemetry health views | PLAN-034 signal contract; PLAN-035 |
 
 Development support follows using project knowledge from documentation, ADRs, API contracts, and repositories. Examples include appropriate service templates, change-impact analysis, and reviews with runtime context. General code completion is not a separate product goal.
 
@@ -338,8 +340,8 @@ tool-call spans. Record only safe operation/model/tool names, durations, token
 counts, outcomes, and opaque run IDs. Keep raw traces operator-only; never
 capture prompts, responses, tool arguments/results, or retrieved project
 content. Provide a separate project-scoped AI-run status and evidence view.
-Use the Phase 4 configurable root sample rate for normal runs and temporary
-100% sampling for controlled evaluation; approval and outcome records remain
+Use the Phase 4 configurable root sample rate, now **1.0 (100%)** by owner
+direction on October 17, 2026, for normal runs and controlled evaluation; approval and outcome records remain
 durable outside the 24-hour trace store.
 
 On October 16, 2026, a sampled synthetic agent-loop probe passed deployed
@@ -358,6 +360,78 @@ the six expected events for the human diagnosis/development/proposal/approval/
 execution/reuse-rejection journey, including exactly one successful execution.
 These checks preserve the recovered application and do not replace the remaining
 full adversarial corpus. Second-provider evaluation is deferred to Phase 9 package 9.10.
+
+## 5.7 — Add OpenLIT instrumentation (`PLAN-034`)
+
+Status: planned as of October 17, 2026; OpenLIT is not installed or accepted.
+Accountable role: AI / observability. Prerequisites: existing Phase 4 telemetry
+and Phase 5 run/model/tool boundaries.
+
+1. Pin a compatible OpenLIT Python SDK and instrument the actual LangChain/OpenAI
+   Responses path, including tools-disabled finalization and failed/timeout calls.
+   Reuse the existing tracer/provider, root decision and private Alloy OTLP path;
+   keep AI-run and tool spans linked to one model span per real request. Verify
+   SDK/framework compatibility and prevent duplicate spans, providers, exporters,
+   token totals or cost accounting. Retain existing durable run/audit records.
+2. Explicitly disable message-content capture (`capture_message_content=False`)
+   and allowlist stored attributes and metrics before export. Exclude prompt and
+   completion text, tool arguments/results, retrieved evidence, exception text,
+   credentials and personal data from spans, events, logs and labels. Disable
+   unused instrumentors and external/console export. Treat environment overrides
+   as untrusted configuration; test privacy with seeded sensitive markers.
+3. Record bounded provider/model/tool names, durations, success/error/timeout,
+   token usage (including availability and incomplete usage), and estimated cost
+   with pinned local pricing provenance. Do not fetch pricing dynamically at
+   runtime. Keep run/trace IDs out of metric labels. Use reviewed, bounded project
+   dimensions for operator filtering and derive provenance from authorized state.
+4. Add an explicit private OTLP metrics path through Alloy to Prometheus, selecting
+   either reviewed SDK metrics or one derived metrics path per signal. Version the
+   attribute/metric translation and histogram buckets before writing queries;
+   bound cardinality, queues, payloads and resource cost. Trace and metric export
+   failure must not break AI runs, approval, or the Platform API. Keep the existing
+   24-hour/4-GiB trace limits and document observed loss under full sampling.
+5. Verify deterministic model fixtures, real supported call-path smoke evidence,
+   retries/finalization, failures, redaction, authorization, restart and collector
+   outage/recovery at the 100% default. Record trace completeness, measured overhead
+   and metric totals against durable run records; distinguish missing export from
+   zero usage and avoid claiming delivered coverage from configuration alone.
+
+**Exit:** compatible, content-free OpenLIT spans and bounded metrics reach the
+existing private backends with correct parentage, no double counting, and dated
+source/local/deployed evidence in the backlog.
+
+Design reference: [OpenLIT Python SDK configuration](https://github.com/openlit/openlit/blob/main/sdk/python/README.md)
+documents existing tracer/meter integration, message-content controls and OTLP
+export. Validate the chosen release against the acceptance criteria above.
+
+## 5.8 — Provision AI Grafana dashboards (`PLAN-035`)
+
+Status: planned as of October 17, 2026. Accountable role: observability / AI.
+Prerequisites: PLAN-034 signal contract and existing operator Grafana provisioning.
+Generate versioned dashboard JSON through `scripts/generate-dashboards.py`, using
+the existing provisioned Prometheus and Tempo data sources.
+
+| Dashboard | Required panels and navigation |
+|---|---|
+| AI operations | Run/model/tool request rate, success/error/timeout/abstention, p50/p95 duration, in-flight work, tool calls per run, and bounded links to Tempo traces |
+| AI usage and cost | Input/output tokens, usage completeness, estimated cost/rate by reviewed provider/model/project dimensions, pricing version, and missing/unknown usage separated from zero |
+| AI telemetry health | Expected vs observed run/model/tool spans, configured 100% sampling, exporter/collector failures and drops, ingestion health, queue pressure, storage/retention budget and explicit no-data states |
+
+Use bounded service/project/model selectors with queries scoped to the selection;
+shared dashboards and raw data sources remain operator-only. Run IDs belong in
+safe trace links or tables, not Prometheus labels. No panel may display prompts,
+responses, tools' content or raw errors. Derive abstention/approval/execution
+signals from reviewed application counters, not invented SDK metrics; absent
+signals must display unavailable. Correlate trace IDs and time windows before
+adding drill-down links. Preserve a clear distinction between model-call success,
+diagnostic quality and observed application recovery.
+
+**Exit:** generated dashboard/query checks and redacted deployed readback prove
+known success/failure/timeout and missing-usage panels, correct token/cost totals,
+selector isolation, working trace links, meaningful empty/error states, restart
+provisioning and collector recovery at 100% sampling. Empty templates alone do
+not satisfy acceptance. Record revisions, resource cost and remaining gaps in
+the backlog; these packages remain Phase 5 work rather than Phase 9 leftovers.
 
 ## Evaluation and demonstration
 

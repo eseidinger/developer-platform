@@ -167,7 +167,7 @@ def component_resources(name, components, database_ip, password, configuration=N
                 {"name": "OTEL_EXPORTER_OTLP_PROTOCOL", "value": "http/protobuf"},
                 {"name": "OTEL_SERVICE_NAME", "value": name + "." + component["name"]},
                 {"name": "OTEL_TRACES_SAMPLER", "value": "parentbased_traceidratio"},
-                {"name": "OTEL_TRACES_SAMPLER_ARG", "value": os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "0.1")},
+                {"name": "OTEL_TRACES_SAMPLER_ARG", "value": os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "1.0")},
                 {"name": "QUARKUS_OTEL_TRACES_EXPORTER", "value": "otlp"},
                 {"name": "QUARKUS_OTEL_EXPORTER_OTLP_PROTOCOL", "value": "http/protobuf"},
                 {"name": "QUARKUS_OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://127.0.0.1:4318"},

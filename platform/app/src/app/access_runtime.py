@@ -122,7 +122,7 @@ def shared_manifests(image, api_ip, identity_ip, internal_key, session_key):
                     "env": [{"name": "APPLICATION_ACCESS_API", "value": "http://" + api_ip + ":8000"},
                             {"name": "PLATFORM_OTLP_ENDPOINT", "value": "http://alloy:4318/v1/traces"},
                             {"name": "PLATFORM_TRACE_SERVICE_NAME", "value": "application-access-boundary"},
-                            {"name": "PLATFORM_TRACE_SAMPLE_RATE", "value": os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "0.1")},
+                            {"name": "PLATFORM_TRACE_SAMPLE_RATE", "value": os.environ.get("PLATFORM_TRACE_SAMPLE_RATE", "1.0")},
                             {"name": "APPLICATION_ACCESS_REPLICA", "valueFrom": {"fieldRef": {"fieldPath": "metadata.uid"}}}],
                     "envFrom": [{"secretRef": {"name": "authorizer"}}],
                     "securityContext": {"allowPrivilegeEscalation": False, "readOnlyRootFilesystem": True,

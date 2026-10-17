@@ -214,9 +214,9 @@ because acceptance moved phases.
 - [ ] **Security (`PLAN-021`, `PLAN-023`, `PLAN-024`):** Verify project-scoped metric
   and trace reads, cross-project denial, forged context/resource-origin rejection,
   and secret/PII redaction in stored spans, metrics, links and evidence.
-- [ ] **Sampling (`PLAN-021`, `PLAN-024`):** Exercise 0%, the 10% default and temporary
-  100% fixture sampling; check root decisions and downstream behavior, distinguish
-  sampling gaps from collection failure, and restore normal settings.
+- [ ] **Sampling (`PLAN-021`, `PLAN-024`):** Exercise 0%, an explicit 10% override and the
+  100% default; check root decisions and downstream behavior, distinguish
+  sampling gaps from collection failure, and restore the 100% default.
 - [ ] **Failure/recovery (`PLAN-021`–`PLAN-024`):** Inject bounded application and
   telemetry collector/backend failures. Show useful no-data/error states, continued
   application/deployment operation and authorization, and collection recovery.

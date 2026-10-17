@@ -46,8 +46,8 @@ The original planning baseline had provisioned Prometheus and Loki data sources
 but no trace backend or provisioned dashboards. [ADR-021](../../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md)
 selects Tempo 3 single-process/local storage, existing Compose Alloy, a private
 authenticated workload OTLP gateway, an operator-configurable root sample rate
-defaulting to 10%, 24-hour trace retention, and a hard 4 GiB trace-volume
-budget. It also fixes the workload identity, app declaration, and project-read
+defaulting to 100% as of the October 17 owner request, 24-hour trace retention,
+and a hard 4 GiB trace-volume budget. It also fixes the workload identity, app declaration, and project-read
 boundaries. These decisions now have implementation and partial deployed evidence in the
 backlog; remaining limit/retention verification belongs to Phase 9 package 9.9.
 
@@ -73,8 +73,8 @@ backlog; remaining limit/retention verification belongs to Phase 9 package 9.9.
    source operator-only until a separately authorized project view exists.
 4. Test an allowed and a denied request, successful and failed asynchronous
    operations, interruption/retry, backend unavailability, cross-project
-   access, and secret/PII redaction. Exercise 0%, the 10% default, and a
-   temporary 100% fixture rate; restore the normal setting. Record trace
+   access, and secret/PII redaction. Exercise 0%, an explicit 10% override, and the
+   100% default; restore 100% afterward. Record trace
    completeness, sampled gaps, resource cost, revisions, and the retention
    policy without claiming elapsed-retention results from configuration alone.
 

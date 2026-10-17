@@ -77,14 +77,14 @@ link to an initiating trace when one exists. Trace context conveys no access
 rights and does not replace `X-Platform-Principal-*` headers.
 
 Use an operator-managed root head-sampling probability, validated in the
-inclusive range **0.0–1.0**, with **0.1 (10%)** as the default for normal
+inclusive range **0.0–1.0**, with **1.0 (100%)** as the default for normal
 requests and scheduled jobs. Set it through deployment configuration and apply
 changes with a controlled rollout; it is not an application declaration or a
 project-user setting. Downstream components use parent-based sampling so they
-follow the sampled flag from the trusted platform boundary. Acceptance fixtures
-and incident investigations may temporarily set the root rate to **1.0 (100%)**
-and must restore the configured normal rate afterward. A higher rate does not
-relax the gateway, Alloy, Tempo, ingest, or storage limits below. Head sampling
+follow the sampled flag from the trusted platform boundary. On October 17, 2026,
+the owner requested 100% tracing, superseding the original 10% default. Acceptance
+fixtures may exercise lower rates and must restore **1.0 (100%)** afterward.
+A higher rate does not relax the gateway, Alloy, Tempo, ingest, or storage limits below. Head sampling
 cannot guarantee that every failed request is retained.
 
 Cap a stored trace at **256 KiB**, an OTLP request at **256 KiB**,

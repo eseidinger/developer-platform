@@ -31,8 +31,11 @@ and telemetry gateway as needed. The host needs the `acl` package; the
 deployment playbook installs it.
 
 `PLATFORM_TRACE_SAMPLE_RATE` sets the root probability from 0 to 1 and defaults
-to 0.1. Change it in `.env`, then recreate `platform-api` through the normal
-controlled deployment. An initiating sampled API request records a W3C context
+to 1.0 (100%). Change it in `.env`, then recreate `platform-api` and
+reconcile hosted-application access gateways and tracing-enabled workloads through
+the normal controlled deployment. Existing gateways and Pods retain their old
+environment until recreated/reconciled. The 100% default samples every eligible
+root; queue/ingest limits, backend outages and retention can still lose spans. An initiating sampled API request records a W3C context
 with its durable operation; a worker retry creates a new trace with an origin
 link. The response header `X-Platform-Trace-Id` is diagnostic and grants no
 read access. Raw trace search remains operator-only.
