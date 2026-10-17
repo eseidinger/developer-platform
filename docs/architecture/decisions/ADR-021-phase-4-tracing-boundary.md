@@ -108,6 +108,17 @@ against measured lab traffic and the host reserve before declaring acceptance.
 Telemetry loss, sampling, and overload must never block an application request,
 deployment, or authorization decision.
 
+**Capacity policy amendment (October 17, 2026):** The owner selected preservation
+of 24-hour retention alongside 100% root sampling. The limits above remain the
+implemented baseline until a measured resize is reviewed and rolled out. If
+combined application and AI telemetry does not fit, propose a bounded storage
+increase with coordinated alert/ingestion thresholds and resource limits;
+do not automatically shorten retention or reduce sampling. The
+[OpenLIT capacity plan](../../maintainers/delivery/plans/phase-5-ai-operations.md#57-add-openlit-instrumentation-plan-034)
+requires representative measurements, protected host reserves and deployed
+retention/loss evidence. No new filesystem size is selected by this amendment.
+
+
 ### Reads, recovery and failure behavior
 
 Raw Tempo search and Grafana remain operator-only. Add one fixed Platform API

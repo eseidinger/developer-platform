@@ -367,6 +367,55 @@ Status: planned as of October 17, 2026; OpenLIT is not installed or accepted.
 Accountable role: AI / observability. Prerequisites: existing Phase 4 telemetry
 and Phase 5 run/model/tool boundaries.
 
+**Owner-selected approach (October 17, 2026):** Use focused provider
+instrumentation inside the Platform API process. Keep platform-owned AI-run and
+tool spans; OpenLIT owns provider-request spans and replaces overlapping manual
+model spans once compatibility is verified. Disable LangChain framework and other
+unused automatic instrumentors. Preserve ordinary API traces, trusted context,
+project isolation and the existing provider/export pipeline; verify these with
+regression checks. Hosted applications retain their own instrumentation. The
+separate 100% sampling policy and shared telemetry capacity apply independently.
+This decision selects the design; PLAN-034 remains unimplemented and open.
+
+**Owner-selected metrics path (October 17, 2026):** Export direct OTLP metrics
+through private Alloy to Prometheus, separately from traces sent to Tempo.
+OpenLIT owns verified provider-call metrics; application counters own AI-run and
+tool outcomes, including abstention and approval/execution signals. Define one
+producer for every signal; if a required SDK signal is missing, use a documented
+application metric as its sole producer. Do not derive dashboard request,
+usage or cost totals from spans. Trace sampling, span loss and trace retention
+must not determine those totals. Direct metrics can still be lost during
+collection outages; show availability gaps and reconcile against durable run
+records rather than presenting metric totals as billing records. The bounded
+dashboard dimensions below are selected; metric names, histogram buckets and
+the exact Alloy/Prometheus translation remain implementation decisions.
+
+**Owner-selected cost policy (October 17, 2026):** Use one versioned local
+pricing table shared by durable run estimates and dashboard cost metrics.
+Display estimated USD with model/provider and pricing-version provenance; update
+prices through reviewed source changes rather than runtime downloads. Support
+separate input, cached-input and output rates where available, accounting for
+whether cached tokens are a subset of reported input to avoid double charging.
+Missing usage, incomplete failed-call usage and unknown model pricing must remain
+explicitly unknown/incomplete, never silently zero or a complete total. Preserve
+the original estimate and pricing version on historical runs; any later
+recalculation must be separately identified. Provider billing remains the source
+for actual charges. Validate supported provider usage fields and rate mappings
+during implementation; this policy is selected, not implemented.
+
+**Owner-selected capacity policy (October 17, 2026):** Preserve 24-hour trace
+retention and 100% root sampling for the combined platform, hosted-application
+and AI workload. Treat the current 4-GiB filesystem as the implemented starting
+budget, not the target ceiling if measurements show it is insufficient. Measure
+representative total ingress, stored growth, compaction peaks, queue pressure,
+dropped spans and CPU/RAM/disk headroom on the existing lab. Propose a concrete
+bounded storage increase, with aligned warning/ingestion-stop thresholds and
+reviewed ingress/memory limits, when needed to meet the selected targets. Do not
+automatically shorten retention or lower sampling. Keep host reserves protected
+and retain current enforced limits until the measured resize is reviewed and
+rolled out. Verify the 24-hour retained history and losses after rollout; a
+configured retention value alone is not acceptance evidence.
+
 1. Pin a compatible OpenLIT Python SDK and instrument the actual LangChain/OpenAI
    Responses path, including tools-disabled finalization and failed/timeout calls.
    Reuse the existing tracer/provider, root decision and private Alloy OTLP path;
@@ -381,15 +430,18 @@ and Phase 5 run/model/tool boundaries.
    as untrusted configuration; test privacy with seeded sensitive markers.
 3. Record bounded provider/model/tool names, durations, success/error/timeout,
    token usage (including availability and incomplete usage), and estimated cost
-   with pinned local pricing provenance. Do not fetch pricing dynamically at
-   runtime. Keep run/trace IDs out of metric labels. Use reviewed, bounded project
+   using the selected shared, versioned local USD pricing policy, with
+   cached-token accounting and explicit unknown/incomplete estimates. Do not fetch
+   pricing dynamically at runtime. Keep run/trace IDs out of metric labels. Use reviewed, bounded project
    dimensions for operator filtering and derive provenance from authorized state.
-4. Add an explicit private OTLP metrics path through Alloy to Prometheus, selecting
-   either reviewed SDK metrics or one derived metrics path per signal. Version the
+4. Add the selected direct private OTLP metrics path through Alloy to Prometheus,
+   using reviewed SDK metrics and application counters with one owner per signal.
+   Keep dashboard totals independent of span-derived metrics. Version the
    attribute/metric translation and histogram buckets before writing queries;
    bound cardinality, queues, payloads and resource cost. Trace and metric export
-   failure must not break AI runs, approval, or the Platform API. Keep the existing
-   24-hour/4-GiB trace limits and document observed loss under full sampling.
+   failure must not break AI runs, approval, or the Platform API. Preserve 24-hour
+   retention and 100% root sampling; measure and size bounded trace storage under
+   the selected capacity policy. Document observed loss and protect host reserves.
 5. Verify deterministic model fixtures, real supported call-path smoke evidence,
    retries/finalization, failures, redaction, authorization, restart and collector
    outage/recovery at the 100% default. Record trace completeness, measured overhead
@@ -416,6 +468,18 @@ the existing provisioned Prometheus and Tempo data sources.
 | AI operations | Run/model/tool request rate, success/error/timeout/abstention, p50/p95 duration, in-flight work, tool calls per run, and bounded links to Tempo traces |
 | AI usage and cost | Input/output tokens, usage completeness, estimated cost/rate by reviewed provider/model/project dimensions, pricing version, and missing/unknown usage separated from zero |
 | AI telemetry health | Expected vs observed run/model/tool spans, configured 100% sampling, exporter/collector failures and drops, ingestion health, queue pressure, storage/retention budget and explicit no-data states |
+
+**Owner-selected dashboard detail (October 17, 2026):** Support bounded
+service/project and provider/model filtering, action type (explanation,
+investigation, development assistance), outcome (completed, failed, timeout,
+abstained) and tool name on tool panels. Each metric uses only its relevant
+subset of these dimensions, with explicit per-label and total-series limits;
+do not attach every dimension to every metric. Use server-derived project and
+service identity and reviewed model/tool values. Exclude run IDs, trace IDs,
+user IDs and content from metric labels. Individual runs remain discoverable
+through safe trace links and the authorized AI-run interface. Metric names,
+latency histogram buckets and exact cardinality limits are engineering choices
+that must be documented and verified before acceptance.
 
 Use bounded service/project/model selectors with queries scoped to the selection;
 shared dashboards and raw data sources remain operator-only. Run IDs belong in
