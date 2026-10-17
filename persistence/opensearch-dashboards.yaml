@@ -14,7 +14,8 @@ opensearch_security.cookie.isSameSite: Strict
 opensearch_security.cookie.ttl: 86400000
 opensearch_security.session.ttl: 86400000
 opensearch_security.session.keepalive: false
+opensearch_security.multitenancy.enabled: true
 opensearch_security.multitenancy.tenants.enable_global: false
-opensearch_security.multitenancy.tenants.enable_private: true
-opensearch_security.multitenancy.tenants.preferred: [Private]
+opensearch_security.multitenancy.tenants.enable_private: false
+opensearch_security.multitenancy.tenants.preferred: []
 logging.silent: true

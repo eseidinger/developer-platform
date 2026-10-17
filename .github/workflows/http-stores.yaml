@@ -21,6 +21,33 @@ jobs:
       - run: docker build --target store-console-export --output type=local,dest=/tmp/platform-store-consoles platform
       - run: STORE_CONSOLE_FIXTURE=1 STORE_RUSTFS_CONSOLE_DIR=/tmp/platform-store-consoles/rustfs uv run --project platform/app python scripts/verify-shared-store-compose.py
 
+  opensearch-console:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: sudo apt-get update && sudo apt-get install -y acl
+      - run: npm ci --prefix platform/ui
+      - run: npx playwright install --with-deps chromium
+        working-directory: platform/ui
+      - name: Pull pinned server and console images
+        run: |
+          uv run --project platform/app python - <<'PY'
+          import subprocess, yaml
+          config = yaml.safe_load(open('persistence/shared-stores.yaml'))
+          for name in ('opensearch', 'opensearch-dashboards'):
+              subprocess.run(['docker', 'pull', config['services'][name]['image']], check=True)
+          PY
+      - run: STORE_DASHBOARDS_FIXTURE=1 uv run --project platform/app python scripts/verify-shared-store-compose.py
+
   installation:
     runs-on: ubuntu-latest
     timeout-minutes: 12
@@ -32,6 +59,14 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --locked
       - run: sudo apt-get update && sudo apt-get install -y acl
+      - name: Pull pinned native images before private configuration preparation
+        run: |
+          uv run --project platform/app python - <<'PY'
+          import subprocess, yaml
+          config = yaml.safe_load(open('persistence/shared-stores.yaml'))
+          for name in ('rustfs', 'qdrant', 'opensearch'):
+              subprocess.run(['docker', 'pull', config['services'][name]['image']], check=True)
+          PY
       - run: uv run --project platform/app python scripts/verify-shared-store-compose.py
       - run: uv run --project platform/app python scripts/verify-opensearch-tls.py
 

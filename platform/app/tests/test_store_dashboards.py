@@ -6,6 +6,8 @@ from unittest.mock import patch
 from uuid import uuid4
 
 from fastapi import HTTPException
+from fastapi.testclient import TestClient
+import httpx2 as httpx
 from starlette.requests import Request
 from app.stores import catalog, dashboards
 
@@ -14,10 +16,10 @@ class DashboardsBridgeTests(TestCase):
     def setUp(self):
         self.environ = patch.dict(os.environ, {'OPENSEARCH_DASHBOARDS_IP': '172.30.80.31',
             'OPENSEARCH_IP': '172.30.80.17', 'OPENSEARCH_CA_FILE': '/public/ca.pem',
-            'STORE_RELAY_IP': '172.30.80.15'})
+            'STORE_RELAY_IP': '172.30.80.15', 'OPENSEARCH_DASHBOARDS_PASSWORD': 's' * 32})
         self.environ.start(); self.addCleanup(self.environ.stop)
         self.cid = uuid4()
-        self.row = {'credential_id': str(self.cid), 'provider': 'opensearch', 'kind': 'human',
+        self.row = {'credential_id': str(self.cid), 'resource_id': str(uuid4()), 'provider': 'opensearch', 'kind': 'human',
             'relay_port': 20000, 'expires_at': datetime.now(timezone.utc) + timedelta(hours=24)}
 
     def request(self, user=None, selected=True, source='172.30.80.31', extra=()):
@@ -78,3 +80,61 @@ class DashboardsBridgeTests(TestCase):
         with self.assertRaises(HTTPException): dashboards.native_target(request, lambda cid: None)
         request.scope['raw_path'] = b'/_search'
         with self.assertRaises(HTTPException): dashboards.native_target(request, lambda cid: self.row)
+
+    def test_only_prelogin_settings_use_restricted_server_key_and_data_keeps_human_auth(self):
+        from app.stores.opensearch import authorization, tenant
+        seen = []
+        class Bytes(httpx.AsyncByteStream):
+            async def __aiter__(self): yield b'{}'
+        async def handler(request):
+            seen.append((str(request.url), request.headers.get('authorization'), request.headers.get('securitytenant')))
+            return httpx.Response(200, stream=Bytes())
+        real_client = httpx.AsyncClient
+        def transport(**kwargs):
+            kwargs.pop('verify')  # Mock transport performs no TLS or socket I/O.
+            return real_client(transport=httpx.MockTransport(handler), **kwargs)
+        app = dashboards.create_backend(lambda cid: self.row)
+        with TestClient(app, base_url='http://' + dashboards.HOST, client=('172.30.80.31', 12345)) as client, patch(
+                'app.stores.dashboards.httpx.AsyncClient', side_effect=transport):
+            header = {dashboards.HEADER: str(self.cid)}
+            self.assertEqual(client.get('/_plugins/_security/dashboardsinfo', headers=header).status_code, 200)
+            self.assertEqual(client.get('/_search', headers=header).status_code, 403)
+            self.assertEqual(client.get('/_plugins/_security/dashboardsinfo').status_code, 403)
+            human = authorization(catalog.login(self.cid), 'own-secret')
+            self.assertEqual(client.get('/_search', headers={**header, 'Authorization': human, 'securitytenant': 'foreign'}).status_code, 200)
+        self.assertEqual(seen, [('https://172.30.80.17:9200/_plugins/_security/dashboardsinfo',
+            authorization('kibanaserver', 's' * 32), None), ('http://172.30.80.15:20000/_search', human, tenant(self.row))])
+
+    def test_generic_console_discovery_is_scoped_to_its_named_index(self):
+        from app.stores.opensearch import authorization, index
+        seen = []
+        class Bytes(httpx.AsyncByteStream):
+            async def __aiter__(self): yield b'{}'
+        async def handler(request):
+            seen.append(str(request.url)); return httpx.Response(200, stream=Bytes())
+        real_client = httpx.AsyncClient
+        def transport(**kwargs):
+            kwargs.pop('verify'); return real_client(transport=httpx.MockTransport(handler), **kwargs)
+        with TestClient(dashboards.create_backend(lambda cid: self.row), base_url='http://' + dashboards.HOST,
+                client=('172.30.80.31', 12345)) as client, patch('app.stores.dashboards.httpx.AsyncClient', side_effect=transport):
+            headers = {dashboards.HEADER: str(self.cid), 'Authorization': authorization(catalog.login(self.cid), 'native-secret')}
+            self.assertEqual(client.get('/_resolve/index/*?expand_wildcards=all', headers=headers).status_code, 200)
+            self.assertEqual(client.get('/_resolve/index/foreign', headers=headers).status_code, 200)
+        self.assertEqual(seen, ['http://172.30.80.15:20000/_resolve/index/' + index(self.row) + '?expand_wildcards=all',
+            'http://172.30.80.15:20000/_resolve/index/foreign'])
+
+    def test_unbound_server_cannot_recreate_resource_metadata_after_lease_cleanup(self):
+        from app.stores.opensearch import authorization, tenant
+        physical = '.kibana_123_' + tenant(self.row) + '_1'
+        headers = {'Authorization': authorization('kibanaserver', 's' * 32)}
+        with TestClient(dashboards.create_backend(lambda cid: None), base_url='http://' + dashboards.HOST,
+                client=('172.30.80.31', 12345)) as client, patch('app.stores.dashboards.httpx.AsyncClient') as upstream:
+            self.assertEqual(client.get('/' + physical, headers=headers).status_code, 403)
+            self.assertEqual(client.get('/.kibana', headers={**headers, 'securitytenant': tenant(self.row)}).status_code, 403)
+            self.assertEqual(client.post('/_bulk', headers=headers, content=(
+                '{"index":{"_index":"' + physical + '"}}\n{"type":"synthetic"}\n')).status_code, 403)
+            escaped = physical.replace('.', r'\u002e', 1)
+            self.assertEqual(client.post('/_bulk', headers=headers, content=(
+                '{"index":{"_index":"' + escaped + '"}}\n{"type":"synthetic"}\n')).status_code, 403)
+            self.assertEqual(client.post('/_bulk', headers=headers, content=b'x' * (1024 * 1024 + 1)).status_code, 413)
+        upstream.assert_not_called()

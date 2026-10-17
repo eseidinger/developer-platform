@@ -32,7 +32,8 @@ def main():
     with tempfile.TemporaryDirectory(prefix='opensearch-native-tls-') as directory:
         root = Path(directory)
         preparation.prepare(root, {'COMPOSE_PROFILES': 'opensearch', 'OPENSEARCH_IP': '127.0.0.1',
-            'OPENSEARCH_ADMIN_PASSWORD': password, 'OPENSEARCH_DASHBOARDS_PASSWORD': secrets.token_hex(32)})
+            'OPENSEARCH_ADMIN_PASSWORD': password, 'OPENSEARCH_DASHBOARDS_PASSWORD': secrets.token_hex(32),
+            'STORE_OPENSEARCH_CONSOLE_COOKIE_KEY': secrets.token_hex(32)})
         private = root / 'opensearch'
         original_ca = (private / 'ca.pem').read_bytes()
         preparation.prepare(root, {'COMPOSE_PROFILES': 'opensearch', 'OPENSEARCH_IP': '127.0.0.1'})

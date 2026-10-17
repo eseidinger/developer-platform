@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { beforeEach, expect, test, vi } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import { StoresPage } from './stores-page'
 import * as api from './stores-api'
 
@@ -15,6 +15,7 @@ const grant = { grant_id: '22345678-1234-4234-8234-123456789abc', resource_id: r
   mode: 'read-write' as const, state: 'active', observed_state: 'active', version: 1, error_code: null }
 const pending = { credential_id: '32345678-1234-4234-8234-123456789abc', grant_id: grant.grant_id, state: 'issuing',
   expires_at: new Date(Date.now() + 86400000).toISOString(), issued_at: new Date().toISOString() }
+afterEach(cleanup)
 beforeEach(() => {
   vi.resetAllMocks()
   vi.mocked(api.getContext).mockResolvedValue({ manage: false, platform_admin: false, providers: [{ id: 'postgresql', enabled: true }] })
@@ -63,10 +64,12 @@ test('credential issuance is explicit and pending provisioning never retries the
   await user.click(screen.getByRole('button', { name: 'Close and discard credential' }))
   expect(screen.queryByDisplayValue('seed-private-password')).not.toBeInTheDocument()
 })
-test('console launch sends an ephemeral POST assertion without caching it or placing it in a URL', async () => {
-  vi.mocked(api.getMine).mockResolvedValue([{ grant, resource: { ...resource, provider: 'qdrant', console_url: '/store-access' } }])
+test.each([['s3', 'RustFS', 'RUSTFS_CONSOLE_SECRET_KEY'], ['qdrant', 'Qdrant', 'QDRANT_API_KEY'],
+  ['opensearch', 'OpenSearch', 'OPENSEARCH_PASSWORD']] as const)(
+  '%s console launch sends an ephemeral POST assertion without caching it or placing it in a URL', async (provider, label, key) => {
+  vi.mocked(api.getMine).mockResolvedValue([{ grant, resource: { ...resource, provider, console_url: '/store-access' } }])
   vi.mocked(api.leases).mockResolvedValue([{ ...pending, state: 'active' }])
-  vi.mocked(api.reveal).mockResolvedValue({ ...pending, state: 'active', connection: { QDRANT_API_KEY: 'seed-private-password' } })
+  vi.mocked(api.reveal).mockResolvedValue({ ...pending, state: 'active', connection: { [key]: 'seed-private-password' } })
   vi.mocked(api.launchConsole).mockResolvedValue({ url: 'https://console-20000.apps.fixture.invalid/__platform/start', launch: 'seed-ephemeral-assertion' })
   const submitted: { action: string; method: string; value: string }[] = []
   const submit = vi.spyOn(HTMLFormElement.prototype, 'submit').mockImplementation(function (this: HTMLFormElement) {
@@ -75,7 +78,7 @@ test('console launch sends an ephemeral POST assertion without caching it or pla
   try {
     const { user, client } = setup()
     await user.click(await screen.findByRole('button', { name: 'Inspect this lease' }))
-    await user.click(await screen.findByRole('button', { name: 'Open Qdrant console' }))
+    await user.click(await screen.findByRole('button', { name: `Open ${label} console` }))
     await waitFor(() => expect(submitted).toHaveLength(1))
     expect(submitted[0]).toEqual({ action: 'https://console-20000.apps.fixture.invalid/__platform/start', method: 'post', value: 'seed-ephemeral-assertion' })
     expect(document.querySelector('input[name="launch"]')).toBeNull()

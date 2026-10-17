@@ -100,12 +100,17 @@ try {
       if (!denied) throw Error()
       console.log('PASS Qdrant ' + provider.mode + ' official console login, scoped collection, point permissions and foreign/admin denial')
     } else {
+      stage = name + '-foreign-lease-login'
+      const foreignLogin = await page.evaluate(async peer => (await fetch('/auth/login', { method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'osd-xsrf': 'true' },
+        body: JSON.stringify({ username: peer.OPENSEARCH_USERNAME, password: peer.OPENSEARCH_PASSWORD }) })).status, provider.peer)
+      if (foreignLogin !== 401) { console.log('Foreign native login status: ' + foreignLogin); throw Error() }
       stage = name + '-username-field'
       await page.locator('input').first().fill(provider.connection.OPENSEARCH_USERNAME)
       stage = name + '-password-field'
       await page.locator('input[type="password"]').fill(provider.connection.OPENSEARCH_PASSWORD)
       stage = name + '-login-submit'
-      await page.getByRole('button', { name: /log in/i }).click()
+      await page.getByRole('button', { name: 'basicauth_login_button', exact: true }).click()
       stage = name + '-authenticated-navigation'
       await page.waitForURL(url => !url.pathname.includes('/app/login'), { timeout: 20000 })
       stage = name + '-native-data-proxy'
@@ -127,7 +132,7 @@ try {
       if (result.read !== 200 || !result.hasFixture || result.write !== result.expectedWrite || result.other !== 403 || result.drop !== 403) {
         console.log('Synthetic Dashboards native status: ' + JSON.stringify(result)); throw Error()
       }
-      stage = name + '-private-saved-objects'
+      stage = name + '-resource-saved-objects'
       const saved = await page.evaluate(async connection => {
         const headers = { 'osd-xsrf': 'true', 'Content-Type': 'application/json' }
         const prior = await fetch('/api/saved_objects/index-pattern/fixture', { headers })
@@ -135,8 +140,15 @@ try {
           body: JSON.stringify({ attributes: { title: connection.OPENSEARCH_INDEX } }) })
         return { prior: prior.status, created: created.status }
       }, provider.connection)
-      if (saved.prior !== 404 || saved.created !== 200) { console.log('Synthetic saved-object status: ' + JSON.stringify(saved)); throw Error() }
-      console.log('PASS OpenSearch Dashboards ' + provider.mode + ' native login, scoped data, foreign/admin denial and private saved-object isolation')
+      if (saved.prior !== (provider.retained_workspace ? 200 : 404) || saved.created !== (provider.retained_workspace ? 409 : 200)) { console.log('Synthetic saved-object status: ' + JSON.stringify(saved)); throw Error() }
+      stage = name + '-discover-view'
+      const configured = await page.evaluate(async () => (await fetch('/api/opensearch-dashboards/settings', {
+        method: 'POST', headers: { 'osd-xsrf': 'true', 'Content-Type': 'application/json' },
+        body: JSON.stringify({ changes: { defaultIndex: 'fixture' } }) })).status)
+      if (configured !== 200) { console.log('Default data-view setting status: ' + configured); throw Error() }
+      await page.goto(provider.origin + '/app/discover')
+      await page.waitForFunction(() => document.body.textContent.includes('console fixture'), null, { timeout: 20000 })
+      console.log('PASS OpenSearch Dashboards ' + provider.mode + ' native login, Discover documents, scoped data, foreign/admin denial and resource workspace isolation/retention')
     }
     stage = name + '-active-console-revocation'
     const end = provider.mode === 'read-write' ? 'expire' : 'revoke'
@@ -155,8 +167,12 @@ try {
     for (const value of Object.values(activeProvider.connection)) text = text.replaceAll(value, '[redacted]')
     console.log('Scoped synthetic console view: ' + new URL(activePage.url()).pathname + ' ' + text.slice(0, 700))
     console.log(statuses.join('|'))
-    if (activeProvider.provider === 'opensearch') console.log('Login field metadata: ' + JSON.stringify(
-      await activePage.locator('input').evaluateAll(elements => elements.map(element => ({ type: element.type, name: element.name, placeholder: element.placeholder })))))
+    if (activeProvider.provider === 'opensearch') {
+      console.log('Login field metadata: ' + JSON.stringify(await activePage.locator('input').evaluateAll(elements =>
+        elements.map(element => ({ type: element.type, name: element.name, placeholder: element.placeholder, filled: Boolean(element.value) })))))
+      console.log('Login button metadata: ' + JSON.stringify(await activePage.locator('button').evaluateAll(elements =>
+        elements.map(element => ({ text: element.textContent?.slice(0, 60), disabled: element.disabled })))))
+    }
   }
   console.log(stage)
   process.exitCode = 1

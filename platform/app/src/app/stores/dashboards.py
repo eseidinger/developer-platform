@@ -8,7 +8,9 @@ import asyncio
 import base64
 import contextlib
 import ipaddress
+import json
 import os
+import re
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -23,6 +25,7 @@ from .http_relay import identity
 HOST = 'opensearch-store-backend.internal'
 HEADER = 'x-platform-store-lease'
 COOKIE = '__Host-store-dashboards-auth'
+RESOURCE_INDEX = re.compile(rb'\.kibana_-?\d+_resource[a-f0-9]{32}')
 
 
 def native_target(request, load):
@@ -49,9 +52,8 @@ def native_target(request, load):
                 or row['expires_at'] <= datetime.now(timezone.utc)
                 or not 20000 <= row['relay_port'] <= 20511):
             raise ValueError()
-        # The official login page makes this public native configuration read
-        # before a user has signed in. Preserve its anonymous request (or the
-        # restricted server identity), still requiring the launched human lease.
+        # The official login page requests configuration before native sign-in.
+        # Confine that exception to one read and an active launched human lease.
         if metadata and user in {'', 'kibanaserver'}:
             address = str(ipaddress.IPv4Address(os.environ['OPENSEARCH_IP']))
             return f'https://{address}:9200', os.environ['OPENSEARCH_CA_FILE'], None
@@ -73,23 +75,66 @@ def create_backend(load, server=None):
         if row is None and server is not None:  # Disposable provider endpoint only.
             target, verify = server
         raw = request.scope['raw_path'] + (b'?' + request.scope['query_string'] if request.scope['query_string'] else b'')
+        if row is not None and request.method == 'GET' and request.url.path == '/_resolve/index/*':
+            # This console represents one named index. Scope the UI's generic
+            # discovery request to that index, without granting cluster-wide
+            # metadata privileges or changing any document/search request.
+            from .opensearch import index
+            raw = b'/_resolve/index/' + index(row).encode() + (b'?' + request.scope['query_string'] if request.scope['query_string'] else b'')
         # Fixed native destinations only; no caller-controlled upstream URL or
         # operator credential injection. Native roles authenticate every request.
         url = httpx.URL(target).copy_with(raw_path=raw)
-        headers = {name: request.headers[name] for name in ('authorization', 'content-type', 'securitytenant') if name in request.headers}
+        headers = {name: request.headers[name] for name in ('authorization', 'content-type') if name in request.headers}
+        if row is not None:
+            from .opensearch import tenant
+            headers['securitytenant'] = tenant(row)
+        if (row is None and not request.headers.get('authorization') and HEADER in request.headers
+                and request.method == 'GET' and request.scope['raw_path'] == b'/_plugins/_security/dashboardsinfo'):
+            # This native realm requires authentication even for login settings.
+            # Only this metadata read uses the restricted console server account.
+            from .opensearch import authorization
+            headers['authorization'] = authorization('kibanaserver', os.environ['OPENSEARCH_DASHBOARDS_PASSWORD'])
         try:
             await asyncio.wait_for(slots.acquire(), .1)
         except TimeoutError:
             raise HTTPException(503, 'Console capacity is occupied') from None
         transport = None
         try:
+            content = None if request.method in {'GET', 'HEAD'} else request.stream()
+            if row is None and HEADER not in request.headers:
+                # Unbound server calls initialize global system metadata only.
+                # Resource metadata runs as the leased human, including native
+                # migrations. Reject delayed server jobs recreating a purged
+                # resource's tenant indexes, even when a bulk body names them.
+                if request.headers.get('securitytenant') or RESOURCE_INDEX.search(request.url.path.encode()):
+                    raise HTTPException(403, 'Resource metadata requires its human lease')
+                if request.headers.get('content-encoding', 'identity') != 'identity':
+                    raise HTTPException(400)
+                if content is not None:
+                    payload = bytearray()
+                    async for part in request.stream():
+                        payload.extend(part)
+                        if len(payload) > 1024 * 1024: raise HTTPException(413)
+                    try:
+                        try:
+                            documents = [json.loads(payload)] if payload else []
+                        except ValueError:
+                            documents = [json.loads(line) for line in payload.splitlines() if line.strip()]
+                    except ValueError:
+                        raise HTTPException(400) from None
+                    # Decode JSON escapes before checking bulk/reindex targets;
+                    # original bytes are forwarded unchanged after validation.
+                    if any(RESOURCE_INDEX.search(json.dumps(value).encode()) for value in documents):
+                        raise HTTPException(403, 'Resource metadata requires its human lease')
+                    content = bytes(payload)
             transport = httpx.AsyncClient(trust_env=False, follow_redirects=False, verify=verify, timeout=httpx.Timeout(60, connect=3))
             response = await transport.send(transport.build_request(request.method, url, headers=headers,
-                content=None if request.method in {'GET', 'HEAD'} else request.stream()), stream=True)
+                content=content), stream=True)
         except BaseException as error:
             slots.release()
             if transport: await transport.aclose()
             if isinstance(error, asyncio.CancelledError): raise
+            if isinstance(error, HTTPException): raise
             raise HTTPException(502, 'Native console connection unavailable') from None
 
         async def stream():

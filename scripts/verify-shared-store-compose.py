@@ -31,7 +31,7 @@ def main():
     config = {'COMPOSE_PROFILES': 's3,qdrant,opensearch', 'OPENSEARCH_IP': '127.0.0.1',
         'RUSTFS_ACCESS_KEY': secrets.token_hex(10), 'RUSTFS_SECRET_KEY': secrets.token_hex(32),
         'QDRANT_API_KEY': secrets.token_hex(32), 'OPENSEARCH_ADMIN_PASSWORD': secrets.token_hex(32),
-        'OPENSEARCH_DASHBOARDS_PASSWORD': secrets.token_hex(32)}
+        'OPENSEARCH_DASHBOARDS_PASSWORD': secrets.token_hex(32), 'STORE_OPENSEARCH_CONSOLE_COOKIE_KEY': secrets.token_hex(32)}
     dashboards = os.environ.get('STORE_DASHBOARDS_FIXTURE') == '1'
     consoles = os.environ.get('STORE_CONSOLE_FIXTURE') == '1' or dashboards
     if consoles: config['COMPOSE_PROFILES'] = 'opensearch' if dashboards else 's3,qdrant'

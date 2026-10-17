@@ -27,7 +27,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 from . import catalog, recovery, dashboards
 
 COOKIE = '__Host-store-console'
-PROVIDERS = {'s3', 'qdrant'}
+PROVIDERS = {'s3', 'qdrant', 'opensearch'}
 ISSUER = 'developer-platform-store-console'
 HOP = {'host', 'cookie', 'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
        'te', 'trailer', 'transfer-encoding', 'upgrade', 'forwarded', 'x-forwarded-host',
@@ -174,7 +174,8 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
                 raise ValueError('Different console')
             row = await asyncio.to_thread(load, UUID(claims['credential_id']))
             if (not row or row['relay_port'] != port or row['issuer'] != claims['identity_issuer']
-                    or row['subject'] != claims['sub']):
+                    or row['subject'] != claims['sub'] or row['expires_at'] <= datetime.now(timezone.utc)
+                    or claims['exp'] <= time.time()):
                 raise ValueError('Inactive human lease')
             return row
         except Exception:
@@ -291,7 +292,10 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
                    and not name.lower().startswith(('x-forwarded-', 'x-platform-store-'))]
         headers.append(('Host', request.headers['host']))
         if frontend:
+            from .opensearch import tenant
             headers.append((dashboards.HEADER, str(row['credential_id'])))
+            headers = [(name, value) for name, value in headers if name.lower() != 'securitytenant']
+            headers.append(('securitytenant', tenant(row)))
             headers.append(('X-Forwarded-Proto', 'https'))
             if dashboards.COOKIE in request.cookies:
                 headers.append(('Cookie', dashboards.COOKIE + '=' + dashboards_cookie(request.cookies[dashboards.COOKIE])))
@@ -343,7 +347,12 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
         async def stream():
             async def alive():
                 while True:
-                    current = await asyncio.to_thread(load, UUID(row['credential_id']))
+                    remaining = (row['expires_at'] - datetime.now(timezone.utc)).total_seconds()
+                    if remaining <= 0: return
+                    try:
+                        current = await asyncio.wait_for(asyncio.to_thread(load, UUID(row['credential_id'])), min(.5, remaining))
+                    except Exception:
+                        return
                     deadline = min(current['expires_at'], row['expires_at']) if current else datetime.now(timezone.utc)
                     if deadline <= datetime.now(timezone.utc):
                         return
@@ -378,8 +387,15 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             if name.decode('latin1').lower() not in HOP | {'set-cookie', 'access-control-allow-origin', 'access-control-allow-credentials'}]
         result.headers.update({'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
             'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin',
-            'Content-Security-Policy': ("frame-ancestors 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'"
-                if static or frontend else "sandbox; default-src 'none'; frame-ancestors 'none'"), 'X-Frame-Options': 'DENY'})
+            'X-Frame-Options': 'DENY'})
+        policy = ("frame-ancestors 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'"
+            if static or frontend else "sandbox; default-src 'none'; frame-ancestors 'none'")
+        if (static or frontend) and upstream.headers.get('content-security-policy'):
+            # Multiple policies intersect: retain the official console's script,
+            # worker and nonce restrictions while adding the platform boundary.
+            result.headers.append('Content-Security-Policy', policy)
+        else:
+            result.headers['Content-Security-Policy'] = policy
         for value in native_cookies:
             result.set_cookie(dashboards.COOKIE, value, path='/', secure=True, httponly=True, samesite='strict',
                 max_age=max(0, int(row['expires_at'].timestamp() - time.time())) if value else 0)

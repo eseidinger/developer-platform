@@ -1,5 +1,6 @@
 import os
 import asyncio
+import threading
 from pathlib import Path
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -64,6 +65,11 @@ class ConsoleBoundaryTests(TestCase):
         expired = console.assertion({**self.row, 'expires_at': datetime.now(timezone.utc) - timedelta(seconds=2)}, 'launch', 30)
         self.assertEqual(self.launch(expired).status_code, 401)
         self.assertEqual(self.launch(console.assertion(self.row, 'session', 30)).status_code, 401)
+
+    def test_valid_assertion_does_not_authorize_a_row_that_expired_during_catalog_loading(self):
+        self.launch()
+        self.current = {**self.row, 'expires_at': datetime.now(timezone.utc) - timedelta(seconds=1)}
+        self.assertEqual(self.client.get('/').status_code, 401)
 
     def test_no_http_launch_unbounded_body_or_cross_origin_writes(self):
         self.assertEqual(self.client.post('http://console-20000.apps.fixture.invalid/__platform/start').status_code, 400)
@@ -159,38 +165,47 @@ class ConsoleBoundaryTests(TestCase):
         async def handler(request):
             seen.append(dict(request.headers))
             return httpx.Response(200, stream=Bytes(b'console'), headers={
-                'Set-Cookie': dashboards.COOKIE + '=Fe26.2*native; Path=/wrong; Domain=foreign.invalid'})
+                'Set-Cookie': dashboards.COOKIE + '=Fe26.2*native; Path=/wrong; Domain=foreign.invalid',
+                'Content-Security-Policy': "script-src 'self'"})
         real_client = httpx.AsyncClient
         with patch.dict(os.environ, {'OPENSEARCH_DASHBOARDS_IP': '127.0.0.4'}), patch(
                 'app.stores.console.httpx.AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)):
             self.launch()
             self.client.cookies.set('unrelated', 'never-forward')
-            response = self.client.get('/', headers={dashboards.HEADER: str(uuid4())})
+            response = self.client.get('/', headers={dashboards.HEADER: str(uuid4()), 'securitytenant': 'foreign'})
             self.assertEqual(response.status_code, 200)
             self.assertIn('Secure', response.headers['set-cookie'])
             self.assertNotIn('Domain=', response.headers['set-cookie'])
             self.assertIn('Path=/', response.headers['set-cookie'])
+            self.assertEqual(response.headers.get_list('content-security-policy'), ["script-src 'self'",
+                "frame-ancestors 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'"])
             self.client.get('/')
         self.assertNotIn('cookie', seen[0])
         self.assertEqual(seen[0][dashboards.HEADER], self.row['credential_id'])
+        from app.stores.opensearch import tenant
+        self.assertEqual(seen[0]['securitytenant'], tenant(self.row))
         self.assertEqual(seen[1]['cookie'], dashboards.COOKIE + '=Fe26.2*native')
         self.assertNotIn(console.COOKIE, seen[1]['cookie'])
 
 
 class DashboardsStreamingTests(IsolatedAsyncioTestCase):
-    async def check_fence(self, expire):
+    async def check_fence(self, expire, stall=False):
         class Held(httpx.AsyncByteStream):
             async def __aiter__(self):
                 yield b'first'
                 await asyncio.Event().wait()
         cid = str(uuid4())
-        row = {'credential_id': cid, 'relay_port': 20000, 'provider': 'opensearch',
+        row = {'credential_id': cid, 'resource_id': str(uuid4()), 'relay_port': 20000, 'provider': 'opensearch',
             'issuer': 'https://identity.fixture.invalid', 'subject': 'human',
             'expires_at': datetime.now(timezone.utc) + timedelta(hours=24)}
         current = [dict(row)]
+        blocked, released = [False], threading.Event()
+        def load(cid):
+            if blocked[0]: released.wait(2)
+            return current[0]
         with patch.dict(os.environ, {'DATABASE_KEY': 's' * 32, 'APPS_DOMAIN': 'apps.fixture.invalid',
                 'OPENSEARCH_DASHBOARDS_IP': '127.0.0.4'}):
-            app = console.create_gateway(lambda cid: current[0])
+            app = console.create_gateway(load)
             request = Request({'type': 'http', 'method': 'GET', 'scheme': 'https', 'path': '/held',
                 'raw_path': b'/held', 'query_string': b'', 'path_params': {'port': 20000},
                 'headers': [(b'host', b'console-20000.apps.fixture.invalid'),
@@ -200,18 +215,29 @@ class DashboardsStreamingTests(IsolatedAsyncioTestCase):
             real_client = httpx.AsyncClient
             with patch('app.stores.console.httpx.AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)):
                 endpoint = next(route.endpoint for route in app.routes if getattr(route, 'path', None) == '/{path:path}')
+                if stall:
+                    current[0]['expires_at'] = datetime.now(timezone.utc) + timedelta(seconds=1)
                 response = await endpoint(request, 'held')
+                blocked[0] = stall
                 iterator = response.body_iterator
                 self.assertEqual(await asyncio.wait_for(anext(iterator), 1), b'first')
-                if expire:
+                if stall:
+                    pass
+                elif expire:
                     current[0]['expires_at'] = datetime.now(timezone.utc) + timedelta(milliseconds=100)
                 else:
                     current[0] = None
-                with self.assertRaises(StopAsyncIteration):
-                    await asyncio.wait_for(anext(iterator), 1)
+                try:
+                    with self.assertRaises(StopAsyncIteration):
+                        await asyncio.wait_for(anext(iterator), 1.5)
+                finally:
+                    released.set()
 
     async def test_already_streaming_frontend_closes_on_revocation(self):
         await self.check_fence(False)
 
     async def test_already_streaming_frontend_closes_at_lease_deadline(self):
         await self.check_fence(True)
+
+    async def test_catalog_stall_cannot_keep_a_frontend_stream_open_past_its_deadline(self):
+        await self.check_fence(False, stall=True)

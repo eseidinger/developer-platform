@@ -55,19 +55,21 @@ def prepare_search(root, config):
     address = str(ipaddress.IPv4Address(config.get('OPENSEARCH_IP', '172.30.80.17')))
     destination = root / 'opensearch'
     required = ['ca.pem', 'ca-key.pem', 'node.pem', 'node-key.pem', 'admin.pem', 'admin-key.pem',
-                'opensearch.yml', 'bootstrap/internal_users.yml', 'bootstrap/roles_mapping.yml', 'identity.json']
+                'opensearch.yml', 'bootstrap/config.yml', 'bootstrap/internal_users.yml', 'bootstrap/roles_mapping.yml', 'identity.json']
     if destination.exists():
         if not all((destination / name).is_file() for name in required):
             raise RuntimeError('Existing OpenSearch configuration is incomplete; inspect it before retrying')
         identity = json.loads((destination / 'identity.json').read_text())
         if identity.get('address') != address:
             raise RuntimeError('OpenSearch address changed; plan certificate renewal before deployment')
+        if identity.get('console_tenant_policy') != 'resource-v1':
+            raise RuntimeError('OpenSearch console policy changed; use a clean setup or an explicitly reviewed native tenant migration')
         command(['openssl', 'x509', '-in', str(destination / 'node.pem'), '-checkend', '86400', '-noout'])
         service_permissions(destination)
         shutil.copy2(destination / 'ca.pem', root / 'public/opensearch-ca.pem')
         (root / 'public/opensearch-ca.pem').chmod(0o644)
         return
-    for key in ('OPENSEARCH_ADMIN_PASSWORD', 'OPENSEARCH_DASHBOARDS_PASSWORD'):
+    for key in ('OPENSEARCH_ADMIN_PASSWORD', 'OPENSEARCH_DASHBOARDS_PASSWORD', 'STORE_OPENSEARCH_CONSOLE_COOKIE_KEY'):
         if len(config.get(key, '')) < 32:
             raise RuntimeError('Generate the required store credentials with scripts/init.py first')
     with tempfile.TemporaryDirectory(prefix='store-tls-', dir=root) as temporary:
@@ -101,6 +103,8 @@ def prepare_search(root, config):
             'all_access': {'backend_roles': ['admin']}, 'kibana_server': {'users': ['kibanaserver']}}, indent=2))
         basic = {'_meta': {'type': 'config', 'config_version': 2}, 'config': {'dynamic': {
             'http': {'anonymous_auth_enabled': False},
+            'kibana': {'multitenancy_enabled': True, 'private_tenant_enabled': False,
+                'server_username': 'kibanaserver', 'index': '.kibana'},
             'authc': {'basic_internal_auth_domain': {'http_enabled': True, 'transport_enabled': True, 'order': 0,
                 'http_authenticator': {'type': 'basic', 'challenge': True}, 'authentication_backend': {'type': 'intern'}}}}}}
         write(bootstrap / 'config.yml', json.dumps(basic, indent=2))
@@ -120,7 +124,7 @@ def prepare_search(root, config):
             'plugins.security.allow_default_init_securityindex': False,
             'plugins.security.restapi.roles_enabled': ['all_access', 'security_rest_api_access']}
         write(stage / 'opensearch.yml', json.dumps(server, indent=2), 0o644)
-        write(stage / 'identity.json', json.dumps({'address': address, 'image': IMAGE}))
+        write(stage / 'identity.json', json.dumps({'address': address, 'image': IMAGE, 'console_tenant_policy': 'resource-v1'}))
         # Keep only protected configuration, not temporary CSRs and extensions.
         for pattern in ('*.csr', '*.ext', '*.srl'):
             for path in stage.glob(pattern):
@@ -140,7 +144,7 @@ def prepare(root, config):
 if __name__ == '__main__':
     try:
         config = settings()
-        for key in ('COMPOSE_PROFILES', 'OPENSEARCH_IP', 'OPENSEARCH_ADMIN_PASSWORD', 'OPENSEARCH_DASHBOARDS_PASSWORD'):
+        for key in ('COMPOSE_PROFILES', 'OPENSEARCH_IP', 'OPENSEARCH_ADMIN_PASSWORD', 'OPENSEARCH_DASHBOARDS_PASSWORD', 'STORE_OPENSEARCH_CONSOLE_COOKIE_KEY'):
             if key in os.environ:
                 config[key] = os.environ[key]
         prepare(Path('.runtime/stores'), config)

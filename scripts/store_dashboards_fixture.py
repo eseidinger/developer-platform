@@ -46,7 +46,7 @@ async def isolation(image, name):
 
 
 @asynccontextmanager
-async def running(load, provider):
+async def running(load, provider, resource):
     os.environ.update({'OPENSEARCH_DASHBOARDS_IP': '127.0.0.1', 'OPENSEARCH_IP': '127.0.0.1',
         'OPENSEARCH_CA_FILE': provider.ca_file, 'STORE_RELAY_IP': '127.0.0.1'})
     app = FastAPI()
@@ -55,12 +55,15 @@ async def running(load, provider):
     async def observed(request, call_next):
         result = await call_next(request)
         category = ('authinfo' if request.url.path == '/_plugins/_security/authinfo' else
-            'dashboardsinfo' if request.url.path == '/_plugins/_security/dashboardsinfo' else 'other')
+            'dashboardsinfo' if request.url.path == '/_plugins/_security/dashboardsinfo' else
+            'aliases' if '_alias' in request.url.path else 'cat-indices' if '/_cat/indices' in request.url.path else
+            'field-caps' if '_field_caps' in request.url.path else 'resolve-index' if '/_resolve/index' in request.url.path else 'other')
         try:
             principal = base64.b64decode(request.headers.get('authorization', '').removeprefix('Basic ')).split(b':')[0]
             principal = 'server' if principal == b'kibanaserver' else 'user' if principal.startswith(b'credential_') else 'none'
         except Exception: principal = 'invalid'
-        statuses[category + ':' + request.method + ':' + principal + (':bound' if dashboards.HEADER in request.headers else ':unbound') + ':' + str(result.status_code)] += 1
+        statuses[category + ':' + request.method + ':' + principal + (':bound' if dashboards.HEADER in request.headers else ':unbound')
+            + (':tenant' if request.headers.get('securitytenant') else ':no-tenant') + ':' + str(result.status_code)] += 1
         return result
     app.router.routes.append(Host(dashboards.HOST,
         app=dashboards.create_backend(load, server=(provider.endpoint, provider.ca_file))))
@@ -75,6 +78,13 @@ async def running(load, provider):
             if server.started: break
             await asyncio.sleep(.05)
         else: raise RuntimeError('Disposable native bridge did not start')
+        from app.stores.opensearch import authorization, index
+        headers = {'Host': dashboards.HOST, 'Authorization': authorization('kibanaserver', os.environ['OPENSEARCH_DASHBOARDS_PASSWORD'])}
+        async with httpx.AsyncClient(trust_env=False, timeout=5) as transport:
+            for path in ('/' + index(resource) + '/_search', '/_plugins/_security/api/internalusers'):
+                result = await transport.get(f'http://127.0.0.1:{native_port}' + path, headers=headers)
+                assert result.status_code == 403, 'Console server account exceeded its system metadata role'
+        print('PASS restricted console server account cannot read resource documents or administer native identities')
         with tempfile.TemporaryDirectory(prefix='store-dashboards-') as directory:
             source = yaml.safe_load((ROOT / 'persistence/shared-stores.yaml').read_text())
             service = copy.deepcopy(source['services']['opensearch-dashboards'])

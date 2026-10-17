@@ -4,6 +4,7 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import os
 import json
+import re
 import secrets
 import subprocess
 import time
@@ -11,7 +12,8 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import httpx
-from app.stores.opensearch import OpenSearch, index, authorization
+from app.stores.opensearch import OpenSearch, index, tenant, authorization
+from app.stores.http_client import PrivateJSON
 from app.stores.relay import Relay
 from app.stores import catalog
 from app.stores.s3 import StoreError
@@ -86,7 +88,23 @@ def main():
         assert result['hits']['hits'][0]['_id'] == 'one'
         denied(lambda: ro.request('PUT', prefix + '/_doc/three', {'title': 'denied'}))
         denied(lambda: ro.request('PUT', prefix + '/_mapping', {'properties': {'denied': {'type': 'keyword'}}}))
+        reader_bulk = httpx.post(endpoint + '/_bulk', content=json.dumps({'index': {'_index': index(first), '_id': 'reader-denied'}})
+            + '\n' + json.dumps({'title': 'denied'}) + '\n', headers={
+                'Authorization': authorization(catalog.login(reader['credential_id']), catalog.secret_for(reader['credential_id'])),
+                'Content-Type': 'application/x-ndjson'}).json()
+        assert reader_bulk['errors'] and reader_bulk['items'][0]['index']['status'] == 403
         denied(lambda: rw.request('GET', foreign + '/_search'))
+        assert index(first) in ro.request('GET', prefix + '/_alias')
+        denied(lambda: ro.request('GET', foreign + '/_alias'))
+        assert ro.request('GET', '/_resolve/index/' + index(first))['indices'][0]['name'] == index(first)
+        denied(lambda: ro.request('GET', '/_resolve/index/' + index(other)))
+        try:
+            visible = ro.request('GET', '/_resolve/index/*?expand_wildcards=all')
+        except StoreError as error:
+            assert '(403)' in str(error)
+        else:
+            assert index(other) not in {value['name'] for value in visible['indices']}, 'Wildcard metadata exposed a foreign resource'
+        denied(lambda: rw.request('POST', '/_aliases', {'actions': [{'add': {'index': index(first), 'alias': index(first) + '-alias'}}]}))
         denied(lambda: rw.request('DELETE', prefix))
         denied(lambda: rw.request('PUT', prefix + '/_settings', {'index.blocks.write': False}))
         denied(lambda: rw.request('PUT', '/rogue', {}))
@@ -104,6 +122,26 @@ def main():
                 'Content-Type': 'application/x-ndjson'}).json()
         assert bulk['errors'] and bulk['items'][0]['index']['status'] in {200, 201}
         assert bulk['items'][1]['index']['status'] == 403
+        def workspace(native, resource, credential):
+            return PrivateJSON(native.endpoint, {'Authorization': authorization(catalog.login(credential['credential_id']),
+                catalog.secret_for(credential['credential_id'])), 'securitytenant': tenant(resource)}, native.ca_file)
+        # Store readers can manage visualization metadata in this resource's
+        # workspace, while the existing document/mapping write denials remain.
+        try:
+            workspace(provider, first, reader).request('PUT', '/.kibana/_doc/fixture?refresh=true', {'title': 'retained workspace'})
+        except StoreError:
+            result = httpx.put(endpoint + '/.kibana/_doc/fixture?refresh=true', headers={
+                'Authorization': authorization(catalog.login(reader['credential_id']), catalog.secret_for(reader['credential_id'])),
+                'securitytenant': tenant(first)}, json={'title': 'retained workspace'})
+            action = re.search(r'no permissions for \[((?:indices|cluster):[a-z:_/*]+)', result.text)
+            print('Native workspace denied action: ' + (action[1] if action else 'unclassified'))
+            raise
+        other_reader = {'credential_id': str(uuid4()), 'mode': 'read-only',
+            'expires_at': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
+        provider.issue(other, other_reader)
+        workspace(provider, other, other_reader).request('PUT', '/.kibana/_doc/fixture?refresh=true', {'title': 'other workspace'})
+        denied(lambda: workspace(provider, other, reader).request('GET', '/.kibana/_doc/fixture'))
+        assert provider.console_indices(first) and provider.console_indices(other)
         assert provider.usage(first) > 0
         with restored(name, volume, '/usr/share/opensearch/data', IMAGE, ['--memory', '1536m', '--cpus', '1',
                 '-e', 'OPENSEARCH_INITIAL_ADMIN_PASSWORD', '-e', 'discovery.type=single-node',
@@ -129,6 +167,8 @@ def main():
             hits = fresh_reader.request('POST', prefix + '/_search', {'query': {'match': {'title': 'energy'}}})
             assert hits['hits']['hits'][0]['_id'] == 'one'
             assert fresh_reader.request('GET', prefix + '/_mapping')[index(first)]['mappings']['properties']['kind']['type'] == 'keyword'
+            assert workspace(recovered, first, fresh).request('GET', '/.kibana/_doc/fixture')['_source']['title'] == 'retained workspace'
+            denied(lambda: workspace(recovered, other, fresh).request('GET', '/.kibana/_doc/fixture'))
             denied(lambda: fresh_reader.request('GET', foreign + '/_search'))
             denied(lambda: fresh_reader.request('PUT', prefix + '/_doc/forbidden', {'title': 'denied'}))
             recovered.validate_recovery(other)
@@ -175,7 +215,9 @@ def main():
             denied(lambda c=credential: provider.probe(first, c))
         provider.purge(first)
         provider.purge(first)
+        assert not provider.console_indices(first) and provider.console_indices(other)
         provider.validate_recovery(other)
+        assert workspace(provider, other, other_reader).request('GET', '/.kibana/_doc/fixture')['_source']['title'] == 'other workspace'
         print('PASS pinned OpenSearch: index-scoped readers/writers, mapping DDL, ranked/filter/facet queries, foreign/index-purge/admin/alias/settings denial, idempotent credentials/revocation, lease enforcement, measured usage and isolated purge')
     finally:
         subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True, timeout=30)

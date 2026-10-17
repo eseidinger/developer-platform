@@ -39,10 +39,14 @@ async def run(providers, endpoints, static_ports):
     rows, resources, credentials, issued = {}, {}, {}, {}
     variants = [(name, provider, mode) for name, provider in providers.items()
                 for mode in ('read-write', 'read-only')]
-    for index, (name, provider, mode) in enumerate(variants):
-        variant = name + '-' + mode
-        resource = {'resource_id': str(uuid4()), 'quota_bytes': 16 * 1024 * 1024,
-                    'configuration': {'vector_size': 3, 'distance': 'Cosine'}}
+    if 'opensearch' in providers:
+        variants.append(('opensearch', providers['opensearch'], 'renewed-read-only'))
+    for index, (name, provider, selected_mode) in enumerate(variants):
+        variant = name + '-' + selected_mode
+        mode = selected_mode.removeprefix('renewed-')
+        resource = resources['opensearch-read-write'] if selected_mode == 'renewed-read-only' else {
+            'resource_id': str(uuid4()), 'quota_bytes': 16 * 1024 * 1024,
+            'configuration': {'vector_size': 3, 'distance': 'Cosine'}}
         for attempt in range(100):
             try:
                 await asyncio.to_thread(provider.provision, resource)
@@ -55,7 +59,7 @@ async def run(providers, endpoints, static_ports):
         await asyncio.to_thread(provider.issue, resource, credential)
         row = {**credential, 'expires_at': datetime.fromisoformat(credential['expires_at']),
                'relay_port': 20000 + index, 'issuer': 'https://identity.fixture.test', 'subject': 'human',
-               'provider': name, 'resource_id': resource['resource_id'], 'created_at': datetime.now(timezone.utc), 's3_sessions': {}}
+               'provider': name, 'fixture_variant': variant, 'resource_id': resource['resource_id'], 'created_at': datetime.now(timezone.utc), 's3_sessions': {}}
         rows[row['relay_port']] = row
         resources[variant] = resource
         credentials[variant] = provider.credentials(resource, credential)
@@ -145,16 +149,18 @@ async def run(providers, endpoints, static_ports):
     try:
         if 'opensearch' in providers:
             from store_dashboards_fixture import running as running_dashboards
-            static_ports['opensearch'] = await stack.enter_async_context(running_dashboards(load, providers['opensearch']))
+            resource = next(row for row in rows.values() if row['provider'] == 'opensearch')
+            static_ports['opensearch'] = await stack.enter_async_context(running_dashboards(load, providers['opensearch'], resource))
         for _ in range(100):
             if server.started and len(relay.servers) == len(rows): break
             await asyncio.sleep(.05)
         else: raise RuntimeError('Disposable console gateway did not start')
         config = {'gateway': f'https://127.0.0.1:{gateway_port}', 'proxy': f'http://127.0.0.1:{proxy_port}', 'providers': {}}
         for port, row in rows.items():
-            variant = row['provider'] + '-' + row['mode']
+            variant = row['fixture_variant']
             other = row['provider'] + '-' + ('read-only' if row['mode'] == 'read-write' else 'read-write')
-            config['providers'][variant] = {'origin': console.origin(port), 'provider': row['provider'], 'mode': row['mode'],
+            if 'renewed-' in variant: other = 'opensearch-read-only'
+            config['providers'][variant] = {'origin': console.origin(port), 'provider': row['provider'], 'mode': row['mode'], 'retained_workspace': 'renewed-' in variant, 'peer': credentials[other],
                 'foreign': credentials[other].get('S3_BUCKET', credentials[other].get('QDRANT_COLLECTION', credentials[other].get('OPENSEARCH_INDEX'))),
                 'launch': console.assertion(row, 'launch', 30), 'port': port,
                 'connection': credentials[variant]}
@@ -166,12 +172,31 @@ async def run(providers, endpoints, static_ports):
             if isinstance(output, bytes): output = output.decode(errors='replace')
             raise RuntimeError('Synthetic console fixture timed out at: ' + output[-2000:]) from None
         if result.returncode:
+            if 'opensearch' in providers:
+                native = providers['opensearch']
+                for physical, _ in native.console_indices(resources['opensearch-read-write']):
+                    mapping = await asyncio.to_thread(native.root.request, 'GET', '/' + physical + '/_mapping')
+                    properties = mapping[physical]['mappings'].get('properties', {})
+                    print('Synthetic saved-object mapping types: ' + json.dumps({key: properties.get(key, {}).get('type')
+                        for key in ('type', 'namespaces', 'namespace', 'updated_at')}))
             raise RuntimeError('Official console fixture failed: ' + result.stdout.strip()[:1200])
         # Native 24-hour keys remain valid: the previous denials must come from
         # the authoritative lease boundary, not native deletion or fixture routing.
         for provider, resource, credential in issued.values():
             await asyncio.to_thread(provider.probe, resource, credential)
         print(result.stdout.strip())
+        if 'opensearch' in providers:
+            provider = providers['opensearch']
+            first, other = resources['opensearch-read-write'], resources['opensearch-read-only']
+            assert provider.console_indices(first) and provider.console_indices(other)
+            for variant, (native, resource, credential) in issued.items():
+                if variant.startswith('opensearch') and resource['resource_id'] == first['resource_id']:
+                    await asyncio.to_thread(native.revoke, resource, credential)
+            await asyncio.to_thread(provider.purge, first)
+            await asyncio.to_thread(provider.purge, first)
+            assert not provider.console_indices(first) and provider.console_indices(other)
+            await asyncio.to_thread(provider.validate_recovery, other)
+            print('PASS resource workspace survives human renewal; isolated idempotent purge removes its data, tenant and physical console indexes while retaining the other workspace')
     finally:
         await stack.aclose()
         server.should_exit = True
