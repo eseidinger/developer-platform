@@ -178,6 +178,7 @@ def neo4j(provider,resources):
 
 
 PG_CACHE = {}
+PG_ERRORS = {}
 PG_OFFSET = 0
 
 
@@ -188,6 +189,8 @@ def postgres(provider, resources):
     known = {str(r['resource_id']) for r in active}
     for rid in list(PG_CACHE):
         if rid not in known: del PG_CACHE[rid]
+    for rid in list(PG_ERRORS):
+        if rid not in known: del PG_ERRORS[rid]
     chosen = (active[PG_OFFSET:] + active[:PG_OFFSET])[:8]
     PG_OFFSET = (PG_OFFSET + 8) % max(1, len(active))
     for resource in chosen:
@@ -213,10 +216,15 @@ def postgres(provider, resources):
                     for name,value in zip(('active','blocks_done','blocks_total'), progress))
             readings.append(line('platform_native_resource_last_success_timestamp_seconds', time.time(), labels))
             PG_CACHE[str(resource['resource_id'])] = readings
+            PG_ERRORS[str(resource['resource_id'])] = False
         except Exception:
             # Keep old samples with their own original success time.
-            pass
-    return [item for readings in PG_CACHE.values() for item in readings]
+            PG_ERRORS[str(resource['resource_id'])] = True
+    result=[item for readings in PG_CACHE.values() for item in readings]
+    for resource in active:
+        labels={'provider':'postgresql','project':resource['owner_project'],'resource_id':str(resource['resource_id']),'scope':'resource'}
+        result.append(line('platform_native_resource_collection_up',int(not PG_ERRORS.get(str(resource['resource_id']),True)),labels))
+    return result
 
 
 def loop(stop, control):

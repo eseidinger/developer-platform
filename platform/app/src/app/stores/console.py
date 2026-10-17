@@ -22,12 +22,12 @@ from uuid import UUID
 import httpx2 as httpx
 import h11
 import jwt
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from . import catalog, recovery, dashboards
 
 COOKIE = '__Host-store-console'
-PROVIDERS = {'s3', 'qdrant', 'opensearch'}
+PROVIDERS = {'s3', 'qdrant', 'opensearch', 'neo4j'}
 ISSUER = 'developer-platform-store-console'
 HOP = {'host', 'cookie', 'connection', 'keep-alive', 'proxy-authenticate', 'proxy-authorization',
        'te', 'trailer', 'transfer-encoding', 'upgrade', 'forwarded', 'x-forwarded-host',
@@ -51,8 +51,9 @@ def lease(conn, credential_id):
         return None
     if conn.execute('SELECT COALESCE(backup_until>now(),false) FROM store_control WHERE singleton').fetchone()[0]:
         return None
-    row = conn.execute("""SELECT c.credential_id,c.relay_port,c.expires_at,g.issuer,g.subject,r.provider,r.resource_id,r.created_at
+    row = conn.execute("""SELECT c.credential_id,c.relay_port,c.expires_at,g.issuer,g.subject,r.provider,r.resource_id,r.created_at,c.admission_sha256,host(i.host)
         FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
+        LEFT JOIN store_instances i USING(resource_id)
         JOIN projects p ON p.name=r.owner_project
         WHERE c.credential_id=%s AND c.state='active' AND c.expires_at>now() AND c.grant_version=g.version
         AND g.kind='human' AND g.state='active' AND r.state='active' AND r.observed_state='active'
@@ -61,7 +62,7 @@ def lease(conn, credential_id):
         (credential_id,)).fetchone()
     if not row or not enabled(row[5]):
         return None
-    value = dict(zip(('credential_id', 'relay_port', 'expires_at', 'issuer', 'subject', 'provider', 'resource_id', 'created_at'), row))
+    value = dict(zip(('credential_id', 'relay_port', 'expires_at', 'issuer', 'subject', 'provider', 'resource_id', 'created_at', 'admission_sha256', 'native_host'), row))
     return {**value, 'kind': 'human', 's3_sessions': catalog.console_sessions(conn, row[0]) if row[5] == 's3' else {}}
 
 
@@ -85,6 +86,7 @@ def assertion(row, kind, lifetime):
 
 
 def backend(row, static):
+    if row['provider'] == 'neo4j': return row['native_host'], 7474
     if row['provider'] == 'opensearch':
         return os.environ['OPENSEARCH_DASHBOARDS_IP'], 5601
     if not static:
@@ -93,7 +95,7 @@ def backend(row, static):
 
 
 def landing(provider):
-    return {'s3': '/rustfs/console/', 'qdrant': '/dashboard/', 'opensearch': '/'}[provider]
+    return {'s3': '/rustfs/console/', 'qdrant': '/dashboard/', 'opensearch': '/', 'neo4j': '/browser/'}[provider]
 
 
 def dashboards_cookie(value):
@@ -152,7 +154,7 @@ async def acknowledged(row, access, digest):
     raise ValueError('Private relay did not observe the native session')
 
 
-def create_gateway(load, destination=backend, register=None, acknowledge=acknowledged):
+def create_gateway(load, destination=backend, register=None, acknowledge=acknowledged, observe_socket=None):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     slots = asyncio.Semaphore(32)
 
@@ -180,6 +182,63 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             return row
         except Exception:
             raise HTTPException(401, 'Open an active console lease from the platform portal') from None
+
+    @app.websocket('/{path:path}')
+    async def bolt_socket(socket: WebSocket, path: str):
+        upstream = None
+        tasks = []
+        acquired = False
+        phase = 'request-boundary'
+        try:
+            port = int(socket.path_params['port'])
+            base = origin(port)
+            proxied = socket.client and socket.client.host == os.environ.get('PROXY_IP') and socket.headers.get('x-forwarded-proto') == 'https'
+            for phase, valid in [
+                    ('request-path',not path),
+                    ('request-host',socket.headers.get('host') in {base[8:],base[8:]+':443'}),
+                    ('request-origin',socket.headers.get('origin') == base),
+                    ('request-tls',socket.url.scheme == 'wss' or proxied),
+                    ('request-subprotocol',socket.headers.get('sec-websocket-protocol') in {None,'bolt'})]:
+                if not valid: raise ValueError()
+            phase = 'catalog-authentication'
+            row = await authorize(socket.cookies.get(COOKIE), 'session', port)
+            if row['provider'] != 'neo4j': raise ValueError()
+            await asyncio.wait_for(slots.acquire(), .1)
+            acquired = True
+            address = str(ipaddress.IPv4Address(os.environ['STORE_RELAY_IP']))
+            phase = 'private-relay-connect'
+            reader, upstream = await asyncio.wait_for(asyncio.open_connection(address, port), 3)
+            phase = 'protocol-forwarding'
+            await socket.accept(subprotocol='bolt' if socket.headers.get('sec-websocket-protocol') else None)
+            async def requests():
+                while True:
+                    data = await socket.receive_bytes()
+                    if not data or len(data) > 1056768: return
+                    upstream.write(data)
+                    await upstream.drain()
+            async def responses():
+                while data := await reader.read(65536): await socket.send_bytes(data)
+            async def guard():
+                while True:
+                    remaining = row['expires_at'].timestamp() - time.time()
+                    if remaining <= 0: return
+                    try: await asyncio.wait_for(authorize(socket.cookies.get(COOKIE), 'session', port), min(.5,remaining))
+                    except Exception: return
+                    await asyncio.sleep(min(.25,remaining))
+            tasks = [asyncio.create_task(requests()),asyncio.create_task(responses()),asyncio.create_task(guard())]
+            done,_=await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            if observe_socket:
+                for task in done:
+                    error=task.exception()
+                    observe_socket('request' if task is tasks[0] else 'response' if task is tasks[1] else 'guard',type(error).__name__ if error else 'Completed')
+        except Exception as error:
+            if observe_socket: observe_socket(phase,type(error).__name__)
+        finally:
+            for task in tasks: task.cancel()
+            await asyncio.gather(*tasks,return_exceptions=True)
+            if upstream: upstream.close()
+            with contextlib.suppress(Exception): await socket.close(code=1008)
+            if acquired: slots.release()
 
     @app.api_route('/{path:path}', methods=['GET', 'HEAD', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'])
     async def console(request: Request, path: str):
@@ -219,6 +278,10 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             return response
         row = await authorize(request.cookies.get(COOKIE), 'session', port)
         frontend = row['provider'] == 'opensearch'
+        if row['provider'] == 'neo4j' and path == '' and request.method == 'GET':
+            # Catalog-authorized connection discovery; never leak raw native addresses.
+            return JSONResponse({'bolt_direct': 'bolt+s://' + base[8:] + ':443',
+                'bolt_routing': 'bolt+s://' + base[8:] + ':443'}, headers={'Cache-Control':'no-store'})
         if row['provider'] == 's3' and path == 'rustfs/admin/v3/is-admin':
             # Every platform console identity is a non-administrator. Native
             # admin discovery itself requires global rights in this release;
@@ -237,7 +300,8 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             raise HTTPException(403, 'Console origin required')
         if request.headers.get('upgrade') or request.method == 'OPTIONS':
             raise HTTPException(400, 'Unsupported console protocol')
-        static = ((row['provider'] == 's3' and (path == 'rustfs/console' or path.startswith('rustfs/console/')))
+        static = ((row['provider'] == 'neo4j' and (path == 'browser' or path.startswith('browser/')))
+                  or (row['provider'] == 's3' and (path == 'rustfs/console' or path.startswith('rustfs/console/')))
                   or (row['provider'] == 'qdrant' and (path == 'dashboard' or path.startswith('dashboard/'))))
         native_auth = (request.headers.get('authorization') or request.headers.get('api-key')
             or b'X-Amz-Credential=' in request.scope['query_string'])

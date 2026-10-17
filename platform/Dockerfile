@@ -31,4 +31,4 @@ COPY --from=ui-builder /ui/dist/ ./src/app/static/
 COPY --from=store-console-assets /console/out/ ./store-consoles/rustfs/
 USER 10001
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/app/.venv/bin:$PATH"
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--no-access-log"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--ws-max-size", "1056768", "--ws-max-queue", "4", "--no-access-log"]

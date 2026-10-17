@@ -580,6 +580,41 @@
     {
       "id": 17,
       "type": "timeseries",
+      "title": "JVM collection age",
+      "description": "Original success time for the JVM batch; retained samples do not become fresh when Docker collection succeeds. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 64
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "time()-platform_native_last_success_timestamp_seconds{provider=\"neo4j\"}",
+          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
       "title": "Relayed Bolt connections",
       "description": "Platform data-lease TCP connections; excludes operator-native maintenance connections. Missing data means collection or target discovery needs checking.",
       "datasource": {
@@ -589,7 +624,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 64
       },
       "targets": [
@@ -613,7 +648,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 19,
       "type": "timeseries",
       "title": "Dedicated instance running",
       "description": "Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting. Missing data means collection or target discovery needs checking.",
@@ -624,8 +659,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 64
+        "x": 0,
+        "y": 72
       },
       "targets": [
         {

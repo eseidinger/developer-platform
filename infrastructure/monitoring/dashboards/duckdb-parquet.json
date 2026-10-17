@@ -385,7 +385,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "query": "label_values(platform_store_quota_bytes{provider=\"s3\"}, project)",
+        "query": "label_values(platform_store_workload_last_collection_timestamp_seconds{provider=\"duckdb\"}, project)",
         "refresh": 1,
         "multi": true,
         "includeAll": true,
@@ -402,7 +402,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "query": "label_values(platform_store_quota_bytes{provider=\"s3\",project=~\"$project\"}, resource_id)",
+        "query": "label_values(platform_store_workload_last_collection_timestamp_seconds{provider=\"duckdb\",project=~\"$project\"}, resource_id)",
         "refresh": 1,
         "multi": true,
         "includeAll": true,

@@ -79,3 +79,28 @@ class BoltFenceTests(unittest.TestCase):
         with self.assertRaises(ValueError): admission(self.password,{'admission_sha256':None})
 
 if __name__ == '__main__': unittest.main()
+
+class BoltBudgetTests(unittest.IsolatedAsyncioTestCase):
+    async def test_oversized_message_rejected_before_reading_its_next_body(self):
+        import asyncio
+        from app.stores.bolt_relay import message
+        reader=asyncio.StreamReader()
+        reader.feed_data((b'\xff\xff'+b'x'*65535)*16+b'\xff\xff')
+        with self.assertRaises(ValueError):await message(reader)
+
+    async def test_bolt_memory_budget_rejects_before_opening_a_backend(self):
+        import asyncio,time
+        from datetime import datetime,timedelta,timezone
+        from unittest.mock import Mock,patch
+        from app.stores.relay import Relay,MAX_BOLT_CONNECTIONS
+        relay=Relay(host='127.0.0.1')
+        relay.bolt_connections=MAX_BOLT_CONNECTIONS
+        relay.last_success=time.monotonic()
+        relay.leases[20000]={'provider':'neo4j','credential_id':str(uuid4()),'expires_at':datetime.now(timezone.utc)+timedelta(hours=1)}
+        writer=Mock()
+        with patch('asyncio.open_connection') as connection:
+            await relay.handle(20000,asyncio.StreamReader(),writer)
+        writer.close.assert_called_once()
+        connection.assert_not_called()
+        self.assertEqual(relay.connections,0)
+        self.assertEqual(relay.bolt_connections,MAX_BOLT_CONNECTIONS)

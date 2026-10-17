@@ -265,8 +265,8 @@
     {
       "id": 8,
       "type": "timeseries",
-      "title": "Resource native sample age",
-      "description": "Bounded round-robin PostgreSQL database collection; failures retain the original timestamp. Missing data means collection or target discovery needs checking.",
+      "title": "Resource native collection health",
+      "description": "Zero means the last attempt failed or no first sample exists; eight resources are sampled per pass. Missing data means collection or target discovery needs checking.",
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
@@ -276,6 +276,41 @@
         "w": 12,
         "x": 12,
         "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "platform_native_resource_collection_up{project=~\"$project\",resource_id=~\"$resource\"}",
+          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Resource native sample age",
+      "description": "Bounded round-robin PostgreSQL database collection; failures retain the original timestamp. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 32
       },
       "targets": [
         {
@@ -298,7 +333,7 @@
       }
     },
     {
-      "id": 9,
+      "id": 10,
       "type": "timeseries",
       "title": "Estimated dead rows",
       "description": "PostgreSQL estimates across resource tables, not an exact graph/vector count. Missing data means collection or target discovery needs checking.",
@@ -309,7 +344,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 32
       },
       "targets": [
@@ -333,7 +368,7 @@
       }
     },
     {
-      "id": 10,
+      "id": 11,
       "type": "timeseries",
       "title": "Vacuum activity",
       "description": "Aggregate native vacuum/autovacuum counts for resource tables. Missing data means collection or target discovery needs checking.",
@@ -344,8 +379,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 32
+        "x": 0,
+        "y": 40
       },
       "targets": [
         {
@@ -368,7 +403,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 12,
       "type": "timeseries",
       "title": "Projection lag",
       "description": "Application projection worker numeric observation; requires protected-source integration. Missing data means collection or target discovery needs checking.",
@@ -379,7 +414,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 40
       },
       "targets": [
@@ -403,7 +438,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 13,
       "type": "timeseries",
       "title": "Pending source updates",
       "description": "Application projection worker numeric observation; requires protected-source integration. Missing data means collection or target discovery needs checking.",
@@ -414,8 +449,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 40
+        "x": 0,
+        "y": 48
       },
       "targets": [
         {
@@ -438,7 +473,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 14,
       "type": "timeseries",
       "title": "Last successful validation age",
       "description": "Application validation observation; absence means no evidence. Missing data means collection or target discovery needs checking.",
@@ -449,7 +484,7 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
+        "x": 12,
         "y": 48
       },
       "targets": [

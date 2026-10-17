@@ -18,6 +18,7 @@ from . import catalog, recovery
 
 log = logging.getLogger(__name__)
 MAX_CONNECTIONS = 128
+MAX_BOLT_CONNECTIONS = 16
 
 
 def backend_endpoint(lease):
@@ -125,6 +126,7 @@ class Relay:
         self.leases = {}
         self.servers = {}
         self.connections = 0
+        self.bolt_connections = 0
         self.by_credential = {}
         self.last_success = 0.0
 
@@ -144,10 +146,12 @@ class Relay:
 
     async def handle(self, port, reader, writer):
         lease = self.leases.get(port)
-        if lease is None or self.connections >= MAX_CONNECTIONS or self.by_credential.get(lease["credential_id"], 0) >= 20 or not self.allowed(port, lease):
+        is_bolt = lease is not None and lease['provider'] == 'neo4j'
+        if (is_bolt and self.bolt_connections >= MAX_BOLT_CONNECTIONS) or lease is None or self.connections >= MAX_CONNECTIONS or self.by_credential.get(lease["credential_id"], 0) >= 20 or not self.allowed(port, lease):
             writer.close()
             return
         self.connections += 1
+        self.bolt_connections += int(is_bolt)
         self.by_credential[lease["credential_id"]] = self.by_credential.get(lease["credential_id"], 0) + 1
         backend_writer = None
         tasks = []
@@ -204,6 +208,7 @@ class Relay:
                     with contextlib.suppress(Exception):
                         await stream.wait_closed()
             self.connections -= 1
+            self.bolt_connections -= int(is_bolt)
             self.by_credential[lease["credential_id"]] -= 1
             if self.by_credential[lease["credential_id"]] == 0:
                 del self.by_credential[lease["credential_id"]]

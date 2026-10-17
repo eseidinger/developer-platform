@@ -214,7 +214,7 @@ class DashboardsStreamingTests(IsolatedAsyncioTestCase):
             async def handler(request): return httpx.Response(200, stream=Held())
             real_client = httpx.AsyncClient
             with patch('app.stores.console.httpx.AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)):
-                endpoint = next(route.endpoint for route in app.routes if getattr(route, 'path', None) == '/{path:path}')
+                endpoint = next(route.endpoint for route in app.routes if getattr(route, 'path', None) == '/{path:path}' and getattr(route, 'methods', None))
                 if stall:
                     current[0]['expires_at'] = datetime.now(timezone.utc) + timedelta(seconds=1)
                 response = await endpoint(request, 'held')

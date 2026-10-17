@@ -371,7 +371,7 @@ def performance_dashboards():
         if uid == 'rustfs-s3':
             add('Native request throughput','sum by (method,api,http_request_method) (rate(rustfs_http_server_requests_total{provider="s3"}[5m]))','ops','Native RustFS OTLP through the separate allowlisted Alloy metrics pipeline; shared service scope.')
             add('Native request p95 latency','histogram_quantile(0.95,sum by (le,method,api,http_request_method) (rate(rustfs_http_server_request_duration_seconds_bucket{provider="s3"}[5m])))','s','Native histogram; per-operation dimensions depend on the verified release schema.')
-            add('Native request errors','sum by (status,status_code,http_response_status_code) (rate(rustfs_http_server_requests_total{provider="s3",http_response_status_code=~"4..|5.."}[5m]))','ops','HTTP response class. Authentication/permission denials are distinct from service failures.')
+            add('Native request errors','sum by (status,status_code,http_response_status_code) (rate(rustfs_http_server_requests_total{provider="s3",http_response_status_code=~"4..|5.."}[5m]) or rate(rustfs_http_server_requests_total{provider="s3",status_code=~"4..|5.."}[5m]) or rate(rustfs_http_server_requests_total{provider="s3",status=~"4..|5.."}[5m]))','ops','HTTP response class. Authentication/permission denials are distinct from service failures.')
             add('Native uploaded bytes','sum(rate(rustfs_http_server_request_body_bytes_total{provider="s3"}[5m]))','Bps','Native shared HTTP request bodies.')
             add('Native downloaded bytes','sum(rate(rustfs_http_server_response_body_bytes_total{provider="s3"}[5m]))','Bps','Native shared HTTP response bodies.')
             add('Native export age','time()-timestamp(rustfs_runtime_readiness_ready{provider="s3"})','s','Age of the last native readiness observation accepted by Prometheus. Missing is unavailable.')
@@ -410,6 +410,7 @@ def performance_dashboards():
             add('Major page faults','rate('+prefix+'process_major_page_faults_total[5m])','ops','Native process I/O pressure; shared service.')
             add('File descriptor utilization',prefix+'process_open_fds / ('+prefix+'process_max_fds > 0)','percentunit','Native process descriptor usage; shared service.')
         elif uid in {'age-performance','pgvector-performance'}:
+            add('Resource native collection health',f'platform_native_resource_collection_up{{{selected}}}',description='Zero means the last attempt failed or no first sample exists; eight resources are sampled per pass.')
             add('Resource native sample age',f'time()-platform_native_resource_last_success_timestamp_seconds{{{selected}}}','s','Bounded round-robin PostgreSQL database collection; failures retain the original timestamp.')
             add('Estimated dead rows',f'platform_native_postgresql_estimated_dead_rows{{{selected}}}',description='PostgreSQL estimates across resource tables, not an exact graph/vector count.')
             add('Vacuum activity',f'rate(platform_native_postgresql_vacuums_total{{{selected}}}[5m])','ops','Aggregate native vacuum/autovacuum counts for resource tables.')
@@ -430,6 +431,7 @@ def performance_dashboards():
             add('JVM GC time',f'rate(platform_native_neo4j_jvm_gc_seconds_total{{{selected}}}[5m])','s','Standard JVM collector time, aggregated across garbage collectors.')
             add('JVM live threads',f'platform_native_neo4j_jvm_threads{{{selected}}}',description='Standard JVM thread count.')
             add('JVM collection health','platform_native_collection_up{provider="neo4j"}',description='Independent per-instance JVM collection; failures retain old values with their success timestamp.')
+            add('JVM collection age','time()-platform_native_last_success_timestamp_seconds{provider="neo4j"}','s','Original success time for the JVM batch; retained samples do not become fresh when Docker collection succeeds.')
             add('Relayed Bolt connections',f'platform_store_relay_connections{{provider="neo4j",resource_id=~"$resource"}}',description='Platform data-lease TCP connections; excludes operator-native maintenance connections.')
             add('Dedicated instance running',f'platform_native_container_running{{provider="neo4j",{selected}}}',description='Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting.')
         dashboard={'uid':uid,'title':title,'schemaVersion':41,'version':1,'editable':False,'timezone':'browser','refresh':'30s',
@@ -438,6 +440,11 @@ def performance_dashboards():
         dashboard['templating']={'list':[
             {'name':'project','type':'query','datasource':{'type':'prometheus','uid':'prometheus'},'query':f'label_values(platform_store_quota_bytes{{provider="{provider}"}}, project)','refresh':1,'multi':True,'includeAll':True,'allValue':'.*','current':{'text':'All','value':'$__all'}},
             {'name':'resource','type':'query','datasource':{'type':'prometheus','uid':'prometheus'},'query':f'label_values(platform_store_quota_bytes{{provider="{provider}",project=~"$project"}}, resource_id)','refresh':1,'multi':True,'includeAll':True,'allValue':'.*','current':{'text':'All','value':'$__all'}}]}
+        if uid == 'duckdb-parquet':
+            # Embedded jobs can profile local datasets without a shared S3 resource.
+            variables=dashboard['templating']['list']
+            variables[0]['query']='label_values(platform_store_workload_last_collection_timestamp_seconds{provider="duckdb"}, project)'
+            variables[1]['query']='label_values(platform_store_workload_last_collection_timestamp_seconds{provider="duckdb",project=~"$project"}, resource_id)'
         result.append(dashboard)
     return result
 

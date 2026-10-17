@@ -93,15 +93,32 @@ class Controller:
         net = self.engine.call('GET', '/networks/' + network)
         if net.get('Labels', {}).get(LABEL) != str(rid) or not net.get('Internal'):
             raise ValueError('Network ownership mismatch')
-        # Only reviewed infrastructure containers join the private instance network.
-        for member in os.environ.get('NEO4J_NETWORK_MEMBERS', 'developer-platform-neo4j-controller-1,developer-platform-platform-api-1,developer-platform-store-access-1').split(','):
-            if not member: continue
-            member_info = self.engine.call('GET', '/containers/' + member + '/json')
-            if network not in member_info['NetworkSettings']['Networks']:
-                self.engine.call('POST', '/networks/' + network + '/connect', {'Container': member})
+        self.attach_members(network)
         if not info['State']['Running']:
             self.engine.call('POST', '/containers/' + name + '/start')
         return self.address(rid)
+
+    def attach_members(self,network,missing=False):
+        # Recreated Compose infrastructure gets new IDs; never rely on its old
+        # private-network attachment surviving a normal operator deployment.
+        for member in os.environ.get('NEO4J_NETWORK_MEMBERS','developer-platform-neo4j-controller-1,developer-platform-platform-api-1,developer-platform-store-access-1').split(','):
+            if not member:continue
+            info=self.engine.call('GET','/containers/'+member+'/json',missing=missing)
+            if info and info.get('State',{}).get('Running') and network not in info['NetworkSettings']['Networks']:
+                self.engine.call('POST','/networks/'+network+'/connect',{'Container':member})
+
+    def reconcile_networks(self):
+        for item in self.engine.call('GET','/containers/json?all=1'):
+            label=(item.get('Labels') or {}).get(LABEL)
+            if not label:continue
+            rid=UUID(label)
+            if '/'+names(rid)[0] not in item.get('Names',[]):continue
+            info=self.info(rid)
+            if not info or not info['State']['Running']:continue
+            network=names(rid)[2]
+            value=self.engine.call('GET','/networks/'+network)
+            if value.get('Labels',{}).get(LABEL)!=str(rid) or not value.get('Internal'):raise ValueError('Network ownership mismatch')
+            self.attach_members(network,missing=True)
 
     def address(self, rid):
         info = self.info(rid)
@@ -229,13 +246,33 @@ class Controller:
 
 
 def create_app(controller=None):
-    app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     for name in ('NEO4J_CONTROLLER_KEY','NEO4J_ADMIN_KEY'):
         if len(os.environ.get(name,''))<32:raise ValueError('Operator controller secret configuration unavailable')
     maximum=int(os.environ.get('NEO4J_MAX_INSTANCES','4'))
     memory=int(os.environ.get('NEO4J_INSTANCE_MEMORY_BYTES','1610612736'))
     if not 1<=maximum<=64 or not 1073741824<=memory<=17179869184:raise ValueError('Operator instance allocation invalid')
     control = controller or Controller()
+
+    from contextlib import asynccontextmanager
+    import asyncio
+    @asynccontextmanager
+    async def lifespan(app):
+        async def maintain():
+            while True:
+                def attach():
+                    with LOCK:
+                        DEADLINE.until=time.monotonic()+4
+                        try:control.reconcile_networks()
+                        finally:del DEADLINE.until
+                try:await asyncio.to_thread(attach)
+                except Exception:pass  # Collection health exposes missing connectivity; never dump daemon data.
+                await asyncio.sleep(5)
+        task=asyncio.create_task(maintain())
+        try:yield
+        finally:
+            task.cancel()
+            await asyncio.gather(task,return_exceptions=True)
+    app=FastAPI(docs_url=None,redoc_url=None,openapi_url=None,lifespan=lifespan)
 
     @app.post('/v1/instances/{rid}/{action}')
     async def operation(rid: UUID, action: str, request: Request):

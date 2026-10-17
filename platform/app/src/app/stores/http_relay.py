@@ -67,12 +67,16 @@ def identity(request, lease):
                     or not hmac.compare_digest(hashlib.sha256(tokens[0].encode()).hexdigest(), session['token_sha256'])):
                 raise ValueError('Lease identity mismatch')
             headers['_session'] = (key, session['token_sha256'])
-    elif lease['provider'] == 'opensearch':
+    elif lease['provider'] in {'opensearch', 'neo4j'}:
         if not auth.startswith('Basic '):
             raise ValueError('Basic authentication required')
         raw = base64.b64decode(auth[6:], validate=True)
-        if raw.split(b':', 1)[0] != catalog.login(lease['credential_id']).encode():
+        if b':' not in raw or raw.split(b':', 1)[0] != catalog.login(lease['credential_id']).encode():
             raise ValueError('Lease identity mismatch')
+        if lease['provider'] == 'neo4j':
+            from .neo4j import admission
+            if b'impersonated-user' in headers: raise ValueError('Impersonation unavailable')
+            admission(raw.split(b':', 1)[1].decode('ascii'), lease)
     elif lease['provider'] == 'qdrant':
         token = headers.get(b'api-key')
         if token and auth:

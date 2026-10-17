@@ -60,6 +60,9 @@ def main():
             controller.apply(resources[0], 'issue', {'credential_id': str(credential), 'password': catalog.secret_for(credential)})
         controller.query(resources[0], 'CREATE (:Fixture {value:42})', database='neo4j',
             user=catalog.login(cid), password=password)
+        controller.query(resources[0],'CREATE CONSTRAINT fixture_value IF NOT EXISTS FOR (n:Fixture) REQUIRE n.value IS UNIQUE',
+            database='neo4j',user=catalog.login(cid),password=password)
+        controller.query(resources[0],'DROP CONSTRAINT fixture_value IF EXISTS',database='neo4j',user=catalog.login(cid),password=password)
         # Full-access user management is the native capability the platform fence must contain.
         controller.query(resources[0], 'ALTER USER ' + catalog.login(other) + ' SET PASSWORD $password CHANGE NOT REQUIRED',
             {'password': password}, user=catalog.login(cid), password=password)
@@ -89,8 +92,13 @@ def main():
             asyncio.run(run({'neo4j':Native()}, {}, {}))
         # Full-access users can damage native administration; stop/purge fencing
         # remains available without a native administrator login.
-        controller.query(resources[0],'ALTER USER neo4j SET PASSWORD $password CHANGE NOT REQUIRED',
-            {'password':secrets.token_hex(32)},user=catalog.login(cid),password=password)
+        native_env={**os.environ,'NEO4J_USERNAME':catalog.login(cid),'NEO4J_PASSWORD':password}
+        changed=subprocess.run(['docker','run','--rm','-i','--network','container:'+names(resources[0])[0],
+            '--memory','256m','--cpus','1','--entrypoint','cypher-shell','-e','NEO4J_USERNAME','-e','NEO4J_PASSWORD',
+            IMAGE,'-a','bolt://127.0.0.1:7687','--format','plain'],env=native_env,
+            input='ALTER USER neo4j SET PASSWORD \''+secrets.token_hex(32)+'\' CHANGE NOT REQUIRED;\n',
+            text=True,capture_output=True,timeout=30)
+        assert changed.returncode==0,'Native full-access administrator mutation failed'
         for _ in range(30):
             try:
                 controller.apply(resources[0],'retire',{});break

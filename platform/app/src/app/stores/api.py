@@ -92,7 +92,7 @@ def install(app, control):
         with control.connect() as conn:
             rows = conn.execute("""SELECT row_to_json(r) FROM store_resources r
                 WHERE owner_project=%s AND state<>'purged' ORDER BY created_at,resource_id LIMIT 128""", (project,)).fetchall()
-        return reply({"resources": [r[0] for r in rows]})
+        return reply({"resources": [{**r[0],"capabilities":providers.capabilities(r[0]["provider"])} for r in rows]})
 
     @app.post("/v1/projects/{project}/resources", status_code=202)
     def create_resource(project: str, body: ResourceCreate, principal: Principal = caller):
@@ -111,7 +111,7 @@ def install(app, control):
     def get_resource(resource_id: UUID, principal: Principal = caller):
         with mutation(principal) as conn:
             row = owner(conn, resource_id, principal)
-            return reply({**row, "quota_enforcement": providers.get(row["provider"]).quota_enforcement})
+            return reply({**row, "capabilities":providers.capabilities(row["provider"]), "quota_enforcement": providers.get(row["provider"]).quota_enforcement})
 
     @app.patch("/v1/resources/{resource_id}")
     def rename_resource(resource_id: UUID, body: ResourceRename, principal: Principal = caller):
@@ -260,7 +260,7 @@ def install(app, control):
             key = conn.execute("SELECT fingerprint FROM store_human_keys WHERE issuer=%s AND subject=%s",
                 (principal.issuer, principal.subject)).fetchone()
         return reply({"key_fingerprint": key[0] if key else None,
-            "grants": [{"grant": r[0], "resource": {**r[1], "console_url": providers.console_url(r[1]["provider"])}} for r in rows]})
+            "grants": [{"grant": r[0], "resource": {**r[1], "console_url": providers.console_url(r[1]["provider"]), "capabilities":providers.capabilities(r[1]["provider"])}} for r in rows]})
 
     def own_human(conn, grant_id, principal):
         human(conn, principal)

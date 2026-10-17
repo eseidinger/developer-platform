@@ -35,7 +35,10 @@ try {
     const context = await browser.newContext({ ignoreHTTPSErrors: true, proxy: { server: config.proxy } })
     await context.route('https://platform.fixture.test/**', route => route.fulfill({ contentType: 'text/html', body: '<html><body>Fixture portal</body></html>' }))
     context.setDefaultTimeout(10000)
-    const page = await context.newPage(); activePage = page; activeProvider = provider; statuses = []
+    const page = await context.newPage();
+    const liveSockets = new Set();
+    page.on('websocket', socket => { liveSockets.add(socket); socket.on('close', () => liveSockets.delete(socket)) });
+    activePage = page; activeProvider = provider; statuses = []
     page.on('response', response => { const path = new URL(response.url()).pathname; if ((path === '/' || path.startsWith('/rustfs/admin/')) && statuses.length < 32) statuses.push(response.request().method() + ' ' + response.status() + ' ' + path) })
     stage = name + '-anonymous'
     await page.goto(provider.origin + '/')
@@ -49,7 +52,7 @@ try {
       document.body.append(form); form.submit()
     }, provider)
     await page.waitForURL(url => provider.provider === 's3' ? url.pathname.startsWith('/rustfs/console/') :
-      provider.provider === 'qdrant' ? url.pathname.startsWith('/dashboard/') : url.pathname.includes('/app/login'))
+      provider.provider === 'qdrant' ? url.pathname.startsWith('/dashboard/') : provider.provider === 'neo4j' ? url.pathname.startsWith('/browser/') : url.pathname.includes('/app/login'))
     stage = name + '-native-login'
     if (provider.provider === 's3') {
       await page.getByPlaceholder('Please enter account').fill(provider.connection.RUSTFS_CONSOLE_ACCESS_KEY)
@@ -99,6 +102,25 @@ try {
       }, provider)
       if (!denied) throw Error()
       console.log('PASS Qdrant ' + provider.mode + ' official console login, scoped collection, point permissions and foreign/admin denial')
+    } else if (provider.provider === 'neo4j') {
+      stage = name + '-browser-connect';
+      await page.getByRole('button', { name: 'Connect', exact: true }).waitFor();
+      const inputs = page.locator('input[type="text"]');
+      await inputs.nth(1).fill(new URL(provider.origin).host + ':443');
+      await inputs.nth(2).fill(provider.connection.NEO4J_USERNAME);
+      await page.locator('input[type="password"]').fill(provider.connection.NEO4J_PASSWORD);
+      await page.getByRole('button', {name:'Connect',exact:true}).click();
+      await page.waitForFunction(() => /connection status:\s*connected/.test(document.body.innerText.toLowerCase()),null,{timeout:20000});
+      if (!liveSockets.size) throw Error();
+      const checked = await page.evaluate(async connection => {
+        const response = await fetch('/db/neo4j/query/v2', {method:'POST',headers:{'Content-Type':'application/json',Authorization:'Basic '+btoa(connection.NEO4J_USERNAME+':'+connection.NEO4J_PASSWORD)},body:JSON.stringify({statement:'CREATE (:BrowserFixture {value:7}) RETURN 7'})});
+        const value=await response.json();
+        return response.status===202 || (response.status===200 && !value.errors?.length);
+      },provider.connection);
+      if (!checked) throw Error();
+      const foreign = await page.evaluate(async peer => (await fetch('/db/neo4j/query/v2',{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Basic '+btoa(peer.NEO4J_USERNAME+':'+peer.NEO4J_PASSWORD)},body:JSON.stringify({statement:'RETURN 1'})})).status,provider.peer);
+      if (foreign!==401) throw Error();
+      console.log('PASS Neo4j official Browser native WSS login, graph writes and foreign-lease denial');
     } else {
       stage = name + '-foreign-lease-login'
       const foreignLogin = await page.evaluate(async peer => (await fetch('/auth/login', { method: 'POST',
@@ -151,9 +173,13 @@ try {
       console.log('PASS OpenSearch Dashboards ' + provider.mode + ' native login, Discover documents, scoped data, foreign/admin denial and resource workspace isolation/retention')
     }
     stage = name + '-active-console-revocation'
-    const end = provider.mode === 'read-write' ? 'expire' : 'revoke'
+    const end = name.includes('second-') ? 'revoke' : provider.mode === 'read-write' ? 'expire' : 'revoke'
     await context.request.post(config.gateway + '/' + end + '/' + provider.port)
     if (end === 'expire') await new Promise(resolve => setTimeout(resolve, 400))
+    if (provider.provider === 'neo4j') {
+      for(let attempt=0;attempt<20 && liveSockets.size;attempt++) await new Promise(resolve => setTimeout(resolve,100));
+      if(liveSockets.size) throw Error();
+    }
     const expired = await page.evaluate(async () => (await fetch('/')).status)
     if (expired !== 401) throw Error()
     await page.reload()
@@ -162,9 +188,9 @@ try {
     await context.close()
   }
 } catch {
-  if (activePage && ['s3', 'opensearch'].includes(activeProvider.provider)) {
+  if (activePage && ['s3', 'opensearch', 'neo4j'].includes(activeProvider.provider)) {
     let text = await activePage.innerText('body', { timeout: 3000 })
-    for (const value of Object.values(activeProvider.connection)) text = text.replaceAll(value, '[redacted]')
+    for (const value of Object.values(activeProvider.connection)) if (typeof value==='string' && value) text = text.replaceAll(value, '[redacted]')
     console.log('Scoped synthetic console view: ' + new URL(activePage.url()).pathname + ' ' + text.slice(0, 700))
     console.log(statuses.join('|'))
     if (activeProvider.provider === 'opensearch') {

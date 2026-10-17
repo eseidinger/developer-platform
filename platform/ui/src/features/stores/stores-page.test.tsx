@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -65,7 +65,7 @@ test('credential issuance is explicit and pending provisioning never retries the
   expect(screen.queryByDisplayValue('seed-private-password')).not.toBeInTheDocument()
 })
 test.each([['s3', 'RustFS', 'RUSTFS_CONSOLE_SECRET_KEY'], ['qdrant', 'Qdrant', 'QDRANT_API_KEY'],
-  ['opensearch', 'OpenSearch', 'OPENSEARCH_PASSWORD']] as const)(
+  ['opensearch', 'OpenSearch', 'OPENSEARCH_PASSWORD'], ['neo4j', 'Neo4j', 'NEO4J_PASSWORD']] as const)(
   '%s console launch sends an ephemeral POST assertion without caching it or placing it in a URL', async (provider, label, key) => {
   vi.mocked(api.getMine).mockResolvedValue([{ grant, resource: { ...resource, provider, console_url: '/store-access' } }])
   vi.mocked(api.leases).mockResolvedValue([{ ...pending, state: 'active' }])
@@ -85,4 +85,21 @@ test.each([['s3', 'RustFS', 'RUSTFS_CONSOLE_SECRET_KEY'], ['qdrant', 'Qdrant', '
     expect(JSON.stringify(client.getQueryCache().getAll().map(q => q.state.data))).not.toContain('seed-ephemeral-assertion')
     expect(JSON.stringify(client.getQueryCache().getAll().map(q => q.state.data))).not.toContain('seed-private-password')
   } finally { submit.mockRestore() }
+})
+
+test('Neo4j human grants expose full access and never offer a read-only downgrade', async () => {
+  vi.mocked(api.getContext).mockResolvedValue({ manage: true, platform_admin: false, providers: [{ id: 'neo4j', enabled: true }] })
+  vi.mocked(api.getResources).mockResolvedValue([{ ...resource, provider: 'neo4j' }])
+  vi.mocked(api.getGrants).mockResolvedValue([grant])
+  vi.mocked(api.createHuman).mockResolvedValue(grant)
+  const { user } = setup()
+  const button = await screen.findByRole('button', { name: 'Grant human access' })
+  const form = button.closest('form')!
+  expect(within(form).queryByRole('option', { name: 'Read-only' })).not.toBeInTheDocument()
+  expect(within(form).getByRole('option', { name: 'Full instance access (data, schema and native accounts)' })).toBeInTheDocument()
+  await user.type(within(form).getByLabelText('Issuer'), 'https://fixture.invalid')
+  await user.type(within(form).getByLabelText('Subject ID'), 'native-writer')
+  await user.click(button)
+  await waitFor(() => expect(api.createHuman).toHaveBeenCalledWith(resource.resource_id, { issuer: 'https://fixture.invalid', subject: 'native-writer', mode: 'read-write' }))
+  expect(screen.queryByRole('button', { name: 'Change permissions' })).not.toBeInTheDocument()
 })

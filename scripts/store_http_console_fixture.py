@@ -34,16 +34,16 @@ async def run(providers, endpoints, static_ports):
     if os.environ.get('STORE_CONSOLE_VERIFY_PENDING') != '1':
         providers = {name: provider for name, provider in providers.items() if name in console.PROVIDERS}
     os.environ.update({'DATABASE_KEY': secrets.token_hex(32), 'STORE_CONSOLE_HTTP_ENABLED': 'true',
-        'STORE_ENABLED_PROVIDERS': 's3,qdrant,opensearch', 'APPS_DOMAIN': 'apps.fixture.test',
+        'STORE_ENABLED_PROVIDERS': 's3,qdrant,opensearch,neo4j', 'STORE_RELAY_IP':'127.0.0.1', 'APPS_DOMAIN': 'apps.fixture.test',
         'PLATFORM_DOMAIN': 'platform.fixture.test', 'PROXY_IP': '127.0.0.1'})
     rows, resources, credentials, issued = {}, {}, {}, {}
     variants = [(name, provider, mode) for name, provider in providers.items()
-                for mode in ('read-write', 'read-only')]
+                for mode in (('read-write','second-read-write') if name == 'neo4j' else ('read-write','read-only'))]
     if 'opensearch' in providers:
         variants.append(('opensearch', providers['opensearch'], 'renewed-read-only'))
     for index, (name, provider, selected_mode) in enumerate(variants):
         variant = name + '-' + selected_mode
-        mode = selected_mode.removeprefix('renewed-')
+        mode = selected_mode.removeprefix('renewed-').removeprefix('second-')
         resource = resources['opensearch-read-write'] if selected_mode == 'renewed-read-only' else {
             'resource_id': str(uuid4()), 'quota_bytes': 16 * 1024 * 1024,
             'configuration': {'vector_size': 3, 'distance': 'Cosine'}}
@@ -60,6 +60,10 @@ async def run(providers, endpoints, static_ports):
         row = {**credential, 'expires_at': datetime.fromisoformat(credential['expires_at']),
                'relay_port': 20000 + index, 'issuer': 'https://identity.fixture.test', 'subject': 'human',
                'provider': name, 'fixture_variant': variant, 'resource_id': resource['resource_id'], 'created_at': datetime.now(timezone.utc), 's3_sessions': {}}
+        if name == 'neo4j':
+            import hashlib
+            instance = await asyncio.to_thread(provider.provision, resource)
+            row.update(native_host=instance['host'], admission_sha256=hashlib.sha256(catalog.secret_for(credential['credential_id']).encode()).hexdigest())
         rows[row['relay_port']] = row
         resources[variant] = resource
         credentials[variant] = provider.credentials(resource, credential)
@@ -70,7 +74,7 @@ async def run(providers, endpoints, static_ports):
         if name == 'opensearch':
             from app.stores.opensearch import index
             await asyncio.to_thread(provider.root.request, 'PUT', '/' + index(resource) + '/_doc/fixture?refresh=true', {'title': 'console fixture', 'kind': 'scoped'})
-    relay = Relay(load=lambda: {port: {**row, 's3_sessions': dict(row['s3_sessions'])} for port, row in rows.items()}, backend=lambda row: ('127.0.0.1', endpoints[row['provider']]), host='127.0.0.1')
+    relay = Relay(load=lambda: {port: {**row, 's3_sessions': dict(row['s3_sessions'])} for port, row in rows.items()}, backend=lambda row: (row['native_host'],7687) if row['provider']=='neo4j' else ('127.0.0.1', endpoints[row['provider']]), host='127.0.0.1')
     async def refresh():
         while True:
             await relay.refresh()
@@ -93,7 +97,7 @@ async def run(providers, endpoints, static_ports):
         raise RuntimeError('Relay did not observe the console child session')
     app = FastAPI()
     app.router.routes.append(Host('console-{port:int}.apps.fixture.test', app=console.create_gateway(load,
-        destination=lambda row, static: ('127.0.0.1', static_ports[row['provider']] if static or row['provider'] == 'opensearch' else row['relay_port']),
+        destination=lambda row, static: (row['native_host'],7474) if row['provider']=='neo4j' else ('127.0.0.1', static_ports[row['provider']] if static or row['provider'] == 'opensearch' else row['relay_port']),
         register=register, acknowledge=acknowledge)))
     @app.post('/expire/{port}')
     def expire(port: int):
@@ -159,6 +163,7 @@ async def run(providers, endpoints, static_ports):
         for port, row in rows.items():
             variant = row['fixture_variant']
             other = row['provider'] + '-' + ('read-only' if row['mode'] == 'read-write' else 'read-write')
+            if row['provider'] == 'neo4j': other = 'neo4j-' + ('second-read-write' if variant == 'neo4j-read-write' else 'read-write')
             if 'renewed-' in variant: other = 'opensearch-read-only'
             config['providers'][variant] = {'origin': console.origin(port), 'provider': row['provider'], 'mode': row['mode'], 'retained_workspace': 'renewed-' in variant, 'peer': credentials[other],
                 'foreign': credentials[other].get('S3_BUCKET', credentials[other].get('QDRANT_COLLECTION', credentials[other].get('OPENSEARCH_INDEX'))),

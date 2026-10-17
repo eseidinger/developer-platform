@@ -40,6 +40,7 @@ def main():
         path = Path(directory)
         preparation.prepare(path / 'stores', config)
         data = copy.deepcopy(yaml.safe_load((ROOT / 'persistence/shared-stores.yaml').read_text()))
+        del data['services']['neo4j-controller']  # Dedicated-controller fixtures run separately, without live infrastructure membership.
         del data['services']['opensearch-dashboards']  # Browser fixture supplies its private bridge.
         selected = ('opensearch', 'opensearch-init') if dashboards else (('rustfs', 'qdrant') if consoles else tuple(data['services']))
         data['services'] = {name: value for name, value in data['services'].items() if name in selected}

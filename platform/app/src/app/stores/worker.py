@@ -21,15 +21,26 @@ def _deny(conn, credential, resource):
                  (credential["credential_id"],))
 
 
+def deny_stale(conn, rows):
+    # A full-access native user can damage its instance's admin account. Attempt
+    # one failed cleanup per resource/pass, rather than holding the global lock
+    # through every outstanding generation of the same broken instance.
+    failed=set()
+    for credential,resource in rows:
+        identity=resource['resource_id']
+        if identity in failed:continue
+        if not _attempt(conn,'store_credentials','credential_id',credential['credential_id'],
+                lambda c=credential,r=resource:_deny(conn,c,r)):
+            failed.add(identity)
+
+
 def reconcile(conn, control=None):
     """Caller holds the common lifecycle lock. Relay enforces deadlines independently."""
     if recovery.required(conn):
         recovered = conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
             JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
             WHERE c.state<>'revoked' LIMIT 256""").fetchall()
-        for credential, resource in recovered:
-            _attempt(conn, "store_credentials", "credential_id", credential["credential_id"],
-                lambda c=credential, r=resource: _deny(conn, c, r))
+        deny_stale(conn,recovered)
         return
     conn.execute("""UPDATE store_resources r SET state='retired',observed_state='pending',version=version+1
         FROM projects p WHERE p.name=r.owner_project AND r.state='active' AND (p.status='retired'
@@ -44,9 +55,7 @@ def reconcile(conn, control=None):
         WHERE c.state<>'revoked' AND (c.expires_at<=now() OR g.state<>'active' OR r.state<>'active'
             OR c.grant_version<>g.version)
         ORDER BY c.expires_at LIMIT 256""").fetchall()
-    for credential, resource in stale:
-        _attempt(conn, "store_credentials", "credential_id", credential["credential_id"],
-                 lambda c=credential, r=resource: _deny(conn, c, r))
+    deny_stale(conn,stale)
     resources = conn.execute("""SELECT row_to_json(r) FROM store_resources r
         WHERE state<>'purged' AND observed_state<>state ORDER BY updated_at LIMIT 128""").fetchall()
     for (resource,) in resources:

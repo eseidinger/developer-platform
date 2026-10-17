@@ -590,6 +590,7 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "pyjwt", extra = ["crypto"] },
     { name = "uvicorn" },
+    { name = "websockets" },
 ]
 
 [package.dev-dependencies]
@@ -611,6 +612,7 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], specifier = "==3.3.6" },
     { name = "pyjwt", extras = ["crypto"], specifier = "==2.15.1" },
     { name = "uvicorn", specifier = "==0.53.0" },
+    { name = "websockets", specifier = "==17.2" },
 ]
 
 [package.metadata.requires-dev]

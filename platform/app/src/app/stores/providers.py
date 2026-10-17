@@ -44,6 +44,15 @@ def get(name):
         raise ProviderUnavailable('Selected provider configuration is incomplete') from None
 
 
+def capabilities(name):
+    if name not in {'postgresql','s3','opensearch','qdrant','neo4j'}:raise ProviderUnavailable('Unknown provider')
+    full=name=='neo4j'
+    return {'access_model':'full-instance' if full else 'named-resource',
+        'supported_modes':['read-write'] if full else ['read-only','read-write'],
+        'native_account_management':full,'dedicated_instance':full,
+        **({'max_resources_per_project':1} if full else {})}
+
+
 def availability():
     result = []
     for name in ('postgresql', 's3', 'opensearch', 'qdrant', 'neo4j'):
@@ -53,7 +62,7 @@ def availability():
             enabled = True
         except ProviderUnavailable:
             enabled = False
-        result.append({'id': name, 'enabled': enabled})
+        result.append({'id': name, 'enabled': enabled, 'capabilities':capabilities(name)})
     return result
 
 

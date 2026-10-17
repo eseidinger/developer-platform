@@ -108,3 +108,40 @@ jobs:
       - run: uv sync --project platform/app --locked
       - run: docker pull opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c
       - run: uv run --project platform/app python scripts/verify-opensearch.py
+
+  neo4j-community:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: npm ci --prefix platform/ui
+      - run: npx playwright install --with-deps chromium
+        working-directory: platform/ui
+      - run: docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 persistence/neo4j
+      - run: uv run --project platform/app python scripts/verify-neo4j-catalog.py
+      - run: uv run --project platform/app python scripts/verify-neo4j-network-recreation.py
+      - run: NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify-neo4j.py
+
+  native-performance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - run: docker build -t developer-platform-api:phase7-review platform
+      - run: python3 scripts/generate-dashboards.py --check
+      - run: uv run --project platform/app --group analytics-fixtures python examples/store-observability/verify.py
+      - run: python3 scripts/verify-store-metric-pipeline.py
+      - name: Verify native store alert behavior
+        run: docker run --rm --network none --entrypoint /bin/promtool -v "$PWD/infrastructure/monitoring:/work:ro" -w /work prom/prometheus:v3.14.0 test rules tests/native-stores.test.yaml tests/stores.test.yaml
