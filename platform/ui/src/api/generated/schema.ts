@@ -620,7 +620,10 @@ export interface paths {
         /** List Human Database Grants */
         get: operations["list_human_database_grants_projects__name__database_access_grants_get"];
         put?: never;
-        /** Grant Human Database Access */
+        /**
+         * Grant Human Database Access
+         * @deprecated
+         */
         post: operations["grant_human_database_access_projects__name__database_access_grants_post"];
         /** Revoke Human Database Access */
         delete: operations["revoke_human_database_access_projects__name__database_access_grants_delete"];
@@ -655,7 +658,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        /** Issue My Human Database Credential */
+        /**
+         * Issue My Human Database Credential
+         * @deprecated
+         */
         post: operations["issue_my_human_database_credential_projects__name__database_access_me_credential_post"];
         delete?: never;
         options?: never;

@@ -48,7 +48,11 @@ class HumanDatabaseDrillTests(unittest.TestCase):
         component = declaration["spec"]["components"][0]
         self.assertEqual(component["exposure"], "private")
         self.assertEqual(component["health"]["readiness"]["path"], "/health/ready")
-        self.assertEqual(declaration["spec"]["resources"][0]["deletionPolicy"], "retain")
+        self.assertNotIn("resources", declaration["spec"])
+        self.assertEqual(component["bindings"], [])
+        bound = drill.declaration(project, IMAGE, RUN_ID, "11111111-1111-1111-1111-111111111111")
+        ApplicationEnvelopeV1Alpha2.model_validate(bound)
+        self.assertEqual(len(bound["spec"]["components"][0]["bindings"]), 1)
 
     def test_ssh_requires_pinned_host_key_and_only_one_forward(self):
         command = drill.ssh_command(Path("/tmp/key"), Path("/tmp/known_hosts"),

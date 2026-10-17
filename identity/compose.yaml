@@ -76,6 +76,23 @@ services:
           -s "webOrigins=[\"https://$$PLATFORM_DOMAIN\",\"http://localhost\",\"http://localhost:5173\",\"http://localhost:8000\",\"http://127.0.0.1:8000\",\"https://platform.localhost\"]" \
           -s 'attributes={"pkce.code.challenge.method":"S256"}' \
           -s 'protocolMappers=[{"name":"platform-api audience","protocol":"openid-connect","protocolMapper":"oidc-audience-mapper","consentRequired":false,"config":{"included.client.audience":"platform-api","id.token.claim":"false","access.token.claim":"true"}}]'
+        console_id="$$(/opt/keycloak/bin/kcadm.sh get clients -r platform -q clientId=platform-store-console --fields id \
+          | sed -n 's/.*"id" *: *"\([^" ]*\)".*/\1/p')"
+        if [ -z "$$console_id" ]; then
+          /opt/keycloak/bin/kcadm.sh create clients -r platform \
+            -s clientId=platform-store-console -s name='Platform Store Console' \
+            -s enabled=true -s protocol=openid-connect -s publicClient=false \
+            -s standardFlowEnabled=true -s directAccessGrantsEnabled=false -s serviceAccountsEnabled=false
+          console_id="$$(/opt/keycloak/bin/kcadm.sh get clients -r platform -q clientId=platform-store-console --fields id \
+            | sed -n 's/.*"id" *: *"\([^" ]*\)".*/\1/p')"
+        fi
+        test -n "$$console_id"
+        /opt/keycloak/bin/kcadm.sh update "clients/$$console_id" -r platform \
+          -s enabled=true -s publicClient=false -s standardFlowEnabled=true \
+          -s directAccessGrantsEnabled=false -s serviceAccountsEnabled=false \
+          -s "secret=$$STORE_CONSOLE_OIDC_SECRET" \
+          -s "redirectUris=[\"https://$$PLATFORM_DOMAIN/store-console/postgresql/oauth2/authorize\"]" \
+          -s 'attributes={"pkce.code.challenge.method":"S256"}'
         provisioner_id="$$(/opt/keycloak/bin/kcadm.sh get clients -r platform -q clientId=platform-credential-provisioner --fields id \
           | sed -n 's/.*"id" *: *"\([^"]*\)".*/\1/p')"
         if [ -z "$$provisioner_id" ]; then
@@ -97,6 +114,7 @@ services:
     environment:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:?Run scripts/init.py}
       KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}
+      STORE_CONSOLE_OIDC_SECRET: ${STORE_CONSOLE_OIDC_SECRET:?Run scripts/init.py}
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
     networks:
       platform:

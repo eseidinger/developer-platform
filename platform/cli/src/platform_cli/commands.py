@@ -25,7 +25,7 @@ from .registry import COMMANDS, CommandSpec
 
 
 SENSITIVE_KEYS = {"client_secret", "clientsecret", "access_token", "accesstoken", "refresh_token",
-                  "refreshtoken", "id_token", "idtoken", "password", "private_key", "privatekey", "authorization"}
+                  "refreshtoken", "id_token", "idtoken", "password", "private_key", "privatekey", "authorization", "pgpassword", "aws_secret_access_key", "opensearch_password", "qdrant_api_key", "neo4j_password"}
 
 
 class AccessOperationFailed(RuntimeError):

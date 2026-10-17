@@ -54,27 +54,17 @@ class HumanDatabaseAccessTests(unittest.TestCase):
         self.assertIn("pg_terminate_backend", conn.execute.call_args_list[1].args[0])
         self.assertEqual(conn.execute.call_args_list[1].args[1], ("human_abcd",))
 
-    def test_only_named_human_can_rotate_credential(self):
-        conn = Mock()
-        conn.execute.return_value.fetchone.return_value = ("human_abcd",)
-        with patch.object(main, "require_human_database_principal"), \
-             patch.object(main, "connect", return_value=nullcontext(conn)), \
-             patch.object(main.human_database_access, "prepare_role") as prepare, \
-             patch.object(main, "required_audit"):
-            response = main.issue_my_human_database_credential("alpha", self.principal)
-        self.assertEqual(response.headers["cache-control"], "no-store")
-        self.assertEqual(prepare.call_args.args[1], "human_abcd")
-        self.assertNotIn(prepare.call_args.args[2].encode(), response.headers.values())
-        self.assertIn(b'"username":"human_abcd"', response.body)
-
-    def test_unknown_grant_cannot_rotate_credential(self):
-        conn = Mock()
-        conn.execute.return_value.fetchone.return_value = None
-        with patch.object(main, "require_human_database_principal"), \
-             patch.object(main, "connect", return_value=nullcontext(conn)):
-            with self.assertRaises(HTTPException) as error:
-                main.issue_my_human_database_credential("alpha", self.principal)
-        self.assertEqual(error.exception.status_code, 404)
+    def test_legacy_issuance_cannot_bypass_named_resource_expiry(self):
+        with patch.object(main, "connect") as connect:
+            for action in (
+                lambda: main.issue_my_human_database_credential("alpha", self.principal),
+                lambda: main.grant_human_database_access("alpha", main.HumanDatabaseGrant(
+                    issuer=self.principal.issuer, subject=self.principal.subject, public_key=key()), self.principal),
+            ):
+                with self.assertRaises(HTTPException) as error:
+                    action()
+                self.assertEqual(error.exception.status_code, 410)
+            connect.assert_not_called()
 
     def test_automation_principal_cannot_use_human_database_flow(self):
         with patch.object(main, "connect", return_value=nullcontext(Mock())), \

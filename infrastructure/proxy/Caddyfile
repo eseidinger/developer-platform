@@ -5,7 +5,18 @@
 	}
 }
 {$PLATFORM_DOMAIN} {
-	reverse_proxy platform-api:8000
+	redir /store-console/postgresql /store-console/postgresql/ 308
+	handle_path /store-console/postgresql/* {
+		reverse_proxy postgres-console:8080 {
+			header_up X-Script-Name /store-console/postgresql
+			header_up X-Scheme {scheme}
+			header_up X-Forwarded-Host {host}
+			header_up X-Forwarded-Prefix /store-console/postgresql
+		}
+	}
+	handle {
+		reverse_proxy platform-api:8000
+	}
 }
 {$IDENTITY_DOMAIN} {
 	reverse_proxy keycloak:8080

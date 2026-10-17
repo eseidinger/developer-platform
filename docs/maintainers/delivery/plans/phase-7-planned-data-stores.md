@@ -1,8 +1,9 @@
 # Phase 7 — Planned Data Stores
 
-Status: planned, unscheduled as of October 17, 2026. PostgreSQL is already
-implemented; its baseline and remaining integration acceptance are package 7.1.
-Additional stores have no implementation or operational acceptance recorded here.
+Status: implementation in progress as of October 17, 2026. PostgreSQL named
+resources/private access/console are implemented in source with disposable local
+evidence; deployed integration/recovery acceptance remains open in package 7.1.
+Additional shared-store providers have no operational acceptance recorded here.
 
 ## Implementation checkpoint — October 17, 2026
 
@@ -17,8 +18,12 @@ consoles, provider expansion and deployed acceptance remain in progress. See the
 boundary tests and a disposable real PostgreSQL fixture pass resource isolation,
 cross-writer schema ownership, future-object read access, read-only denials,
 expiry, session revocation, 30-day worker rotation/retry/deadline handling, real
-relay authentication/session expiry and isolated purge. The backend suite ran
-462 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
+relay authentication/session expiry and isolated purge. The pinned AGE/pgvector runtime image also passes writer/reader graph/vector
+queries and denial of graph writes/extension removal. A disposable real
+Keycloak → pgAdmin fixture passes SSO, scoped connection/query, password-saving
+denial, expired reconnect and anonymous denial. Production console network/TLS
+and deployed access acceptance remain open. The backend suite ran
+461 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
 explicit issuance and secret-cache exclusion. No live resources were changed.
 PLAN-026/036 and Phase 7 acceptance remain open.
 

@@ -13,6 +13,9 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     networks:
+      store-consoles:
+        aliases:
+          - ${IDENTITY_DOMAIN:-identity.localhost}
       platform:
         ipv4_address: ${PROXY_IP:-172.30.80.20}
     mem_limit: 256m

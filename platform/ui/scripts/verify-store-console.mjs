@@ -1,0 +1,62 @@
+// Disposable fixture only. Sensitive input travels over stdin; no screenshots/traces.
+import { chromium } from '@playwright/test'
+let input = ''
+for await (const part of process.stdin) input += part
+const config = JSON.parse(input)
+let stage = 'browser-start'
+const browser = await chromium.launch({ headless: true })
+try {
+  const context = await browser.newContext()
+  const page = await context.newPage()
+  stage = 'console-login'
+  await page.goto(config.base + '/login')
+  await page.getByRole('button', { name: /Platform sign-in/ }).click()
+  stage = 'identity-login'
+  await page.locator('#username').fill(config.username)
+  await page.locator('#password').fill(config.password)
+  await page.locator('#kc-login').click()
+  stage = 'sso-return'
+  await page.waitForURL(url => url.pathname.endsWith('/browser/'), { timeout: 30000 })
+  stage = 'csrf-bootstrap'
+  const utils = await context.request.get(config.base + '/browser/js/utils.js')
+  const script = await utils.text()
+  const token = script.match(/pgAdmin\['csrf_token'\]\s*=\s*'([^']+)'/)
+  if (!token) throw Error()
+  const headers = { 'X-pgA-CSRFToken': token[1], Referer: config.base + '/browser/' }
+  const call = async (method, path, data) => {
+    const response = await context.request.fetch(config.base + path, { method, headers, data })
+    return { status: response.status(), body: await response.json() }
+  }
+  stage = 'scoped-server-registration'
+  const c = config.connection
+  const created = await call('POST', '/browser/server/obj/1/', { name: 'Expiring fixture', db: c.PGDATABASE,
+    host: c.PGHOST, port: Number(c.PGPORT), username: c.PGUSER, role: '', service: '',
+    connection_params: { sslmode: 'disable' }, connect_now: false })
+  const sid = created.body.node?._id
+  if (!sid) throw Error()
+  stage = 'scoped-server-connect'
+  const path = `/browser/server/connect/1/${sid}`
+  const connected = await call('POST', path, { password: c.PGPASSWORD, save_password: true })
+  if (connected.body.data?.connected !== true || connected.body.data?.is_password_saved !== false) throw Error()
+  stage = 'scoped-query'
+  const stats = await call('GET', `/browser/server/stats/1/${sid}`)
+  if (stats.status !== 200 || stats.body.success === 0) throw Error()
+  stage = 'lease-expiry'
+  await context.request.post(config.expireUrl)
+  // The real relay guard closes the existing pgAdmin backend connection.
+  await new Promise(resolve => setTimeout(resolve, 600))
+  await call('DELETE', path)
+  const expired = await call('POST', path, { password: c.PGPASSWORD })
+  if (expired.body.data?.connected === true || (expired.status === 200 && expired.body.success === 1)) throw Error()
+  stage = 'anonymous-denial'
+  const anonymous = await browser.newContext()
+  const denied = await anonymous.request.get(config.base + `/browser/server/obj/1/${sid}`, { maxRedirects: 0 })
+  if (![302, 401, 403].includes(denied.status())) throw Error()
+  await anonymous.close()
+  console.log('PASS console: real Keycloak SSO; scoped pgAdmin connection/query; password saving denied; expired reconnect denied; anonymous denial')
+} catch {
+  console.log(stage)
+  process.exitCode = 1
+} finally {
+  await browser.close()
+}

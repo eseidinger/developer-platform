@@ -1898,46 +1898,10 @@ def list_human_database_grants(name: str, principal: Principal = Depends(current
     return {"project": name, "grants": [_database_access_record(row) for row in rows]}
 
 
-@app.post("/projects/{name}/database-access/grants", status_code=201)
+@app.post("/projects/{name}/database-access/grants", status_code=201, deprecated=True)
 def grant_human_database_access(name: str, body: HumanDatabaseGrant,
                                 principal: Principal = Depends(current_principal)):
-    require_permission(principal, "grant", name)
-    require_human_database_principal(principal, name)
-    actor = actor_for(principal)
-    key, fingerprint = human_database_access.parse_public_key(body.public_key)
-    role = human_database_access.role_name(name, body.issuer, body.subject)
-    database = project_database_name(name)
-    with connect() as conn:
-        project = conn.execute("SELECT status FROM projects WHERE name=%s", (name,)).fetchone()
-        if project is None:
-            raise HTTPException(404, "Unknown project")
-        if project[0] in ("empty", "retired", "retiring"):
-            raise HTTPException(409, "Project database is not active")
-        if not conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (database,)).fetchone():
-            raise HTTPException(409, "Project database is unavailable")
-        if conn.execute("""SELECT 1 FROM human_database_access WHERE project=%s AND issuer=%s
-            AND subject=%s AND active""", (name, body.issuer, body.subject)).fetchone():
-            raise HTTPException(409, "Human database access already exists")
-        try:
-            # The initial password is deliberately discarded. Only the named human can
-            # obtain a usable one-time password through the self-service endpoint.
-            human_database_access.prepare_role(conn, role, human_database_access.new_password())
-            with connect_project_database(name) as project_conn:
-                human_database_access.grant_read_only(project_conn, database, database, role)
-            row = conn.execute("""INSERT INTO human_database_access
-                (project, issuer, subject, role_name, public_key, fingerprint, active)
-                VALUES (%s,%s,%s,%s,%s,%s,true)
-                ON CONFLICT(project, issuer, subject) DO UPDATE SET
-                    public_key=excluded.public_key, fingerprint=excluded.fingerprint,
-                    active=true, updated_at=now()
-                RETURNING project, issuer, subject, role_name, fingerprint, active, created_at, updated_at""",
-                (name, body.issuer, body.subject, role, key, fingerprint)).fetchone()
-        except psycopg.Error as exc:
-            log.error("Human database grant failed project=%s error_type=%s", name, type(exc).__name__)
-            raise HTTPException(503, "Database access could not be prepared") from None
-    required_audit(actor, "database-access.grant", "principal", body.issuer + "|" + body.subject,
-                   "succeeded", {"project": name}, {"username": role})
-    return _database_access_record(row)
+    raise HTTPException(410, "Implicit project database grants were replaced by named store resources")
 
 
 @app.get("/projects/{name}/database-access/me")
@@ -1972,22 +1936,9 @@ def update_my_human_database_key(name: str, body: HumanDatabaseKey,
     return _database_access_record(row)
 
 
-@app.post("/projects/{name}/database-access/me/credential")
+@app.post("/projects/{name}/database-access/me/credential", deprecated=True)
 def issue_my_human_database_credential(name: str, principal: Principal = Depends(current_principal)):
-    require_human_database_principal(principal, name)
-    with connect() as conn:
-        row = conn.execute("""SELECT role_name FROM human_database_access
-            WHERE project=%s AND issuer=%s AND subject=%s AND active""",
-            (name, principal.issuer, principal.subject)).fetchone()
-        if row is None:
-            raise HTTPException(404, "No active human database grant")
-        password = human_database_access.new_password()
-        human_database_access.prepare_role(conn, row[0], password)
-    required_audit(actor_for(principal), "database-access.credential.rotate", "project", name,
-                   "succeeded", {"project": name}, {"username": row[0]})
-    return JSONResponse({"project": name, "database": project_database_name(name),
-                         "username": row[0], "password": password},
-                        headers={"Cache-Control": "no-store"})
+    raise HTTPException(410, "Use /v1/store-access/{grant_id}/credentials for expiring named-resource access")
 
 
 @app.delete("/projects/{name}/database-access/grants")

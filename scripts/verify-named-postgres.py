@@ -30,7 +30,7 @@ def main():
     try:
         run("docker", "run", "-d", "--name", name, "--memory", "512m", "--cpus", "1",
             "-e", "POSTGRES_PASSWORD=" + password, "-p", "127.0.0.1::5432",
-            "--tmpfs", "/var/lib/postgresql:rw,size=256m", "postgres:18.6-trixie")
+            "--tmpfs", "/var/lib/postgresql:rw,size=256m", os.environ.get("NAMED_POSTGRES_IMAGE", "postgres:18.6-trixie"))
         port = int(run("docker", "port", name, "5432/tcp").rsplit(":", 1)[1])
         def connect(database):
             return psycopg.connect(host="127.0.0.1", port=port, dbname=database, user="postgres",
@@ -51,7 +51,7 @@ def main():
             catalog.initialize(conn)
             with conn.transaction():
                 catalog.lock(conn)
-                alpha = catalog.create_resource(conn, "alpha", ResourceCreate(name="primary", provider="postgresql"))
+                alpha = catalog.create_resource(conn, "alpha", ResourceCreate(name="primary", provider="postgresql", extensions=["vector", "age"] if os.environ.get("NAMED_POSTGRES_EXTENSIONS") == "1" else []))
                 beta = catalog.create_resource(conn, "beta", ResourceCreate(name="other", provider="postgresql"))
             for res in (alpha, beta):
                 provider.provision(res)
@@ -106,6 +106,32 @@ def main():
                         pass
                     else:
                         raise AssertionError("Resource writer gained administrator/expiry authority")
+            if alpha["extensions"]:
+                with login(a) as writer:
+                    writer.execute("CREATE TABLE public.embeddings(id int, embedding vector(3))")
+                    writer.execute("INSERT INTO public.embeddings VALUES(1,'[1,2,3]'),(2,'[4,5,6]')")
+                    writer.execute("CREATE INDEX ON public.embeddings USING hnsw(embedding vector_l2_ops)")
+                    writer.execute("SELECT create_graph('fixture_graph')")
+                    writer.execute("SELECT * FROM cypher('fixture_graph', $$ CREATE (:Node {id: 1})-[:LINK]->(:Node {id: 2}) $$) AS (v agtype)")
+                with login(reader) as ro:
+                    assert ro.execute("SELECT id FROM public.embeddings ORDER BY embedding <-> '[1,2,3]'::vector LIMIT 1").fetchone()[0] == 1
+                    assert ro.execute("SELECT * FROM cypher('fixture_graph', $$ MATCH (n:Node) RETURN count(n) $$) AS (v agtype)").fetchone()[0] == '2'
+                    try:
+                        ro.execute("SELECT * FROM cypher('fixture_graph', $$ CREATE (:Node {id: 3}) $$) AS (v agtype)")
+                    except psycopg.errors.InsufficientPrivilege:
+                        pass
+                    else:
+                        raise AssertionError("AGE reader gained graph write rights")
+                with login(b) as writer:
+                    writer.execute("SELECT * FROM cypher('fixture_graph', $$ MATCH (n:Node) SET n.changed = true RETURN n $$) AS (v agtype)")
+                    for query in ("DROP EXTENSION vector CASCADE", "DROP EXTENSION age CASCADE"):
+                        try:
+                            writer.execute(query)
+                        except psycopg.errors.InsufficientPrivilege:
+                            pass
+                        else:
+                            raise AssertionError("Writer removed a managed extension")
+                print("PASS selected pgvector HNSW and AGE: both writers; reader queries; denied graph writes and extension removal")
             held = login(a)
             held.execute("SELECT 1")
             provider.revoke(alpha, a)
@@ -179,6 +205,36 @@ def main():
                 finally:
                     server.close(); await server.wait_closed()
             asyncio.run(relay_check())
+            if os.environ.get("NAMED_POSTGRES_CONSOLE") == "1":
+                async def console_check():
+                    from store_console_fixture import run as console_run
+                    lease = {"credential_id": active["credential_id"], "resource_id": alpha["resource_id"],
+                        "provider": "postgresql", "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5)}
+                    relay = Relay(backend=lambda value: ("127.0.0.1", port))
+                    relay.leases = {20000: lease}; relay.last_success = time.monotonic()
+                    server = await asyncio.start_server(lambda r,w: relay.handle(20000,r,w), "127.0.0.1", 0)
+                    async def expire(reader, writer):
+                        await reader.readuntil(b"\r\n\r\n")
+                        lease["expires_at"] = datetime.now(timezone.utc) - timedelta(seconds=1)
+                        writer.write(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+                        await writer.drain(); writer.close()
+                    control = await asyncio.start_server(expire, "127.0.0.1", 0)
+                    async def heartbeat():
+                        while True:
+                            relay.last_success = time.monotonic()
+                            await asyncio.sleep(.5)
+                    beat = asyncio.create_task(heartbeat())
+                    connection = {"PGHOST": "127.0.0.1", "PGPORT": str(server.sockets[0].getsockname()[1]),
+                        "PGDATABASE": catalog.identifier(alpha["resource_id"]), "PGUSER": catalog.login(active["credential_id"]),
+                        "PGPASSWORD": catalog.secret_for(active["credential_id"])}
+                    try:
+                        await asyncio.to_thread(console_run, connection, f"http://127.0.0.1:{control.sockets[0].getsockname()[1]}/expire")
+                    finally:
+                        beat.cancel()
+                        await asyncio.gather(beat, return_exceptions=True)
+                        server.close(); control.close()
+                        await server.wait_closed(); await control.wait_closed()
+                asyncio.run(console_check())
             # Retiring/purging one resource must not touch the other database.
             all_credentials = conn.execute("SELECT row_to_json(c) FROM store_credentials c JOIN store_grants g USING(grant_id) WHERE g.resource_id=%s", (alpha["resource_id"],)).fetchall()
             for (cred,) in all_credentials:

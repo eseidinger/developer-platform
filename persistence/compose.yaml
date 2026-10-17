@@ -1,6 +1,7 @@
 services:
   postgres:
-    image: postgres:18.6-trixie
+    image: developer-platform-postgres:18.6-vector0.8.7-age1.8.0
+    build: .
     restart: unless-stopped
     environment:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
@@ -18,3 +19,35 @@ services:
     mem_limit: 6g
     cpus: 3
     shm_size: 256m
+
+  postgres-console:
+    image: dpage/pgadmin4:9.18@sha256:c332c5f6dfba995d9ebc4af261d93506d6876085d712eaaa3defc8dd1a3f26de
+    restart: unless-stopped
+    environment:
+      PGADMIN_DEFAULT_EMAIL: console-bootstrap@example.com
+      PGADMIN_DEFAULT_PASSWORD: ${STORE_CONSOLE_BOOTSTRAP_PASSWORD:?Run scripts/init.py}
+      PGADMIN_DISABLE_POSTFIX: "true"
+      PGADMIN_LISTEN_PORT: "8080"
+      STORE_CONSOLE_OIDC_SECRET: ${STORE_CONSOLE_OIDC_SECRET:?Run scripts/init.py}
+      IDENTITY_DOMAIN: ${IDENTITY_DOMAIN:-identity.localhost}
+    volumes:
+      - ./console/config_local.py:/pgadmin4/config_local.py:ro
+      - postgres_console:/var/lib/pgadmin
+    networks:
+      store-consoles: {}
+    depends_on:
+      store-access:
+        condition: service_healthy
+      keycloak-realm-init:
+        condition: service_completed_successfully
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp"]
+    mem_limit: 512m
+    cpus: 0.5
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/misc/ping"]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5

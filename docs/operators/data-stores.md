@@ -2,8 +2,9 @@
 
 Phase 7 implementation is in progress. PostgreSQL named resources, the API/CLI,
 portal and private lease relay are implemented in source and disposable tests.
-Provider expansion, browser-console deployment, backup/restore and deployed
-acceptance are still being completed. No existing installation has been reset.
+The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
+Disposable console SSO/connection acceptance passes; provider expansion,
+backup/restore and deployed acceptance are still being completed. No existing installation has been reset.
 
 ## Resource and binding workflow
 
@@ -51,6 +52,8 @@ Conflicting names/duplicate bindings are rejected. New production deployments
 have no implicit `database` Secret or project-wide PostgreSQL egress. The sample
 renderer requires `--binding-id` for its web component. Update old declarations
 and recreate the setup; no legacy migration/compatibility path is provided.
+Legacy grant and non-expiring credential issuance endpoints now return HTTP 410.
+Historical inspection/revocation remains available for operator cleanup.
 
 Application and human writers share a resource-scoped schema owner, so they can
 manage each other's tables/indexes and future schemas. They do not own the
@@ -68,7 +71,8 @@ Old credentials are retired after verified handover, or at most one hour after
 the replacement was issued. A failed rollout/retry never extends that deadline.
 
 Human grants are separate from credential generations. In **My store access**,
-register an Ed25519 public key before issuing credentials. Replacing the key ends
+register an Ed25519 public key for private SSH access. Console-only access
+does not require an SSH key. Replacing the key ends
 current leases. An administrator first grants read-only/read-write access to a
 resource through **Data stores** or `stores grants create RESOURCE_UUID --file`.
 
@@ -108,6 +112,38 @@ The initial relay accepts 128 concurrent connections, 20 per credential, and 512
 ports (20000–20511). A human key may authorize at most 64 leases per SSH login.
 No Docker socket is exposed to the API/relay.
 
+## PostgreSQL browser console
+
+The portal opens `/store-console/postgresql/`. pgAdmin 9.18 uses Keycloak SSO
+with Authorization Code + PKCE and subject-based identities. The operator-managed
+confidential client has only the exact console callback URL; it has no service
+account or direct password grant. Local pgAdmin password authentication is disabled,
+including the random bootstrap administrator. Console login never grants store access.
+
+In pgAdmin, register **Host name/address** `store-access`, **Port** the credential's
+`PGPORT`, **Maintenance database** `PGDATABASE`, **Username** `PGUSER`, and **SSL mode**
+`Disable`. Supply your own `PGPASSWORD`. The lease relay verifies the exact
+user/database and closes the backend connection at expiry, revoke or downgrade.
+Renew and register/update the new lease port/user to reconnect. Password saving,
+PSQL shell and shared administrator server registrations are disabled. Query
+history is not persisted. User registrations/settings live in the console volume;
+these disposable preferences do not authorize restored data access.
+
+The console has no host port and joins only the internal `store-consoles` network.
+Only the edge proxy and lease relay bridge that network. The edge proxy resolves
+the identity domain within this network, so HTTPS discovery/JWKS/token requests
+use the same trusted issuer without raw database network access. Local deployments
+using private TLS authorities must install their CA into the console trust store;
+certificate verification must remain enabled. Production console and IdP traffic
+uses HTTPS. The SSO fixture explicitly uses disposable loopback HTTP instead.
+
+The production PostgreSQL image builds pgvector 0.8.7 and AGE 1.8.0-rc0 from the
+reviewed commits on PostgreSQL 18.6. Only AGE is globally preloaded to support
+ordinary data identities; neither extension is installed in unselected databases.
+TimescaleDB remains deferred and is absent from this runtime image. pgvector
+objects are in the operator-owned `platform_extensions` schema. AGE uses its
+operator-owned `ag_catalog`; application graphs remain resource-scoped.
+
 ## Retention and capacity
 
 Binding/application removal revokes consumer access and retains resource data.
@@ -146,3 +182,16 @@ read-only/foreign-resource denial, no expiry/admin escalation, session revocatio
 30-day rotation/retry/deadline handling, real authentication/query/session expiry
 through the relay, and isolated purge. Relay stream tests cover identity mismatch,
 revocation and catalog failure. These are not live application or recovery evidence.
+
+The opt-in live human-access drill requires a dedicated human administrator with
+no existing store grants or registered key. It refuses to replace an operator's
+existing key or disrupt their leases. It retains the run projects/resources and
+the dedicated user's public key; revoke/delete the dedicated identity after review.
+
+Add `NAMED_POSTGRES_IMAGE=developer-platform-postgres:18.6-vector0.8.7-age1.8.0`
+and `NAMED_POSTGRES_EXTENSIONS=1` to exercise the reviewed runtime image.
+`NAMED_POSTGRES_CONSOLE=1` additionally starts disposable Keycloak/pgAdmin and
+uses installed Playwright Chromium to verify real SSO, scoped connection/query,
+denied password saving, expiry reconnect denial and anonymous denial. It uses
+loopback-only HTTP/host networking for its disposable IdP/console, not production
+HTTPS/isolated-network evidence. All fixture containers and volumes are removed.

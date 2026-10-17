@@ -3991,6 +3991,7 @@
         "summary": "List Human Database Grants"
       },
       "post": {
+        "deprecated": true,
         "operationId": "grant_human_database_access_projects__name__database_access_grants_post",
         "parameters": [
           {
@@ -4085,6 +4086,7 @@
     },
     "/projects/{name}/database-access/me/credential": {
       "post": {
+        "deprecated": true,
         "operationId": "issue_my_human_database_credential_projects__name__database_access_me_credential_post",
         "parameters": [
           {

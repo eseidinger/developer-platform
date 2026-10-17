@@ -22,7 +22,7 @@ def install(app, control):
 
     def human(conn, principal):
         if control.access_scope(conn, principal) is not None:
-            raise HTTPException(403, "Storage administration and human access require a human identity")
+            raise HTTPException(403, "Personal data access requires a human identity")
 
     @contextmanager
     def mutation(principal):
@@ -43,11 +43,12 @@ def install(app, control):
         control.require_permission(principal, "manage", row["owner_project"])
         return row
 
-    def audit(principal, action, row):
+    def audit(conn, principal, action, row):
+        res = row if row.get("owner_project") else catalog.resource(conn, row["resource_id"])
         identity = row.get("resource_id") or row.get("grant_id")
         control.required_audit(control.actor_for(principal), "store." + action, "store-resource", str(identity),
-            "succeeded", {"project": row.get("owner_project") or row.get("consumer_project")},
-            {key: row[key] for key in ("state", "version", "grant_id", "mode") if key in row})
+            "succeeded", {"project": res["owner_project"]},
+            {key: row[key] for key in ("state", "version", "grant_id", "mode", "consumer_project", "component") if key in row})
 
     @app.get("/v1/projects/{project}/store-context")
     def context(project: str, principal: Principal = caller):
@@ -77,7 +78,7 @@ def install(app, control):
             if count >= 128:
                 raise catalog.Conflict("The operator's 128-resource allocation is full")
             row = catalog.create_resource(conn, project, body)
-            audit(principal, "create", row)
+            audit(conn, principal, "create", row)
         return reply(row, 202)
 
     @app.get("/v1/resources/{resource_id}")
@@ -96,7 +97,7 @@ def install(app, control):
             conn.execute("""UPDATE store_resources SET name=%s,version=version+1,updated_at=now()
                 WHERE resource_id=%s""", (body.name, resource_id))
             row = catalog.resource(conn, resource_id)
-            audit(principal, "rename", row)
+            audit(conn, principal, "rename", row)
         return reply(row)
 
     @app.put("/v1/resources/{resource_id}/quota")
@@ -111,14 +112,14 @@ def install(app, control):
             conn.execute("""UPDATE store_resources SET quota_bytes=%s,version=version+1,
                 observed_state='pending',updated_at=now() WHERE resource_id=%s""", (body.quota_bytes, resource_id))
             row = catalog.resource(conn, resource_id)
-            audit(principal, "quota", row)
+            audit(conn, principal, "quota", row)
         return reply(row, 202)
 
     @app.post("/v1/resources/{resource_id}/retirement", status_code=202)
     def retire_resource(resource_id: UUID, body: Version, principal: Principal = caller):
         with mutation(principal) as conn:
             row = catalog.retire(conn, owner(conn, resource_id, principal), body.version)
-            audit(principal, "retire", row)
+            audit(conn, principal, "retire", row)
         return reply(row, 202)
 
     @app.get("/v1/resources/{resource_id}/purge-preview")
@@ -134,7 +135,7 @@ def install(app, control):
     def purge_resource(resource_id: UUID, body: Purge, principal: Principal = caller):
         with mutation(principal) as conn:
             row = catalog.request_purge(conn, owner(conn, resource_id, principal), body)
-            audit(principal, "purge-request", row)
+            audit(conn, principal, "purge-request", row)
         return reply(row, 202)
 
     @app.get("/v1/resources/{resource_id}/grants")
@@ -148,7 +149,7 @@ def install(app, control):
     def create_human_grant(resource_id: UUID, body: HumanGrant, principal: Principal = caller):
         with mutation(principal) as conn:
             row = catalog.create_human_grant(conn, owner(conn, resource_id, principal), body, principal.audit_id)
-            audit(principal, "human-grant", row)
+            audit(conn, principal, "human-grant", row)
         return reply(row, 202)
 
     @app.post("/v1/projects/{project}/resource-bindings", status_code=202)
@@ -156,7 +157,7 @@ def install(app, control):
         control.require_permission(principal, "manage", project)
         with mutation(principal) as conn:
             row = catalog.request_binding(conn, project, body, principal.audit_id)
-            audit(principal, "binding-request", row)
+            audit(conn, principal, "binding-request", row)
         return reply(row, 202)
 
     @app.get("/v1/projects/{project}/resource-bindings")
@@ -172,7 +173,7 @@ def install(app, control):
             row = catalog.grant(conn, grant_id, lock=True)
             owner(conn, row["resource_id"], principal)
             row = catalog.approve(conn, row, body, principal.audit_id)
-            audit(principal, "binding-approval", row)
+            audit(conn, principal, "binding-approval", row)
         return reply(row, 202)
 
     @app.put("/v1/resource-grants/{grant_id}/mode", status_code=202)
@@ -184,7 +185,7 @@ def install(app, control):
                     and row["mode"] == "read-only" and body.mode == "read-write"):
                 raise catalog.Conflict("Revoke and request a new cross-project binding for increased permissions")
             row = catalog.change_mode(conn, row, body, principal.audit_id)
-            audit(principal, "grant-mode", row)
+            audit(conn, principal, "grant-mode", row)
         return reply(row, 202)
 
     @app.post("/v1/resource-grants/{grant_id}/revocation", status_code=202)
@@ -200,7 +201,7 @@ def install(app, control):
             if not owner_allowed:
                 control.require_permission(principal, "manage", project)
             row = catalog.revoke(conn, row, body.version)
-            audit(principal, "grant-revoke", row)
+            audit(conn, principal, "grant-revoke", row)
         return reply(row, 202)
 
     @app.put("/v1/store-access/me/key")
@@ -230,7 +231,10 @@ def install(app, control):
                 JOIN store_resources r USING(resource_id) WHERE g.kind='human' AND g.issuer=%s
                 AND g.subject=%s AND g.state='active' AND r.state='active' ORDER BY r.name LIMIT 256""",
                 (principal.issuer, principal.subject)).fetchall()
-        return reply({"grants": [{"grant": r[0], "resource": {**r[1], "console_url": providers.console_url(r[1]["provider"])}} for r in rows]})
+            key = conn.execute("SELECT fingerprint FROM store_human_keys WHERE issuer=%s AND subject=%s",
+                (principal.issuer, principal.subject)).fetchone()
+        return reply({"key_fingerprint": key[0] if key else None,
+            "grants": [{"grant": r[0], "resource": {**r[1], "console_url": providers.console_url(r[1]["provider"])}} for r in rows]})
 
     def own_human(conn, grant_id, principal):
         human(conn, principal)

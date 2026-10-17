@@ -4,8 +4,6 @@ Only fixed, non-secret check names and run-scoped project names enter evidence.
 The run never deploys the platform or automatically purges SQL data.
 """
 import argparse
-import hashlib
-import hmac
 import ipaddress
 import json
 import os
@@ -23,14 +21,14 @@ from urllib.parse import urlencode
 import jwt
 import psycopg
 
-from .harness import API, DrillError, Keycloak, ROOT, operator_tokens, origin, private_text, require, settings
+from .harness import API, DrillError, Keycloak, ROOT, operator_tokens, origin, private_text, require, settings, wait_for
 
 
 RUN_ID = re.compile(r"^[0-9a-f]{12}$")
 IMAGE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]+@sha256:[0-9a-f]{64}$")
 CHECKS = (
     "isolated-bastion-configuration", "human-platform-administrator", "two-ready-project-databases",
-    "ungranted-key-denied", "automation-grant-denied", "human-grant-and-distinct-credential",
+    "ungranted-key-denied", "automation-credential-denied", "human-grant-and-distinct-credential",
     "authorized-tunnel", "read-only-own-database", "foreign-project-denied",
     "revocation-terminates-session", "revoked-login-denied", "revoked-key-denied",
     "redacted-audit-trail", "test-persona-revoked",
@@ -46,20 +44,19 @@ def project_names(run_id: str) -> tuple[str, str]:
     return "hd-" + run_id + "-a", "hd-" + run_id + "-b"
 
 
-def declaration(project: str, image: str, run_id: str) -> dict:
+def declaration(project: str, image: str, run_id: str, binding_id: str | None = None) -> dict:
     require(bool(IMAGE.fullmatch(image)), "digest_pinned_fixture_image_required")
     return {"apiVersion": "platform.example/v1alpha2", "kind": "Application",
         "metadata": {"name": project, "project": project}, "spec": {
             "components": [{"name": "api", "type": "service",
+                "bindings": [{"bindingId": binding_id}] if binding_id else [],
                 "runtime": {"type": "container", "image": image},
                 "ports": [{"name": "http", "protocol": "http", "port": 8080}],
                 "replicas": 1, "exposure": "private",
                 "health": {"readiness": {"path": "/health/ready"}},
                 "resources": {"requests": {"cpu": "100m", "memory": "128Mi"},
                               "limits": {"cpu": "500m", "memory": "256Mi"}}}],
-            "configuration": {"values": {"ACCEPTANCE_RUN_ID": run_id, "FIXTURE_ROLE": "database"}},
-            "resources": [{"name": "state", "type": "postgres", "profile": "shared-dev",
-                           "deletionPolicy": "retain"}]}}
+            "configuration": {"values": {"ACCEPTANCE_RUN_ID": run_id, "FIXTURE_ROLE": "database"}}}}
 
 
 def validate(args) -> None:
@@ -209,6 +206,8 @@ class Drill:
     def __init__(self, args, config: dict, api: API, report: Report):
         self.args, self.config, self.api, self.report = args, config, api, report
         self.project_a, self.project_b = project_names(args.run_id)
+        self.grant_id = None
+        self.resources = {}
         self.grant_requested = False
         self.grant_revoked = False
         self.persona_id = None
@@ -247,17 +246,21 @@ class Drill:
             f"[{self.args.bastion_host}]:{self.args.bastion_port}",
             "-f", str(self.args.known_hosts_file)], capture_output=True, timeout=5)
         require(host_key.returncode == 0, "trusted_bastion_host_key_missing")
-        postgres_ip = self.config.get("POSTGRES_IP")
+        postgres_ip = self.config.get("STORE_RELAY_IP", "172.30.80.15")
         try:
             require(isinstance(postgres_ip, str) and ipaddress.ip_address(postgres_ip).version == 4,
                     "postgres_ip_missing")
         except ValueError:
             raise DrillError("postgres_ip_missing") from None
-        self.destination = postgres_ip + ":5432"
+        self.relay_ip = postgres_ip
+        self.destination = postgres_ip + ":*"
         assert_bastion_config(Path("/etc/ssh/sshd_config_platform_db"), self.destination)
         self.report.check("isolated-bastion-configuration", True)
         self.api.request("GET", "/platform/test-runner-credentials")
         self.human_issuer, self.human_subject = self.human_identity()
+        current_access = self.api.request("GET", "/v1/store-access/me")
+        require(not current_access.get("grants") and current_access.get("key_fingerprint") is None,
+            "dedicated_human_without_existing_store_access_required")
         self.report.check("human-platform-administrator", True)
         for project in (self.project_a, self.project_b):
             require(self.api_status("GET", f"/projects/{project}/revisions") == 404,
@@ -267,8 +270,19 @@ class Drill:
 
     def deploy_projects(self) -> None:
         for project in (self.project_a, self.project_b):
+            self.api.request("POST", "/projects", {"name": project}, statuses=(201,))
+            resource = self.api.request("POST", "/v1/projects/" + project + "/resources",
+                {"name": "state", "provider": "postgresql"}, statuses=(202,))
+            self.resources[project] = resource["resource_id"]
+            wait_for(lambda: self.api.request("GET", "/v1/resources/" + resource["resource_id"])["observed_state"] == "active",
+                "named_database_not_ready")
+            binding = self.api.request("POST", "/v1/projects/" + project + "/resource-bindings",
+                {"resource_id": resource["resource_id"], "component": "api", "mode": "read-write"}, statuses=(202,))
+            wait_for(lambda: any(g["grant_id"] == binding["grant_id"] and g["observed_state"] == "active"
+                for g in self.api.request("GET", "/v1/projects/" + project + "/resource-bindings")["bindings"]),
+                "named_binding_not_ready")
             accepted = self.api.request("PUT", "/projects/" + project,
-                declaration(project, self.args.fixture_image, self.args.run_id), statuses=(202,))
+                declaration(project, self.args.fixture_image, self.args.run_id, binding["grant_id"]), etag=0, statuses=(202,))
             wait_deployment(self.api, accepted)
         self.report.check("two-ready-project-databases", True)
 
@@ -292,19 +306,18 @@ class Drill:
         require(response.status_code == 200, "test_persona_token_unavailable")
         token = response.json().get("access_token")
         require(isinstance(token, str) and bool(token), "test_persona_token_missing")
-        denied = self.api_status("POST", "/projects/" + self.project_a + "/database-access/grants",
-            {"issuer": self.human_issuer, "subject": self.human_subject, "public_key": key}, token=token)
-        self.report.check("automation-grant-denied", denied == 403)
+        denied = self.api_status("POST", "/v1/store-access/00000000-0000-0000-0000-000000000000/credentials", token=token)
+        self.report.check("automation-credential-denied", denied == 403)
 
     def check_sql(self, username: str, password: str, port: int) -> None:
         connection_args = {"host": "127.0.0.1", "port": port, "user": username,
                            "password": password, "connect_timeout": 5}
-        self.sql_connection = psycopg.connect(**connection_args, dbname="project_" + self.project_a.replace("-", "_"),
+        self.sql_connection = psycopg.connect(**connection_args, dbname="resource_" + self.resources[self.project_a].replace("-", ""),
                                               autocommit=True)
-        own_database = "project_" + self.project_a.replace("-", "_")
+        own_database = "resource_" + self.resources[self.project_a].replace("-", "")
         own = self.sql_connection.execute("SELECT current_database(), current_user").fetchone()
         marker = self.sql_connection.execute("SELECT marker FROM acceptance_state WHERE id=1").fetchone()
-        read_ok = own == (own_database, username) and marker == ("database-" + self.args.run_id,)
+        read_ok = own == (own_database, own_database + "_reader") and marker == ("database-" + self.args.run_id,)
         for statement in ("INSERT INTO acceptance_state(id, marker) VALUES (2, 'denied')",
                           "CREATE TABLE human_access_probe (id integer)"):
             with psycopg.connect(**connection_args, dbname=own_database) as denied_connection:
@@ -319,7 +332,7 @@ class Drill:
         self.report.check("read-only-own-database", read_ok)
         try:
             with psycopg.connect(**connection_args,
-                                 dbname="project_" + self.project_b.replace("-", "_")):
+                                 dbname="resource_" + self.resources[self.project_b].replace("-", "")):
                 foreign_denied = False
         except psycopg.OperationalError:
             foreign_denied = True
@@ -341,34 +354,39 @@ class Drill:
             public_key = " ".join(fields[:2])
             local_port = unused_local_port()
             command = ssh_command(key_path, self.args.known_hosts_file, self.args.bastion_host,
-                                  self.args.bastion_port, local_port, self.destination)
+                                  self.args.bastion_port, local_port, self.relay_ip + ":20000")
             self.report.check("ungranted-key-denied", denied_ssh(command))
             self.machine_denial(public_key)
-            grant_body = {"issuer": self.human_issuer, "subject": self.human_subject,
-                          "public_key": public_key}
-            # A network error after creation is still cleaned up by the exact
-            # run-project/identity cleanup call in main().
+            self.api.request("PUT", "/v1/store-access/me/key", {"public_key": public_key})
             self.grant_requested = True
-            grant = self.api.request("POST", "/projects/" + self.project_a + "/database-access/grants",
-                                     grant_body, statuses=(201,))
-            mine = self.api.request("GET", "/projects/" + self.project_a + "/database-access/me")
-            credential = self.api.request("POST", "/projects/" + self.project_a + "/database-access/me/credential")
-            username, password = credential.get("username"), credential.get("password")
-            workload_role = "project_" + self.project_a.replace("-", "_")
-            workload_password = hmac.new(self.config["DATABASE_KEY"].encode(), self.project_a.encode(),
-                                         hashlib.sha256).hexdigest()
-            valid = (grant.get("active") is True and grant.get("username") == username == mine.get("username")
-                     and isinstance(password, str) and len(password) >= 32
-                     and username != workload_role and password != workload_password
-                     and mine.get("database") == workload_role and mine.get("ssh_user") == "platform-db")
+            grant = self.api.request("POST", "/v1/resources/" + self.resources[self.project_a] + "/human-grants",
+                {"issuer": self.human_issuer, "subject": self.human_subject, "mode": "read-only"}, statuses=(202,))
+            self.grant_id = grant["grant_id"]
+            lease = self.api.request("POST", "/v1/store-access/" + self.grant_id + "/credentials", statuses=(202,))
+            credential = None
+            def credential_ready():
+                nonlocal credential
+                credential = self.api.request("GET", "/v1/store-access/credentials/" + lease["credential_id"], statuses=(200,202))
+                return credential.get("state") == "active" and "connection" in credential
+            wait_for(credential_ready, "human_credential_not_ready")
+            connection = credential["connection"]
+            username, password = connection["PGUSER"], connection["PGPASSWORD"]
+            workload_role = "resource_" + self.resources[self.project_a].replace("-", "")
+            valid = (grant["mode"] == "read-only" and grant["state"] == "active"
+                and isinstance(password, str) and len(password) >= 32 and username.startswith("credential_")
+                and connection["PGDATABASE"] == workload_role
+                and 86390 <= (datetime.fromisoformat(lease["expires_at"]) - datetime.fromisoformat(lease["issued_at"])).total_seconds() <= 86400)
             self.report.check("human-grant-and-distinct-credential", valid)
+            self.destination = self.relay_ip + ":" + str(credential["ssh"]["destination_port"])
+            command = ssh_command(key_path, self.args.known_hosts_file, self.args.bastion_host,
+                self.args.bastion_port, local_port, self.destination)
             self.tunnel = subprocess.Popen(command, stdin=subprocess.DEVNULL,
                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             try:
                 self.report.check("authorized-tunnel", ready_tunnel(self.tunnel, local_port))
                 self.check_sql(username, password, local_port)
-                self.api.request("DELETE", "/projects/" + self.project_a + "/database-access/grants",
-                                 {"issuer": self.human_issuer, "subject": self.human_subject})
+                self.api.request("POST", "/v1/resource-grants/" + self.grant_id + "/revocation",
+                                 {"version": grant["version"]}, statuses=(202,))
                 self.grant_revoked = True
                 terminated = False
                 deadline = time.monotonic() + 10
@@ -408,8 +426,7 @@ class Drill:
                   and event["scope"].get("project") == self.project_a
                   and event.get("result") == "succeeded"]
         actions = {event.get("action") for event in scoped}
-        required = {"database-access.grant", "database-access.credential.rotate",
-                    "database-access.tunnel.authorize", "database-access.revoke"}
+        required = {"store.human-grant", "store.credential-reveal", "store.grant-revoke"}
         encoded = json.dumps(events)
         secret_free = password not in encoded and public_key not in encoded
         self.report.check("redacted-audit-trail", required <= actions and secret_free)
@@ -418,10 +435,13 @@ class Drill:
         success = True
         if self.grant_requested and not self.grant_revoked:
             try:
-                status = self.api_status("DELETE", "/projects/" + self.project_a + "/database-access/grants",
-                    {"issuer": self.human_issuer, "subject": self.human_subject})
-                self.grant_revoked = status in (200, 404)
-                success = success and self.grant_revoked
+                rows = self.api.request("GET", "/v1/resources/" + self.resources[self.project_a] + "/grants")["grants"]
+                for row in rows:
+                    if (row["kind"] == "human" and row["issuer"] == self.human_issuer
+                            and row["subject"] == self.human_subject and row["state"] == "active"):
+                        self.api.request("POST", "/v1/resource-grants/" + row["grant_id"] + "/revocation",
+                            {"version": row["version"]}, statuses=(202,))
+                self.grant_revoked = True
             except Exception:
                 success = False
         if self.persona_creation_attempted and not self.persona_revoked:
