@@ -1,0 +1,16 @@
+name: HTTP data stores
+on: [push, pull_request]
+
+jobs:
+  rustfs-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: docker pull rustfs/rustfs:1.0.2@sha256:7e948dad4748bda48f8985fda7195f8cf2e4259427011f6120acc2c9acf51587
+      - run: uv run --project platform/app python scripts/verify-rustfs.py
