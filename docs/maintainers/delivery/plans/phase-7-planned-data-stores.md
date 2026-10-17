@@ -12,8 +12,11 @@ Native RustFS, OpenSearch and Qdrant adapters now pass real isolation, credentia
 query and empty-volume recovery fixtures. Opt-in pinned Compose services,
 configuration/capacity-gated provider registration and non-demo OpenSearch TLS
 initialization are implemented. The actual production Compose definitions pass
-disposable health/administration checks. RustFS/Qdrant native browser login, RO/RW isolation and active-session revocation now pass local TLS
-fixtures. OpenSearch Dashboards and combined deployed acceptance remain open; PostgreSQL is the default selection.
+disposable health/administration checks. RustFS, Qdrant and OpenSearch Dashboards
+native browser login, RO/RW isolation and active-session expiry/revocation now
+pass local TLS fixtures. OpenSearch resource workspaces survive human renewal
+and are included in usage, backup/recovery and isolated purge. Combined deployed
+acceptance remains open; PostgreSQL is the default selection.
 See the [RustFS](../../../../persistence/compatibility/rustfs-2026-10-17.md),
 [OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md) and
 [Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) records.
@@ -26,7 +29,8 @@ PostgreSQL role/database provisioning and lifecycle/workload reconciliation.
 The routes and workers are now wired into the source application. The portal
 and CLI manage named resources, grants/bindings and human credential leases;
 the private relay enforces credential identity and session deadlines. Browser
-consoles, provider expansion and deployed acceptance remain in progress. See the
+consoles and the three opt-in providers have local evidence; deployed acceptance
+and external domain comparisons remain in progress. See the
 [operator workflow](../../../operators/data-stores.md). Eight API
 boundary tests and a disposable real PostgreSQL fixture pass resource isolation,
 cross-writer schema ownership, future-object read access, read-only denials,
@@ -36,7 +40,9 @@ queries and denial of graph writes/extension removal. A disposable real
 Keycloak → pgAdmin fixture passes SSO, scoped connection/query, password-saving
 denial, expired reconnect and anonymous denial. Production console network/TLS
 and deployed access acceptance remain open. The backend suite ran
-509 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
+531 tests successfully (16 skipped); the portal suite passes 46 tests. Production
+image construction passes, including bundled RustFS assets and exclusion of the
+optional DuckDB dependency from the API runtime. The relay and portal tests cover expiry, denial,
 explicit issuance and secret-cache exclusion. No live resources were changed.
 Source now includes bounded usage measurements/alerts, the named-store dashboard,
 restore quarantine, and version-pinned purge acknowledgment after verified
@@ -227,6 +233,17 @@ storage, the analytical comparison is reproducible, and the selected object-stor
 provider passes provisioning and recovery acceptance.
 
 ### 7.3 — Full-Text Search
+
+**Source/local checkpoint (October 17, 2026):** The exact-index OpenSearch
+provider and official pinned Dashboards are implemented. Real-browser fixtures
+pass native login, Discover, read-only/read-write data and mapping permissions,
+foreign-resource denial, workspace isolation and renewal, and already-open
+session expiry/revocation. Resource-scoped saved views are editable in both
+modes; read-only document/schema access remains enforced natively. Native
+fixtures pass empty-volume restoration with fresh scoped approval and isolated
+workspace/data purge. These are synthetic local checks; judged domain search
+comparisons, application rebuild semantics and deployed acceptance remain open.
+See the [compatibility evidence](../../../../persistence/compatibility/opensearch-2026-10-17.md).
 
 **Task:** PLAN-028. **Source:** phase 2. **Entry:** package 7.2 analytical foundation.
 

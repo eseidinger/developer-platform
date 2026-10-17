@@ -5,8 +5,9 @@ portal and private lease relay are implemented in source and disposable tests.
 The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
 Disposable console SSO/connection and encrypted empty-server restore fixtures pass;
 RustFS, OpenSearch and Qdrant have native providers and opt-in Compose services
-with local isolation/recovery evidence. RustFS and Qdrant browser access pass local native-login, mode/isolation and
-revocation fixtures; OpenSearch Dashboards and deployed acceptance remain incomplete. No existing installation has been reset.
+with local isolation/recovery evidence. RustFS, Qdrant and OpenSearch Dashboards
+browser access pass local native-login, mode/isolation and expiry/revocation
+fixtures; deployed acceptance remains incomplete. No existing installation has been reset.
 
 ## Selecting shared services
 
@@ -180,7 +181,7 @@ The outer relay binds requests to that lease identity, streams bounded chunks
 and closes connections at expiry/revocation. OpenSearch backend TLS remains
 verified with the operator CA; private HTTP on the tunnel/relay segment relies
 on SSH transport encryption. Applications receive the private lease endpoint
-directly through their explicit binding. Only accepted console adapters advertise browser launch links. OpenSearch currently offers the native-client path.
+directly through their explicit binding. Supported console adapters advertise browser launch links for active human credentials.
 
 ## DuckDB/Parquet application artifacts
 
@@ -194,9 +195,9 @@ bucket/catalog backups and fresh access approval. Synthetic SQL comparisons and
 empty-volume snapshot recovery pass locally; external domain benchmarks and
 deployed off-host recovery remain open.
 
-## RustFS and Qdrant browser consoles
+## RustFS, Qdrant and OpenSearch browser consoles
 
-Use **Open RustFS console** or **Open Qdrant console** on an active human credential.
+Use the provider's **Open console** action on an active human credential.
 The portal posts a 30-second launch assertion to a lease hostname under the existing
 `APPS_DOMAIN`; it never puts a credential in a launch URL. The gateway sets a
 Secure, HttpOnly, host-only session cookie bounded by the human lease deadline.
@@ -208,15 +209,17 @@ exact human generation before login completes; no child secret/token is stored
 in the platform catalog. Applications and private native clients continue to
 use expiring service-account keys. The gateway
 checks the current human grant/generation for every request; native data requests
-still use that JWT through the private relay. It never injects an operator key.
+still use the matching native human credential through the private relay. Native
+data requests never use an operator key.
 A platform administrator still needs an explicit human grant. Static assets and
 backend data become unavailable after expiry, downgrade, retirement or revocation;
 renew and launch a fresh session to continue.
 
 The API proxies at most 32 concurrent console requests with bounded streaming.
 Only fixed operator endpoints and the selected lease port are reachable. Writes
-require the exact console Origin; cross-origin response sharing, backend cookies,
-WebSockets and upgrades are rejected. This adapter's verified UI path uses ordinary
+require the exact console Origin; cross-origin response sharing, WebSockets and
+upgrades are rejected. Only the dedicated encrypted Dashboards authentication
+cookie is forwarded to that provider; the platform launch cookie stays private. This adapter's verified UI path uses ordinary
 HTTP requests. Each launch and an invalidated session clear the console site's
 browser storage/cache; server responses are not cached. The native UI can save
 its key in browser storage during the active session, so clear site data when
@@ -238,18 +241,48 @@ an authorized page mounted while policy refreshes, preserving initial and native
 authorization checks. The image includes the Apache-2.0 license and modification
 notice. No browser-time downloads or updates occur. A console lists only its
 catalog-authorized bucket; this metadata adapter grants no global bucket-list
-permission. All object operations remain native-authorized. OpenSearch Dashboards
-remains unadvertised until server-account and per-human session integration is
-verified.
+permission. All object operations remain native-authorized.
 
-The candidate Dashboards service is pinned to 3.9.0 and uses a separate internal
-`search-consoles` network with the API. It has no host port, raw-store network
-membership or administrator key. `STORE_SEARCH_CONSOLE_SUBNET`,
-`STORE_SEARCH_API_IP` and `OPENSEARCH_DASHBOARDS_IP` must be distinct from the
-platform/cluster networks; bootstrap validates fixed members and existing owners.
-Run `scripts/init.py` to generate the separate missing console-cookie key without
-replacing existing secrets. Human launch remains disabled until the local browser
-and tenant-lifecycle fixture passes. See the
+### OpenSearch Dashboards
+
+Sign in with the issued `OPENSEARCH_USERNAME` and `OPENSEARCH_PASSWORD`. Create
+an index pattern matching `OPENSEARCH_INDEX`, select it in Discover and browse
+that resource's documents. Read-only grants cannot write documents or mappings;
+both modes may edit console preferences and saved views. The workspace belongs
+to the resource and is shared with its explicitly granted humans. It persists
+across credential renewal; global and private per-user tenants are disabled.
+Console indexes contribute to resource usage and are captured with the native
+volume backup. Confirmed purge removes the resource's data index, tenant and
+physical console indexes while retaining other resources.
+
+Dashboards 3.9.0 uses a separate internal `search-consoles` network with the API.
+It has no host port, raw-store network membership or administrator key.
+`STORE_SEARCH_CONSOLE_SUBNET`, `STORE_SEARCH_API_IP` and
+`OPENSEARCH_DASHBOARDS_IP` must be distinct from platform/cluster networks;
+bootstrap validates fixed members and existing owners. Run `scripts/init.py` to
+generate the separate missing `STORE_OPENSEARCH_CONSOLE_COOKIE_KEY` without
+replacing existing secrets. The native cookie is Secure, HttpOnly, host-only and
+bounded by the original human deadline. Renewal requires a new launch/login.
+
+The private bridge requires the fixed console source IP and binds native Basic
+identity, tenant and relay port to the active human generation. Its restricted
+`kibanaserver` account handles global system metadata and the exact pre-login
+settings read; it cannot read resource documents or administer identities.
+Resource metadata migrations and searches run as the leased human. Unbound
+server calls cannot select resource tenants/indexes, including through bulk
+payloads; server-metadata writes are bounded to 1 MiB. Native backend TLS uses
+the generated operator CA with certificate verification enabled. The gateway
+preserves the upstream content security policy and adds its own boundary.
+
+The reviewed native tenant policy is `resource-v1`. Preparation rejects older
+cached policies rather than silently reusing them; migrate existing realms only
+through reviewed operator maintenance. Credential issuance requires private
+native tenants disabled. Keep native and UI multitenancy enabled with only the
+named resource tenant available; disabling UI multitenancy produces incorrect
+saved-object mappings in this pinned release. The local browser fixture verifies
+Discover, both data-access modes, cross-resource denial, workspace renewal,
+expiry/revocation and isolated purge. Deployed OIDC, DNS, trusted TLS, off-host
+recovery and upgrade acceptance remain open. See the
 [compatibility record](../../persistence/compatibility/opensearch-2026-10-17.md).
 
 ## PostgreSQL browser console

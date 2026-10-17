@@ -1305,6 +1305,14 @@ Added October 17, 2026 from the [data store roadmap](../../product/data-store-ro
 - [ ] **PLAN-026 · 7.1** — PostgreSQL Baseline and Integration. Required outcome: Independent named-resource lifecycle, explicit component bindings and resource-scoped human read-only/read-write grants implemented and accepted for PostgreSQL; clean-setup cross-project deployed acceptance, provisioning/recovery and documented baseline. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.1](plans/phase-7-planned-data-stores.md#71-postgresql-baseline-and-integration).
 - [ ] **PLAN-027 · 7.2** — Analytics and S3-Compatible Object Storage. Required outcome: PostgreSQL/DuckDB and raw-storage comparisons; RustFS-backed S3 provider lifecycle/recovery and official console integration. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.2](plans/phase-7-planned-data-stores.md#72-analytics-and-s3-compatible-object-storage).
 - [ ] **PLAN-028 · 7.3** — Full-Text Search. Required outcome: Judged PostgreSQL FTS/OpenSearch comparison and rebuildable index acceptance. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.3](plans/phase-7-planned-data-stores.md#73-full-text-search).
+  **Source/local checkpoint (October 17, 2026):** Opt-in OpenSearch and official
+  Dashboards pass native login/Discover, read-only/read-write and foreign-resource
+  boundaries, shared resource workspace renewal, already-open expiry/revocation,
+  empty-volume recovery and isolated data/workspace purge. RustFS/Qdrant consoles
+  and version-pinned Parquet/DuckDB synthetic comparisons also pass locally.
+  Production image build, 531 backend tests (16 skipped) and 46 portal tests pass.
+  These checks do not close domain comparisons or deployed integration/recovery
+  acceptance. See the [Phase 7 checkpoint](plans/phase-7-planned-data-stores.md).
 - [ ] **PLAN-029 · 7.4** — Graph Data. Required outcome: PostgreSQL/AGE/Neo4j equivalence and provider operational evidence. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.4](plans/phase-7-planned-data-stores.md#74-graph-data).
 - [ ] **PLAN-030 · 7.5** — Vector Retrieval and AI Memory. Required outcome: pgvector/Qdrant quality comparison and scoped lifecycle/rebuild evidence. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.5](plans/phase-7-planned-data-stores.md#75-vector-retrieval-and-ai-memory).
 - [ ] **PLAN-031 · 8.1** — Time Series and OLAP. Required outcome: Realistic-load PostgreSQL/TimescaleDB/ClickHouse comparison with DuckDB reference. Accountable role: platform API / operations, with external application/experiment owners. See [package 8.1](plans/phase-8-deferred-data-stores.md#81-time-series-and-olap).
