@@ -18,6 +18,21 @@ log = logging.getLogger(__name__)
 MAX_CONNECTIONS = 128
 
 
+def backend_endpoint(lease):
+    endpoints = {'postgresql': ('POSTGRES_IP', 5432), 's3': ('RUSTFS_IP', 9000),
+                 'opensearch': ('OPENSEARCH_IP', 9200), 'qdrant': ('QDRANT_IP', 6333)}
+    setting, port = endpoints[lease['provider']]
+    import ipaddress
+    return str(ipaddress.ip_address(os.environ[setting])), port
+
+
+def http_tls(lease):
+    if lease['provider'] != 'opensearch':
+        return None  # Private network/SSH boundary, matching the PostgreSQL lab profile.
+    import ssl
+    return ssl.create_default_context(cafile=os.environ['OPENSEARCH_CA_FILE'])
+
+
 def connect():
     return psycopg.connect(host=os.environ["POSTGRES_HOST"], dbname="platform", user="platform_store_relay",
         password=os.environ["STORE_RELAY_PASSWORD"], autocommit=True, connect_timeout=2,
@@ -88,7 +103,7 @@ async def postgres_startup(reader, writer, lease):
 class Relay:
     def __init__(self, load=snapshot, backend=None, host="0.0.0.0"):
         self.load = load
-        self.backend = backend or (lambda lease: (os.environ["POSTGRES_IP"], 5432))
+        self.backend = backend or backend_endpoint
         self.host = host
         self.leases = {}
         self.servers = {}
@@ -113,7 +128,15 @@ class Relay:
         tasks = []
         try:
             if lease["provider"] != "postgresql":
-                raise ValueError("Unsupported relay provider")
+                from .http_relay import exchange
+                async def guard_http():
+                    while self.allowed(port, lease):
+                        await asyncio.sleep(.25)
+                tasks = [asyncio.create_task(exchange(reader, writer, lease, self.backend(lease),
+                    tls=http_tls(lease))), asyncio.create_task(guard_http())]
+                remaining = max(0, (lease["expires_at"] - datetime.now(timezone.utc)).total_seconds())
+                await asyncio.wait_for(asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining)
+                return
             startup = await asyncio.wait_for(postgres_startup(reader, writer, lease), 5)
             backend_reader, backend_writer = await asyncio.wait_for(asyncio.open_connection(*self.backend(lease)), 3)
             backend_writer.write(startup)

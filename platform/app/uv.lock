@@ -578,7 +578,9 @@ name = "developer-platform-api"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "boto3" },
     { name = "fastapi" },
+    { name = "h11" },
     { name = "httpx2" },
     { name = "kubernetes" },
     { name = "langchain-openai" },
@@ -592,7 +594,9 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "boto3", specifier = "==1.43.114" },
     { name = "fastapi", specifier = "==0.141.1" },
+    { name = "h11", specifier = "==0.16.0" },
     { name = "httpx2", specifier = "==2.13.1" },
     { name = "kubernetes", specifier = "==36.0.3" },
     { name = "langchain-openai", specifier = ">=1.6,<2" },
