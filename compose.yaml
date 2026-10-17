@@ -2,6 +2,7 @@ name: developer-platform
 include:
   - infrastructure/proxy/compose.yaml
   - persistence/compose.yaml
+  - persistence/shared-stores.yaml
   - infrastructure/monitoring/compose.yaml
   - identity/compose.yaml
   - platform/compose.yaml
@@ -14,6 +15,9 @@ networks:
       config:
         - subnet: ${PLATFORM_SUBNET:-172.30.80.0/24}
 volumes:
+  rustfs_data:
+  qdrant_data:
+  opensearch_data:
   postgres_console:
   postgres:
   caddy_data:

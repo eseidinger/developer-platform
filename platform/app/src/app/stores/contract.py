@@ -30,6 +30,8 @@ class ResourceCreate(Strict):
             raise ValueError("unique extensions apply only to PostgreSQL resources")
         if self.configuration is not None and self.provider != 'qdrant':
             raise ValueError('Vector configuration applies only to Qdrant resources')
+        if self.provider == 'qdrant' and self.configuration is None:
+            self.configuration = VectorConfiguration()
         return self
 
 

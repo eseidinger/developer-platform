@@ -4,7 +4,51 @@ Phase 7 implementation is in progress. PostgreSQL named resources, the API/CLI,
 portal and private lease relay are implemented in source and disposable tests.
 The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
 Disposable console SSO/connection and encrypted empty-server restore fixtures pass;
-provider expansion and deployed acceptance are still being completed. No existing installation has been reset.
+RustFS, OpenSearch and Qdrant have native providers and opt-in Compose services
+with local isolation/recovery evidence. Their browser consoles and deployed
+acceptance remain incomplete. No existing installation has been reset.
+
+## Selecting shared services
+
+Run `python3 scripts/init.py` to generate missing operator keys without replacing
+existing keys. After reviewing combined host capacity, set `COMPOSE_PROFILES` in
+the operator `.env` to the desired comma-separated services: `s3`, `qdrant`,
+`opensearch`. An empty selection keeps PostgreSQL only. Explicitly allocate each
+selected provider in `STORE_CAPACITY_BYTES`, for example:
+
+```dotenv
+COMPOSE_PROFILES=s3,qdrant,opensearch
+STORE_CAPACITY_BYTES={"postgresql":17179869184,"s3":8589934592,"qdrant":4294967296,"opensearch":4294967296}
+```
+
+These are example logical allocations, requiring review against physical capacity.
+Compose limits are 1 GiB/one CPU each for RustFS and Qdrant, and 2 GiB/two CPUs
+for OpenSearch, plus a transient 512 MiB initializer. Existing services, workload
+requests, telemetry, backup and recovery also need headroom. Services remain
+running together; removing a selection does not remove or purge their volumes.
+Disable selection only during coordinated operator maintenance after revoking
+access; it is not a substitute for retirement or purge.
+
+Use the existing operator deployment workflow or `bash scripts/up.sh` to prepare
+configuration, start the selected services and wait for health/initialization.
+Ansible prepares configuration before the existing maintenance outage. The API
+advertises a provider only when selection, required configuration and a positive
+capacity allocation are present. This reports configuration readiness; native
+provisioning/reconciliation reports actual service failures separately. Neo4j
+Community Edition stays unavailable because it cannot satisfy the selected
+shared-resource authorization contract.
+
+`scripts/prepare-stores.py` generates an operator-owned OpenSearch CA, verified
+server/client certificates and a non-demo access realm under `.runtime/stores`.
+Only the public CA is mounted into the API/relay. The unprivileged one-shot
+initializer alone receives the administrator client key; it retains an existing
+native access catalog and refuses to overwrite a damaged one. Repeat preparation
+preserves keys. Address changes, partial configuration or certificates with less
+than one day remaining require explicit operator repair/renewal before deployment.
+Node/admin certificates expire after one year; the CA expires after ten years.
+Keep those configuration files in the encrypted recovery bundle. No provider has
+a raw published host port; the API has native administrative credentials and no
+Docker socket. This source wiring does not constitute deployed acceptance.
 
 ## Resource and binding workflow
 
@@ -126,6 +170,18 @@ The initial relay accepts 128 concurrent connections, 20 per credential, and 512
 ports (20000–20511). A human can hold at most 64 current credential leases across resources, matching
 the SSH key authorization limit. Each grant also caps outstanding generations at 24.
 No Docker socket is exposed to the API/relay.
+
+For HTTP stores, use the returned SSH forwarding instructions and replace only
+the host/port in `AWS_ENDPOINT_URL_S3`, `QDRANT_URL` or `OPENSEARCH_URL` with
+`http://127.0.0.1:15432` on your local client. Keep the resource identifier and
+scoped credential unchanged. S3 clients must use path-style addressing. OpenSearch
+uses Basic authentication, Qdrant its JWT API key and RustFS its S3 service key.
+The outer relay binds requests to that lease identity, streams bounded chunks
+and closes connections at expiry/revocation. OpenSearch backend TLS remains
+verified with the operator CA; private HTTP on the tunnel/relay segment relies
+on SSH transport encryption. Applications receive the private lease endpoint
+directly through their explicit binding. HTTP-store browser launch links are
+not advertised until their authenticated console adapters are implemented.
 
 ## PostgreSQL browser console
 

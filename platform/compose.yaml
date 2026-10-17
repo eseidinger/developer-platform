@@ -40,6 +40,15 @@ services:
       STORE_SSH_PORT: ${STORE_SSH_PORT:-2222}
       STORE_CONSOLE_POSTGRES_ENABLED: "true"
       STORE_CAPACITY_BYTES: ${STORE_CAPACITY_BYTES:-}
+      STORE_ENABLED_PROVIDERS: postgresql,${COMPOSE_PROFILES:-}
+      RUSTFS_IP: ${RUSTFS_IP:-172.30.80.16}
+      RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-}
+      RUSTFS_SECRET_KEY: ${RUSTFS_SECRET_KEY:-}
+      OPENSEARCH_IP: ${OPENSEARCH_IP:-172.30.80.17}
+      OPENSEARCH_ADMIN_PASSWORD: ${OPENSEARCH_ADMIN_PASSWORD:-}
+      OPENSEARCH_CA_FILE: /run/stores/opensearch-ca.pem
+      QDRANT_IP: ${QDRANT_IP:-172.30.80.18}
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
       TELEMETRY_CATALOG_PASSWORD: ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
       DATABASE_BASTION_TOKEN: ${DATABASE_BASTION_TOKEN:?Run scripts/init.py}
       PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
@@ -84,6 +93,7 @@ services:
     volumes:
       - monitoring_discovery:/var/lib/platform-monitoring
       - ../.runtime/controller.kubeconfig:/run/platform/kubeconfig:ro
+      - ../.runtime/stores/public:/run/stores:ro
     networks:
       platform:
         ipv4_address: ${PLATFORM_API_IP:-172.30.80.11}
@@ -112,10 +122,17 @@ services:
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
+      RUSTFS_IP: ${RUSTFS_IP:-172.30.80.16}
+      STORE_ENABLED_PROVIDERS: postgresql,${COMPOSE_PROFILES:-}
+      OPENSEARCH_IP: ${OPENSEARCH_IP:-172.30.80.17}
+      OPENSEARCH_CA_FILE: /run/stores/opensearch-ca.pem
+      QDRANT_IP: ${QDRANT_IP:-172.30.80.18}
       STORE_RELAY_PASSWORD: ${STORE_RELAY_PASSWORD:?Run scripts/init.py}
     depends_on:
       platform-api:
         condition: service_healthy
+    volumes:
+      - ../.runtime/stores/public:/run/stores:ro
     networks:
       platform:
         ipv4_address: ${STORE_RELAY_IP:-172.30.80.15}

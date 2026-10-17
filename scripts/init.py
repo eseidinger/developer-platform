@@ -6,10 +6,13 @@ import os
 root = Path(__file__).resolve().parents[1]
 target = root / ".env"
 content = (root / ".env.example").read_text()
-secret_keys = ("STORE_RELAY_PASSWORD", "STORE_CONSOLE_BOOTSTRAP_PASSWORD", "STORE_CONSOLE_OIDC_SECRET", "POSTGRES_PASSWORD", "POSTGRES_MONITOR_PASSWORD", "DATABASE_KEY", "TELEMETRY_CATALOG_PASSWORD", "DATABASE_BASTION_TOKEN", "PLATFORM_AUDIT_PASSWORD", "PLATFORM_AUDIT_READER_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD",
+secret_keys = ("RUSTFS_ACCESS_KEY", "RUSTFS_SECRET_KEY", "QDRANT_API_KEY", "OPENSEARCH_ADMIN_PASSWORD", "OPENSEARCH_DASHBOARDS_PASSWORD", "STORE_RELAY_PASSWORD", "STORE_CONSOLE_BOOTSTRAP_PASSWORD", "STORE_CONSOLE_OIDC_SECRET", "POSTGRES_PASSWORD", "POSTGRES_MONITOR_PASSWORD", "DATABASE_KEY", "TELEMETRY_CATALOG_PASSWORD", "DATABASE_BASTION_TOKEN", "PLATFORM_AUDIT_PASSWORD", "PLATFORM_AUDIT_READER_PASSWORD", "KEYCLOAK_ADMIN_PASSWORD",
                "KEYCLOAK_DB_PASSWORD", "KEYCLOAK_PROVISIONER_SECRET", "GRAFANA_PASSWORD")
+def generated(key):
+    return secrets.token_hex(10 if key == "RUSTFS_ACCESS_KEY" else 32)
+
 for key in secret_keys:
-    content = content.replace(key + "=\n", key + "=" + secrets.token_hex(32) + "\n")
+    content = content.replace(key + "=\n", key + "=" + generated(key) + "\n")
 try:
     fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
 except FileExistsError:
@@ -20,7 +23,7 @@ except FileExistsError:
             if existing and not existing.endswith("\n"):
                 output.write("\n")
             for key in missing:
-                output.write(key + "=" + secrets.token_hex(32) + "\n")
+                output.write(key + "=" + generated(key) + "\n")
         target.chmod(0o600)
         print("Added generated values for new required secrets: " + ", ".join(missing) + ".")
     else:

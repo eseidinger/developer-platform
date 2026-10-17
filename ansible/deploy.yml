@@ -311,6 +311,13 @@
             mode: '0700'
           when: platform_installed_backup_runner.stat.exists
 
+        - name: Prepare selected data-store configuration before the service outage
+          ansible.builtin.command:
+            argv: [python3, scripts/prepare-stores.py]
+            chdir: "{{ platform_install_dir }}"
+          changed_when: false
+          no_log: true
+
         - name: Stop existing Compose services cleanly
           ansible.builtin.command:
             argv: [docker, compose, stop, --timeout, '60']

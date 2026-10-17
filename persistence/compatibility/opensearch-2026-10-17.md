@@ -41,10 +41,18 @@ watermarks are not an isolated per-resource byte quota; an index write block
 would also prevent authorized document cleanup. Admission and stale/unknown
 measurements must remain visible until provider-specific enforcement is verified.
 
-The provider stays unregistered until Compose/TLS, coordinated backup/recovery
-and authenticated Dashboards/session integration are ready. No live resources
+The provider is opt-in behind operator selection, complete TLS configuration and
+an explicit capacity budget. Authenticated Dashboards/session integration and
+deployed recovery acceptance remain open. No live resources
 were changed. Native role boundaries follow the
 [OpenSearch role guide](https://docs.opensearch.org/latest/security/access-control/users-roles/)
 and [permission reference](https://docs.opensearch.org/latest/security/access-control/permissions/).
 
 The fixture additionally captures the stopped service’s real Docker volume and restores it into an empty second volume/server. Retained object versions, vectors/payload indexes, or search documents/mappings and native access metadata survive as applicable. Recovered native credentials are revoked before fresh scoped reader approval; unrelated resources remain intact. The common backup code now contains coordinated lease-pause, stopped-volume capture and required-archive restore adapters. Combined deployed encrypted multi-store recovery and browser/session acceptance remain open.
+
+Production Compose wiring additionally passes a disposable native fixture with
+the generated CA/server/admin certificates, verified hostname, no demo users,
+an unprivileged initializer and working health checks. Repeated preparation keeps
+the CA and a second initialization retains existing scoped users. Issue/probe
+checks require the exact expected resource role, rejecting ambient broader role
+mappings. These checks do not validate deployed TLS renewal or Dashboards.

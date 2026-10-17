@@ -90,6 +90,7 @@ def main():
         denied(lambda: rw.request('DELETE', prefix))
         denied(lambda: rw.request('PUT', prefix + '/_settings', {'index.blocks.write': False}))
         denied(lambda: rw.request('PUT', '/rogue', {}))
+        denied(lambda: rw.request('PUT', '/' + catalog.login(writer['credential_id']), {}))
         denied(lambda: rw.request('GET', '/_plugins/_security/api/internalusers'))
         denied(lambda: rw.request('PUT', '/_plugins/_security/api/internalusers/' + catalog.login(writer['credential_id']),
             {'password': 'Aa9!synthetic-replacement', 'backend_roles': ['all_access']}))

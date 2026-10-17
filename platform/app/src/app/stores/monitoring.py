@@ -56,7 +56,7 @@ def exposition(resources, credentials, now=None, quarantined=False):
             'usage_error': int(bool(row.get('usage_error'))),
             'reconcile_pending': int(row['state'] != row['observed_state']),
             # Extend only after provider-specific hard growth-denial fixtures pass.
-            'hard_quota': 0,
+            'hard_quota': int(row['provider'] == 's3'),
             'credentials_active': counts.get(row['resource_id'], {}).get('active', 0),
             'credentials_cleanup_pending': counts.get(row['resource_id'], {}).get('cleanup', 0)}
         for key, value in values.items():

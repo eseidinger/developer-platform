@@ -62,7 +62,7 @@ def install(app, control):
             admin = control.is_allowed(conn, principal, "manage", project)
             platform_admin = control.is_platform_admin(conn, principal)
             return reply({"project": project, "manage": admin, "platform_admin": platform_admin,
-                "providers": [{"id": "postgresql", "enabled": True}],
+                "providers": providers.availability(),
                 "limits": {"resources": 128, "grants_per_resource": 64, "concurrent_credential_leases": 512}})
 
     @app.get("/v1/projects/{project}/resources")

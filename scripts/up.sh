@@ -6,6 +6,7 @@ for tool in docker k3d kubectl python3 setfacl; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 test -f .env || { echo "Run python3 scripts/init.py first" >&2; exit 1; }
+python3 scripts/prepare-stores.py
 if ! mountpoint -q /var/lib/developer-platform/tempo; then
   echo "Prepare the bounded trace filesystem: sudo bash scripts/prepare-tempo-storage.sh" >&2
   exit 1
@@ -20,6 +21,33 @@ python3 scripts/generate-dashboards.py
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 docker compose up -d --wait --wait-timeout 120 postgres
 python3 scripts/setup-postgres-monitoring.py
+# Claim selected stores' fixed addresses before dynamically addressed services.
+# The initializer is a one-shot job; wait for persistent services separately.
+store_services=()
+IFS=',' read -ra store_profiles <<< "${COMPOSE_PROFILES:-}"
+for profile in "${store_profiles[@]}"; do
+  case "$profile" in
+    s3) store_services+=(rustfs) ;;
+    qdrant) store_services+=(qdrant) ;;
+    opensearch) store_services+=(opensearch); docker compose up -d opensearch-init ;;
+  esac
+done
+if (( ${#store_services[@]} )); then
+  echo "Starting selected persistent data stores..."
+  docker compose up -d --wait --wait-timeout 240 "${store_services[@]}"
+fi
+if [[ ",${COMPOSE_PROFILES:-}," == *,opensearch,* ]]; then
+  initializer=$(docker compose ps -aq opensearch-init)
+  for attempt in $(seq 1 60); do
+    state=$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$initializer")
+    if [[ "$state" == 'exited 0' ]]; then break; fi
+    if [[ "$state" == exited* || "$attempt" == 60 ]]; then
+      echo "OpenSearch initialization failed or timed out; inspect private initializer diagnostics." >&2
+      exit 1
+    fi
+    sleep 2
+  done
+fi
 python3 scripts/cluster_config.py > .runtime/k3d.yaml
 if ! k3d cluster list -o json | python3 -c 'import json,sys; sys.exit(not any(c["name"] == "workloads" for c in json.load(sys.stdin)))'; then
   k3d cluster create --config .runtime/k3d.yaml

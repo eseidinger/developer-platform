@@ -2,6 +2,7 @@
 import json
 import os
 from .postgres import Postgres
+from .s3 import StoreError
 
 
 class ProviderUnavailable(Exception):
@@ -11,7 +12,43 @@ class ProviderUnavailable(Exception):
 def get(name):
     if name == "postgresql":
         return Postgres()
-    raise ProviderUnavailable("Provider has not been configured and verified")
+    selected = {value.strip() for value in os.environ.get('STORE_ENABLED_PROVIDERS', 'postgresql').split(',')}
+    if name not in selected:
+        raise ProviderUnavailable('Provider is not selected by the operator')
+    definitions = {'s3': ('RUSTFS_IP', ('RUSTFS_ACCESS_KEY', 'RUSTFS_SECRET_KEY')),
+        'opensearch': ('OPENSEARCH_IP', ('OPENSEARCH_ADMIN_PASSWORD',)),
+        'qdrant': ('QDRANT_IP', ('QDRANT_API_KEY',))}
+    if name not in definitions:
+        raise ProviderUnavailable('Provider cannot satisfy the configured resource contract')
+    try:
+        import ipaddress
+        address, secrets = definitions[name]
+        ipaddress.IPv4Address(os.environ[address])
+        if any(len(os.environ[key]) < (20 if key == 'RUSTFS_ACCESS_KEY' else 32) for key in secrets):
+            raise ValueError('Unconfigured administration credentials')
+        if name == 's3':
+            from .s3 import S3
+            return S3()
+        if name == 'qdrant':
+            from .qdrant import Qdrant
+            return Qdrant()
+        from .opensearch import OpenSearch
+        return OpenSearch()
+    except (KeyError, ValueError, OSError, StoreError):
+        raise ProviderUnavailable('Selected provider configuration is incomplete') from None
+
+
+def availability():
+    result = []
+    for name in ('postgresql', 's3', 'opensearch', 'qdrant', 'neo4j'):
+        try:
+            get(name)
+            budget(name)
+            enabled = True
+        except ProviderUnavailable:
+            enabled = False
+        result.append({'id': name, 'enabled': enabled})
+    return result
 
 
 def budget(name):
@@ -43,6 +80,11 @@ def connection(resource, credential):
     if resource["provider"] == "postgresql":
         fields.update({"PGHOST": str(ipaddress.ip_address(os.environ.get("STORE_RELAY_IP", "172.30.80.15"))),
                        "PGPORT": str(credential["relay_port"]), "PGSSLMODE": "disable"})
+    else:
+        address = str(ipaddress.ip_address(os.environ.get('STORE_RELAY_IP', '172.30.80.15')))
+        endpoint = f'http://{address}:{credential["relay_port"]}'
+        key = {'s3': 'AWS_ENDPOINT_URL_S3', 'qdrant': 'QDRANT_URL', 'opensearch': 'OPENSEARCH_URL'}[resource['provider']]
+        fields[key] = endpoint
     return fields
 
 

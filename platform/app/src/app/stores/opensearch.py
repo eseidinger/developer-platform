@@ -47,6 +47,12 @@ class OpenSearch:
         self.root.request('PUT', '/_plugins/_security/api/internalusers/' + catalog.login(credential['credential_id']),
             {'password': catalog.secret_for(credential['credential_id']),
              'backend_roles': [role(resource, credential['mode'])], 'attributes': {}, 'opendistro_security_roles': []})
+        self.verify_roles(resource, credential)
+
+    def verify_roles(self, resource, credential):
+        actual = self.scoped(credential).request('GET', '/_plugins/_security/authinfo')
+        if set(actual.get('roles', [])) != {role(resource, credential['mode'])}:
+            raise StoreError('Native role mapping exceeds the resource grant')
 
     def revoke(self, resource, credential):
         self.root.request('DELETE', '/_plugins/_security/api/internalusers/' + catalog.login(credential['credential_id']), missing=True)
@@ -61,6 +67,7 @@ class OpenSearch:
             catalog.secret_for(credential['credential_id']))}, self.ca_file)
 
     def probe(self, resource, credential):
+        self.verify_roles(resource, credential)
         self.scoped(credential).request('GET', '/' + index(resource) + '/_search?size=0')
 
     def usage(self, resource):

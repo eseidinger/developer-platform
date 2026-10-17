@@ -2,6 +2,19 @@ name: HTTP data stores
 on: [push, pull_request]
 
 jobs:
+  installation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: uv run --project platform/app python scripts/verify-shared-store-compose.py
+      - run: uv run --project platform/app python scripts/verify-opensearch-tls.py
+
   rustfs-lifecycle:
     runs-on: ubuntu-latest
     timeout-minutes: 10

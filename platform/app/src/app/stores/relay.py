@@ -55,8 +55,9 @@ def snapshot():
             AND NOT EXISTS(SELECT 1 FROM store_project_retirements retired
                 WHERE retired.project IN (r.owner_project,g.consumer_project))
             AND c.relay_port IS NOT NULL LIMIT 512""").fetchall()
+    selected = {'postgresql', *os.environ.get('STORE_ENABLED_PROVIDERS', 'postgresql').split(',')}
     return {row[0]: {"credential_id": str(row[1]), "expires_at": row[2], "resource_id": str(row[3]), "provider": row[4]}
-            for row in rows}
+            for row in rows if row[4] in selected}
 
 
 def initialize_identity(conn):

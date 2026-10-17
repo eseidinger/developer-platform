@@ -9,8 +9,11 @@ The owner requested continued implementation as far as possible with regular
 commits. Source/local provider work continues while deployed acceptance remains
 open; this does not accept the earlier package's deployed gate or enable a service.
 Native RustFS, OpenSearch and Qdrant adapters now pass real isolation, credential,
-query and empty-volume recovery fixtures. They remain unregistered while
-Compose/configuration, authenticated consoles and combined acceptance are completed.
+query and empty-volume recovery fixtures. Opt-in pinned Compose services,
+configuration/capacity-gated provider registration and non-demo OpenSearch TLS
+initialization are implemented. The actual production Compose definitions pass
+disposable health/administration checks. Authenticated HTTP-store consoles and
+combined deployed acceptance remain open; PostgreSQL is the default selection.
 See the [RustFS](../../../../persistence/compatibility/rustfs-2026-10-17.md),
 [OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md) and
 [Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) records.
