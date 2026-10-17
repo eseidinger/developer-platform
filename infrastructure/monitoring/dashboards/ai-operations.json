@@ -1,0 +1,357 @@
+{
+  "uid": "ai-operations",
+  "title": "AI operations",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "developer-platform",
+    "operator",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_runs_total, project)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "action",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_runs_total, action)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "provider",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_tokens_total, provider)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_tokens_total, model)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Explore AI traces (last hour)",
+      "type": "link",
+      "targetBlank": true,
+      "url": "/explore?schemaVersion=1&panes=%7B%22ai%22%3A+%7B%22datasource%22%3A+%22tempo%22%2C+%22queries%22%3A+%5B%7B%22refId%22%3A+%22A%22%2C+%22queryType%22%3A+%22traceql%22%2C+%22query%22%3A+%22%7B+resource.service.name+%3D+%5C%22platform-api%5C%22+%26%26+name+%3D+%5C%22platform.ai.run%5C%22+%7D%22%7D%5D%2C+%22range%22%3A+%7B%22from%22%3A+%22now-1h%22%2C+%22to%22%3A+%22now%22%7D%7D%7D"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Run outcomes",
+      "description": "Completed, abstained and failed runs. Empty data is unknown, not zero. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (outcome) (rate(platform_ai_runs_total{project=~\"$project\",action=~\"$action\"}[5m]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Model and tool call outcomes",
+      "description": "One application counter per actual attempt. Tool names are allowlisted. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation,outcome,tool) (rate(platform_ai_operations_total{project=~\"$project\",action=~\"$action\",operation=~\"model|tool\"}[5m]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Operation p50 duration",
+      "description": "OpenLIT owns provider duration; platform owns run/tool duration. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.50, sum by (le,operation) (rate(platform_ai_duration_seconds_bucket{project=~\"$project\",action=~\"$action\"}[5m])))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Operation p95 duration",
+      "description": "Latency buckets are bounded at source; includes failed provider calls. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le,operation) (rate(platform_ai_duration_seconds_bucket{project=~\"$project\",action=~\"$action\"}[5m])))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "In-flight operations",
+      "description": "Active work in this API process. Missing data is not idle. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation) (platform_ai_in_flight{project=~\"$project\",action=~\"$action\"})",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Tool calls per finished run",
+      "description": "No denominator means no observed completions; do not substitute zero. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(platform_ai_tool_calls_total{project=~\"$project\",action=~\"$action\"}[5m])) / sum(rate(platform_ai_runs_total{project=~\"$project\",action=~\"$action\"}[5m]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Approvals and queued executions",
+      "description": "Durable audit remains authoritative. Queued execution is not successful workload recovery. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 24
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (operation,outcome) (increase(platform_ai_changes_total{project=~\"$project\"}[$__range]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}

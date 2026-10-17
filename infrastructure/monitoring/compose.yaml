@@ -40,7 +40,7 @@ services:
     depends_on: [platform-api]
     image: prom/prometheus:v3.14.0
     restart: unless-stopped
-    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=4GB"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--web.enable-otlp-receiver", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=4GB"]
     volumes:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
       - ./alerts.yaml:/etc/prometheus/alerts.yml:ro

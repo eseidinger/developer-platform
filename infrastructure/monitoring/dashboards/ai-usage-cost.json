@@ -1,0 +1,252 @@
+{
+  "uid": "ai-usage-cost",
+  "title": "AI usage and estimated cost",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "browser",
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "tags": [
+    "developer-platform",
+    "operator",
+    "ai"
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "project",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_runs_total, project)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "action",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_runs_total, action)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "provider",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_tokens_total, provider)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      },
+      {
+        "name": "model",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "prometheus"
+        },
+        "query": {
+          "query": "label_values(platform_ai_tokens_total, model)",
+          "refId": "VariableQuery"
+        },
+        "refresh": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        }
+      }
+    ]
+  },
+  "links": [
+    {
+      "title": "Explore AI traces (last hour)",
+      "type": "link",
+      "targetBlank": true,
+      "url": "/explore?schemaVersion=1&panes=%7B%22ai%22%3A+%7B%22datasource%22%3A+%22tempo%22%2C+%22queries%22%3A+%5B%7B%22refId%22%3A+%22A%22%2C+%22queryType%22%3A+%22traceql%22%2C+%22query%22%3A+%22%7B+resource.service.name+%3D+%5C%22platform-api%5C%22+%26%26+name+%3D+%5C%22platform.ai.run%5C%22+%7D%22%7D%5D%2C+%22range%22%3A+%7B%22from%22%3A+%22now-1h%22%2C+%22to%22%3A+%22now%22%7D%7D%7D"
+    }
+  ],
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Input, cached input and output tokens",
+      "description": "Cached input is a subset of input: never sum all three token types as total usage. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (token_type,model) (increase(platform_ai_tokens_total{project=~\"$project\",action=~\"$action\",provider=~\"$provider\",model=~\"$model\"}[$__range]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Usage and estimate completeness",
+      "description": "Unknown includes missing/failed usage, unsupported models and unverified cached-input pricing. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (completeness,model) (increase(platform_ai_usage_observations_total{project=~\"$project\",action=~\"$action\",provider=~\"$provider\",model=~\"$model\"}[$__range]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Known estimated cost (USD)",
+      "description": "Partial known estimates only. Read alongside unknown observations. Versioned local pricing; provider bills are actual charges. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model,pricing_version) (increase(platform_ai_estimated_cost_usd_total{project=~\"$project\",action=~\"$action\",provider=~\"$provider\",model=~\"$model\"}[$__range]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Estimated cost rate (USD/s)",
+      "description": "Not billing. Collection outages and incomplete usage undercount; durable run records retain estimate provenance. Missing data means collection or target discovery needs checking.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (model,pricing_version) (rate(platform_ai_estimated_cost_usd_total{project=~\"$project\",action=~\"$action\",provider=~\"$provider\",model=~\"$model\"}[5m]))",
+          "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom"
+        }
+      }
+    }
+  ]
+}

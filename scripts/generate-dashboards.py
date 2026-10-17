@@ -2,6 +2,7 @@
 
 import json
 import argparse
+from urllib.parse import urlencode
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1] / "infrastructure/monitoring/dashboards"
@@ -244,6 +245,61 @@ def postgres_dashboard():
     return dashboard
 
 
+def ai_dashboards():
+    """Direct metrics only: exporter acceptance is not Tempo persistence proof."""
+    variables = []
+    for name, source in (("project", "platform_ai_runs_total"), ("action", "platform_ai_runs_total"),
+                         ("provider", "platform_ai_tokens_total"), ("model", "platform_ai_tokens_total")):
+        variables.append({"name": name, "type": "query", "datasource": {"type": "prometheus", "uid": "prometheus"},
+            "query": {"query": f'label_values({source}, {name})', "refId": "VariableQuery"},
+            "refresh": 1, "multi": True, "includeAll": True, "allValue": ".*",
+            "current": {"text": "All", "value": "$__all"}})
+    selected = 'project=~"$project",action=~"$action"'
+    model = selected + ',provider=~"$provider",model=~"$model"'
+    definitions = [
+        ("ai-operations", "AI operations", [
+            ("Run outcomes", f'sum by (outcome) (rate(platform_ai_runs_total{{{selected}}}[5m]))', "ops", "Completed, abstained and failed runs. Empty data is unknown, not zero."),
+            ("Model and tool call outcomes", f'sum by (operation,outcome,tool) (rate(platform_ai_operations_total{{{selected},operation=~"model|tool"}}[5m]))', "ops", "One application counter per actual attempt. Tool names are allowlisted."),
+            ("Operation p50 duration", f'histogram_quantile(0.50, sum by (le,operation) (rate(platform_ai_duration_seconds_bucket{{{selected}}}[5m])))', "s", "OpenLIT owns provider duration; platform owns run/tool duration."),
+            ("Operation p95 duration", f'histogram_quantile(0.95, sum by (le,operation) (rate(platform_ai_duration_seconds_bucket{{{selected}}}[5m])))', "s", "Latency buckets are bounded at source; includes failed provider calls."),
+            ("In-flight operations", f'sum by (operation) (platform_ai_in_flight{{{selected}}})', "short", "Active work in this API process. Missing data is not idle."),
+            ("Tool calls per finished run", f'sum(rate(platform_ai_tool_calls_total{{{selected}}}[5m])) / sum(rate(platform_ai_runs_total{{{selected}}}[5m]))', "short", "No denominator means no observed completions; do not substitute zero."),
+            ("Approvals and queued executions", 'sum by (operation,outcome) (increase(platform_ai_changes_total{project=~"$project"}[$__range]))', "short", "Durable audit remains authoritative. Queued execution is not successful workload recovery."),
+        ]),
+        ("ai-usage-cost", "AI usage and estimated cost", [
+            ("Input, cached input and output tokens", f'sum by (token_type,model) (increase(platform_ai_tokens_total{{{model}}}[$__range]))', "short", "Cached input is a subset of input: never sum all three token types as total usage."),
+            ("Usage and estimate completeness", f'sum by (completeness,model) (increase(platform_ai_usage_observations_total{{{model}}}[$__range]))', "short", "Unknown includes missing/failed usage, unsupported models and unverified cached-input pricing."),
+            ("Known estimated cost (USD)", f'sum by (model,pricing_version) (increase(platform_ai_estimated_cost_usd_total{{{model}}}[$__range]))', "currencyUSD", "Partial known estimates only. Read alongside unknown observations. Versioned local pricing; provider bills are actual charges."),
+            ("Estimated cost rate (USD/s)", f'sum by (model,pricing_version) (rate(platform_ai_estimated_cost_usd_total{{{model}}}[5m]))', "currencyUSD", "Not billing. Collection outages and incomplete usage undercount; durable run records retain estimate provenance."),
+        ]),
+        ("ai-telemetry-health", "AI telemetry health", [
+            ("Direct metric heartbeat age", 'time() - platform_ai_heartbeat_timestamp_seconds', "s", "A stale/missing heartbeat signals collection failure, not zero AI traffic. Global pipeline panel, independent of project filters."),
+            ("Configured root sampling", 'platform_ai_configured_root_sample_ratio', "percentunit", "Expected 100%. Configuration does not prove delivered trace coverage."),
+            ("Finished operations expecting spans", f'sum by (operation) (increase(platform_ai_operations_total{{{selected}}}[$__range]))', "short", "Application attempts; compare with global exported spans cautiously across process restarts and in-flight boundaries."),
+            ("AI span export acceptance", 'sum by (operation,outcome) (increase(platform_ai_spans_exported_total[$__range]))', "short", "Global SDK batch exporter result, not per-project or proof of Tempo persistence. Failed batches may be lost."),
+            ("Collector trace failures", 'sum(rate(otelcol_exporter_send_failed_spans_total[5m]))', "ops", "Global Alloy exporter failures. Missing series requires checking collector version/discovery."),
+            ("Metric export queue", 'otelcol_exporter_queue_size{exporter="otlphttp/ai_metrics"}', "short", "Global Alloy metric export queue. Direct metrics can be lost after bounded retry or queue overflow."),
+            ("Cardinality drops", 'increase(platform_ai_cardinality_dropped_total[$__range])', "short", "Source refuses new metric series beyond 1024 attribute sets; at most 128 named projects plus other."),
+            ("Trace filesystem available", 'node_filesystem_avail_bytes{mountpoint="/var/lib/developer-platform/tempo"}', "bytes", "Current 4 GiB trace volume and 24-hour retention remain in force. Storage growth must be measured before resize."),
+            ("Tempo ingestion", 'sum(rate(tempo_distributor_spans_received_total[5m]))', "ops", "Global backend ingestion, not proof that a particular AI run is retained."),
+        ]),
+    ]
+    dashboards = []
+    for uid, title, entries in definitions:
+        dashboards.append({"uid": uid, "title": title, "schemaVersion": 41, "version": 1,
+            "editable": False, "timezone": "browser", "refresh": "30s", "time": {"from": "now-1h", "to": "now"},
+            "tags": ["developer-platform", "operator", "ai"], "templating": {"list": variables},
+            "links": [{"title": "Explore AI traces (last hour)", "type": "link", "targetBlank": True,
+                "url": "/explore?" + urlencode({"schemaVersion": "1", "panes": json.dumps({"ai": {
+                    "datasource": "tempo", "queries": [{"refId": "A", "queryType": "traceql",
+                    "query": '{ resource.service.name = "platform-api" && name = "platform.ai.run" }'}],
+                    "range": {"from": "now-1h", "to": "now"}}})})}],
+            "panels": [panel(i, name, expr, unit=unit, description=description,
+                legend="{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}")
+                for i, (name, expr, unit, description) in enumerate(entries, 1)]})
+    return dashboards
+
+
 def generate(check=False):
     ROOT.mkdir(parents=True, exist_ok=True)
     expected = {}
@@ -260,7 +316,7 @@ def generate(check=False):
         if uid == "workloads-capacity":
             augment_capacity(dashboard)
         expected[uid] = dashboard
-    for dashboard in (application_dashboard(), micrometer_dashboard(), postgres_dashboard()):
+    for dashboard in (application_dashboard(), micrometer_dashboard(), postgres_dashboard(), *ai_dashboards()):
         expected[dashboard["uid"]] = dashboard
     stale = []
     for uid, dashboard in expected.items():

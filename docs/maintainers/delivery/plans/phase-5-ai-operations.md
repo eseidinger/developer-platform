@@ -363,7 +363,8 @@ full adversarial corpus. Second-provider evaluation is deferred to Phase 9 packa
 
 ## 5.7 — Add OpenLIT instrumentation (`PLAN-034`)
 
-Status: planned as of October 17, 2026; OpenLIT is not installed or accepted.
+Status: source implementation and local verification in progress as of October 17, 2026;
+deployed acceptance remains open. See the [signal contract](../../../../infrastructure/monitoring/AI.md).
 Accountable role: AI / observability. Prerequisites: existing Phase 4 telemetry
 and Phase 5 run/model/tool boundaries.
 
@@ -375,7 +376,7 @@ unused automatic instrumentors. Preserve ordinary API traces, trusted context,
 project isolation and the existing provider/export pipeline; verify these with
 regression checks. Hosted applications retain their own instrumentation. The
 separate 100% sampling policy and shared telemetry capacity apply independently.
-This decision selects the design; PLAN-034 remains unimplemented and open.
+The focused source integration is implemented; PLAN-034 deployed acceptance remains open.
 
 **Owner-selected metrics path (October 17, 2026):** Export direct OTLP metrics
 through private Alloy to Prometheus, separately from traces sent to Tempo.
@@ -458,7 +459,8 @@ export. Validate the chosen release against the acceptance criteria above.
 
 ## 5.8 — Provision AI Grafana dashboards (`PLAN-035`)
 
-Status: planned as of October 17, 2026. Accountable role: observability / AI.
+Status: source dashboards generated as of October 17, 2026; deployed acceptance
+remains open. Accountable role: observability / AI.
 Prerequisites: PLAN-034 signal contract and existing operator Grafana provisioning.
 Generate versioned dashboard JSON through `scripts/generate-dashboards.py`, using
 the existing provisioned Prometheus and Tempo data sources.

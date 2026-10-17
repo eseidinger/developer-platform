@@ -1,3 +1,9 @@
+# Bound out-of-order ingestion from the two private OTLP exporter consumers.
+storage:
+  tsdb:
+    out_of_order_time_window: 2m
+otlp:
+  translation_strategy: UnderscoreEscapingWithSuffixes
 global:
   scrape_interval: 30s
 rule_files: [/etc/prometheus/alerts.yml, /etc/prometheus/capacity-rules.yml]
