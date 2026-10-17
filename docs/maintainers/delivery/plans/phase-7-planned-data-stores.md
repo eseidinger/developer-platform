@@ -4,6 +4,18 @@ Status: planned, unscheduled as of October 17, 2026. PostgreSQL is already
 implemented; its baseline and remaining integration acceptance are package 7.1.
 Additional stores have no implementation or operational acceptance recorded here.
 
+## Implementation checkpoint — October 17, 2026
+
+Source work has started in `app.stores`: independent resource/grant/credential
+catalog, versioned administration requests, API authorization boundaries,
+PostgreSQL role/database provisioning and lifecycle/workload reconciliation.
+These routes and workers are not yet installed into the application; runtime,
+private/console access and provider expansion remain in progress. Six API
+boundary tests and a disposable real PostgreSQL fixture pass resource isolation,
+cross-writer schema ownership, future-object read access, read-only denials,
+expiry, session revocation and isolated purge. No live resources were changed.
+PLAN-026/036 and Phase 7 acceptance remain open.
+
 ## Goal and scope
 
 Provide the planned analytical, object-storage, search, graph and vector

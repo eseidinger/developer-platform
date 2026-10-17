@@ -1,0 +1,242 @@
+"""Durable desired/observed lifecycle. IDs, not names, identify resources and grants."""
+import hashlib
+import hmac
+import os
+from datetime import timedelta
+from uuid import uuid4
+from psycopg.types.json import Jsonb
+
+HUMAN_LIFETIME = timedelta(hours=24)
+APPLICATION_ROTATION = timedelta(days=30)
+ROTATION_OVERLAP = timedelta(hours=1)
+
+
+class Conflict(Exception):
+    pass
+
+
+class NotFound(Exception):
+    pass
+
+
+def initialize(conn):
+    conn.execute("""CREATE TABLE IF NOT EXISTS store_resources (
+        resource_id UUID PRIMARY KEY, owner_project TEXT NOT NULL REFERENCES projects(name),
+        name TEXT NOT NULL, provider TEXT NOT NULL CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant')),
+        extensions JSONB NOT NULL DEFAULT '[]', quota_bytes BIGINT NOT NULL CHECK(quota_bytes>0),
+        state TEXT NOT NULL CHECK(state IN ('active','retired','purging','purged')),
+        observed_state TEXT NOT NULL DEFAULT 'pending', error_code TEXT,
+        version BIGINT NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+    conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_resource_names
+        ON store_resources(owner_project,name) WHERE state<>'purged'""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS store_grants (
+        grant_id UUID PRIMARY KEY, resource_id UUID NOT NULL REFERENCES store_resources(resource_id),
+        kind TEXT NOT NULL CHECK(kind IN ('human','binding')),
+        issuer TEXT, subject TEXT, consumer_project TEXT REFERENCES projects(name), component TEXT,
+        mode TEXT NOT NULL CHECK(mode IN ('read-only','read-write')),
+        state TEXT NOT NULL CHECK(state IN ('pending','active','rejected','revoked')),
+        observed_state TEXT NOT NULL DEFAULT 'pending', version BIGINT NOT NULL DEFAULT 1,
+        requested_by TEXT NOT NULL, approved_by TEXT, error_code TEXT, bound_once BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        CHECK((kind='human' AND issuer IS NOT NULL AND subject IS NOT NULL
+                  AND consumer_project IS NULL AND component IS NULL)
+            OR (kind='binding' AND issuer IS NULL AND subject IS NULL
+                  AND consumer_project IS NOT NULL AND component IS NOT NULL)))""")
+    conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_human_grant_identity
+        ON store_grants(resource_id,issuer,subject) WHERE kind='human' AND state IN ('pending','active')""")
+    conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_binding_identity
+        ON store_grants(resource_id,consumer_project,component) WHERE kind='binding' AND state IN ('pending','active')""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS store_credentials (
+        credential_id UUID PRIMARY KEY, grant_id UUID NOT NULL REFERENCES store_grants(grant_id),
+        grant_version BIGINT NOT NULL, mode TEXT NOT NULL CHECK(mode IN ('read-only','read-write')),
+        state TEXT NOT NULL CHECK(state IN ('issuing','active','retiring','revoked')),
+        issued_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL,
+        handover_deadline TIMESTAMPTZ, observed_state TEXT NOT NULL DEFAULT 'pending', error_code TEXT,
+        UNIQUE(credential_id,grant_id))""")
+    conn.execute("CREATE INDEX IF NOT EXISTS store_credentials_expiry ON store_credentials(expires_at) WHERE state<>'revoked'")
+    conn.execute("REVOKE ALL ON store_resources,store_grants,store_credentials FROM PUBLIC")
+
+
+def _object(conn, table, field, identity, lock=False):
+    # Table and field are module-owned literals, never caller input.
+    row = conn.execute(f"SELECT row_to_json(item) FROM {table} item WHERE {field}=%s" +
+                       (" FOR UPDATE" if lock else ""), (identity,)).fetchone()
+    if not row:
+        raise NotFound()
+    return row[0]
+
+
+def resource(conn, resource_id, lock=False):
+    return _object(conn, "store_resources", "resource_id", resource_id, lock)
+
+
+def grant(conn, grant_id, lock=False):
+    return _object(conn, "store_grants", "grant_id", grant_id, lock)
+
+
+def assert_version(row, version):
+    if row["version"] != version:
+        raise Conflict("The resource changed; refresh before retrying")
+
+
+def active_project(conn, project):
+    row = conn.execute("SELECT status FROM projects WHERE name=%s FOR UPDATE", (project,)).fetchone()
+    if not row or row[0] == "retired":
+        raise Conflict("Project is not active")
+
+
+def create_resource(conn, project, body):
+    active_project(conn, project)
+    resource_id = uuid4()
+    conn.execute("""INSERT INTO store_resources(resource_id,owner_project,name,provider,extensions,quota_bytes,state)
+        VALUES (%s,%s,%s,%s,%s,%s,'active')""",
+        (resource_id, project, body.name, body.provider, Jsonb(body.extensions), body.quota_bytes))
+    return resource(conn, resource_id)
+
+
+def check_grant_capacity(conn, resource_id):
+    count = conn.execute("""SELECT count(*) FROM store_grants WHERE resource_id=%s
+        AND state IN ('pending','active')""", (resource_id,)).fetchone()[0]
+    if count >= 64:
+        raise Conflict("The resource's 64 active/pending grants allocation is full")
+
+
+def create_human_grant(conn, res, body, actor):
+    if res["state"] != "active":
+        raise Conflict("Resource is not active")
+    active_project(conn, res["owner_project"])
+    check_grant_capacity(conn, res["resource_id"])
+    identity = uuid4()
+    conn.execute("""INSERT INTO store_grants(grant_id,resource_id,kind,issuer,subject,mode,state,requested_by,approved_by)
+        VALUES (%s,%s,'human',%s,%s,%s,'active',%s,%s)""",
+        (identity, res["resource_id"], body.issuer, body.subject, body.mode, actor, actor))
+    return grant(conn, identity)
+
+
+def request_binding(conn, consumer, body, actor):
+    active_project(conn, consumer)
+    res = resource(conn, body.resource_id, lock=True)
+    active_project(conn, res["owner_project"])
+    if res["state"] != "active":
+        raise Conflict("Resource is not active")
+    check_grant_capacity(conn, res["resource_id"])
+    identity = uuid4()
+    own = consumer == res["owner_project"]
+    conn.execute("""INSERT INTO store_grants(grant_id,resource_id,kind,consumer_project,component,mode,state,
+        requested_by,approved_by) VALUES (%s,%s,'binding',%s,%s,%s,%s,%s,%s)""",
+        (identity, res["resource_id"], consumer, body.component, body.mode, "active" if own else "pending",
+         actor, actor if own else None))
+    return grant(conn, identity)
+
+
+def approve(conn, row, approve_request, actor):
+    assert_version(row, approve_request.version)
+    res = resource(conn, row["resource_id"], lock=True)
+    if row["kind"] != "binding" or row["state"] != "pending" or res["state"] != "active":
+        raise Conflict("Binding is not pending approval on an active resource")
+    active_project(conn, res["owner_project"])
+    active_project(conn, row["consumer_project"])
+    conn.execute("""UPDATE store_grants SET state=%s,approved_by=%s,version=version+1,updated_at=now()
+        WHERE grant_id=%s""", ("active" if approve_request.approve else "rejected", actor, row["grant_id"]))
+    return grant(conn, row["grant_id"])
+
+
+def retire(conn, row, version):
+    assert_version(row, version)
+    if row["state"] != "active":
+        raise Conflict("Only active resources can be retired")
+    conn.execute("""UPDATE store_resources SET state='retired',observed_state='pending',
+        version=version+1,updated_at=now() WHERE resource_id=%s""", (row["resource_id"],))
+    conn.execute("""UPDATE store_grants SET state='revoked',observed_state='pending',version=version+1,
+        updated_at=now() WHERE resource_id=%s AND state IN ('pending','active')""", (row["resource_id"],))
+    return resource(conn, row["resource_id"])
+
+
+def request_purge(conn, row, body):
+    assert_version(row, body.version)
+    if str(body.confirm_resource_id) != row["resource_id"] or body.confirm_owner_project != row["owner_project"]:
+        raise Conflict("Purge confirmation does not identify this resource and owner")
+    if row["state"] != "retired" or row["observed_state"] != "retired":
+        raise Conflict("Purge requires retirement and completed access cleanup")
+    held = conn.execute("""SELECT 1 FROM store_credentials c JOIN store_grants g USING(grant_id)
+        WHERE g.resource_id=%s AND c.state<>'revoked' LIMIT 1""", (row["resource_id"],)).fetchone()
+    if held:
+        raise Conflict("Credential cleanup is incomplete")
+    conn.execute("""UPDATE store_resources SET state='purging',observed_state='pending',
+        version=version+1,updated_at=now() WHERE resource_id=%s""", (row["resource_id"],))
+    return resource(conn, row["resource_id"])
+
+
+def issue(conn, row):
+    res = resource(conn, row["resource_id"], lock=True)
+    if row["state"] != "active" or res["state"] != "active" or res["observed_state"] != "active":
+        raise Conflict("Grant and resource must be active and provisioned")
+    active_project(conn, res["owner_project"])
+    if row["kind"] == "binding":
+        active_project(conn, row["consumer_project"])
+    outstanding = conn.execute("""SELECT count(*) FROM store_credentials WHERE grant_id=%s
+        AND state<>'revoked' AND expires_at>now()""", (row["grant_id"],)).fetchone()[0]
+    if outstanding >= 24:
+        raise Conflict("Too many outstanding credential generations; wait for expiry or revoke access")
+    identity = uuid4()
+    lifetime = HUMAN_LIFETIME if row["kind"] == "human" else APPLICATION_ROTATION + ROTATION_OVERLAP
+    if row["kind"] == "binding":
+        # Persist the FIRST replacement deadline. Retries cannot extend it.
+        conn.execute("""UPDATE store_credentials SET state='retiring',handover_deadline=COALESCE(handover_deadline,now()+%s),
+            expires_at=LEAST(expires_at,COALESCE(handover_deadline,now()+%s))
+            WHERE grant_id=%s AND state IN ('active','retiring')""",
+            (ROTATION_OVERLAP, ROTATION_OVERLAP, row["grant_id"]))
+    conn.execute("""INSERT INTO store_credentials(credential_id,grant_id,grant_version,mode,state,expires_at)
+        VALUES (%s,%s,%s,%s,'issuing',now()+%s)""",
+        (identity, row["grant_id"], row["version"], row["mode"], lifetime))
+    return _object(conn, "store_credentials", "credential_id", identity)
+
+
+def secret_for(credential_id):
+    key = os.environ.get("DATABASE_KEY", "")
+    if len(key) < 32:
+        raise RuntimeError("Managed credential key is unavailable")
+    return hmac.new(key.encode(), ("store-credential-v1:" + str(credential_id)).encode(), hashlib.sha256).hexdigest()
+
+
+def identifier(resource_id):
+    from uuid import UUID
+    return "resource_" + UUID(str(resource_id)).hex
+
+
+def login(credential_id):
+    from uuid import UUID
+    return "credential_" + UUID(str(credential_id)).hex
+
+
+def lock(conn):
+    # Same lifecycle lock as deployments/retirement: serialize authority checks
+    # with changes to the desired workload and avoid provider-side races.
+    conn.execute("SELECT pg_advisory_xact_lock(731904)")
+
+
+def revoke(conn, row, version):
+    assert_version(row, version)
+    conn.execute("""UPDATE store_grants SET state='revoked',observed_state='pending',version=version+1,
+        updated_at=now() WHERE grant_id=%s""", (row["grant_id"],))
+    return grant(conn, row["grant_id"])
+
+
+def change_mode(conn, row, body, actor):
+    assert_version(row, body.version)
+    if row["state"] != "active":
+        raise Conflict("Grant is not active")
+    # Only an owning-project administrator may call this operation. Existing
+    # generations become stale immediately, including on scope increase.
+    conn.execute("""UPDATE store_grants SET mode=%s,approved_by=%s,version=version+1,
+        observed_state='pending',updated_at=now() WHERE grant_id=%s""", (body.mode, actor, row["grant_id"]))
+    return grant(conn, row["grant_id"])
+
+
+def retire_project(conn, project):
+    conn.execute("""UPDATE store_resources SET state='retired',observed_state='pending',version=version+1,
+        updated_at=now() WHERE owner_project=%s AND state='active'""", (project,))
+    conn.execute("""UPDATE store_grants SET state='revoked',observed_state='pending',version=version+1,updated_at=now()
+        WHERE state IN ('pending','active') AND (consumer_project=%s OR resource_id IN
+            (SELECT resource_id FROM store_resources WHERE owner_project=%s))""", (project, project))
