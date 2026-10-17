@@ -43,7 +43,7 @@ def main():
             return value['data']['result']
         try:
             run('docker','run','-d','--name',prom,'--network','none','--memory','256m','-v',f'{tmp}/prom.yml:/etc/prometheus/prometheus.yml:ro','prom/prometheus:v3.14.0','--config.file=/etc/prometheus/prometheus.yml','--web.enable-otlp-receiver')
-            run('docker','run','-d','--name',alloy,'--network','container:'+prom,'--memory','256m','-v',f'{tmp}/config.alloy:/etc/alloy/config.alloy:ro','grafana/alloy:v1.19.2','run','/etc/alloy/config.alloy')
+            run('docker','run','-d','--name',alloy,'--network','container:'+prom,'--memory','512m','-v',f'{tmp}/config.alloy:/etc/alloy/config.alloy:ro','grafana/alloy:v1.19.2','run','/etc/alloy/config.alloy')
             wait(lambda: 'running' in run('docker','inspect',alloy,'--format','{{.State.Status}}'))
             run('docker','run','-d','--name',store,'--network','container:'+prom,'--memory','768m','--cpus','1',
                 '--tmpfs','/data:rw,uid=10001,gid=10001,size=64m','--tmpfs','/logs:rw,uid=10001,gid=10001,size=16m',

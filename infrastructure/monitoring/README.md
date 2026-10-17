@@ -397,6 +397,13 @@ statistics, with document and identity administration denied. Qdrant uses the
 separate `STORE_MONITOR_PASSWORD` as a native read-only key for metrics; its
 edition does not provide a metrics-only key, so keep that operator credential
 private. Resource mappings come from the catalog, not arbitrary native labels.
+All OTLP memory limiters use a common 384 MiB hard / 288 MiB soft process-heap
+budget inside Alloy's existing 512 MiB container limit. The limiter observes the
+whole collector heap, not just its named pipeline; smaller per-signal limits
+refused RustFS telemetry in the deployed multi-pipeline collector. Body limits,
+label allowlists, aggregation and batching still apply. See the
+[Alloy limiter semantics](https://grafana.com/docs/alloy/latest/reference/components/otelcol/otelcol.processor.memory_limiter/).
+
 The native collector prepares OpenSearch's restricted monitoring account once per
 process before collecting, including on an installation with no named resources.
 Failed setup is retried on the next pass; subsequent statistics requests use the
