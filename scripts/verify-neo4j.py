@@ -52,6 +52,7 @@ def main():
                 raise AssertionError('Community fixture readiness failed')
         values=controller.apply(resources[0],'jvm',{})
         assert values['platform_jvm_heap_used_bytes']>0 and values['platform_jvm_heap_max_bytes']>0
+        assert values['platform_jvm_gc_seconds_total']>=0 and values['platform_jvm_threads']>0
         print('PASS Community standard JVM heap/GC metrics without Enterprise features')
         cid, other = uuid4(), uuid4()
         password = catalog.secret_for(cid)
@@ -90,7 +91,11 @@ def main():
         # remains available without a native administrator login.
         controller.query(resources[0],'ALTER USER neo4j SET PASSWORD $password CHANGE NOT REQUIRED',
             {'password':secrets.token_hex(32)},user=catalog.login(cid),password=password)
-        controller.apply(resources[0],'retire',{})
+        for _ in range(30):
+            try:
+                controller.apply(resources[0],'retire',{});break
+            except Exception:time.sleep(.5)
+        else:raise AssertionError('Dedicated retirement did not finish')
         controller.apply(resources[0],'retire',{})
         assert not controller.info(resources[0])['State']['Running']
         assert controller.apply(resources[0],'usage',{})['used_bytes']>0

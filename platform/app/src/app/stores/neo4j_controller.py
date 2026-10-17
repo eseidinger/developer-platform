@@ -79,7 +79,6 @@ class Controller:
             self.engine.call('POST', '/containers/create?name=' + name, {
                 'Image': IMAGE, 'Labels': labels, 'User': '7474:7474',
                 'Env': ['NEO4J_AUTH=neo4j/' + self.password(rid),
-                    'NEO4J_server_jvm_additional=-javaagent:/opt/platform/jmx-agent.jar=9404:/opt/platform/jmx.yaml',
                     'NEO4J_server_memory_heap_initial__size=256m', 'NEO4J_server_memory_heap_max__size=512m',
                     'NEO4J_server_memory_pagecache_size=256m', 'NEO4J_server_bolt_tls__level=DISABLED',
                     'NEO4J_dbms_security_allow__csv__import__from__file__urls=false',
@@ -213,10 +212,11 @@ class Controller:
             import re
             values={}
             for item in response.text.splitlines():
-                matched=re.fullmatch(r'(platform_jvm_heap_(?:used|max|committed)_bytes|platform_jvm_gc_seconds_total|platform_jvm_threads)(?:\{[^}]*\})? ([0-9.eE+\-]+)',item)
+                matched=re.fullmatch(r'(platform_jvm_heap_(?:used|max|committed)_bytes|jvm_gc_collection_seconds_sum|platform_jvm_threads)(?:\{[^}]*\})? ([0-9.eE+\-]+)',item)
                 if matched:
-                    values[matched[1]]=values.get(matched[1],0)+float(matched[2])
-            if not {'platform_jvm_heap_used_bytes','platform_jvm_heap_max_bytes'} <= values.keys(): raise ValueError('JVM metrics unavailable')
+                    name='platform_jvm_gc_seconds_total' if matched[1]=='jvm_gc_collection_seconds_sum' else matched[1]
+                    values[name]=values.get(name,0)+float(matched[2])
+            if not {'platform_jvm_heap_used_bytes','platform_jvm_heap_max_bytes','platform_jvm_gc_seconds_total','platform_jvm_threads'} <= values.keys(): raise ValueError('JVM metrics unavailable')
             return values
         if action == 'usage':
             for volume in self.engine.call('GET','/system/df').get('Volumes',[]):
