@@ -15,6 +15,11 @@ def get(name):
     selected = {value.strip() for value in os.environ.get('STORE_ENABLED_PROVIDERS', 'postgresql').split(',')}
     if name not in selected:
         raise ProviderUnavailable('Provider is not selected by the operator')
+    if name == 'neo4j':
+        if len(os.environ.get('NEO4J_CONTROLLER_KEY', '')) < 32:
+            raise ProviderUnavailable('Dedicated instance controller is not configured')
+        from .neo4j import Neo4j
+        return Neo4j()
     definitions = {'s3': ('RUSTFS_IP', ('RUSTFS_ACCESS_KEY', 'RUSTFS_SECRET_KEY')),
         'opensearch': ('OPENSEARCH_IP', ('OPENSEARCH_ADMIN_PASSWORD',)),
         'qdrant': ('QDRANT_IP', ('QDRANT_API_KEY',))}
@@ -80,6 +85,9 @@ def connection(resource, credential):
     if resource["provider"] == "postgresql":
         fields.update({"PGHOST": str(ipaddress.ip_address(os.environ.get("STORE_RELAY_IP", "172.30.80.15"))),
                        "PGPORT": str(credential["relay_port"]), "PGSSLMODE": "disable"})
+    elif resource['provider'] == 'neo4j':
+        address = str(ipaddress.ip_address(os.environ.get('STORE_RELAY_IP', '172.30.80.15')))
+        fields['NEO4J_URI'] = f'bolt://{address}:{credential["relay_port"]}'
     else:
         address = str(ipaddress.ip_address(os.environ.get('STORE_RELAY_IP', '172.30.80.15')))
         endpoint = f'http://{address}:{credential["relay_port"]}'

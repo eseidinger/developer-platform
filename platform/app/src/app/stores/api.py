@@ -13,7 +13,11 @@ from ..identity import Principal
 
 
 def reply(body, status=200):
-    return JSONResponse(jsonable_encoder(body), status_code=status, headers={"Cache-Control": "no-store"})
+    def public(value):
+        if isinstance(value, dict): return {key: public(item) for key,item in value.items() if key != 'admission_sha256'}
+        if isinstance(value, list): return [public(item) for item in value]
+        return value
+    return JSONResponse(jsonable_encoder(public(body)), status_code=status, headers={"Cache-Control": "no-store"})
 
 
 def install(app, control):

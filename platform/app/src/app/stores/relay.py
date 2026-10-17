@@ -21,6 +21,9 @@ MAX_CONNECTIONS = 128
 
 
 def backend_endpoint(lease):
+    if lease['provider'] == 'neo4j':
+        import ipaddress
+        return str(ipaddress.IPv4Address(lease['native_host'])), 7687
     endpoints = {'postgresql': ('POSTGRES_IP', 5432), 's3': ('RUSTFS_IP', 9000),
                  'opensearch': ('OPENSEARCH_IP', 9200), 'qdrant': ('QDRANT_IP', 6333)}
     setting, port = endpoints[lease['provider']]
@@ -47,8 +50,9 @@ def snapshot():
             return {}
         if conn.execute('SELECT COALESCE(backup_until>now(),false) FROM store_control WHERE singleton').fetchone()[0]:
             return {}
-        rows = conn.execute("""SELECT c.relay_port,c.credential_id,c.expires_at,r.resource_id,r.provider,g.kind
+        rows = conn.execute("""SELECT c.relay_port,c.credential_id,c.expires_at,r.resource_id,r.provider,g.kind,c.admission_sha256,host(i.host)
             FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
+            LEFT JOIN store_instances i USING(resource_id)
             JOIN projects p ON p.name=r.owner_project
             LEFT JOIN projects consumer ON consumer.name=g.consumer_project
             WHERE c.state IN ('active','retiring') AND c.expires_at>now() AND c.grant_version=g.version
@@ -65,7 +69,7 @@ def snapshot():
         sessions.setdefault(str(cid), {})[key] = {'token_sha256': digest, 'expires_at': expiry}
     selected = {'postgresql', *os.environ.get('STORE_ENABLED_PROVIDERS', 'postgresql').split(',')}
     return {row[0]: {"credential_id": str(row[1]), "expires_at": row[2], "resource_id": str(row[3]), "provider": row[4],
-                    'kind': row[5], 's3_sessions': sessions.get(str(row[1]), {})}
+                    'kind': row[5], 'admission_sha256': row[6], 'native_host': row[7], 's3_sessions': sessions.get(str(row[1]), {})}
             for row in rows if row[4] in selected}
 
 
@@ -79,7 +83,7 @@ def initialize_identity(conn):
     conn.execute(sql.SQL("ALTER ROLE platform_store_relay PASSWORD {}").format(sql.Literal(password)))
     conn.execute("GRANT CONNECT ON DATABASE platform TO platform_store_relay")
     conn.execute("GRANT USAGE ON SCHEMA public TO platform_store_relay")
-    conn.execute("GRANT SELECT ON store_control,store_project_retirements,store_credentials,store_grants,store_resources,store_console_sessions TO platform_store_relay")
+    conn.execute("GRANT SELECT ON store_control,store_project_retirements,store_credentials,store_grants,store_resources,store_instances,store_console_sessions TO platform_store_relay")
     conn.execute("GRANT SELECT(name,status) ON projects TO platform_store_relay")
 
 
@@ -147,6 +151,15 @@ class Relay:
         backend_writer = None
         tasks = []
         try:
+            if lease['provider'] == 'neo4j':
+                from .bolt_relay import exchange
+                async def guard_bolt():
+                    while self.allowed(port, lease): await asyncio.sleep(.25)
+                tasks = [asyncio.create_task(exchange(reader, writer, lease, self.backend(lease))),
+                    asyncio.create_task(guard_bolt())]
+                remaining = max(0, (lease['expires_at'] - datetime.now(timezone.utc)).total_seconds())
+                await asyncio.wait_for(asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining)
+                return
             if lease["provider"] != "postgresql":
                 from .http_relay import exchange
                 session = [None]

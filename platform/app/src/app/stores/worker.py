@@ -53,7 +53,11 @@ def reconcile(conn, control=None):
         def apply_resource(res=resource):
             provider = providers.get(res["provider"])
             if res["state"] == "active":
-                provider.provision(res)
+                instance = provider.provision(res)
+                if res['provider'] == 'neo4j':
+                    conn.execute("""INSERT INTO store_instances(resource_id,host,port) VALUES(%s,%s,7687)
+                        ON CONFLICT(resource_id) DO UPDATE SET host=excluded.host,port=excluded.port""",
+                        (res['resource_id'], instance['host']))
             elif res["state"] in {"retired", "purging"}:
                 held = conn.execute("""SELECT 1 FROM store_credentials c JOIN store_grants g USING(grant_id)
                     WHERE g.resource_id=%s AND c.state<>'revoked' LIMIT 1""", (res["resource_id"],)).fetchone()
@@ -61,6 +65,8 @@ def reconcile(conn, control=None):
                     AND observed_state<>state LIMIT 1""", (res["resource_id"],)).fetchone()
                 if held or pending_grant:
                     return
+                if res['provider'] == 'neo4j' and res['state'] == 'retired':
+                    provider.retire(res)
                 if res["state"] == "purging":
                     if res.get("purge_backup_version") != res["version"] or not res.get("purge_backup_snapshot"):
                         conn.execute("UPDATE store_resources SET error_code='PurgeAwaitingVerifiedBackup' WHERE resource_id=%s",
