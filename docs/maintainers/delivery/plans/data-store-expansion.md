@@ -135,11 +135,15 @@ security/configuration recovery and fresh access approval. See the
 [backup modes](https://neo4j.com/docs/operations-manual/current/backup-restore/modes/).
 No commercial edition or license is selected.
 
-**Status:** Decision recorded, not implemented or operationally accepted. Keep
-Neo4j unavailable until dedicated-instance provisioning, capability rejection,
-identity/session enforcement, console isolation, capacity and recovery fixtures
-pass. The prior shared-instance incompatibility finding remains valid; this
-explicit resource mapping and access exception replace that proposed deployment.
+**Source/local checkpoint (October 17, 2026):** Dedicated instances, explicit
+full-access capability/read-only rejection, private Bolt and official Browser,
+independent issued-secret verification, session fencing, instance capacity limits,
+monitoring and stopped-volume recovery are implemented with disposable evidence.
+The prior shared-instance incompatibility remains valid; this resource mapping
+and access exception replace that deployment. Opt-in configuration readiness is
+not deployed operational acceptance. See the
+[compatibility record](../../../../persistence/compatibility/neo4j-2026-10-17.md)
+and [operator workflow](../../../operators/data-stores.md#dedicated-neo4j-community-resources).
 
 ## Shared-store upgrade decision
 

@@ -74,3 +74,32 @@ backup, not merely selecting the old tag. Restore quarantine revokes recovered
 store grants; fresh explicit approval and bindings follow validation. In-place
 replacement/deletion of real data requires separately authorized destructive
 recovery; this runbook does not authorize it.
+
+
+## Dedicated Neo4j Community maintenance
+
+Neo4j containers are managed per resource by the operator controller and are not
+Compose service replicas. A normal infrastructure deployment reattaches replaced
+API/relay/controller IDs to running owned networks; it does not upgrade native
+images or start retired instances. Record each resource UUID, configured image and
+actual image ID, retained volume and operator key/configuration inventory before
+maintenance. Account for every instance's CPU/memory and clean shutdown time.
+
+Build the reviewed Community/JVM image and run the full native, real-catalog and
+network-recreation fixtures linked in the
+[compatibility record](../../../persistence/compatibility/neo4j-2026-10-17.md).
+Keep the standard agent flag in the image configuration; repeated entrypoint JVM
+environment expansion broke restart in the verified release. Check heap/GC/thread
+collection after restart, not just first boot. Never substitute Enterprise metrics.
+
+Before replacing a native instance, take and verify its encrypted off-host backup,
+pause its data leases and preserve its volume and exact version inventory. Stop
+cleanly; a successful restored copy does not establish that the original can
+restart after capture. Validate native format compatibility using the candidate
+image and the empty-volume recovery fixture. Recreate only the confirmed owned
+instance through a reviewed operator procedure, preserving resource identity and
+private network/volume ownership. The controller rejects unexpected image/layout
+ownership rather than silently migrating native data. Reconcile endpoints before
+allowing fresh native traffic, then verify scoped admission, applications, Browser,
+expiry/revocation, monitoring and backup. An older image alone is not rollback.
+Retain quarantine and require fresh approval when restoring recovered grants.

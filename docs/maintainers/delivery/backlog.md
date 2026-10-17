@@ -1308,8 +1308,9 @@ versioned collectors/Grafana dashboards, bounded private collection, explicit
 native/container/application attribution, missing/stale-data visibility,
 actionable alerts and pinned-release verification. Link from the named-resource
 overview. Built-in Enterprise-only Neo4j metrics and cloud-only Qdrant metrics
-must not be assumed available. These additions are planned, not implemented;
-see the [panel scope, collection requirements and evidence plan](plans/phase-7-planned-data-stores.md#native-performance-dashboards).
+must not be assumed available. All eight definitions, native collection and application instrumentation examples
+now have source/local evidence; deployed collection and external integrations
+remain open. See the [panel scope, collection requirements and evidence plan](plans/phase-7-planned-data-stores.md#native-performance-dashboards).
 
 - [ ] **PLAN-036 · 7.1** — Implement common private/native-client and browser-console access for named PostgreSQL resources through API/CLI/portal and operator Compose/Ansible configuration. Provide scoped human credentials, protected tunnel/HTTPS routes and resource launchers with supported login/session behavior. Verify both paths across read-only/read-write users, schema changes, resource/project denial, key/credential rotation and active-session revocation/downgrade/retirement. Preserve the common contract as PLAN-027–030 add provider-specific access/console adapters. Prerequisites: PLAN-026 named-resource/grant model and selected lifecycle policy. Owner: API / UI / identity / operations. See the [access decision](plans/data-store-expansion.md#private-and-browser-console-access-decision).
 
@@ -1331,8 +1332,10 @@ see the [panel scope, collection requirements and evidence plan](plans/phase-7-p
   Preserve credential expiry/rotation and session fencing, private/Browser paths,
   per-instance capacity/monitoring, retained-data lifecycle and verified offline
   backup/recovery. Verify native administration cannot bypass platform access
-  controls. This exception is planned, not implemented; keep the provider gated
-  until fixtures pass. See the [decision](plans/data-store-expansion.md#neo4j-community-dedicated-instance-decision).
+  controls. Dedicated provisioning, explicit full-access discovery/rejection, private Bolt,
+  official Browser, independent admission, JVM metrics, catalog/network replacement
+  and cold recovery/purge now have source/local evidence. Deployed acceptance
+  remains open. See the [decision](plans/data-store-expansion.md#neo4j-community-dedicated-instance-decision).
 - [ ] **PLAN-030 · 7.5** — Vector Retrieval and AI Memory. Required outcome: pgvector/Qdrant quality comparison and scoped lifecycle/rebuild evidence. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.5](plans/phase-7-planned-data-stores.md#75-vector-retrieval-and-ai-memory).
 - [ ] **PLAN-031 · 8.1** — Time Series and OLAP. Required outcome: Realistic-load PostgreSQL/TimescaleDB/ClickHouse comparison with DuckDB reference. Accountable role: platform API / operations, with external application/experiment owners. See [package 8.1](plans/phase-8-deferred-data-stores.md#81-time-series-and-olap).
 - [ ] **PLAN-032 · 8.2** — Caching and Realtime. Required outcome: Valkey comparison including invalidation, consistency, memory and operations. Accountable role: platform API / operations, with external application/experiment owners. See [package 8.2](plans/phase-8-deferred-data-stores.md#82-caching-and-realtime).

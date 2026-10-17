@@ -345,16 +345,16 @@ query-text, query-ID and replication-client collectors are disabled. The fixed
 `postgres-queries.yaml` aggregates connection states, lock waits and transaction
 ages in SQL before export, avoiding collisions and sensitive session labels from
 the stock activity collector. It uses the pinned exporter's deprecated custom
-query option; revalidate compatibility before upgrading. No per-table
-vacuum/dead-tuple statistics are collected across project databases in this scope.
+query option; revalidate compatibility before upgrading. The shared exporter has no per-table labels. The Phase 7 collector below adds
+aggregate named-database vacuum/dead-tuple observations.
 
 Bootstrap runs `scripts/setup-postgres-monitoring.py` after PostgreSQL is healthy.
 It reconciles `platform_monitor` with `pg_monitor`, five connections maximum,
 read-only default transactions and a five-second statement timeout. It receives
 no application-table grants, superuser, role/database creation, replication or
-RLS bypass privileges. It connects only to `platform` to read shared catalog
-statistics; it does not need project application credentials or per-project
-connection grants. `pg_monitor` is a trusted operator role able to read cluster
+RLS bypass privileges. The shared exporter connects to `platform` for catalog statistics. The additional
+Phase 7 collector receives CONNECT to retained named PostgreSQL databases for
+aggregate statistics; neither collector uses application credentials or table-data grants. `pg_monitor` is a trusted operator role able to read cluster
 statistics; never expose its credential to projects or AI tools.
 
 Run `python3 scripts/init.py` to generate `POSTGRES_MONITOR_PASSWORD` in `.env`,
@@ -410,7 +410,7 @@ named databases through reviewed operator maintenance. These additions extend
 the earlier platform-only exporter scope described above.
 
 AGE/pgvector/Neo4j query latency and DuckDB/job profiling require explicit
-application instrumentation. The [collector example](../../examples/store-observability/metrics.py)
+application instrumentation. The [collector example and integration guide](../../examples/store-observability/README.md)
 opens no listener and returns Prometheus text for an application's existing
 protected metrics route. Enable the normal application metrics opt-in; its
 reviewed allowlist now accepts these bounded metric families. Only numeric
@@ -424,3 +424,18 @@ parsing all store-dashboard queries. Native OpenSearch/Qdrant fixtures additiona
 verify collector permissions and release-specific metric schemas. Alert fixtures
 include `tests/native-stores.test.yaml`; thresholds are operational starting
 points to tune against observed workloads, not store-adoption requirements.
+
+Neo4j Community's pinned image includes a checksum-verified standard JVM agent;
+heap, live threads and normalized GC seconds do not require Enterprise metrics.
+The agent flag is set once in the image configuration: passing it through the
+entrypoint's repeatable environment setting broke restarts by duplicating it.
+Native JVM collection and clean restart are fixture-verified. A separate private
+relay scrape exposes aggregate resource connection counts without credential IDs.
+The operator controller also reattaches replaced infrastructure to running owned
+instance networks; it never starts retired/stopped instances.
+
+Collection timestamps/health remain separate from retained last-good values.
+PostgreSQL resource health includes never-sampled and failed database attempts;
+its bounded round robin must not be mistaken for continuous per-resource sampling.
+Run `examples/store-observability/verify.py` with the optional analytics fixture
+group for actual DuckDB profiling and numeric-only export evidence.

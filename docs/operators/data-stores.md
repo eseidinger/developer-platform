@@ -4,22 +4,22 @@ Phase 7 implementation is in progress. PostgreSQL named resources, the API/CLI,
 portal and private lease relay are implemented in source and disposable tests.
 The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
 Disposable console SSO/connection and encrypted empty-server restore fixtures pass;
-RustFS, OpenSearch and Qdrant have native providers and opt-in Compose services
+RustFS, OpenSearch, Qdrant and dedicated Neo4j Community have native providers and opt-in service selection
 with local isolation/recovery evidence. RustFS, Qdrant and OpenSearch Dashboards
-browser access pass local native-login, mode/isolation and expiry/revocation
-fixtures; deployed acceptance remains incomplete. No existing installation has been reset.
+browser access, plus Neo4j Browser, pass local native-login, supported-mode/isolation
+and expiry/revocation fixtures; deployed acceptance remains incomplete. No existing installation has been reset.
 
 ## Selecting shared services
 
 Run `python3 scripts/init.py` to generate missing operator keys without replacing
 existing keys. After reviewing combined host capacity, set `COMPOSE_PROFILES` in
 the operator `.env` to the desired comma-separated services: `s3`, `qdrant`,
-`opensearch`. An empty selection keeps PostgreSQL only. Explicitly allocate each
+`opensearch`, `neo4j`. An empty selection keeps PostgreSQL only. Explicitly allocate each
 selected provider in `STORE_CAPACITY_BYTES`, for example:
 
 ```dotenv
-COMPOSE_PROFILES=s3,qdrant,opensearch
-STORE_CAPACITY_BYTES={"postgresql":17179869184,"s3":8589934592,"qdrant":4294967296,"opensearch":4294967296}
+COMPOSE_PROFILES=s3,qdrant,opensearch,neo4j
+STORE_CAPACITY_BYTES={"postgresql":17179869184,"s3":8589934592,"qdrant":4294967296,"opensearch":4294967296,"neo4j":4294967296}
 ```
 
 These are example logical allocations, requiring review against physical capacity.
@@ -36,11 +36,12 @@ Ansible prepares configuration before the existing maintenance outage. The API
 advertises a provider only when selection, required configuration and a positive
 capacity allocation are present. This reports configuration readiness; native
 provisioning/reconciliation reports actual service failures separately. Neo4j
-Community Edition remains unavailable pending implementation of the selected
+Community Edition uses the selected
 [dedicated-instance model](../maintainers/delivery/plans/data-store-expansion.md#neo4j-community-dedicated-instance-decision):
-one Docker instance/volume per named resource, initially one per project, with
-explicit full instance access only. Read-only grants will be rejected. This is a
-planned Neo4j-specific exception; no current Compose profile enables it.
+one Docker instance/volume per named resource, initially one retained resource per
+project, with explicit full instance access only. Read-only grants are rejected.
+The `neo4j` selection requires its operator controller/key and capacity budget;
+configuration readiness does not establish deployed acceptance.
 
 `scripts/prepare-stores.py` generates an operator-owned OpenSearch CA, verified
 server/client certificates and a non-demo access realm under `.runtime/stores`.
@@ -53,6 +54,82 @@ Node/admin certificates expire after one year; the CA expires after ten years.
 Keep those configuration files in the encrypted recovery bundle. No provider has
 a raw published host port; the API has native administrative credentials and no
 Docker socket. This source wiring does not constitute deployed acceptance.
+
+## Dedicated Neo4j Community resources
+
+Selecting `neo4j` builds the reviewed Community image from
+`persistence/neo4j/Dockerfile`. Creating a named resource then provisions its own
+persistent container, volume and internal network. Resource UUIDs determine names;
+renaming the resource does not recreate data. The project limit includes retired
+resources until confirmed purge. Several components, including owner-approved
+cross-project consumers, may bind to that same instance.
+
+The `neo4j-controller` is an operator service with Docker socket authority; neither
+the API, relay, project application nor console receives that socket. The controller
+accepts bounded predefined operations from the fixed API source using
+`NEO4J_CONTROLLER_KEY`; it accepts no arbitrary image, mount, command or Cypher.
+Only the controller receives `NEO4J_ADMIN_KEY`, used to derive separate per-instance
+native administrator passwords. Rotating the RPC key does not change those native
+passwords. Preserve the admin key in the encrypted configuration backup; changing
+it requires reviewed native administrator credential maintenance.
+
+Default limits are four retained instances across the platform, one CPU and
+1.5 GiB memory per instance. Configure `NEO4J_MAX_INSTANCES` (1–64) and
+`NEO4J_INSTANCE_MEMORY_BYTES` (1–16 GiB) only after reviewing combined host capacity,
+including the 8 GiB reserve, shared stores, Kubernetes workloads and recovery.
+Instance count admission includes retained stopped resources; byte quotas remain
+advisory. Memory/image changes for existing instances require reviewed operator
+maintenance. Native instances have no published host ports, Docker socket or
+unrestricted procedure plugins; file-URL CSV imports are disabled.
+
+Each instance network admits only its server and the API/relay/controller
+infrastructure. Every five seconds the operator controller reconciles attachments
+after Compose replaces infrastructure containers. This changes connectivity only;
+it never starts a stopped instance or reactivates a grant. The local network fixture
+verifies replacement IDs rejoin correctly and stopped instances remain stopped.
+
+The wire/API mode `read-write` means **full instance access** for Community,
+including data/schema changes and native account management. Provider/resource
+responses explicitly expose `capabilities.access_model=full-instance`,
+`supported_modes=[read-write]` and the project limit. Read-only requests and
+read-only downgrades fail. Keep explicit human grants, component bindings and owner
+approval; platform administration alone still grants no native data access.
+Full-access users can disrupt other users or the administrator within this same
+resource. Account mutations cannot create a platform lease or extend its deadline:
+relay admission independently verifies the issued platform secret. Account cleanup
+failures remain visible while revoked access is fenced. Retirement can stop the
+instance, and confirmed purge can remove its owned volume/network, even when its
+native administrator password was changed. Repairing active native administration
+requires isolated operator maintenance, not broader project/platform privileges.
+
+Applications receive `NEO4J_URI`, `NEO4J_USERNAME`, `NEO4J_PASSWORD` and
+`NEO4J_DATABASE=neo4j`. Use the direct `bolt://` endpoint through the private relay
+or encrypted SSH tunnel; native Bolt TLS is disabled inside that private boundary
+so authentication cannot hide in an opaque stream. The relay negotiates reviewed
+Bolt 5.4, checks every LOGON/reauthentication, rejects impersonation, and closes
+held connections at lease expiry, revocation or stale catalog state. Chunk large
+imports: client messages are bounded to 1 MiB and 16 concurrent Bolt connections
+across the relay, within its existing total connection budget. Queries are forwarded
+unchanged; Cypher text is not used as an authorization filter.
+
+Use **Open Neo4j console** on an active human credential. In official Neo4j Browser,
+choose `bolt+s://`, enter the console hostname with port `443` as the Connection
+URL, and enter this lease's `NEO4J_USERNAME`/`NEO4J_PASSWORD`. The portal session
+cookie authorizes the frontend; native authentication still applies. WSS transports
+Bolt to the same private relay and accepts only the matching console Origin and
+lease. Already-open sockets close on expiry/revocation. Invalid reloads clear the
+console's cookies/storage; saved local values belong to that browser profile.
+Use trusted HTTPS in deployment; fixture certificates and ignored browser errors
+are disposable-test choices.
+
+Scheduled backup pauses leases and captures the stopped native `/data` volume,
+including the system database, with an image inventory in the encrypted bundle.
+The original instance must restart after capture. Restore requires empty volumes,
+reviewed matching image inventory, quarantine, recovered-identity cleanup and fresh
+approval. It rebuilds private endpoints rather than reusing old addresses; retired
+resources return to their stopped state. Update the installed backup runner before
+enabling this provider. A tag downgrade is not a validated recovery procedure.
+See the [compatibility evidence](../../persistence/compatibility/neo4j-2026-10-17.md).
 
 ## Resource and binding workflow
 
@@ -425,6 +502,22 @@ These operational procedures and recovery targets require provider-specific
 verification before deployed acceptance.
 
 ## Local verification
+
+Neo4j checks run only against disposable services:
+
+```bash
+docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 persistence/neo4j
+uv run --project platform/app python scripts/verify-neo4j-catalog.py
+uv run --project platform/app python scripts/verify-neo4j-network-recreation.py
+NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify-neo4j.py
+```
+
+The browser fixture additionally needs the portal's installed Playwright Chromium.
+It verifies native access and schemas, independent admission, held-session fencing,
+empty-volume recovery, network isolation, official Browser login and resource purge.
+The [performance monitoring guide](../../infrastructure/monitoring/README.md#phase-7-store-performance)
+links all eight dashboards, native pipeline verification and workload instrumentation.
+
 
 `UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python
 scripts/verify-named-postgres.py` runs against a disposable PostgreSQL container.

@@ -8,18 +8,20 @@ Additional shared-store providers have no operational acceptance recorded here.
 The owner requested continued implementation as far as possible with regular
 commits. Source/local provider work continues while deployed acceptance remains
 open; this does not accept the earlier package's deployed gate or enable a service.
-Native RustFS, OpenSearch and Qdrant adapters now pass real isolation, credential,
-query and empty-volume recovery fixtures. Opt-in pinned Compose services,
+Native RustFS, OpenSearch, Qdrant and dedicated Neo4j Community adapters now pass
+real isolation, credential, query and empty-volume recovery fixtures. Opt-in pinned Compose services,
 configuration/capacity-gated provider registration and non-demo OpenSearch TLS
 initialization are implemented. The actual production Compose definitions pass
 disposable health/administration checks. RustFS, Qdrant and OpenSearch Dashboards
 native browser login, RO/RW isolation and active-session expiry/revocation now
 pass local TLS fixtures. OpenSearch resource workspaces survive human renewal
 and are included in usage, backup/recovery and isolated purge. Combined deployed
-acceptance remains open; PostgreSQL is the default selection.
+acceptance remains open; PostgreSQL is the default selection. Neo4j uses the
+recorded full-instance-access exception, initially one retained resource per project.
 See the [RustFS](../../../../persistence/compatibility/rustfs-2026-10-17.md),
-[OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md) and
-[Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) records.
+[OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md),
+[Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) and
+[Neo4j](../../../../persistence/compatibility/neo4j-2026-10-17.md) records.
 
 ## Implementation checkpoint — October 17, 2026
 
@@ -29,7 +31,7 @@ PostgreSQL role/database provisioning and lifecycle/workload reconciliation.
 The routes and workers are now wired into the source application. The portal
 and CLI manage named resources, grants/bindings and human credential leases;
 the private relay enforces credential identity and session deadlines. Browser
-consoles and the three opt-in providers have local evidence; deployed acceptance
+consoles and the four opt-in providers have local evidence; deployed acceptance
 and external domain comparisons remain in progress. See the
 [operator workflow](../../../operators/data-stores.md). Eight API
 boundary tests and a disposable real PostgreSQL fixture pass resource isolation,
@@ -40,7 +42,7 @@ queries and denial of graph writes/extension removal. A disposable real
 Keycloak → pgAdmin fixture passes SSO, scoped connection/query, password-saving
 denial, expired reconnect and anonymous denial. Production console network/TLS
 and deployed access acceptance remain open. The backend suite ran
-531 tests successfully (16 skipped); the portal suite passes 46 tests. Production
+567 tests successfully (16 skipped); the portal suite passes 48 tests. Production
 image construction passes, including bundled RustFS assets and exclusion of the
 optional DuckDB dependency from the API runtime. The relay and portal tests cover expiry, denial,
 explicit issuance and secret-cache exclusion. No live resources were changed.
@@ -96,8 +98,13 @@ within Phase 7, alongside the provider/workload packages indicated. Extend the
 existing PostgreSQL dashboard and link every performance dashboard from the
 existing named-resource overview. The overview's quota, lifecycle, credential
 cleanup and quarantine panels remain the common operational entry point.
-Native performance coverage below is planned; the existing overview and
-PostgreSQL panels do not establish completion of these additions.
+All eight performance dashboards now have generated definitions. Native
+PostgreSQL/OpenSearch/Qdrant statistics, RustFS OTLP, container measurements and
+Community JVM/relay metrics have source/local evidence. The application collector
+and real DuckDB profiling example provide workload histograms/numeric fields;
+external application instrumentation and deployed collection remain open.
+Private collector roles, missing/stale-data handling, alerts and real Prometheus
+query validation are implemented. See the [monitoring guide](../../../../infrastructure/monitoring/README.md#phase-7-store-performance).
 
 | Dashboard / package | Required panels | Metrics source and implementation constraints |
 |---|---|---|
@@ -372,8 +379,10 @@ Neo4j Browser, separate human/application identities, existing expiry/rotation
 and active-session fencing, per-instance capacity/monitoring, offline backup
 interruptions and verified recovery/purge. Verify native full-access capabilities
 cannot bypass platform identity or lease controls. No Docker socket in the API
-or commercial edition is selected. Keep the provider unavailable until these
-fixtures pass. See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
+or commercial edition is selected. The provider is now opt-in in source with native/Browser/isolation, real catalog,
+instance-replacement networking, JVM, expiry and cold-volume recovery fixtures.
+Source explicitly reports full-instance access; public/deployed acceptance remains
+open. See the [local evidence](../../../../persistence/compatibility/neo4j-2026-10-17.md). See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
 
 - Deliver AGE graph/projection monitoring and the Neo4j Community per-instance performance dashboard with the dedicated-instance provider; apply the
   [native performance dashboard requirements](#native-performance-dashboards).
