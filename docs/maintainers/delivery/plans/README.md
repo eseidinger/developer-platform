@@ -11,7 +11,7 @@ Only unfinished, owned implementation plans belong here:
 - [CLI implementation and complete project administration](cli.md)
 - [UI implementation](ui.md)
 - [Phase 7 planned data stores](phase-7-planned-data-stores.md) — baseline/integration, analytics/object storage, search, graphs and vectors
-- [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) — workload-triggered time series/OLAP, caching and documents
+- [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) — owner-scheduled time series/OLAP, caching and documents
 - [Phase 9 anytime leftovers — lowest priority](phase-9-anytime-leftovers.md)
 
 **PLAN-020** [UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)

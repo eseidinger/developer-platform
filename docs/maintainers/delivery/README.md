@@ -52,7 +52,7 @@ flowchart LR
     P4 --> P5["5 AI Operations / Development"]
     P5 -. "optional" .-> P6["6 Architecture Expansion"]
     P5 --> P7["7 Planned Data Stores"]
-    P7 -. "workload or domain trigger" .-> P8["8 Deferred Data Stores"]
+    P7 -. "owner-selected schedule" .-> P8["8 Deferred Data Stores"]
     P2C -. "anytime" .-> P9["9 Anytime Leftovers"]
     P1 --> Evidence["Measurements and Operational Evidence"]
     P2A --> Evidence
@@ -78,10 +78,10 @@ flowchart LR
 | [5](plans/phase-5-ai-operations.md) | In progress; Phase 4 gate satisfied; PLAN-025 / 5.6 owner-accepted | Implemented scoped assistance and approved rollback with bounded live evidence; PLAN-010–015 broader acceptance remains open; OpenLIT instrumentation and AI Grafana dashboards planned as 5.7–5.8 |
 | [6](../../architecture/evolution.md) | Optional owner decision after Phase 5; demonstrated need for another compute provider or service boundary | Optional Docker compute adapter and/or polyglot service extraction, each gated by parity, migration, rollback, and operational evidence |
 | [7 – Planned Data Stores](plans/phase-7-planned-data-stores.md) | Existing PostgreSQL capabilities; package 7.1 integration acceptance before additional stores | PostgreSQL baseline, DuckDB/Parquet/S3 foundation and targeted OpenSearch, AGE/Neo4j, pgvector/Qdrant comparisons and provider acceptance |
-| [8 – Deferred Data Stores](plans/phase-8-deferred-data-stores.md) | Named owner, workload/domain trigger, reproducible fixture and budget for the selected package | TimescaleDB/ClickHouse, Valkey and MongoDB/CouchDB comparisons; introduce providers only with measured value and operational evidence |
+| [8 – Deferred Data Stores](plans/phase-8-deferred-data-stores.md) | Owner-selected package, named implementation owner and resource budget | TimescaleDB/ClickHouse, Valkey and MongoDB/CouchDB comparisons; select providers at will; operational policies still apply |
 | [9 anytime leftovers](plans/phase-9-anytime-leftovers.md) | Phase 2C foundation; schedule independently when capacity allows | Finish the remaining PLAN-016/009/017/018/019/006/007/008, deployed PLAN-020 acceptance and deferred PLAN-021–024 follow-ups (9.9) and second AI provider evaluation (9.10) without gating Phases 3–5 or optional 6 |
 
-The [data-store expansion plan](plans/data-store-expansion.md) groups source roadmap phases 0–4 into planned Phase 7 and source phases 5–7 into deferred Phase 8. These are unscheduled and independent of optional Phase 6. Phase 7 packages preserve the baseline → analytics/object storage → search → graph → vector sequence. Phase 8 packages activate independently when justified. Only specifically required integration/recovery evidence from Phase 9 gates those packages; the whole leftovers phase stays non-gating. Provider lifecycle and recovery belong here; reproducible domain benchmarks remain externally owned.
+The [data-store expansion plan](plans/data-store-expansion.md) groups source roadmap phases 0–4 into planned Phase 7 and source phases 5–7 into deferred Phase 8. These are unscheduled and independent of optional Phase 6. Phase 7 packages preserve the baseline → analytics/object storage → search → graph → vector sequence. Phase 8 packages activate independently at the owner's discretion, without benchmark success or workload-need criteria. Only specifically required integration/recovery evidence from Phase 9 gates those packages; the whole leftovers phase stays non-gating. Provider lifecycle and recovery belong here; reproducible domain benchmarks remain externally owned. Selected store services remain running together; measure combined capacity and review any required increase before adding another service, rather than rotating experimental stores.
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their acceptance minimum by that phase’s exit; later extensions do not defer it.
 

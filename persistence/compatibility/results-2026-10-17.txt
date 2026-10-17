@@ -1,0 +1,48 @@
+PostgreSQL 18.6 (Debian 18.6-1.pgdg13+2) on x86_64-pc-linux-gnu, compiled by gcc (Debian 14.2.0-19) 14.2.0, 64-bit
+age|1.8.0
+timescaledb|2.30.2
+vector|0.8.7
+plpgsql|1.0  PASS database=compat_forward_0 role=compat_app
+plpgsql|1.0 vector|0.8.7  PASS database=compat_forward_1 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0  PASS database=compat_forward_2 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0 vector|0.8.7  PASS database=compat_forward_3 role=compat_app
+plpgsql|1.0 timescaledb|2.30.2  PASS database=compat_forward_4 role=compat_app
+plpgsql|1.0 timescaledb|2.30.2 vector|0.8.7  PASS database=compat_forward_5 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0 timescaledb|2.30.2  PASS database=compat_forward_6 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0 timescaledb|2.30.2 vector|0.8.7  PASS database=compat_forward_7 role=compat_app
+plpgsql|1.0  PASS database=compat_reverse_0 role=compat_app
+plpgsql|1.0 vector|0.8.7  PASS database=compat_reverse_1 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0  PASS database=compat_reverse_2 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0 vector|0.8.7  PASS database=compat_reverse_3 role=compat_app
+plpgsql|1.0 timescaledb|2.30.2  PASS database=compat_reverse_4 role=compat_app
+plpgsql|1.0 timescaledb|2.30.2 vector|0.8.7  PASS database=compat_reverse_5 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0 timescaledb|2.30.2  PASS database=compat_reverse_6 role=compat_app
+NOTICE:  graph "compat_graph" has been created
+age|1.8.0 plpgsql|1.0 timescaledb|2.30.2 vector|0.8.7  PASS database=compat_reverse_7 role=compat_app
+PASS plain database has no optional extensions
+PASS reversed shared_preload_libraries and persisted data after restart
+pg_dump: warning: there are circular foreign-key constraints on this table:
+pg_dump: detail: continuous_agg
+pg_dump: hint: You might not be able to restore the dump without using --disable-triggers or temporarily dropping the constraints.
+pg_dump: hint: Consider using a full dump instead of a --data-only dump to avoid this problem.
+PASS vector and time-series queries after combined logical restore
+LIMITATION AGE combined logical restore: SET
+ERROR:  graph with oid 24004 does not exist
+compat_graph|24004|32615|f
+PASS AGE combined query after fixture-only OID repair
+LIMITATION AGE age_only logical restore: SET
+ERROR:  graph with oid 17400 does not exist
+compat_graph|17400|33690|f
+PASS AGE age_only query after fixture-only OID repair
+LIMITATION AGE non-superuser LOAD without global preload: ERROR:  access to library "age" is not allowed
+COMMITS
+vector f37c13f68b57d2c3472b2214fbcff699d6d34876
+age e43dc1a12b78fba4acef9835b2b10379b8d243b4
+timescale b0977bf2d3a5014ee870247be09bc19d3e9f7a5f

@@ -6,6 +6,17 @@ Status: Roadmap proposal; phases indicate priorities, not fixed deadlines or com
 
 Adapted from the [portfolio roadmap dated 17 October 2026](https://chatgpt.com/c/6ad2f8da-1214-83ed-8ce0-cc6c4f78313a). The repository status described there was not rechecked for this Markdown export.
 
+**Current platform policy amendment (17 October 2026):** The owner permits
+selection and permanent adoption of data stores at will. No benchmark success
+criteria, demonstrated-benefit threshold or workload/domain-need trigger is
+required. This supersedes selection/adoption restrictions in the imported roadmap
+below. Comparisons remain learning activities; agreed provisioning, isolation,
+backup/recovery and capacity policies still apply. Selected stores are to remain
+running together; this also supersedes the imported one-at-a-time experiment
+operating model below. Measure combined capacity and resize before adding another
+store when necessary. See the
+[current delivery decision](../maintainers/delivery/plans/data-store-expansion.md#store-selection-decision).
+
 ## 1. Goal and Guiding Principles
 
 PostgreSQL remains the shared reference technology. Specialized data stores are introduced through concrete experiments across projects. Each introduction should support a functional use case, enable a traceable architecture comparison, and provide insights into development and operations.
@@ -84,7 +95,7 @@ Compare the query engine and physical storage separately, using PostgreSQL data 
 
 Compare bounded raw artifacts in PostgreSQL with versioned objects in S3-compatible object storage. Criteria: large artifacts, streaming, checksums, versioning, backups, recovery, and operating costs.
 
-RustFS and Garage are candidates for evaluation; MinIO remains another comparison candidate. Check the current distribution, maturity, license, and operating model before selecting a product.
+**Owner-selected implementation (October 17, 2026): RustFS with its official console**, following comparison with Garage and MinIO. Run it as a shared Docker Compose service with named project buckets and explicit application/component bindings. Verify pinned-release S3 behavior, scoped private/console access, credential lifecycle and backup/recovery during implementation.
 
 **Outcome:** Versioned datasets can be processed independently of physical storage. ODIP gains an analytical layer and object storage for immutable artifacts; the Developer Platform gains an S3-compatible resource provider.
 
