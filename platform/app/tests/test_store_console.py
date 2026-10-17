@@ -57,6 +57,7 @@ class ConsoleBoundaryTests(TestCase):
 
     def test_foreign_console_origin_identity_and_expired_assertions_are_denied(self):
         self.assertEqual(self.launch(origin='https://foreign.invalid').status_code, 403)
+        self.assertEqual(self.launch(origin='null').status_code, 403)
         self.assertEqual(self.launch(port=20001).status_code, 401)
         token = console.assertion(self.row, 'launch', 30)
         self.current = {**self.row, 'subject': 'other'}

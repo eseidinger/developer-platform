@@ -6,6 +6,7 @@ import { ApiError } from '@/api/errors'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog'
 import * as api from './stores-api'
+import { submitConsoleLaunch } from './console-launch'
 
 const box = 'space-y-4 rounded-xl border border-border bg-card p-5'
 const field = 'block rounded-md border border-input bg-background px-3 py-2 text-sm'
@@ -118,12 +119,7 @@ function HumanAccess({ grant, resource, prefix, action, disabled }: { grant: api
   async function openConsole(id: string) {
     const launch = await api.launchConsole(id)
     if (!alive.current) return
-    const form = document.createElement('form')
-    form.method = 'POST'; form.action = launch.url; form.target = '_blank'; form.rel = 'noopener noreferrer'
-    const input = document.createElement('input')
-    input.type = 'hidden'; input.name = 'launch'; input.value = launch.launch
-    form.append(input); document.body.append(form)
-    try { form.submit() } finally { input.value = ''; form.remove() }
+    submitConsoleLaunch(launch.url, launch.launch)
   }
   async function reveal(id: string) { const value = await api.reveal(id); if (alive.current) { setCredential(value); setShown(false) } }
   return <div className="space-y-3 border-t pt-3"><h3 className="font-semibold">{resource.owner_project} / {resource.name} · {grant.mode}</h3><p>{resource.provider} · {resource.resource_id}</p>
