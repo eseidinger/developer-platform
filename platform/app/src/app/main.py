@@ -61,6 +61,7 @@ from .keycloak_credentials import create_client as create_credential_client, del
 from . import access_store
 from .access_worker import loop as application_access_loop
 from . import human_database_access
+from .stores import catalog as store_catalog, worker as store_worker, workloads as store_workloads, relay as store_relay
 from . import tracing
 from . import application_metrics
 from . import telemetry_catalog
@@ -109,6 +110,8 @@ async def lifespan(app):
         initialize_authorization(conn)
         initialize_deployment_credentials(conn)
         human_database_access.initialize(conn)
+        store_catalog.initialize(conn)
+        store_relay.initialize_identity(conn)
         access_store.initialize(conn)
         bootstrap = bootstrap_platform_admin(conn, verifier.issuer)
     if bootstrap:
@@ -126,7 +129,7 @@ async def lifespan(app):
     security_worker.start()
     operation_worker = threading.Thread(
         target=operation_loop,
-        args=(stop, connect, password_for, provision_database, apply, resources, publish_catalog, log, remove),
+        args=(stop, connect, password_for, provision_database, apply, resources, publish_catalog, log, remove, prepare_store_resources),
         daemon=True,
     )
     operation_worker.start()
@@ -145,6 +148,8 @@ async def lifespan(app):
     access_worker = threading.Thread(target=application_access_loop,
                                     args=(stop, sys.modules[__name__]), daemon=True)
     access_worker.start()
+    stores_worker = threading.Thread(target=store_worker.loop, args=(stop, sys.modules[__name__]), daemon=True)
+    stores_worker.start()
     try:
         yield
     finally:
@@ -155,6 +160,7 @@ async def lifespan(app):
         drift_worker.join(timeout=6)
         credential_cleanup_worker.join(timeout=6)
         access_worker.join(timeout=6)
+        stores_worker.join(timeout=6)
         tracing.shutdown()
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
@@ -190,6 +196,8 @@ def portal():
 @app.get("/projects/{name}", include_in_schema=False)
 @app.get("/projects/{name}/application-access", include_in_schema=False)
 @app.get("/projects/{name}/ai", include_in_schema=False)
+@app.get("/projects/{name}/stores", include_in_schema=False)
+@app.get("/store-access", include_in_schema=False)
 @app.get("/platform/administration", include_in_schema=False)
 def portal_route(name: str | None = None):
     """Serve the browser portal for supported client-side routes and deep links."""
@@ -494,6 +502,12 @@ def provision_database(conn, name, password):
         conn.execute(sql.SQL("CREATE DATABASE {} OWNER {}")
                      .format(sql.Identifier(db), sql.Identifier(db)))
     conn.execute(sql.SQL("REVOKE ALL ON DATABASE {} FROM PUBLIC").format(sql.Identifier(db)))
+
+def prepare_store_resources(conn, project, spec, manifests):
+    with conn.transaction():
+        store_catalog.lock(conn)
+        return store_workloads.attach(conn, project, spec, manifests)
+
 
 def apply(manifest):
     resource = runtime.resources.get(api_version=manifest["apiVersion"], kind=manifest["kind"])
@@ -2005,7 +2019,7 @@ def lookup_human_database_key(fingerprint: str, x_database_bastion_token: str | 
         raise HTTPException(404, "Not found")
     destination = os.environ.get("POSTGRES_IP", "172.30.80.10") + ":5432"
     with connect() as conn:
-        record = human_database_access.authorized_key(conn, fingerprint, destination)
+        record = store_catalog.authorized_key(conn, fingerprint, os.environ.get("STORE_RELAY_IP", "172.30.80.15"))
     if record is None:
         raise HTTPException(404, "Not found")
     key, project, issuer, subject = record
@@ -2394,6 +2408,12 @@ def project_database_name(name: str) -> str:
     return "project_" + name.replace("-", "_")
 
 
+def store_history_retained(conn, name):
+    row = conn.execute("""SELECT EXISTS(SELECT 1 FROM store_resources WHERE owner_project=%s)
+        OR EXISTS(SELECT 1 FROM store_grants WHERE consumer_project=%s)""", (name, name)).fetchone()
+    return bool(row and row[0])
+
+
 def current_purge_scope(conn, name: str):
     """Return the destructive scope only for a retired project.
 
@@ -2408,12 +2428,15 @@ def current_purge_scope(conn, name: str):
     credential_rows = conn.execute("""SELECT status, count(*) FROM deployment_credentials
         WHERE project=%s GROUP BY status""", (name,)).fetchall()
     credential_states = {status: count for status, count in credential_rows}
+    retained_stores = store_history_retained(conn, name)
     database = project_database_name(name)
     return {
         "project": name,
         "database": database,
         "role": database,
-        "catalog": ["project", "environments", "applications", "revisions", "operations", "retirement inventory"],
+        "catalog": (["project"] if not retained_stores else []) + ["environments", "applications", "revisions", "operations", "retirement inventory"],
+        "named_resource_owner_retained": retained_stores,
+        "named_resources": "Retained; purge each named resource through its independent confirmed lifecycle",
         "audit_records_retained": True,
         "credential_cleanup": credential_states,
         "scope_token": purge_scope_token(name, row[0], row[1].isoformat(), credential_states),
@@ -2463,7 +2486,12 @@ def delete_project_catalog(conn, name: str) -> None:
         SELECT project_id FROM projects WHERE name=%s)""", (name,))
     conn.execute("""DELETE FROM project_retirements WHERE project_id IN (
         SELECT project_id FROM projects WHERE name=%s)""", (name,))
-    conn.execute("DELETE FROM projects WHERE name=%s", (name,))
+    if store_history_retained(conn, name):
+        # Preserve the immutable ownership/consumer reference and reserved project
+        # name. This operation never purges named stores or their access history.
+        conn.execute("UPDATE projects SET spec=NULL,status='retired',updated_at=now() WHERE name=%s", (name,))
+    else:
+        conn.execute("DELETE FROM projects WHERE name=%s", (name,))
 
 
 @app.get("/operator/projects/{name}/retirement")
@@ -2635,6 +2663,7 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                             raise
                     with access_store.locked(conn):
                         access_store.retire(conn, name, principal)
+                        store_catalog.retire_project(conn, name)
                     required_audit(actor, "project.retire.requested", "project", name, "succeeded",
                                    {"project": name}, {"revision": scope["revision"]})
                 if namespace_exists(name):
@@ -2644,6 +2673,7 @@ def retire(name: str, confirmation: Retirement, principal: Principal = Depends(c
                 else:
                     with conn.transaction():
                         conn.execute("UPDATE projects SET status='retired',updated_at=now() WHERE name=%s", (name,))
+                        store_catalog.retire_project(conn, name)
                         conn.execute("SELECT pg_advisory_xact_lock(%s)", (access_store.LOCK,))
                         access_store.retire(conn, name, principal)
                         # Retiring a project ends access immediately. Provider-client deletion is retried by the
@@ -2814,3 +2844,6 @@ def allow_certificate(domain: str = Query(max_length=253)):
 
 from .access_api import install as install_application_access_api
 install_application_access_api(app, sys.modules[__name__])
+
+from .stores.api import install as install_store_api
+install_store_api(app, sys.modules[__name__])

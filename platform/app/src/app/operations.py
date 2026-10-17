@@ -69,7 +69,7 @@ def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int
 
 def _execute_locked(conn, operation_id, password_for: Callable, provision_database: Callable,
                     apply: Callable, resources: Callable, publish_catalog: Callable,
-                    log: logging.Logger, remove: Callable | None = None) -> None:
+                    log: logging.Logger, remove: Callable | None = None, prepare_resources: Callable | None = None) -> None:
     row = conn.execute("""SELECT o.operation_id, o.application_id, o.revision, o.operation_kind,
             o.state, o.envelope_version, o.envelope, o.actor_issuer, o.actor_subject,
             p.project_id, p.name, p.status
@@ -144,6 +144,8 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
                                   spec.get("resources"), spec.get("configuration"),
                                   readiness_path=spec.get("readiness_path"),
                                   readiness_port=spec.get("readiness_port"))
+        if prepare_resources is not None:
+            manifests = prepare_resources(conn, project, spec, manifests)
         previous = conn.execute("""SELECT spec FROM application_revisions
             WHERE application_id=%s AND revision<%s ORDER BY revision DESC LIMIT 1""",
                                 (application_id, revision)).fetchone()
@@ -165,7 +167,8 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
             publish_catalog(conn)
             step = "database"
             with tracing.span("platform.operation.step", **{"platform.step": "database"}):
-                provision_database(conn, project, password)
+                if prepare_resources is None:
+                    provision_database(conn, project, password)
             # Keep the last restart marker so server-side apply does not roll the pods again.
             latest = conn.execute("""SELECT latest_restart.operation_id
                 FROM application_operations latest_restart
@@ -212,7 +215,7 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
 
 def process_one(connect: Callable, password_for: Callable, provision_database: Callable,
                 apply: Callable, resources: Callable, publish_catalog: Callable,
-                log: logging.Logger, remove: Callable | None = None) -> bool:
+                log: logging.Logger, remove: Callable | None = None, prepare_resources: Callable | None = None) -> bool:
     with connect() as conn:
         candidates = conn.execute("""SELECT operation_id FROM application_operations
             WHERE state IN ('queued', 'running') ORDER BY created_at LIMIT 100""").fetchall()
@@ -229,7 +232,7 @@ def process_one(connect: Callable, password_for: Callable, provision_database: C
                 with tracing.span("platform.operation.execute", links=tracing.origin_link(origin[0] if origin else None),
                                   **{"platform.operation.id": str(operation_id)}):
                     _execute_locked(conn, operation_id, password_for, provision_database,
-                                    apply, resources, publish_catalog, log, remove)
+                                    apply, resources, publish_catalog, log, remove, prepare_resources)
                 return True
             finally:
                 if lifecycle_locked:
@@ -241,11 +244,11 @@ def process_one(connect: Callable, password_for: Callable, provision_database: C
 
 def operation_loop(stop: threading.Event, connect: Callable, password_for: Callable,
                    provision_database: Callable, apply: Callable, resources: Callable,
-                   publish_catalog: Callable, log: logging.Logger, remove: Callable | None = None) -> None:
+                   publish_catalog: Callable, log: logging.Logger, remove: Callable | None = None, prepare_resources: Callable | None = None) -> None:
     while not stop.is_set():
         try:
             processed = process_one(connect, password_for, provision_database,
-                                    apply, resources, publish_catalog, log, remove)
+                                    apply, resources, publish_catalog, log, remove, prepare_resources)
         except Exception as exc:
             log.error("Operation worker iteration failed error_type=%s", type(exc).__name__)
             processed = False

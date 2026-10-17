@@ -6,6 +6,8 @@ include:
   - identity/compose.yaml
   - platform/compose.yaml
 networks:
+  store-consoles:
+    internal: true
   platform:
     name: developer-platform
     ipam:

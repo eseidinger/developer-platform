@@ -1,5 +1,7 @@
 """Resource administration and explicit human data-access APIs."""
 from contextlib import contextmanager
+import os
+import ipaddress
 from uuid import UUID
 from fastapi import Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -7,7 +9,7 @@ from fastapi.responses import JSONResponse
 from psycopg.errors import UniqueViolation
 from . import catalog, providers
 from .contract import (ResourceCreate, ResourceRename, Version, Purge, HumanGrant,
-                       BindingRequest, Approval, GrantUpdate, QuotaChange)
+                       BindingRequest, Approval, GrantUpdate, QuotaChange, PublicKey)
 from ..identity import Principal
 
 
@@ -27,7 +29,6 @@ def install(app, control):
         try:
             with control.connect() as conn, conn.transaction():
                 catalog.lock(conn)
-                human(conn, principal)
                 yield conn
         except catalog.NotFound:
             raise HTTPException(404, "Unknown resource or grant") from None
@@ -47,6 +48,16 @@ def install(app, control):
         control.required_audit(control.actor_for(principal), "store." + action, "store-resource", str(identity),
             "succeeded", {"project": row.get("owner_project") or row.get("consumer_project")},
             {key: row[key] for key in ("state", "version", "grant_id", "mode") if key in row})
+
+    @app.get("/v1/projects/{project}/store-context")
+    def context(project: str, principal: Principal = caller):
+        control.require_permission(principal, "view", project)
+        with control.connect() as conn:
+            admin = control.is_allowed(conn, principal, "manage", project)
+            platform_admin = control.is_platform_admin(conn, principal)
+            return reply({"project": project, "manage": admin, "platform_admin": platform_admin,
+                "providers": [{"id": "postgresql", "enabled": True}],
+                "limits": {"resources": 128, "grants_per_resource": 64, "concurrent_credential_leases": 512}})
 
     @app.get("/v1/projects/{project}/resources")
     def list_resources(project: str, principal: Principal = caller):
@@ -192,6 +203,25 @@ def install(app, control):
             audit(principal, "grant-revoke", row)
         return reply(row, 202)
 
+    @app.put("/v1/store-access/me/key")
+    def replace_key(body: PublicKey, principal: Principal = caller):
+        from ..human_database_access import parse_public_key
+        try:
+            key, fingerprint = parse_public_key(body.public_key)
+        except ValueError:
+            raise HTTPException(422, "A valid Ed25519 public key is required") from None
+        with mutation(principal) as conn:
+            human(conn, principal)
+            conn.execute("""UPDATE store_credentials c SET expires_at=now() FROM store_grants g
+                WHERE c.grant_id=g.grant_id AND g.kind='human' AND g.issuer=%s AND g.subject=%s
+                    AND c.state<>'revoked'""", (principal.issuer, principal.subject))
+            conn.execute("""INSERT INTO store_human_keys(issuer,subject,public_key,fingerprint) VALUES(%s,%s,%s,%s)
+                ON CONFLICT(issuer,subject) DO UPDATE SET public_key=excluded.public_key,fingerprint=excluded.fingerprint""",
+                (principal.issuer, principal.subject, key, fingerprint))
+            control.required_audit(control.actor_for(principal), "store.key-replace", "principal",
+                principal.audit_id, "succeeded")
+        return reply({"fingerprint": fingerprint})
+
     @app.get("/v1/store-access/me")
     def my_resources(principal: Principal = caller):
         with control.connect() as conn:
@@ -200,13 +230,22 @@ def install(app, control):
                 JOIN store_resources r USING(resource_id) WHERE g.kind='human' AND g.issuer=%s
                 AND g.subject=%s AND g.state='active' AND r.state='active' ORDER BY r.name LIMIT 256""",
                 (principal.issuer, principal.subject)).fetchall()
-        return reply({"grants": [{"grant": r[0], "resource": r[1]} for r in rows]})
+        return reply({"grants": [{"grant": r[0], "resource": {**r[1], "console_url": providers.console_url(r[1]["provider"])}} for r in rows]})
 
     def own_human(conn, grant_id, principal):
+        human(conn, principal)
         row = catalog.grant(conn, grant_id, lock=True)
         if row["kind"] != "human" or (row["issuer"], row["subject"]) != (principal.issuer, principal.subject):
             raise HTTPException(404, "Unknown human resource grant")
         return row
+
+    @app.get("/v1/store-access/{grant_id}/credentials")
+    def list_own_credentials(grant_id: UUID, principal: Principal = caller):
+        with mutation(principal) as conn:
+            own_human(conn, grant_id, principal)
+            rows = conn.execute("""SELECT row_to_json(c) FROM store_credentials c WHERE grant_id=%s
+                ORDER BY issued_at DESC LIMIT 24""", (grant_id,)).fetchall()
+        return reply({"credentials": [row[0] for row in rows]})
 
     @app.post("/v1/store-access/{grant_id}/credentials", status_code=202)
     def issue_credential(grant_id: UUID, principal: Principal = caller):
@@ -222,12 +261,19 @@ def install(app, control):
             cred = catalog._object(conn, "store_credentials", "credential_id", credential_id)
             row = own_human(conn, cred["grant_id"], principal)
             res = catalog.resource(conn, row["resource_id"])
-            valid = conn.execute("""SELECT expires_at>now() AND state='active' FROM store_credentials
+            valid = conn.execute("""SELECT expires_at>now() FROM store_credentials
                 WHERE credential_id=%s""", (credential_id,)).fetchone()[0]
-            if (not valid or row["state"] != "active" or res["state"] != "active"
+            if (valid and cred["state"] == "issuing" and row["state"] == "active" and res["state"] == "active"
+                    and cred["grant_version"] == row["version"]):
+                return reply(cred, 202)
+            if (not valid or cred["state"] != "active" or row["state"] != "active" or res["state"] != "active"
                     or cred["grant_version"] != row["version"]):
                 raise HTTPException(409, "Credential is pending, expired, revoked or its grant changed")
             control.required_audit(control.actor_for(principal), "store.credential-reveal", "store-credential",
                 str(credential_id), "succeeded", {"project": res["owner_project"]})
-            return reply({**cred, "provider": res["provider"],
-                "connection": providers.get(res["provider"]).credentials(res, cred)})
+            connection = providers.connection(res, cred)
+            return reply({**cred, "provider": res["provider"], "connection": connection,
+                "transport": "private SSH tunnel or isolated console; relay closes at credential expiry",
+                "ssh": {"user": "platform-db", "host": os.environ.get("PLATFORM_DOMAIN", "platform.localhost"),
+                    "port": 2222, "destination": os.environ.get("STORE_RELAY_IP", "172.30.80.15"),
+                    "destination_port": cred["relay_port"]}})

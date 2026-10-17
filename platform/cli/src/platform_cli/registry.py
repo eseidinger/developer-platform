@@ -151,3 +151,33 @@ for family, collection, fields in (
 add("operator test-runner-credentials rotate", "POST", "/platform/test-runner-credentials/{credential_id}/rotate", "Rotate a test runner credential.", body="credential", fields=("expires_in_days", "overlap_hours"), credential=True, destructive=True)
 
 EXCLUSIONS = {("GET", "/healthz"): "Service liveness probe", ("GET", "/readyz"): "Service readiness probe"}
+
+
+# Named store resources use body versions and explicit UUID scope confirmations.
+add("stores list", "GET", A + "/resources", "List independent named resources.")
+add("stores create", "POST", A + "/resources", "Create a named store resource from JSON.", body="file")
+S = "/v1/resources/{resource_id}"
+add("stores get", "GET", S, "Inspect resource provisioning and quota enforcement.")
+add("stores rename", "PATCH", S, "Rename a resource without changing its stable identity.", body="file")
+add("stores quota", "PUT", S + "/quota", "Approve a capacity-checked quota change (platform admin).", body="file")
+add("stores retire", "POST", S + "/retirement", "Revoke access and retain the named resource.", body="file", destructive=True)
+add("stores purge-preview", "GET", S + "/purge-preview", "Preview the exact resource purge scope.")
+add("stores purge", "POST", S + "/purge", "Purge a retired resource with exact UUID/owner/version confirmation.", body="file", destructive=True)
+add("stores grants list", "GET", S + "/grants", "List human grants and component requests.")
+add("stores grants create", "POST", S + "/human-grants", "Create a resource-scoped human grant.", body="file")
+add("stores bindings list", "GET", A + "/resource-bindings", "List outgoing component bindings.")
+add("stores bindings request", "POST", A + "/resource-bindings", "Request explicit component access.", body="file")
+G = "/v1/resource-grants/{grant_id}"
+add("stores grants approve", "POST", G + "/approval", "Approve or reject a cross-project request.", body="file")
+add("stores grants mode", "PUT", G + "/mode", "Change resource-scoped permissions using the current version.", body="file")
+add("stores grants revoke", "POST", G + "/revocation", "Revoke a grant and all credential generations.", body="file", destructive=True)
+add("stores access me", "GET", "/v1/store-access/me", "List your explicit named-resource grants.")
+add("stores access key", "PUT", "/v1/store-access/me/key", "Replace your Ed25519 key; end current leases.", body="file")
+add("stores access issue", "POST", "/v1/store-access/{grant_id}/credentials", "Issue a new 24-hour credential lease.")
+add("stores access credential", "GET", "/v1/store-access/credentials/{credential_id}", "Reveal your active scoped credential (sensitive output).", credential=True)
+
+add("stores context", "GET", A + "/store-context", "Inspect store administration permissions and enabled providers.")
+add("stores access leases", "GET", "/v1/store-access/{grant_id}/credentials", "List your non-secret credential lease metadata.")
+add("ai context", "GET", P + "/ai/context", "Inspect AI permissions and current revision.")
+add("ai runs list", "GET", P + "/ai/runs", "List project-scoped AI run history.", query=("limit", "before"))
+add("ai proposals list", "GET", P + "/ai/proposals", "List project-scoped AI change proposals.", query=("limit", "before"))

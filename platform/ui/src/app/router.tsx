@@ -6,6 +6,7 @@ import { ProjectWorkspace } from '@/features/projects/project-workspace'
 import { PlatformAdministrationPage } from '@/features/platform/platform-administration-page'
 import { ApplicationAccessPage } from '@/features/access/application-access-page'
 
+import { StoresPage } from '@/features/stores/stores-page'
 import { AiAssistancePage } from '@/features/ai/ai-assistance-page'
 
 const router = createBrowserRouter([
@@ -21,6 +22,8 @@ const router = createBrowserRouter([
         path: 'projects/:name',
         element: <ProjectWorkspace />,
       },
+      { path: 'projects/:name/stores', element: <StoresPage /> },
+      { path: 'store-access', element: <StoresPage /> },
       { path: 'projects/:name/ai', element: <AiAssistancePage /> },
       {
         path: 'projects/:name/application-access',

@@ -189,25 +189,6 @@
         "title": "ApplicationEnvelopeV1Alpha2",
         "type": "object"
       },
-      "Approval": {
-        "additionalProperties": false,
-        "properties": {
-          "groups": {
-            "items": {
-              "type": "string"
-            },
-            "maxItems": 50,
-            "minItems": 1,
-            "title": "Groups",
-            "type": "array"
-          }
-        },
-        "required": [
-          "groups"
-        ],
-        "title": "Approval",
-        "type": "object"
-      },
       "Authentication": {
         "additionalProperties": false,
         "properties": {
@@ -243,6 +224,37 @@
           "anyOfGroups"
         ],
         "title": "Authorization",
+        "type": "object"
+      },
+      "BindingRequest": {
+        "additionalProperties": false,
+        "properties": {
+          "component": {
+            "maxLength": 32,
+            "pattern": "^[a-z][a-z0-9-]{0,30}[a-z0-9]$|^[a-z]$",
+            "title": "Component",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "read-only",
+              "read-write"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "resource_id": {
+            "format": "uuid",
+            "title": "Resource Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "resource_id",
+          "component",
+          "mode"
+        ],
+        "title": "BindingRequest",
         "type": "object"
       },
       "ComponentRuntime": {
@@ -326,21 +338,6 @@
                 "type": "null"
               }
             ]
-          },
-          "resources": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ExternalResource"
-                },
-                "maxItems": 1,
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resources"
           }
         },
         "required": [
@@ -507,38 +504,6 @@
         "title": "Endpoint",
         "type": "object"
       },
-      "ExternalResource": {
-        "additionalProperties": false,
-        "properties": {
-          "deletionPolicy": {
-            "const": "retain",
-            "title": "Deletionpolicy",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "profile": {
-            "const": "shared-dev",
-            "title": "Profile",
-            "type": "string"
-          },
-          "type": {
-            "const": "postgres",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "type",
-          "profile",
-          "deletionPolicy"
-        ],
-        "title": "ExternalResource",
-        "type": "object"
-      },
       "Governance": {
         "additionalProperties": false,
         "properties": {
@@ -621,6 +586,30 @@
           "subject"
         ],
         "title": "GrantReference",
+        "type": "object"
+      },
+      "GrantUpdate": {
+        "additionalProperties": false,
+        "properties": {
+          "mode": {
+            "enum": [
+              "read-only",
+              "read-write"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "mode"
+        ],
+        "title": "GrantUpdate",
         "type": "object"
       },
       "GroupCreate": {
@@ -737,6 +726,38 @@
           "subject"
         ],
         "title": "HumanDatabaseReference",
+        "type": "object"
+      },
+      "HumanGrant": {
+        "additionalProperties": false,
+        "properties": {
+          "issuer": {
+            "maxLength": 512,
+            "minLength": 1,
+            "title": "Issuer",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "read-only",
+              "read-write"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "subject": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Subject",
+            "type": "string"
+          }
+        },
+        "required": [
+          "issuer",
+          "subject",
+          "mode"
+        ],
+        "title": "HumanGrant",
         "type": "object"
       },
       "IdentityAttributes": {
@@ -1136,6 +1157,72 @@
         "title": "ProjectPurge",
         "type": "object"
       },
+      "PublicKey": {
+        "additionalProperties": false,
+        "properties": {
+          "public_key": {
+            "maxLength": 256,
+            "minLength": 1,
+            "title": "Public Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "public_key"
+        ],
+        "title": "PublicKey",
+        "type": "object"
+      },
+      "Purge": {
+        "additionalProperties": false,
+        "properties": {
+          "confirm_owner_project": {
+            "maxLength": 32,
+            "pattern": "^[a-z][a-z0-9-]{0,30}[a-z0-9]$|^[a-z]$",
+            "title": "Confirm Owner Project",
+            "type": "string"
+          },
+          "confirm_resource_id": {
+            "format": "uuid",
+            "title": "Confirm Resource Id",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "confirm_resource_id",
+          "confirm_owner_project"
+        ],
+        "title": "Purge",
+        "type": "object"
+      },
+      "QuotaChange": {
+        "additionalProperties": false,
+        "properties": {
+          "quota_bytes": {
+            "maximum": 1099511627776.0,
+            "minimum": 1048576.0,
+            "title": "Quota Bytes",
+            "type": "integer"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "quota_bytes"
+        ],
+        "title": "QuotaChange",
+        "type": "object"
+      },
       "Readiness": {
         "additionalProperties": false,
         "properties": {
@@ -1183,6 +1270,97 @@
           }
         },
         "title": "Readiness",
+        "type": "object"
+      },
+      "ResourceBinding": {
+        "additionalProperties": false,
+        "properties": {
+          "bindingId": {
+            "format": "uuid",
+            "title": "Bindingid",
+            "type": "string"
+          },
+          "envPrefix": {
+            "default": "",
+            "maxLength": 32,
+            "pattern": "^([A-Z][A-Z0-9_]*_)?$",
+            "title": "Envprefix",
+            "type": "string"
+          }
+        },
+        "required": [
+          "bindingId"
+        ],
+        "title": "ResourceBinding",
+        "type": "object"
+      },
+      "ResourceCreate": {
+        "additionalProperties": false,
+        "properties": {
+          "extensions": {
+            "items": {
+              "enum": [
+                "vector",
+                "age"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Extensions",
+            "type": "array"
+          },
+          "name": {
+            "maxLength": 32,
+            "pattern": "^[a-z][a-z0-9-]{0,30}[a-z0-9]$|^[a-z]$",
+            "title": "Name",
+            "type": "string"
+          },
+          "provider": {
+            "enum": [
+              "postgresql",
+              "s3",
+              "opensearch",
+              "neo4j",
+              "qdrant"
+            ],
+            "title": "Provider",
+            "type": "string"
+          },
+          "quota_bytes": {
+            "default": 1073741824,
+            "maximum": 1099511627776.0,
+            "minimum": 1048576.0,
+            "title": "Quota Bytes",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "provider"
+        ],
+        "title": "ResourceCreate",
+        "type": "object"
+      },
+      "ResourceRename": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "maxLength": 32,
+            "pattern": "^[a-z][a-z0-9-]{0,30}[a-z0-9]$|^[a-z]$",
+            "title": "Name",
+            "type": "string"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "version"
+        ],
+        "title": "ResourceRename",
         "type": "object"
       },
       "Retirement": {
@@ -1357,6 +1535,14 @@
       "ScheduledComponent": {
         "additionalProperties": false,
         "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceBinding"
+            },
+            "maxItems": 8,
+            "title": "Bindings",
+            "type": "array"
+          },
           "concurrencyPolicy": {
             "const": "Forbid",
             "default": "Forbid",
@@ -1465,6 +1651,14 @@
       "ServiceComponent": {
         "additionalProperties": false,
         "properties": {
+          "bindings": {
+            "items": {
+              "$ref": "#/components/schemas/ResourceBinding"
+            },
+            "maxItems": 8,
+            "title": "Bindings",
+            "type": "array"
+          },
           "exposure": {
             "default": "private",
             "enum": [
@@ -1629,21 +1823,6 @@
                 "type": "null"
               }
             ]
-          },
-          "resources": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/ExternalResource"
-                },
-                "maxItems": 1,
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resources"
           }
         },
         "required": [
@@ -1780,6 +1959,60 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "Version": {
+        "additionalProperties": false,
+        "properties": {
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version"
+        ],
+        "title": "Version",
+        "type": "object"
+      },
+      "app__access_contract__Approval": {
+        "additionalProperties": false,
+        "properties": {
+          "groups": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 50,
+            "minItems": 1,
+            "title": "Groups",
+            "type": "array"
+          }
+        },
+        "required": [
+          "groups"
+        ],
+        "title": "Approval",
+        "type": "object"
+      },
+      "app__stores__contract__Approval": {
+        "additionalProperties": false,
+        "properties": {
+          "approve": {
+            "title": "Approve",
+            "type": "boolean"
+          },
+          "version": {
+            "minimum": 1.0,
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "version",
+          "approve"
+        ],
+        "title": "Approval",
         "type": "object"
       }
     },
@@ -2760,6 +2993,48 @@
         "summary": "Provision"
       }
     },
+    "/projects/{name}/ai/context": {
+      "get": {
+        "operationId": "ai_context_projects__name__ai_context_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Ai Context"
+      }
+    },
     "/projects/{name}/ai/policy": {
       "get": {
         "operationId": "get_ai_policy_projects__name__ai_policy_get",
@@ -2853,6 +3128,75 @@
       }
     },
     "/projects/{name}/ai/proposals": {
+      "get": {
+        "operationId": "list_ai_proposals_projects__name__ai_proposals_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Ai Proposals"
+      },
       "post": {
         "operationId": "create_ai_proposal_projects__name__ai_proposals_post",
         "parameters": [
@@ -3081,6 +3425,75 @@
       }
     },
     "/projects/{name}/ai/runs": {
+      "get": {
+        "operationId": "list_ai_runs_projects__name__ai_runs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "required": false,
+            "schema": {
+              "default": 20,
+              "maximum": 50,
+              "minimum": 1,
+              "title": "Limit",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "uuid",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Ai Runs"
+      },
       "post": {
         "operationId": "create_ai_run_projects__name__ai_runs_post",
         "parameters": [
@@ -5456,7 +5869,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Approval"
+                "$ref": "#/components/schemas/app__access_contract__Approval"
               }
             }
           },
@@ -5586,7 +5999,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Approval"
+                "$ref": "#/components/schemas/app__access_contract__Approval"
               }
             }
           },
@@ -6348,6 +6761,190 @@
         "summary": "Governance"
       }
     },
+    "/v1/projects/{project}/resource-bindings": {
+      "get": {
+        "operationId": "list_bindings_v1_projects__project__resource_bindings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Bindings"
+      },
+      "post": {
+        "operationId": "request_binding_v1_projects__project__resource_bindings_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Binding"
+      }
+    },
+    "/v1/projects/{project}/resources": {
+      "get": {
+        "operationId": "list_resources_v1_projects__project__resources_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Resources"
+      },
+      "post": {
+        "operationId": "create_resource_v1_projects__project__resources_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Resource"
+      }
+    },
     "/v1/projects/{project}/service-access-requests": {
       "get": {
         "operationId": "service_requests_v1_projects__project__service_access_requests_get",
@@ -6545,7 +7142,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Approval"
+                "$ref": "#/components/schemas/app__access_contract__Approval"
               }
             }
           },
@@ -6827,6 +7424,788 @@
           }
         ],
         "summary": "Rotate Service"
+      }
+    },
+    "/v1/projects/{project}/store-context": {
+      "get": {
+        "operationId": "context_v1_projects__project__store_context_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Context"
+      }
+    },
+    "/v1/resource-grants/{grant_id}/approval": {
+      "post": {
+        "operationId": "approve_binding_v1_resource_grants__grant_id__approval_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__stores__contract__Approval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Binding"
+      }
+    },
+    "/v1/resource-grants/{grant_id}/mode": {
+      "put": {
+        "operationId": "change_mode_v1_resource_grants__grant_id__mode_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Mode"
+      }
+    },
+    "/v1/resource-grants/{grant_id}/revocation": {
+      "post": {
+        "operationId": "revoke_grant_v1_resource_grants__grant_id__revocation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Grant"
+      }
+    },
+    "/v1/resources/{resource_id}": {
+      "get": {
+        "operationId": "get_resource_v1_resources__resource_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Resource"
+      },
+      "patch": {
+        "operationId": "rename_resource_v1_resources__resource_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Resource"
+      }
+    },
+    "/v1/resources/{resource_id}/grants": {
+      "get": {
+        "operationId": "list_grants_v1_resources__resource_id__grants_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Grants"
+      }
+    },
+    "/v1/resources/{resource_id}/human-grants": {
+      "post": {
+        "operationId": "create_human_grant_v1_resources__resource_id__human_grants_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Human Grant"
+      }
+    },
+    "/v1/resources/{resource_id}/purge": {
+      "post": {
+        "operationId": "purge_resource_v1_resources__resource_id__purge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Purge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Purge Resource"
+      }
+    },
+    "/v1/resources/{resource_id}/purge-preview": {
+      "get": {
+        "operationId": "purge_preview_v1_resources__resource_id__purge_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Purge Preview"
+      }
+    },
+    "/v1/resources/{resource_id}/quota": {
+      "put": {
+        "operationId": "set_quota_v1_resources__resource_id__quota_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Quota"
+      }
+    },
+    "/v1/resources/{resource_id}/retirement": {
+      "post": {
+        "operationId": "retire_resource_v1_resources__resource_id__retirement_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retire Resource"
+      }
+    },
+    "/v1/store-access/credentials/{credential_id}": {
+      "get": {
+        "operationId": "get_credential_v1_store_access_credentials__credential_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Credential"
+      }
+    },
+    "/v1/store-access/me": {
+      "get": {
+        "operationId": "my_resources_v1_store_access_me_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "My Resources"
+      }
+    },
+    "/v1/store-access/me/key": {
+      "put": {
+        "operationId": "replace_key_v1_store_access_me_key_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PublicKey"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Replace Key"
+      }
+    },
+    "/v1/store-access/{grant_id}/credentials": {
+      "get": {
+        "operationId": "list_own_credentials_v1_store_access__grant_id__credentials_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Own Credentials"
+      },
+      "post": {
+        "operationId": "issue_credential_v1_store_access__grant_id__credentials_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Issue Credential"
       }
     }
   }

@@ -118,7 +118,7 @@
           AuthorizedKeysCommand /usr/local/libexec/platform-db-authorized-key %f
           AuthorizedKeysCommandUser platform-db-keylookup
           AllowTcpForwarding local
-          PermitOpen {{ database_postgres_ip }}:5432
+          PermitOpen {{ database_store_relay_ip | default("172.30.80.15") }}:*
           PermitListen none
           AllowStreamLocalForwarding no
           AllowAgentForwarding no

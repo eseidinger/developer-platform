@@ -93,7 +93,7 @@ def project_names(run_id):
     return {role: "ha-" + run_id + "-" + role for role in ("provider", "consumer")}
 
 
-def declaration(project, role, image, run_id, provider_url, issuer):
+def declaration(project, role, image, run_id, provider_url, issuer, bindings=None):
     names = project_names(run_id)
     require(project == names[role] and IMAGE_PATTERN.fullmatch(image), "invalid_fixture_declaration")
     outbound = [{"dns": urlsplit(url).hostname, "port": 443} for url in (provider_url, issuer)] if role == "consumer" else []
@@ -103,13 +103,13 @@ def declaration(project, role, image, run_id, provider_url, issuer):
                     **({"args": ["fixture.py", "--worker"], "command": ["python"]} if not public else {})},
             "ports": [{"name": "http", "protocol": "http", "port": 8080}],
             "replicas": 1, "exposure": "public" if public else "private", "resources": copy.deepcopy(limits),
+            "bindings": ([{"bindingId": bindings[name], "envPrefix": ""}] if bindings and name in bindings else []),
             "health": {"readiness": {"path": "/health/ready", "port": 8080}},
             "outbound": copy.deepcopy(outbound) if public else []}
     return {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": project},
         "spec": {"components": [component("api", True), component("worker", False)],
             "configuration": {"values": {"ACCEPTANCE_RUN_ID": run_id, "FIXTURE_ROLE": role,
-                                            "PROVIDER_URL": provider_url}},
-            "resources": [{"name": "state", "type": "postgres", "profile": "shared-dev", "deletionPolicy": "retain"}]}}
+                                            "PROVIDER_URL": provider_url}}}}
 
 
 def access_policy(readers, humans, administrators):
@@ -498,7 +498,23 @@ class Drill:
             owner = API(self.api.url, MachineTokens({"CLIENT_ID": persona["client_id"], "CLIENT_SECRET": persona["client_secret"],
                                                      "TOKEN_URL": persona["token_endpoint"]}))
             self.owners[role] = owner
-            spec = declaration(project, role, self.args.fixture_image, self.run_id, self.urls["provider"], self.keycloak.issuer)
+            storage = owner.request("POST", "/v1/projects/" + project + "/resources",
+                {"name": "state", "provider": "postgresql", "quota_bytes": 1073741824}, statuses=(202,))
+            def resource_ready():
+                found = owner.request("GET", "/v1/resources/" + storage["resource_id"])
+                return found["observed_state"] == "active"
+            wait_for(resource_ready, "named_database_not_ready")
+            bindings = {}
+            for component in ("api", "worker"):
+                grant = owner.request("POST", "/v1/projects/" + project + "/resource-bindings",
+                    {"resource_id": storage["resource_id"], "component": component, "mode": "read-write"}, statuses=(202,))
+                bindings[component] = grant["grant_id"]
+            def bindings_ready():
+                found = owner.request("GET", "/v1/projects/" + project + "/resource-bindings")["bindings"]
+                return all(any(g["grant_id"] == value and g["observed_state"] == "active" for g in found)
+                           for value in bindings.values())
+            wait_for(bindings_ready, "named_database_bindings_not_ready")
+            spec = declaration(project, role, self.args.fixture_image, self.run_id, self.urls["provider"], self.keycloak.issuer, bindings)
             deployed = owner.request("PUT", "/projects/" + project, spec, etag=0, statuses=(202,))
             operation = owner.operation(deployed)
             require(re.fullmatch(r"[0-9a-f-]{36}", deployed["operation_id"]), "invalid_operation_id")

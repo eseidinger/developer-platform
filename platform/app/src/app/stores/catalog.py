@@ -37,7 +37,7 @@ def initialize(conn):
         mode TEXT NOT NULL CHECK(mode IN ('read-only','read-write')),
         state TEXT NOT NULL CHECK(state IN ('pending','active','rejected','revoked')),
         observed_state TEXT NOT NULL DEFAULT 'pending', version BIGINT NOT NULL DEFAULT 1,
-        requested_by TEXT NOT NULL, approved_by TEXT, error_code TEXT, bound_once BOOLEAN NOT NULL DEFAULT false,
+        requested_by TEXT NOT NULL, approved_by TEXT, error_code TEXT, bound_once BOOLEAN NOT NULL DEFAULT false, delivered_credential_id UUID,
         created_at TIMESTAMPTZ NOT NULL DEFAULT now(), updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         CHECK((kind='human' AND issuer IS NOT NULL AND subject IS NOT NULL
                   AND consumer_project IS NULL AND component IS NULL)
@@ -49,11 +49,17 @@ def initialize(conn):
         ON store_grants(resource_id,consumer_project,component) WHERE kind='binding' AND state IN ('pending','active')""")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_credentials (
         credential_id UUID PRIMARY KEY, grant_id UUID NOT NULL REFERENCES store_grants(grant_id),
-        grant_version BIGINT NOT NULL, mode TEXT NOT NULL CHECK(mode IN ('read-only','read-write')),
+        grant_version BIGINT NOT NULL, relay_port INTEGER, mode TEXT NOT NULL CHECK(mode IN ('read-only','read-write')),
         state TEXT NOT NULL CHECK(state IN ('issuing','active','retiring','revoked')),
         issued_at TIMESTAMPTZ NOT NULL DEFAULT now(), expires_at TIMESTAMPTZ NOT NULL,
         handover_deadline TIMESTAMPTZ, observed_state TEXT NOT NULL DEFAULT 'pending', error_code TEXT,
         UNIQUE(credential_id,grant_id))""")
+    conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_live_relay_ports
+        ON store_credentials(relay_port) WHERE state<>'revoked' AND relay_port IS NOT NULL""")
+    conn.execute("""CREATE TABLE IF NOT EXISTS store_human_keys (
+        issuer TEXT NOT NULL, subject TEXT NOT NULL, public_key TEXT NOT NULL, fingerprint TEXT UNIQUE NOT NULL,
+        PRIMARY KEY(issuer,subject))""")
+    conn.execute("REVOKE ALL ON store_human_keys FROM PUBLIC")
     conn.execute("CREATE INDEX IF NOT EXISTS store_credentials_expiry ON store_credentials(expires_at) WHERE state<>'revoked'")
     conn.execute("REVOKE ALL ON store_resources,store_grants,store_credentials FROM PUBLIC")
 
@@ -179,6 +185,13 @@ def issue(conn, row):
         AND state<>'revoked' AND expires_at>now()""", (row["grant_id"],)).fetchone()[0]
     if outstanding >= 24:
         raise Conflict("Too many outstanding credential generations; wait for expiry or revoke access")
+    # Every credential uses a lease port, including application bindings.
+    free = conn.execute("""SELECT port FROM generate_series(20000,20511) port WHERE NOT EXISTS(
+        SELECT 1 FROM store_credentials c WHERE c.relay_port=port AND c.state<>'revoked')
+        ORDER BY port LIMIT 1""").fetchone()
+    if not free:
+        raise Conflict("Private access lease capacity is full; wait for cleanup")
+    relay_port = free[0]
     identity = uuid4()
     lifetime = HUMAN_LIFETIME if row["kind"] == "human" else APPLICATION_ROTATION + ROTATION_OVERLAP
     if row["kind"] == "binding":
@@ -187,9 +200,9 @@ def issue(conn, row):
             expires_at=LEAST(expires_at,COALESCE(handover_deadline,now()+%s))
             WHERE grant_id=%s AND state IN ('active','retiring')""",
             (ROTATION_OVERLAP, ROTATION_OVERLAP, row["grant_id"]))
-    conn.execute("""INSERT INTO store_credentials(credential_id,grant_id,grant_version,mode,state,expires_at)
-        VALUES (%s,%s,%s,%s,'issuing',now()+%s)""",
-        (identity, row["grant_id"], row["version"], row["mode"], lifetime))
+    conn.execute("""INSERT INTO store_credentials(credential_id,grant_id,grant_version,mode,state,expires_at,relay_port)
+        VALUES (%s,%s,%s,%s,'issuing',now()+%s,%s)""",
+        (identity, row["grant_id"], row["version"], row["mode"], lifetime, relay_port))
     return _object(conn, "store_credentials", "credential_id", identity)
 
 
@@ -240,3 +253,22 @@ def retire_project(conn, project):
     conn.execute("""UPDATE store_grants SET state='revoked',observed_state='pending',version=version+1,updated_at=now()
         WHERE state IN ('pending','active') AND (consumer_project=%s OR resource_id IN
             (SELECT resource_id FROM store_resources WHERE owner_project=%s))""", (project, project))
+
+
+def authorized_key(conn, fingerprint, relay_ip):
+    from ..human_database_access import FINGERPRINT_PATTERN
+    import ipaddress
+    relay_ip = str(ipaddress.ip_address(relay_ip))
+    if not FINGERPRINT_PATTERN.fullmatch(fingerprint):
+        return None
+    rows = conn.execute("""SELECT k.public_key,k.issuer,k.subject,c.relay_port,r.owner_project
+        FROM store_human_keys k JOIN store_grants g ON g.issuer=k.issuer AND g.subject=k.subject
+        JOIN store_resources r USING(resource_id) JOIN store_credentials c USING(grant_id)
+        JOIN projects p ON p.name=r.owner_project WHERE k.fingerprint=%s AND g.kind='human'
+            AND g.state='active' AND r.state='active' AND r.observed_state='active' AND p.status<>'retired'
+            AND c.state='active' AND c.grant_version=g.version AND c.expires_at>now()
+            AND c.relay_port IS NOT NULL ORDER BY c.relay_port LIMIT 65""", (fingerprint,)).fetchall()
+    if not rows or len(rows) > 64:
+        return None
+    permissions = ','.join(f'permitopen="{relay_ip}:{row[3]}"' for row in rows)
+    return f'restrict,port-forwarding,{permissions} {rows[0][0]}', rows[0][4], rows[0][1], rows[0][2]

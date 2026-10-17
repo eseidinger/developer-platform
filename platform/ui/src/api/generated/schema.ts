@@ -1440,6 +1440,42 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects/{project}/resource-bindings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Bindings */
+        get: operations["list_bindings_v1_projects__project__resource_bindings_get"];
+        put?: never;
+        /** Request Binding */
+        post: operations["request_binding_v1_projects__project__resource_bindings_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/projects/{project}/resources": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Resources */
+        get: operations["list_resources_v1_projects__project__resources_get"];
+        put?: never;
+        /** Create Resource */
+        post: operations["create_resource_v1_projects__project__resources_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/projects/{project}/service-access-requests": {
         parameters: {
             query?: never;
@@ -1560,6 +1596,263 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/projects/{project}/store-context": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Context */
+        get: operations["context_v1_projects__project__store_context_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resource-grants/{grant_id}/approval": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Approve Binding */
+        post: operations["approve_binding_v1_resource_grants__grant_id__approval_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resource-grants/{grant_id}/mode": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Change Mode */
+        put: operations["change_mode_v1_resource_grants__grant_id__mode_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resource-grants/{grant_id}/revocation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Revoke Grant */
+        post: operations["revoke_grant_v1_resource_grants__grant_id__revocation_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resources/{resource_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Resource */
+        get: operations["get_resource_v1_resources__resource_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Rename Resource */
+        patch: operations["rename_resource_v1_resources__resource_id__patch"];
+        trace?: never;
+    };
+    "/v1/resources/{resource_id}/grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Grants */
+        get: operations["list_grants_v1_resources__resource_id__grants_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resources/{resource_id}/human-grants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Create Human Grant */
+        post: operations["create_human_grant_v1_resources__resource_id__human_grants_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resources/{resource_id}/purge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Purge Resource */
+        post: operations["purge_resource_v1_resources__resource_id__purge_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resources/{resource_id}/purge-preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Purge Preview */
+        get: operations["purge_preview_v1_resources__resource_id__purge_preview_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resources/{resource_id}/quota": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Set Quota */
+        put: operations["set_quota_v1_resources__resource_id__quota_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/resources/{resource_id}/retirement": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Retire Resource */
+        post: operations["retire_resource_v1_resources__resource_id__retirement_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store-access/credentials/{credential_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Credential */
+        get: operations["get_credential_v1_store_access_credentials__credential_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store-access/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My Resources */
+        get: operations["my_resources_v1_store_access_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store-access/me/key": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Replace Key */
+        put: operations["replace_key_v1_store_access_me_key_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/store-access/{grant_id}/credentials": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Own Credentials */
+        get: operations["list_own_credentials_v1_store_access__grant_id__credentials_get"];
+        put?: never;
+        /** Issue Credential */
+        post: operations["issue_credential_v1_store_access__grant_id__credentials_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1635,11 +1928,6 @@ export interface components {
             metadata: components["schemas"]["Metadata"];
             spec: components["schemas"]["ComponentSpec"];
         };
-        /** Approval */
-        Approval: {
-            /** Groups */
-            groups: string[];
-        };
         /** Authentication */
         Authentication: {
             /**
@@ -1652,6 +1940,21 @@ export interface components {
         Authorization: {
             /** Anyofgroups */
             anyOfGroups: string[];
+        };
+        /** BindingRequest */
+        BindingRequest: {
+            /** Component */
+            component: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "read-only" | "read-write";
+            /**
+             * Resource Id
+             * Format: uuid
+             */
+            resource_id: string;
         };
         /** ComponentRuntime */
         ComponentRuntime: {
@@ -1672,8 +1975,6 @@ export interface components {
             /** Components */
             components: (components["schemas"]["ServiceComponent"] | components["schemas"]["ScheduledComponent"])[];
             configuration?: components["schemas"]["Configuration"] | null;
-            /** Resources */
-            resources?: components["schemas"]["ExternalResource"][] | null;
         };
         /** Configuration */
         Configuration: {
@@ -1750,26 +2051,6 @@ export interface components {
              */
             protocol: "http";
         };
-        /** ExternalResource */
-        ExternalResource: {
-            /**
-             * Deletionpolicy
-             * @constant
-             */
-            deletionPolicy: "retain";
-            /** Name */
-            name: string;
-            /**
-             * Profile
-             * @constant
-             */
-            profile: "shared-dev";
-            /**
-             * Type
-             * @constant
-             */
-            type: "postgres";
-        };
         /** Governance */
         Governance: {
             /** Domainretentionowner */
@@ -1799,6 +2080,16 @@ export interface components {
             issuer: string;
             /** Subject */
             subject: string;
+        };
+        /** GrantUpdate */
+        GrantUpdate: {
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "read-only" | "read-write";
+            /** Version */
+            version: number;
         };
         /** GroupCreate */
         GroupCreate: {
@@ -1834,6 +2125,18 @@ export interface components {
         HumanDatabaseReference: {
             /** Issuer */
             issuer: string;
+            /** Subject */
+            subject: string;
+        };
+        /** HumanGrant */
+        HumanGrant: {
+            /** Issuer */
+            issuer: string;
+            /**
+             * Mode
+             * @enum {string}
+             */
+            mode: "read-only" | "read-write";
             /** Subject */
             subject: string;
         };
@@ -1976,6 +2279,30 @@ export interface components {
             /** Scope Token */
             scope_token: string;
         };
+        /** PublicKey */
+        PublicKey: {
+            /** Public Key */
+            public_key: string;
+        };
+        /** Purge */
+        Purge: {
+            /** Confirm Owner Project */
+            confirm_owner_project: string;
+            /**
+             * Confirm Resource Id
+             * Format: uuid
+             */
+            confirm_resource_id: string;
+            /** Version */
+            version: number;
+        };
+        /** QuotaChange */
+        QuotaChange: {
+            /** Quota Bytes */
+            quota_bytes: number;
+            /** Version */
+            version: number;
+        };
         /** Readiness */
         Readiness: {
             /** Path */
@@ -1984,6 +2311,43 @@ export interface components {
             port?: number | null;
             /** Profile */
             profile?: ("status" | "hello-world") | null;
+        };
+        /** ResourceBinding */
+        ResourceBinding: {
+            /**
+             * Bindingid
+             * Format: uuid
+             */
+            bindingId: string;
+            /**
+             * Envprefix
+             * @default
+             */
+            envPrefix: string;
+        };
+        /** ResourceCreate */
+        ResourceCreate: {
+            /** Extensions */
+            extensions?: ("vector" | "age")[];
+            /** Name */
+            name: string;
+            /**
+             * Provider
+             * @enum {string}
+             */
+            provider: "postgresql" | "s3" | "opensearch" | "neo4j" | "qdrant";
+            /**
+             * Quota Bytes
+             * @default 1073741824
+             */
+            quota_bytes: number;
+        };
+        /** ResourceRename */
+        ResourceRename: {
+            /** Name */
+            name: string;
+            /** Version */
+            version: number;
         };
         /** Retirement */
         Retirement: {
@@ -2047,6 +2411,8 @@ export interface components {
         };
         /** ScheduledComponent */
         ScheduledComponent: {
+            /** Bindings */
+            bindings?: components["schemas"]["ResourceBinding"][];
             /**
              * Concurrencypolicy
              * @default Forbid
@@ -2090,6 +2456,8 @@ export interface components {
         };
         /** ServiceComponent */
         ServiceComponent: {
+            /** Bindings */
+            bindings?: components["schemas"]["ResourceBinding"][];
             /**
              * Exposure
              * @default private
@@ -2143,8 +2511,6 @@ export interface components {
         Spec: {
             application: components["schemas"]["Application"];
             configuration?: components["schemas"]["Configuration"] | null;
-            /** Resources */
-            resources?: components["schemas"]["ExternalResource"][] | null;
         };
         /** TestIdentityCreate */
         TestIdentityCreate: {
@@ -2195,6 +2561,23 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** Version */
+        Version: {
+            /** Version */
+            version: number;
+        };
+        /** Approval */
+        app__access_contract__Approval: {
+            /** Groups */
+            groups: string[];
+        };
+        /** Approval */
+        app__stores__contract__Approval: {
+            /** Approve */
+            approve: boolean;
+            /** Version */
+            version: number;
         };
     };
     responses: never;
@@ -4681,7 +5064,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Approval"];
+                "application/json": components["schemas"]["app__access_contract__Approval"];
             };
         };
         responses: {
@@ -4753,7 +5136,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Approval"];
+                "application/json": components["schemas"]["app__access_contract__Approval"];
             };
         };
         responses: {
@@ -5216,6 +5599,138 @@ export interface operations {
             };
         };
     };
+    list_bindings_v1_projects__project__resource_bindings_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    request_binding_v1_projects__project__resource_bindings_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["BindingRequest"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_resources_v1_projects__project__resources_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_resource_v1_projects__project__resources_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResourceCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
     service_requests_v1_projects__project__service_access_requests_get: {
         parameters: {
             query?: never;
@@ -5332,7 +5847,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["Approval"];
+                "application/json": components["schemas"]["app__access_contract__Approval"];
             };
         };
         responses: {
@@ -5475,6 +5990,556 @@ export interface operations {
                 "application/json": components["schemas"]["Rotation"];
             };
         };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    context_v1_projects__project__store_context_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                project: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    approve_binding_v1_resource_grants__grant_id__approval_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["app__stores__contract__Approval"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    change_mode_v1_resource_grants__grant_id__mode_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["GrantUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_grant_v1_resource_grants__grant_id__revocation_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Version"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_resource_v1_resources__resource_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    rename_resource_v1_resources__resource_id__patch: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ResourceRename"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_grants_v1_resources__resource_id__grants_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_human_grant_v1_resources__resource_id__human_grants_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["HumanGrant"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_resource_v1_resources__resource_id__purge_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Purge"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    purge_preview_v1_resources__resource_id__purge_preview_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    set_quota_v1_resources__resource_id__quota_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["QuotaChange"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    retire_resource_v1_resources__resource_id__retirement_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                resource_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Version"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    get_credential_v1_store_access_credentials__credential_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                credential_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    my_resources_v1_store_access_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+        };
+    };
+    replace_key_v1_store_access_me_key_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PublicKey"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_own_credentials_v1_store_access__grant_id__credentials_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    issue_credential_v1_store_access__grant_id__credentials_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                grant_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
         responses: {
             /** @description Successful Response */
             202: {

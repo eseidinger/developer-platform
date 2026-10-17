@@ -14,6 +14,7 @@ function AppLayout() {
           <NavLink className="font-semibold tracking-tight" to="/">Developer Platform</NavLink>
           <span className="ml-3 text-sm text-muted-foreground">Control Plane</span>
           <nav className="ml-auto" aria-label="Primary navigation">
+            <NavLink className="rounded-md px-3 py-2 text-sm" to="/store-access">My store access</NavLink>
             <NavLink
               className={({ isActive }) =>
                 `rounded-md px-3 py-2 text-sm font-medium ${isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`

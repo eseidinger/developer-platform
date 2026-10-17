@@ -34,6 +34,9 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
       DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
+      STORE_RELAY_PASSWORD: ${STORE_RELAY_PASSWORD:?Run scripts/init.py}
+      STORE_RELAY_IP: ${STORE_RELAY_IP:-172.30.80.15}
+      STORE_CAPACITY_BYTES: ${STORE_CAPACITY_BYTES:-}
       TELEMETRY_CATALOG_PASSWORD: ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
       DATABASE_BASTION_TOKEN: ${DATABASE_BASTION_TOKEN:?Run scripts/init.py}
       PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
@@ -98,3 +101,32 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+
+  store-access:
+    build: .
+    restart: unless-stopped
+    command: ["python", "-m", "app.stores.relay"]
+    environment:
+      POSTGRES_HOST: postgres
+      POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
+      STORE_RELAY_PASSWORD: ${STORE_RELAY_PASSWORD:?Run scripts/init.py}
+    depends_on:
+      platform-api:
+        condition: service_healthy
+    networks:
+      platform:
+        ipv4_address: ${STORE_RELAY_IP:-172.30.80.15}
+      store-consoles: {}
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 256m
+    cpus: 0.5
+
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:19999/healthz', timeout=2)"]
+      interval: 10s
+      timeout: 3s
+      start_period: 20s
+      retries: 3

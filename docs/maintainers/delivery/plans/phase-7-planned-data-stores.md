@@ -9,11 +9,17 @@ Additional stores have no implementation or operational acceptance recorded here
 Source work has started in `app.stores`: independent resource/grant/credential
 catalog, versioned administration requests, API authorization boundaries,
 PostgreSQL role/database provisioning and lifecycle/workload reconciliation.
-These routes and workers are not yet installed into the application; runtime,
-private/console access and provider expansion remain in progress. Six API
+The routes and workers are now wired into the source application. The portal
+and CLI manage named resources, grants/bindings and human credential leases;
+the private relay enforces credential identity and session deadlines. Browser
+consoles, provider expansion and deployed acceptance remain in progress. See the
+[operator workflow](../../../operators/data-stores.md). Six API
 boundary tests and a disposable real PostgreSQL fixture pass resource isolation,
 cross-writer schema ownership, future-object read access, read-only denials,
-expiry, session revocation and isolated purge. No live resources were changed.
+expiry, session revocation, 30-day worker rotation/retry/deadline handling, real
+relay authentication/session expiry and isolated purge. The backend suite ran
+462 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
+explicit issuance and secret-cache exclusion. No live resources were changed.
 PLAN-026/036 and Phase 7 acceptance remain open.
 
 ## Goal and scope

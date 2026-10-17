@@ -8,6 +8,7 @@ from .config import normalize_configuration
 from .manifests import normalize_resources
 from .egress import resolve as resolve_egress_dns, validate as validate_egress
 from .project_policy import validate_component_capacity
+from .stores.contract import ResourceBinding
 
 API_VERSION = "platform.example/v1alpha1"
 COMPONENT_API_VERSION = "platform.example/v1alpha2"
@@ -91,7 +92,6 @@ class Configuration(_Strict):
 class Spec(_Strict):
     application: Application
     configuration: Optional[Configuration] = None
-    resources: Optional[List[ExternalResource]] = Field(default=None, max_length=1)
 
 
 class ApplicationEnvelope(_Strict):
@@ -147,7 +147,15 @@ class _Component(_Strict):
     name: str
     runtime: ComponentRuntime
     resources: Optional[dict] = None
+    bindings: list[ResourceBinding] = Field(default_factory=list, max_length=8)
     outbound: List["OutboundDestination"] = Field(default_factory=list, max_length=5)
+
+    @model_validator(mode="after")
+    def unique_bindings(self):
+        ids = [entry.bindingId for entry in self.bindings]
+        if len(set(ids)) != len(ids):
+            raise ValueError("each component binding must be declared once")
+        return self
 
     @field_validator("name")
     @classmethod
@@ -256,7 +264,6 @@ Component = Union[ServiceComponent, ScheduledComponent]
 class ComponentSpec(_Strict):
     components: List[Component] = Field(min_length=1, max_length=5)
     configuration: Optional[Configuration] = None
-    resources: Optional[List[ExternalResource]] = Field(default=None, max_length=1)
 
     @model_validator(mode="after")
     def unique_names(self):
@@ -294,7 +301,7 @@ CAPABILITIES = {
         "scaling": {"minInstances": 1, "maxInstances": 1, "autoscaling": False},
         "resources": {"requests": "up to 1 CPU / 1Gi", "limits": "up to 2 CPU / 2Gi", "requestsMustNotExceedLimits": True},
         "health": {"readiness": {"profiles": ["status", "hello-world"], "customPath": True}},
-        "externalResources": [{"type": "postgres", "profiles": ["shared-dev"], "deletionPolicies": ["retain"], "maxCount": 1}],
+        "externalResources": {"lifecycle": "independent named resources", "componentBindings": True, "implicitDatabase": False},
         "configuration": {"values": True, "maxValues": 50, "maxValueLength": 1024, "secrets": True, "bindings": ["PG"]},
         "components": {"types": ["service", "scheduled"], "maxCount": 5,
                        "outbound": {"cidrOrDnsAndTcpPort": True, "maxDestinations": 5,
@@ -376,6 +383,8 @@ def to_flat(body):
                                        "retry_limit": component.retryLimit})
                 if component.maxRunSeconds is not None:
                     flat_component["max_run_seconds"] = component.maxRunSeconds
+            if component.bindings:
+                flat_component["bindings"] = [binding.model_dump(mode="json") for binding in component.bindings]
             if component.outbound:
                 flat_component["outbound"] = [destination.model_dump(exclude_none=True) for destination in component.outbound]
             if component.telemetry and component.telemetry.tracing and component.telemetry.tracing.enabled:

@@ -1,49 +1,72 @@
 """Reconcile resources and every credential generation after restart or interruption."""
-from datetime import datetime, timedelta, timezone
 from . import catalog, providers
 
 
-def credentials_to_revoke(conn):
-    return conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
+def _attempt(conn, table, field, identity, operation):
+    # All identifiers here are module literals. Savepoints isolate provider
+    # failures so one broken store cannot starve another store's cleanup.
+    try:
+        with conn.transaction():
+            operation()
+        return True
+    except Exception as error:
+        code = "ProviderUnavailable" if isinstance(error, providers.ProviderUnavailable) else "ProviderOperationFailed"
+        conn.execute(f"UPDATE {table} SET error_code=%s WHERE {field}=%s", (code, identity))
+        return False
+
+
+def _deny(conn, credential, resource):
+    providers.get(resource["provider"]).revoke(resource, credential)
+    conn.execute("UPDATE store_credentials SET state='revoked',observed_state='revoked',error_code=NULL WHERE credential_id=%s",
+                 (credential["credential_id"],))
+
+
+def reconcile(conn, control=None):
+    """Caller holds the common lifecycle lock. Relay enforces deadlines independently."""
+    conn.execute("""UPDATE store_resources r SET state='retired',observed_state='pending',version=version+1
+        FROM projects p WHERE p.name=r.owner_project AND p.status='retired' AND r.state='active'""")
+    conn.execute("""UPDATE store_grants g SET state='revoked',observed_state='pending',version=version+1
+        WHERE g.state IN ('pending','active') AND (EXISTS(SELECT 1 FROM store_resources r
+            WHERE r.resource_id=g.resource_id AND r.state<>'active') OR EXISTS(SELECT 1 FROM projects p
+            WHERE p.name=g.consumer_project AND p.status='retired'))""")
+    stale = conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
         JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
         WHERE c.state<>'revoked' AND (c.expires_at<=now() OR g.state<>'active' OR r.state<>'active'
-            OR c.grant_version<>g.version OR EXISTS(SELECT 1 FROM projects p WHERE
-                p.name IN (r.owner_project,g.consumer_project) AND p.status='retired'))
+            OR c.grant_version<>g.version)
         ORDER BY c.expires_at LIMIT 256""").fetchall()
-
-
-def reconcile(conn):
-    """The caller holds the common lifecycle lock for this short batch."""
-    for credential, resource in credentials_to_revoke(conn):
-        providers.get(resource["provider"]).revoke(resource, credential)
-        conn.execute("UPDATE store_credentials SET state='revoked',observed_state='revoked',error_code=NULL WHERE credential_id=%s",
-                     (credential["credential_id"],))
+    for credential, resource in stale:
+        _attempt(conn, "store_credentials", "credential_id", credential["credential_id"],
+                 lambda c=credential, r=resource: _deny(conn, c, r))
     resources = conn.execute("""SELECT row_to_json(r) FROM store_resources r
-        WHERE state<>'purged' AND observed_state<>state ORDER BY created_at LIMIT 128""").fetchall()
+        WHERE state<>'purged' AND observed_state<>state ORDER BY updated_at LIMIT 128""").fetchall()
     for (resource,) in resources:
-        provider = providers.get(resource["provider"])
-        if resource["state"] == "active":
-            provider.provision(resource)
-        elif resource["state"] in {"retired", "purging"}:
-            held = conn.execute("""SELECT 1 FROM store_credentials c JOIN store_grants g USING(grant_id)
-                WHERE g.resource_id=%s AND c.state<>'revoked' LIMIT 1""", (resource["resource_id"],)).fetchone()
-            if held:
-                continue
-            if resource["state"] == "purging":
-                provider.purge(resource)
-        state = "purged" if resource["state"] == "purging" else resource["state"]
-        conn.execute("UPDATE store_resources SET state=%s,observed_state=%s,error_code=NULL WHERE resource_id=%s",
-                     (state, state, resource["resource_id"]))
+        def apply_resource(res=resource):
+            provider = providers.get(res["provider"])
+            if res["state"] == "active":
+                provider.provision(res)
+            elif res["state"] in {"retired", "purging"}:
+                held = conn.execute("""SELECT 1 FROM store_credentials c JOIN store_grants g USING(grant_id)
+                    WHERE g.resource_id=%s AND c.state<>'revoked' LIMIT 1""", (res["resource_id"],)).fetchone()
+                pending_grant = conn.execute("""SELECT 1 FROM store_grants WHERE resource_id=%s
+                    AND observed_state<>state LIMIT 1""", (res["resource_id"],)).fetchone()
+                if held or pending_grant:
+                    return
+                if res["state"] == "purging":
+                    provider.purge(res)
+            state = "purged" if res["state"] == "purging" else res["state"]
+            conn.execute("UPDATE store_resources SET state=%s,observed_state=%s,error_code=NULL WHERE resource_id=%s",
+                         (state, state, res["resource_id"]))
+        _attempt(conn, "store_resources", "resource_id", resource["resource_id"], apply_resource)
     pending = conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
         JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
         WHERE c.state='issuing' AND c.grant_version=g.version AND g.state='active' AND r.state='active'
             AND r.observed_state='active' AND c.expires_at>now() ORDER BY c.issued_at LIMIT 64""").fetchall()
     for credential, resource in pending:
-        providers.get(resource["provider"]).issue(resource, credential)
-        conn.execute("UPDATE store_credentials SET state='active',observed_state='active',error_code=NULL WHERE credential_id=%s",
-                     (credential["credential_id"],))
-    # One replacement generation at a time: an interrupted issuance is retried,
-    # never replaced by a third generation that could extend the handover window.
+        def activate(c=credential, r=resource):
+            providers.get(r["provider"]).issue(r, c)
+            conn.execute("UPDATE store_credentials SET state='active',observed_state='active',error_code=NULL WHERE credential_id=%s",
+                         (c["credential_id"],))
+        _attempt(conn, "store_credentials", "credential_id", credential["credential_id"], activate)
     due = conn.execute("""SELECT row_to_json(g) FROM store_grants g JOIN store_resources r USING(resource_id)
         WHERE g.kind='binding' AND g.state='active' AND r.state='active' AND r.observed_state='active'
         AND NOT EXISTS(SELECT 1 FROM store_credentials c WHERE c.grant_id=g.grant_id
@@ -51,21 +74,54 @@ def reconcile(conn):
             AND c.issued_at>now()-interval '30 days' AND c.expires_at>now())
         ORDER BY g.updated_at LIMIT 64""").fetchall()
     for (grant,) in due:
-        catalog.issue(conn, grant)
-    conn.execute("""UPDATE store_grants g SET observed_state=state,error_code=NULL
-        WHERE NOT EXISTS(SELECT 1 FROM store_credentials c WHERE c.grant_id=g.grant_id
-            AND c.state<>'revoked' AND (g.state<>'active' OR c.grant_version<>g.version))""")
+        _attempt(conn, "store_grants", "grant_id", grant["grant_id"], lambda g=grant: catalog.issue(conn, g))
+    ready = set()
+    runtime_ok = control is None
+    if control is not None:
+        try:
+            from .workloads import reconcile_runtime
+            ready = reconcile_runtime(conn, control)
+            runtime_ok = True
+        except Exception:
+            control.log.error("Store consumer reconciliation failed error_type=RuntimeReconcileFailed")
+    for project, component in ready:
+        conn.execute("""UPDATE store_grants g SET delivered_credential_id=(SELECT credential_id
+            FROM store_credentials c WHERE c.grant_id=g.grant_id AND c.state='active' AND c.grant_version=g.version
+            ORDER BY c.issued_at DESC LIMIT 1) WHERE g.kind='binding' AND g.consumer_project=%s
+            AND g.component=%s AND g.state='active'""", (project, component))
+    # Retire old generations early only after fresh credentials work and the
+    # consumer has picked them up. The hard expiry deadline never moves on retry.
+    rotating = conn.execute("""SELECT row_to_json(old),row_to_json(fresh),row_to_json(r),row_to_json(g)
+        FROM store_credentials old JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
+        JOIN LATERAL(SELECT c.* FROM store_credentials c WHERE c.grant_id=g.grant_id
+            AND c.state='active' AND c.grant_version=g.version AND c.expires_at>now()
+            ORDER BY c.issued_at DESC LIMIT 1) fresh ON true
+        WHERE old.state='retiring' AND old.expires_at>now() AND g.state='active' LIMIT 64""").fetchall()
+    for old, fresh, resource, grant in rotating:
+        if grant["bound_once"] and (grant["consumer_project"], grant["component"]) not in ready:
+            continue
+        def finish_handover(previous=old, new=fresh, res=resource, g=grant):
+            providers.get(res["provider"]).probe(res, new)
+            _deny(conn, previous, res)
+            conn.execute("UPDATE store_grants SET delivered_credential_id=%s WHERE grant_id=%s",
+                         (new["credential_id"], g["grant_id"]))
+        _attempt(conn, "store_credentials", "credential_id", old["credential_id"], finish_handover)
+    if runtime_ok:
+        conn.execute("""UPDATE store_grants g SET observed_state=state,error_code=NULL
+            WHERE NOT EXISTS(SELECT 1 FROM store_credentials c WHERE c.grant_id=g.grant_id
+                AND c.state<>'revoked' AND (g.state<>'active' OR c.grant_version<>g.version))
+            AND (g.kind='human' OR g.state<>'active' OR EXISTS(SELECT 1 FROM store_credentials c
+                WHERE c.grant_id=g.grant_id AND c.grant_version=g.version AND c.state='active' AND c.expires_at>now()))""")
 
 
 def loop(stop, control):
     while not stop.is_set():
         try:
             with control.connect() as conn, conn.transaction():
-                # Avoid blocking API transactions if deployments own the lifecycle.
                 if not conn.execute("SELECT pg_try_advisory_xact_lock(731904)").fetchone()[0]:
                     stop.wait(1)
                     continue
-                reconcile(conn)
+                reconcile(conn, control)
         except Exception as exc:
             control.log.error("Store reconciliation failed error_type=%s", type(exc).__name__)
         stop.wait(2)

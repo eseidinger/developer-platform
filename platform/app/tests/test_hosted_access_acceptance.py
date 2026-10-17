@@ -144,7 +144,7 @@ class HarnessTests(unittest.TestCase):
             self.assertEqual(len(envelope.spec.components), 2)
             self.assertEqual(sum(c.exposure == "public" for c in envelope.spec.components), 1)
             self.assertEqual(envelope.spec.components[1].outbound, [])
-            self.assertEqual(envelope.spec.resources[0].deletionPolicy, "retain")
+            self.assertNotIn("resources", body["spec"])
             self.assertNotIn("identity", body["spec"])
 
     def test_policy_matches_contract_without_application_special_cases(self):
@@ -360,7 +360,21 @@ class HarnessTests(unittest.TestCase):
         owner = Mock()
         owner.operation.return_value = {"revision": 1}
         declarations = []
+        storage_bindings = []
+        from app.stores.contract import ResourceCreate, BindingRequest
         def owned_request(method, path, body=None, **kwargs):
+            if path.endswith("/resources"):
+                ResourceCreate.model_validate(body)
+                return {"resource_id": str(uuid4())}
+            if path.startswith("/v1/resources/"):
+                return {"observed_state": "active"}
+            if path.endswith("/resource-bindings"):
+                if method == "POST":
+                    BindingRequest.model_validate(body)
+                    row = {"grant_id": str(uuid4()), "observed_state": "active"}
+                    storage_bindings.append(row)
+                    return row
+                return {"bindings": storage_bindings}
             if path.endswith("/governance"):
                 Governance.model_validate(body)
                 return {}

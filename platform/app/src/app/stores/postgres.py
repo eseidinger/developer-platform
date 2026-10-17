@@ -40,7 +40,21 @@ class Postgres:
             conn.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}")
                 .format(sql.Identifier(name), sql.Identifier(reader)))
         with self.connection(name) as conn:
+            conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS public AUTHORIZATION {}").format(sql.Identifier(owner)))
             conn.execute("REVOKE ALL ON SCHEMA public FROM PUBLIC")
+            conn.execute("CREATE SCHEMA IF NOT EXISTS platform_control AUTHORIZATION postgres")
+            conn.execute("REVOKE ALL ON SCHEMA platform_control FROM PUBLIC")
+            conn.execute("""CREATE OR REPLACE FUNCTION platform_control.guard_extensions() RETURNS event_trigger
+                LANGUAGE plpgsql SECURITY DEFINER SET search_path=pg_catalog AS $$
+                BEGIN
+                    IF session_user <> 'postgres' THEN
+                        RAISE EXCEPTION USING ERRCODE='42501', MESSAGE='Extensions are managed by the platform';
+                    END IF;
+                END $$""")
+            if not conn.execute("SELECT 1 FROM pg_event_trigger WHERE evtname='platform_store_extensions'").fetchone():
+                conn.execute("""CREATE EVENT TRIGGER platform_store_extensions ON ddl_command_start
+                    WHEN TAG IN ('CREATE EXTENSION','ALTER EXTENSION','DROP EXTENSION')
+                    EXECUTE FUNCTION platform_control.guard_extensions()""")
             conn.execute(sql.SQL("ALTER SCHEMA public OWNER TO {}").format(sql.Identifier(owner)))
             conn.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(reader)))
             for target in ("TABLES", "SEQUENCES"):
@@ -51,7 +65,14 @@ class Postgres:
             for extension in resource["extensions"]:
                 if extension not in {"vector", "age"}:
                     raise ValueError("Unapproved PostgreSQL extension")
-                conn.execute(sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(sql.Identifier(extension)))
+                if extension == "vector":
+                    conn.execute("CREATE SCHEMA IF NOT EXISTS platform_extensions AUTHORIZATION postgres")
+                    conn.execute("REVOKE CREATE ON SCHEMA platform_extensions FROM PUBLIC")
+                    conn.execute(sql.SQL("GRANT USAGE ON SCHEMA platform_extensions TO {}, {}")
+                        .format(sql.Identifier(owner), sql.Identifier(reader)))
+                    conn.execute("CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA platform_extensions")
+                else:
+                    conn.execute(sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(sql.Identifier(extension)))
             if "age" in resource["extensions"]:
                 conn.execute(sql.SQL("GRANT USAGE ON SCHEMA ag_catalog TO {}, {}")
                     .format(sql.Identifier(owner), sql.Identifier(reader)))
@@ -76,8 +97,9 @@ class Postgres:
                 .format(sql.Identifier(group), sql.Identifier(role)))
             conn.execute(sql.SQL("ALTER ROLE {} IN DATABASE {} SET role TO {}")
                 .format(sql.Identifier(role), sql.Identifier(name), sql.Literal(group)))
-            if "age" in resource["extensions"]:
-                conn.execute(sql.SQL("ALTER ROLE {} IN DATABASE {} SET search_path TO ag_catalog,public")
+            if resource["extensions"]:
+                path = "ag_catalog,public,platform_extensions" if "age" in resource["extensions"] else "public,platform_extensions"
+                conn.execute(sql.SQL("ALTER ROLE {} IN DATABASE {} SET search_path TO " + path)
                     .format(sql.Identifier(role), sql.Identifier(name)))
 
     def revoke(self, resource, credential):
@@ -111,3 +133,10 @@ class Postgres:
     def usage(self, resource):
         with self.connection("postgres") as conn:
             return conn.execute("SELECT pg_database_size(%s)", (catalog.identifier(resource["resource_id"]),)).fetchone()[0]
+
+    def probe(self, resource, credential):
+        host, port = self.endpoint()
+        with psycopg.connect(host=host, port=port, dbname=catalog.identifier(resource["resource_id"]),
+                user=catalog.login(credential["credential_id"]), password=catalog.secret_for(credential["credential_id"]),
+                connect_timeout=2, options="-c statement_timeout=2000", autocommit=True) as conn:
+            conn.execute("SELECT 1").fetchone()

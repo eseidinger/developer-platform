@@ -22,7 +22,7 @@ def main() -> int:
         request = Request(URL + "?" + urlencode({"fingerprint": sys.argv[1]}),
                           headers={"X-Database-Bastion-Token": token})
         with urlopen(request, timeout=3) as response:
-            key = response.read(512).decode("ascii")
+            key = response.read(8192).decode("ascii")
         if key.startswith("restrict,port-forwarding,permitopen=") and key.endswith("\n"):
             sys.stdout.write(key)
     except (OSError, UnicodeError, ValueError):

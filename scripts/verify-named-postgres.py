@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """Disposable real PostgreSQL tests for named resources and cross-writer ownership."""
 import json
+import asyncio
+from unittest.mock import patch
 import os
 import secrets
 import subprocess
@@ -11,7 +13,9 @@ from uuid import uuid4
 import psycopg
 from psycopg import sql
 from app.stores import catalog
-from app.stores.contract import ResourceCreate, HumanGrant
+from app.stores.contract import ResourceCreate, HumanGrant, BindingRequest
+from app.stores import worker
+from app.stores.relay import Relay
 from app.stores.postgres import Postgres
 
 
@@ -40,6 +44,7 @@ def main():
         else:
             raise AssertionError("Disposable PostgreSQL did not start")
         provider = Postgres(connect)
+        provider.endpoint = lambda: ("127.0.0.1", port)
         with connect("postgres") as conn:
             conn.execute("CREATE TABLE projects(name TEXT PRIMARY KEY,status TEXT)")
             conn.execute("INSERT INTO projects VALUES ('alpha','applied'),('beta','applied')")
@@ -91,7 +96,8 @@ def main():
                 pass
             with login(a) as writer:
                 writer.execute("RESET ROLE")
-                for query in (sql.SQL("ALTER ROLE {} SUPERUSER").format(sql.Identifier(catalog.login(a["credential_id"]))),
+                for query in ("CREATE EXTENSION IF NOT EXISTS plpgsql",
+                              sql.SQL("ALTER ROLE {} SUPERUSER").format(sql.Identifier(catalog.login(a["credential_id"]))),
                               sql.SQL("ALTER ROLE {} VALID UNTIL 'infinity'").format(sql.Identifier(catalog.login(a["credential_id"]))),
                               sql.SQL("DROP DATABASE {}").format(sql.Identifier(catalog.identifier(beta["resource_id"])))):
                     try:
@@ -124,12 +130,62 @@ def main():
                 pass
             with login(reader) as ro:
                 assert ro.execute("SELECT count(*) FROM public.shared").fetchone()[0] == 1
+            # Worker restart and bounded automatic application rotation.
+            with conn.transaction():
+                binding = catalog.request_binding(conn, "alpha", BindingRequest(resource_id=alpha["resource_id"],
+                    component="web", mode="read-write"), "fixture-admin")
+            with patch("app.stores.providers.get", return_value=provider):
+                for _ in range(2):
+                    with conn.transaction():
+                        catalog.lock(conn); worker.reconcile(conn)
+                previous = conn.execute("SELECT credential_id FROM store_credentials WHERE grant_id=%s AND state='active'",
+                    (binding["grant_id"],)).fetchone()[0]
+                conn.execute("UPDATE store_credentials SET issued_at=now()-interval '31 days' WHERE credential_id=%s", (previous,))
+                with conn.transaction():
+                    catalog.lock(conn); worker.reconcile(conn)
+                deadline = conn.execute("SELECT handover_deadline FROM store_credentials WHERE credential_id=%s", (previous,)).fetchone()[0]
+                with patch.object(provider, "issue", side_effect=RuntimeError("synthetic outage")):
+                    with conn.transaction():
+                        catalog.lock(conn); worker.reconcile(conn)
+                assert conn.execute("SELECT handover_deadline FROM store_credentials WHERE credential_id=%s", (previous,)).fetchone()[0] == deadline
+                assert conn.execute("SELECT count(*) FROM store_credentials WHERE grant_id=%s AND state='issuing'", (binding["grant_id"],)).fetchone()[0] == 1
+                with conn.transaction():
+                    catalog.lock(conn); worker.reconcile(conn)
+                assert conn.execute("SELECT state FROM store_credentials WHERE credential_id=%s", (previous,)).fetchone()[0] == "revoked"
+                active = conn.execute("SELECT row_to_json(c) FROM store_credentials c WHERE grant_id=%s AND state='active'", (binding["grant_id"],)).fetchone()[0]
+            # Real PG authentication and a real query through the identity-bound
+            # relay; closure at expiry does not depend on the cleanup worker.
+            async def relay_check():
+                lease = {"credential_id": active["credential_id"], "resource_id": alpha["resource_id"],
+                    "provider": "postgresql", "expires_at": datetime.now(timezone.utc) + timedelta(seconds=1)}
+                relay = Relay(backend=lambda value: ("127.0.0.1", port))
+                relay.leases = {20000: lease}; relay.last_success = time.monotonic()
+                server = await asyncio.start_server(lambda r,w: relay.handle(20000,r,w), "127.0.0.1", 0)
+                def query():
+                    client = psycopg.connect(host="127.0.0.1", port=server.sockets[0].getsockname()[1],
+                        dbname=catalog.identifier(alpha["resource_id"]), user=catalog.login(active["credential_id"]),
+                        password=catalog.secret_for(active["credential_id"]), sslmode="prefer", autocommit=True)
+                    assert client.execute("SELECT id FROM public.shared").fetchone()[0] == 1
+                    time.sleep(1.2)
+                    try:
+                        client.execute("SELECT 1")
+                    except psycopg.OperationalError:
+                        pass
+                    else:
+                        raise AssertionError("Expired relay session remained usable")
+                    client.close()
+                try:
+                    await asyncio.wait_for(asyncio.to_thread(query), 5)
+                finally:
+                    server.close(); await server.wait_closed()
+            asyncio.run(relay_check())
             # Retiring/purging one resource must not touch the other database.
-            for cred in credentials:
+            all_credentials = conn.execute("SELECT row_to_json(c) FROM store_credentials c JOIN store_grants g USING(grant_id) WHERE g.resource_id=%s", (alpha["resource_id"],)).fetchall()
+            for (cred,) in all_credentials:
                 provider.revoke(alpha, cred)
             provider.purge(alpha)
             assert conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (catalog.identifier(beta["resource_id"]),)).fetchone()
-        print("PASS named PostgreSQL: separate databases; cross-writer DDL; future-schema reads; read-only write/DDL denial; foreign-resource denial; no admin/expiry escalation; revoked session closure; expired login denial; isolated purge")
+        print("PASS named PostgreSQL: separate databases; cross-writer DDL; future-schema reads; read-only write/DDL denial; foreign-resource denial; no admin/expiry escalation; revoked session closure; expired login denial; 30-day worker rotation/retry/one-hour deadline; real relay authentication/session expiry; isolated purge")
     finally:
         subprocess.run(["docker", "rm", "-f", "-v", name], capture_output=True, timeout=30)
 

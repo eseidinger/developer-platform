@@ -41,8 +41,9 @@ class StoreApiTests(TestCase):
         self.assertEqual(response.status_code, 404)
         provider.assert_not_called()
 
-    def test_machine_identity_cannot_administer_resources_or_issue_human_credentials(self):
-        self.control.access_scope.return_value = {"kind": "automation"}
+    def test_machine_data_access_requires_human_and_resource_admin_checks_current_role(self):
+        self.control.access_scope.return_value = {"kind": "deployment"}
+        self.control.require_permission.side_effect = HTTPException(403, "Denied")
         with patch.object(catalog, "create_resource") as create, patch.object(catalog, "issue") as issue:
             response = self.client.post("/v1/projects/alpha/resources", json={"name": "db", "provider": "postgresql"})
             credential = self.client.post(f"/v1/store-access/{self.grant_id}/credentials")

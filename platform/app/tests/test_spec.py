@@ -17,9 +17,7 @@ def envelope(**changes):
             "endpoints": [{"name": "http", "protocol": "http", "port": 5678, "exposure": "public"}],
             "scaling": {"minInstances": 1, "maxInstances": 1},
             "resources": {"limits": {"cpu": "1", "memory": "512Mi"}},
-            "health": {"readiness": {"profile": "hello-world"}}},
-            "resources": [{"name": "database", "type": "postgres", "profile": "shared-dev",
-                           "deletionPolicy": "retain"}]},
+            "health": {"readiness": {"profile": "hello-world"}}}},
     }
     body.update(changes)
     return body

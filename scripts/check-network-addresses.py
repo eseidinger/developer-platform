@@ -17,6 +17,7 @@ FIXED_SERVICES = {
     "keycloak": ("KEYCLOAK_IP", "172.30.80.12"),
     "telemetry-gateway": ("TELEMETRY_GATEWAY_IP", "172.30.80.13"),
     "alloy": ("ALLOY_IP", "172.30.80.14"),
+    "store-access": ("STORE_RELAY_IP", "172.30.80.15"),
     "proxy": ("PROXY_IP", "172.30.80.20"),
     "blackbox-exporter": ("BLACKBOX_EXPORTER_IP", "172.30.80.21"),
     "prometheus": ("PROMETHEUS_IP", "172.30.80.22"),

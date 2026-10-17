@@ -378,7 +378,9 @@ def execute(spec: CommandSpec, state, values: dict):
                     time.monotonic, time.sleep, lambda s: typer.echo("Operation " + s.operation_id + ": " + s.state, err=True)
                     if output != "json" and not state.quiet else None)
                 result = status.model_dump()
-        if spec.credential:
+        if spec.command == "stores access credential":
+            typer.echo("Sensitive credential material: keep it in a protected secret store.", err=True)
+        elif spec.credential:
             typer.echo("Credential material is returned once; store it in a protected secret store.", err=True)
         emit(result, output, one_time=spec.credential)
         if spec.command == "logs" and values.get("follow"):
@@ -407,7 +409,7 @@ def execute(spec: CommandSpec, state, values: dict):
 def register(app: typer.Typer, spec: CommandSpec):
     """Expose only the options relevant to this operation, retaining domain names."""
     positional = [name for name in ("resource_id", "credential_id", "operation_id", "request_id", "secret",
-                                   "trace_id", "run_id", "proposal_id") if "{" + name + "}" in spec.path]
+                                   "trace_id", "run_id", "proposal_id", "grant_id") if "{" + name + "}" in spec.path]
     params = [inspect.Parameter("ctx", inspect.Parameter.POSITIONAL_OR_KEYWORD, annotation=typer.Context)]
     for name in positional:
         params.append(inspect.Parameter(name, inspect.Parameter.POSITIONAL_OR_KEYWORD,

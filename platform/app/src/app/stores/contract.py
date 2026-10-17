@@ -66,3 +66,7 @@ class QuotaChange(Version):
 class ResourceBinding(Strict):
     bindingId: UUID
     envPrefix: str = Field(default="", max_length=32, pattern=r"^([A-Z][A-Z0-9_]*_)?$")
+
+
+class PublicKey(Strict):
+    public_key: str = Field(min_length=1, max_length=256)

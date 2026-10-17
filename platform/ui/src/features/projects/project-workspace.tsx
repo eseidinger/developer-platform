@@ -19,7 +19,6 @@ import { CreateDeploymentCredentialDialog } from '@/features/projects/create-dep
 import { RevokeDeploymentCredentialDialog } from '@/features/projects/revoke-deployment-credential-dialog'
 import { RotateDeploymentCredentialDialog } from '@/features/projects/rotate-deployment-credential-dialog'
 import { ProjectGrants } from '@/features/projects/project-grants'
-import { ProjectDatabaseAccess } from '@/features/projects/project-database-access'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -110,6 +109,7 @@ function ProjectWorkspace() {
         </div>
         <Link className="inline-block rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted" to={`/projects/${name}/application-access`}>Application access</Link>
         <Link className="inline-block rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted" to={`/projects/${name}/ai`}>AI assistance</Link>
+        <Link className="inline-block rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted" to={`/projects/${name}/stores`}>Data stores</Link>
       </div>
 
       {status !== 'authenticated' && <p className="text-sm text-muted-foreground">Sign in to view this project.</p>}
@@ -149,7 +149,7 @@ function ProjectWorkspace() {
       {configurationQuery.isError && <p role="alert" className="text-sm text-destructive">{configurationQuery.error.message}</p>}
       {dataServicesQuery.data && <section aria-labelledby="data-services-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><h2 id="data-services-title" className="text-lg font-medium">Data services</h2><RequestRecoveryDialog name={name} /></div>{dataServicesQuery.data.services.map((service) => <p key={`${service.type}-${service.name}`} className="mt-2 text-sm"><span className="font-medium">{service.type} ({service.name})</span>: {service.state}{service.reason ? ` (${service.reason})` : ''}</p>)}{dataServicesQuery.data.latestRecoveryRequest && <p className="mt-3 text-sm text-muted-foreground">Latest recovery request: {dataServicesQuery.data.latestRecoveryRequest.status} ({dataServicesQuery.data.latestRecoveryRequest.reason}), requested {new Date(dataServicesQuery.data.latestRecoveryRequest.requestedAt).toLocaleString()}.</p>}</section>}
       {dataServicesQuery.isError && <p role="alert" className="text-sm text-destructive">{dataServicesQuery.error.message}</p>}
-      <ProjectDatabaseAccess name={name} enabled={status === 'authenticated'} />
+
       {credentialsQuery.data && <section aria-labelledby="credentials-title" className="rounded-xl border border-border bg-card p-6 shadow-sm"><div className="flex flex-wrap items-center justify-between gap-3"><div><h2 id="credentials-title" className="text-lg font-medium">Deployment credentials</h2><p className="mt-1 text-sm text-muted-foreground">Credential metadata only. Secret material is never shown here.</p></div><CreateDeploymentCredentialDialog name={name} /></div>{credentialsQuery.data.credentials.length > 0 ? <ul className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">{credentialsQuery.data.credentials.map((credential) => <li key={credential.id} className="px-4 py-3"><div className="flex flex-wrap items-center justify-between gap-3"><span className="font-medium">{credential.name}</span><div className="flex items-center gap-2"><span className="text-muted-foreground">{credential.status}</span>{credential.status === 'active' && <RotateDeploymentCredentialDialog name={name} credentialId={credential.id} credentialName={credential.name} />}{credential.status !== 'revoked' && <RevokeDeploymentCredentialDialog name={name} credentialId={credential.id} credentialName={credential.name} />}</div></div><p className="mt-1 text-xs text-muted-foreground">Expires {new Date(credential.expiresAt).toLocaleString()}{credential.lastUsedAt ? ` · last used ${new Date(credential.lastUsedAt).toLocaleString()}` : ''}{credential.rotatedFrom ? ' · rotated replacement' : ''}</p></li>)}</ul> : <p className="mt-2 text-sm">No deployment credentials.</p>}</section>}
       {credentialsQuery.isError && <p role="alert" className="text-sm text-destructive">{credentialsQuery.error.message}</p>}
       <ProjectGrants name={name} enabled={status === 'authenticated'} />
