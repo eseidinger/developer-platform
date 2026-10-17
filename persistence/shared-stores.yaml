@@ -10,6 +10,10 @@ services:
       RUSTFS_CONSOLE_PREFIX: /rustfs/console
       RUSTFS_OBS_LOG_DIRECTORY: /logs
       RUSTFS_OBS_LOGGER_LEVEL: error
+      RUSTFS_OBS_METRIC_ENDPOINT: http://alloy:4320/v1/metrics
+      RUSTFS_OBS_METER_INTERVAL: "30"
+      RUSTFS_OBS_TRACES_EXPORT_ENABLED: "false"
+      RUSTFS_OBS_LOGS_EXPORT_ENABLED: "false"
     volumes: [rustfs_data:/data]
     tmpfs: ["/logs:uid=10001,gid=10001,size=64m", "/tmp:uid=10001,gid=10001,size=32m"]
     networks:
@@ -31,6 +35,7 @@ services:
     image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
     restart: unless-stopped
     environment:
+      QDRANT__SERVICE__READ_ONLY_API_KEY: ${STORE_MONITOR_PASSWORD:-}
       QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
       QDRANT__SERVICE__JWT_RBAC: "true"
       QDRANT__TELEMETRY_DISABLED: "true"
@@ -129,3 +134,25 @@ services:
       timeout: 5s
       start_period: 120s
       retries: 12
+
+  neo4j-controller:
+    build: ../platform
+    user: "0:0"
+    restart: unless-stopped
+    command: [uvicorn, "app.stores.neo4j_controller:create_app", --factory, --host, "0.0.0.0", --port, "8091", --no-access-log]
+    environment:
+      STORE_ENABLED_PROVIDERS: postgresql,${COMPOSE_PROFILES:-}
+      PLATFORM_API_IP: ${PLATFORM_API_IP:-172.30.80.11}
+      NEO4J_CONTROLLER_KEY: ${NEO4J_CONTROLLER_KEY:?Run scripts/init.py}
+      NEO4J_MAX_INSTANCES: ${NEO4J_MAX_INSTANCES:-4}
+      NEO4J_INSTANCE_MEMORY_BYTES: ${NEO4J_INSTANCE_MEMORY_BYTES:-1610612736}
+    volumes: ["/var/run/docker.sock:/var/run/docker.sock"]
+    networks:
+      platform:
+        ipv4_address: ${NEO4J_CONTROLLER_IP:-172.30.80.31}
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25

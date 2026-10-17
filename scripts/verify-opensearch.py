@@ -43,6 +43,7 @@ def main():
     volume = name + '-data'
     password = 'Aa9!' + secrets.token_hex(32)
     os.environ['DATABASE_KEY'] = secrets.token_hex(32)
+    os.environ['STORE_MONITOR_PASSWORD'] = 'Aa9!' + secrets.token_hex(32)
     env = {**os.environ, 'OPENSEARCH_INITIAL_ADMIN_PASSWORD': password}
     try:
         # The image's demo certificates are used only for internal transport in
@@ -76,6 +77,15 @@ def main():
             provider.issue(first, credential)
             provider.probe(first, credential)
             credentials.append(credential)
+        from app.stores.native_monitoring import opensearch as native_metrics
+        output = native_metrics(provider, [{**first, 'state':'active','owner_project':'fixture'}, {**other,'state':'active','owner_project':'other'}])
+        assert any('platform_native_opensearch_heap_used_bytes' in item for item in output)
+        assert any('platform_native_opensearch_search_total' in item for item in output)
+        from app.stores.opensearch import authorization as native_authorization
+        monitor = PrivateJSON(endpoint, {'Authorization': native_authorization('platform_monitor', os.environ['STORE_MONITOR_PASSWORD'])})
+        denied(lambda: monitor.request('GET', '/' + index(first) + '/_search'))
+        denied(lambda: monitor.request('PUT', '/_plugins/_security/api/internalusers/not-allowed', {'password':'Aa9!'+secrets.token_hex(32)}))
+        print('PASS restricted native statistics collection and data/identity administration denial')
         writer, reader = credentials
         rw, ro = provider.scoped(writer), provider.scoped(reader)
         prefix, foreign = '/' + index(first), '/' + index(other)

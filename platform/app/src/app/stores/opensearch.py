@@ -35,6 +35,16 @@ class OpenSearch:
             password or os.environ['OPENSEARCH_ADMIN_PASSWORD'])}, self.ca_file)
 
     def provision(self, resource):
+        monitor_password = os.environ.get('STORE_MONITOR_PASSWORD')
+        if monitor_password:
+            self.root.request('PUT', '/_plugins/_security/api/roles/platform_monitor', {
+                'cluster_permissions': ['cluster:monitor/nodes/stats', 'cluster:monitor/health'],
+                'index_permissions': [{'index_patterns': ['resource_*'], 'allowed_actions': ['indices:monitor/stats']}],
+                'tenant_permissions': []})
+            self.root.request('PUT', '/_plugins/_security/api/internalusers/platform_monitor',
+                {'password': monitor_password, 'backend_roles': []})
+            self.root.request('PUT', '/_plugins/_security/api/rolesmapping/platform_monitor',
+                {'users': ['platform_monitor'], 'backend_roles': [], 'hosts': []})
         name = index(resource)
         self.root.request('PUT', '/_plugins/_security/api/tenants/' + tenant(resource),
             {'description': 'Named resource console workspace'})

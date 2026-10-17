@@ -15,6 +15,56 @@
     "operator",
     "stores"
   ],
+  "links": [
+    {
+      "title": "PostgreSQL",
+      "type": "link",
+      "url": "/d/postgresql",
+      "keepTime": true
+    },
+    {
+      "title": "RustFS S3",
+      "type": "link",
+      "url": "/d/rustfs-s3",
+      "keepTime": true
+    },
+    {
+      "title": "OpenSearch",
+      "type": "link",
+      "url": "/d/opensearch-performance",
+      "keepTime": true
+    },
+    {
+      "title": "Qdrant",
+      "type": "link",
+      "url": "/d/qdrant-performance",
+      "keepTime": true
+    },
+    {
+      "title": "Neo4j Community",
+      "type": "link",
+      "url": "/d/neo4j-community",
+      "keepTime": true
+    },
+    {
+      "title": "Apache AGE",
+      "type": "link",
+      "url": "/d/age-performance",
+      "keepTime": true
+    },
+    {
+      "title": "pgvector",
+      "type": "link",
+      "url": "/d/pgvector-performance",
+      "keepTime": true
+    },
+    {
+      "title": "DuckDB / Parquet",
+      "type": "link",
+      "url": "/d/duckdb-parquet",
+      "keepTime": true
+    }
+  ],
   "panels": [
     {
       "id": 1,

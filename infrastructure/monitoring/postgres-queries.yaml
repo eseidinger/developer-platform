@@ -35,3 +35,36 @@ pg_platform_settings:
     - max_connections:
         usage: GAUGE
         description: Shared server max_connections setting, including reserved capacity
+pg_platform_wal:
+  query: SELECT wal_records, wal_fpi, wal_bytes::float8 AS bytes, wal_buffers_full FROM pg_stat_wal
+  metrics:
+    - wal_records:
+        usage: COUNTER
+        description: Shared server WAL records
+    - wal_fpi:
+        usage: COUNTER
+        description: Shared server full page WAL images
+    - bytes:
+        usage: COUNTER
+        description: Shared server WAL bytes
+    - wal_buffers_full:
+        usage: COUNTER
+        description: WAL buffer full events
+pg_platform_checkpointer:
+  query: SELECT num_timed, num_requested, write_time/1000 AS write_seconds, sync_time/1000 AS sync_seconds, buffers_written FROM pg_stat_checkpointer
+  metrics:
+    - num_timed:
+        usage: COUNTER
+        description: Timed checkpoints
+    - num_requested:
+        usage: COUNTER
+        description: Requested checkpoints
+    - write_seconds:
+        usage: COUNTER
+        description: Checkpoint write time
+    - sync_seconds:
+        usage: COUNTER
+        description: Checkpoint sync time
+    - buffers_written:
+        usage: COUNTER
+        description: Checkpoint buffers written

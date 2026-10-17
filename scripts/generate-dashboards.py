@@ -235,6 +235,10 @@ def postgres_dashboard():
     add("Database locks", [("{{mode}}", f'pg_locks_count{{{selected}}}')], description="Current locks by lock mode, including granted and waiting locks.")
     add("Database lock waits", [("{{state}}", f'pg_platform_activity_lock_waits{{{selected}}}')], description="Client connections waiting for a lock; no SQL text or session identities are collected.")
     add("Oldest open transaction", [("{{state}}", f'pg_platform_activity_max_transaction_seconds{{{selected}}}')], "s", "Age by client connection state; zero means no open transaction in that state.")
+    for title, metric, unit in [('WAL bytes generated','wal_bytes','Bps'),('WAL buffer-full events','wal_wal_buffers_full','ops'),
+            ('Timed checkpoints','checkpointer_num_timed','ops'),('Requested checkpoints','checkpointer_num_requested','ops'),
+            ('Checkpoint write time','checkpointer_write_seconds','s'),('Checkpoint sync time','checkpointer_sync_seconds','s')]:
+        add(title,[("Shared server", f'rate(pg_platform_{metric}[5m])')],unit,'Native shared PostgreSQL 18 statistics across all databases.')
     dashboard = {"uid": "postgresql", "title": "PostgreSQL", "schemaVersion": 41, "version": 1,
                  "editable": False, "timezone": "browser", "refresh": "30s",
                  "time": {"from": "now-1h", "to": "now"}, "tags": ["developer-platform", "operator", "postgresql"], "panels": panels}
@@ -316,10 +320,121 @@ def store_dashboard():
     return {"uid": "named-data-stores", "title": "Named data-store resources", "schemaVersion": 41,
         "version": 1, "editable": False, "timezone": "browser", "refresh": "30s",
         "time": {"from": "now-1h", "to": "now"}, "tags": ["developer-platform", "operator", "stores"],
+        "links": [{"title":title,"type":"link","url":"/d/"+uid,"keepTime":True}
+            for uid,title in [('postgresql','PostgreSQL'),('rustfs-s3','RustFS S3'),('opensearch-performance','OpenSearch'),
+                ('qdrant-performance','Qdrant'),('neo4j-community','Neo4j Community'),('age-performance','Apache AGE'),
+                ('pgvector-performance','pgvector'),('duckdb-parquet','DuckDB / Parquet')]],
         "panels": [panel(i, title, expr, unit=unit, description=description,
             legend="{{project}} {{resource_id}} {{provider}}")
             for i, (title, expr, unit, description) in enumerate(entries, 1)]}
 
+
+
+def performance_dashboards():
+    """Queries match reviewed native collectors or explicit application metrics."""
+    definitions = [
+        ('rustfs-s3', 'RustFS S3 performance', 's3', None),
+        ('opensearch-performance', 'OpenSearch performance', 'opensearch', 'opensearch'),
+        ('qdrant-performance', 'Qdrant performance', 'qdrant', 'qdrant'),
+        ('neo4j-community', 'Neo4j Community instance performance', 'neo4j', 'containers'),
+        ('age-performance', 'Apache AGE performance and projection health', 'postgresql', 'postgresql'),
+        ('pgvector-performance', 'pgvector performance', 'postgresql', 'postgresql'),
+        ('duckdb-parquet', 'DuckDB / Parquet analytics', 's3', None),
+    ]
+    result = []
+    for uid,title,provider,collector in definitions:
+        entries = []
+        def add(title, expr, unit='short', description=''):
+            entries.append(panel(len(entries)+1,title,expr,unit=unit,description=description,
+                legend='{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}'))
+        selected = 'project=~"$project",resource_id=~"$resource"'
+        if uid != 'duckdb-parquet':
+            add('Provider selected',f'platform_native_selected{{provider="{provider}"}}',description='Operator selection; zero is disabled, missing means collector unavailable.')
+            if collector:
+                add('Native collection health', f'platform_native_collection_up{{provider="{collector}"}}',description='One means this collector pass succeeded; resource samples have separate timestamps.')
+                add('Native collection age', f'time() - platform_native_last_success_timestamp_seconds{{provider="{collector}"}}','s','Zero success timestamp means no successful sample. Old values are retained after failures.')
+            if uid not in {'age-performance','pgvector-performance'}:
+                scope = ','+selected if provider == 'neo4j' else ',scope="shared"'
+                base = 'provider="'+provider+'"'+scope
+                add('Container CPU cores used',f'rate(platform_native_container_cpu_seconds_total{{{base}}}[5m])','cores','Docker counter; shared services are not attributed to the selected project.')
+                add('Container memory / limit',f'platform_native_container_memory_bytes{{{base}}} / (platform_native_container_memory_limit_bytes{{{base}}} > 0)','percentunit','Docker memory excluding inactive file cache; instance/container scope.')
+                add('Container restarts',f'platform_native_container_restarts{{{base}}}',description='Daemon restart count; replacement containers reset this gauge.')
+                add('Container block I/O read',f'rate(platform_native_container_read_bytes_total{{{base}}}[5m])','Bps','Docker block I/O counters; page-cache hits are not physical reads.')
+                add('Container block I/O write',f'rate(platform_native_container_write_bytes_total{{{base}}}[5m])','Bps','Docker block I/O counters; shared store activity is not per resource.')
+        workload = {'age-performance':'age','pgvector-performance':'pgvector','neo4j-community':'neo4j','duckdb-parquet':'duckdb'}.get(uid)
+        if workload:
+            query = 'provider="'+workload+'",'+selected
+            add('Instrumented workload throughput',f'sum by (operation,outcome) (rate(platform_store_workload_duration_seconds_count{{{query}}}[5m]))','ops','Application-owned instrumentation; includes only opted-in operations, not every server query.')
+            add('Instrumented workload p95 latency',f'histogram_quantile(0.95,sum by (le,operation) (rate(platform_store_workload_duration_seconds_bucket{{{query}}}[5m])))','s','Application histograms. No traffic means no latency estimate. Finite buckets end at 300 seconds.')
+            add('Instrumented workload errors',f'sum by (operation) (rate(platform_store_workload_duration_seconds_count{{{query},outcome="error"}}[5m]))','ops','Application failure outcomes without query text or native diagnostics.')
+            add('Workload collection age',f'time()-platform_store_workload_last_collection_timestamp_seconds{{{query}}}','s','Requires the application metrics opt-in and the store-observability example. Missing means instrumentation is unavailable.')
+        if uid == 'rustfs-s3':
+            add('Native request throughput','sum by (method,api,http_request_method) (rate(rustfs_http_server_requests_total{provider="s3"}[5m]))','ops','Native RustFS OTLP through the separate allowlisted Alloy metrics pipeline; shared service scope.')
+            add('Native request p95 latency','histogram_quantile(0.95,sum by (le,method,api,http_request_method) (rate(rustfs_http_server_request_duration_seconds_bucket{provider="s3"}[5m])))','s','Native histogram; per-operation dimensions depend on the verified release schema.')
+            add('Native request errors','sum by (status,status_code,http_response_status_code) (rate(rustfs_http_server_requests_total{provider="s3",http_response_status_code=~"4..|5.."}[5m]))','ops','HTTP response class. Authentication/permission denials are distinct from service failures.')
+            add('Native uploaded bytes','sum(rate(rustfs_http_server_request_body_bytes_total{provider="s3"}[5m]))','Bps','Native shared HTTP request bodies.')
+            add('Native downloaded bytes','sum(rate(rustfs_http_server_response_body_bytes_total{provider="s3"}[5m]))','Bps','Native shared HTTP response bodies.')
+            add('Native export age','time()-timestamp(rustfs_runtime_readiness_ready{provider="s3"})','s','Age of the last native readiness observation accepted by Prometheus. Missing is unavailable.')
+            add('Native free storage','rustfs_cluster_capacity_free_bytes{provider="s3"}','bytes','Native storage capacity, distinct from logical bucket quotas.')
+            add('Native storage usage','rustfs_cluster_capacity_used_bytes{provider="s3"}','bytes','Native cluster storage usage.')
+            add('Native I/O timeouts','sum by (operation)(rate(rustfs_io_timeout_events_total{provider="s3"}[5m]))','ops','Only emitted when the native operation has observations.')
+            add('Backpressure rejections','rate(rustfs_backpressure_rejections{provider="s3"}[5m])','ops','Native backpressure counter; absence is not an observed zero.')
+            add('Scanner cycles','rate(rustfs_scanner_cycles_total{provider="s3"}[5m])','ops','Native maintenance throughput.')
+            add('Healing backlog','rustfs_heal_mrf_queue_depth{provider="s3"}',description='Native healing work queue.')
+        elif uid == 'opensearch-performance':
+            prefix='platform_native_opensearch_'
+            for name,expr,unit in [
+                ('Cluster health (0 green, 1 yellow, 2 red)',prefix+'health','short'),
+                ('Unassigned shards',prefix+'unassigned_shards','short'),
+                ('JVM heap utilization',prefix+'heap_used_bytes / ('+prefix+'heap_max_bytes > 0)','percentunit'),
+                ('JVM GC time','sum by(generation)(rate('+prefix+'gc_seconds_total[5m]))','s'),
+                ('Thread-pool queues',prefix+'thread_pool_queue','short'),
+                ('Thread-pool rejections','rate('+prefix+'thread_pool_rejected_total[5m])','ops'),
+                ('Circuit breaker trips','rate('+prefix+'breaker_tripped_total[5m])','ops'),
+                ('Disk available',prefix+'disk_available_bytes','bytes')]:
+                add(name,expr,unit,'Native shared-node statistics. Interpret shard status against the configured single-node replica policy.')
+            for name,key,unit in [('Search throughput','search_total','ops'),('Index throughput','index_total','ops'),('Failed indexing','index_failed_total','ops')]:
+                add(name,f'rate({prefix}{key}{{{selected}}}[5m])',unit,'Native primary-index counters scoped to the selected catalog resource.')
+            for operation in ('search','index'):
+                add(operation.title()+' mean native time',f'rate({prefix}{operation}_seconds_total{{{selected}}}[5m]) / (rate({prefix}{operation}_total{{{selected}}}[5m]) > 0)','s','Native accumulated operation time/count; this is a mean, not a percentile or end-to-end request latency.')
+            add('Index size',f'{prefix}index_bytes{{{selected}}}','bytes','Native primary-index store size; console metadata is included separately in logical resource usage.')
+            add('Active merges',f'{prefix}merges_active{{{selected}}}',description='Native primary-index segment maintenance.')
+            add('Cache hit rate',f'rate({prefix}cache_hits_total{{{selected}}}[5m]) / ((rate({prefix}cache_hits_total{{{selected}}}[5m])+rate({prefix}cache_misses_total{{{selected}}}[5m])) > 0)','percentunit','Native query-cache observations for the selected resource.')
+        elif uid == 'qdrant-performance':
+            prefix='platform_native_qdrant_'
+            for name,key in [('Points','collection_points'),('Vectors','collection_vectors'),('Unindexed exclusions','collection_indexed_only_excluded_points'),('Running optimizations','collection_running_optimizations'),('Snapshots creating','snapshot_creation_running'),('Snapshots recovering','snapshot_recovery_running')]:
+                add(name,f'{prefix}{key}{{{selected}}}',description='Native self-hosted collection metrics mapped to stable catalog resources; validation collections are excluded.')
+            add('REST throughput',f'sum by(operation,status)(rate({prefix}rest_responses_total{{{selected}}}[5m]))','ops','Native per-collection API response counters; templates, never resolved query URLs.')
+            add('REST p95 latency',f'histogram_quantile(0.95,sum by(le,operation)(rate({prefix}rest_responses_duration_seconds_bucket[5m])))','s','Native histogram; if the release omits collection dimensions this is explicitly shared service latency.')
+            add('Resident memory',prefix+'memory_resident_bytes','bytes','Native process allocator metric; shared service.')
+            add('Major page faults','rate('+prefix+'process_major_page_faults_total[5m])','ops','Native process I/O pressure; shared service.')
+            add('File descriptor utilization',prefix+'process_open_fds / ('+prefix+'process_max_fds > 0)','percentunit','Native process descriptor usage; shared service.')
+        elif uid in {'age-performance','pgvector-performance'}:
+            add('Resource native sample age',f'time()-platform_native_resource_last_success_timestamp_seconds{{{selected}}}','s','Bounded round-robin PostgreSQL database collection; failures retain the original timestamp.')
+            add('Estimated dead rows',f'platform_native_postgresql_estimated_dead_rows{{{selected}}}',description='PostgreSQL estimates across resource tables, not an exact graph/vector count.')
+            add('Vacuum activity',f'rate(platform_native_postgresql_vacuums_total{{{selected}}}[5m])','ops','Aggregate native vacuum/autovacuum counts for resource tables.')
+            if uid == 'age-performance':
+                for title,key,unit in [('Projection lag','projection_lag_seconds','s'),('Pending source updates','pending_updates','short')]:
+                    add(title,f'platform_store_workload_{key}{{provider="age",{selected}}}',unit,'Application projection worker numeric observation; requires protected-source integration.')
+                add('Last successful validation age',f'time()-platform_store_workload_last_validation_timestamp_seconds{{provider="age",{selected}}}','s','Application validation observation; absence means no evidence.')
+            else:
+                add('Vector index size',f'platform_native_pgvector_index_bytes{{{selected}}}','bytes','Native HNSW/IVFFlat indexes aggregated by index type; no per-index names.')
+                add('Vector index scans',f'rate(platform_native_pgvector_index_scans_total{{{selected}}}[5m])','ops','Native index scans; query latency comes from the application histogram above.')
+                add('Index builds active',f'platform_native_postgresql_index_build_active{{{selected}}}',description='All current index builds in the resource, not exclusively vector indexes.')
+                add('Index build block progress',f'platform_native_postgresql_index_build_blocks_done{{{selected}}} / (platform_native_postgresql_index_build_blocks_total{{{selected}}} > 0)','percentunit','Native build stages may not expose block totals; no synthetic progress for those stages.')
+        elif uid == 'duckdb-parquet':
+            for title,key,unit in [('Query CPU time','cpu_seconds','s'),('Peak buffer memory','peak_memory_bytes','bytes'),('Temporary spill usage','spill_bytes','bytes'),('Rows scanned','rows_scanned','short'),('Rows returned','rows_returned','short'),('Artifact bytes transferred','transfer_bytes','bytes')]:
+                add(title,f'platform_store_workload_{key}{{provider="duckdb",{selected}}}',unit,'Selected numeric fields from the last profiled job; plans, paths, SQL and contents are excluded. These gauges are not cumulative counters.')
+        elif uid == 'neo4j-community':
+            add('Dedicated instance running',f'platform_native_container_running{{provider="neo4j",{selected}}}',description='Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting.')
+        dashboard={'uid':uid,'title':title,'schemaVersion':41,'version':1,'editable':False,'timezone':'browser','refresh':'30s',
+            'time':{'from':'now-1h','to':'now'},'tags':['developer-platform','operator','stores','performance'],'panels':entries,
+            'links':[{'title':'Named resources','type':'link','url':'/d/named-data-stores','keepTime':True}]}
+        dashboard['templating']={'list':[
+            {'name':'project','type':'query','datasource':{'type':'prometheus','uid':'prometheus'},'query':f'label_values(platform_store_quota_bytes{{provider="{provider}"}}, project)','refresh':1,'multi':True,'includeAll':True,'allValue':'.*','current':{'text':'All','value':'$__all'}},
+            {'name':'resource','type':'query','datasource':{'type':'prometheus','uid':'prometheus'},'query':f'label_values(platform_store_quota_bytes{{provider="{provider}",project=~"$project"}}, resource_id)','refresh':1,'multi':True,'includeAll':True,'allValue':'.*','current':{'text':'All','value':'$__all'}}]}
+        result.append(dashboard)
+    return result
 
 def generate(check=False):
     ROOT.mkdir(parents=True, exist_ok=True)
@@ -337,7 +452,7 @@ def generate(check=False):
         if uid == "workloads-capacity":
             augment_capacity(dashboard)
         expected[uid] = dashboard
-    for dashboard in (application_dashboard(), micrometer_dashboard(), postgres_dashboard(), store_dashboard(), *ai_dashboards()):
+    for dashboard in (application_dashboard(), micrometer_dashboard(), postgres_dashboard(), store_dashboard(), *performance_dashboards(), *ai_dashboards()):
         expected[dashboard["uid"]] = dashboard
     stale = []
     for uid, dashboard in expected.items():

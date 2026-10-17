@@ -157,3 +157,48 @@ groups:
         annotations:
           summary: "Restored named stores remain quarantined"
           description: "Review latest verified purge intents, source rebuilds and credential cleanup before enabling fresh grants."
+  - name: native-store-performance
+    rules:
+      - alert: NativeStoreCollectorStale
+        expr: (time() - platform_native_collector_timestamp_seconds > 120) or absent(platform_native_collector_timestamp_seconds)
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: Native store metrics collector is stale or unavailable
+      - alert: NativeStoreCollectionUnavailable
+        expr: platform_native_collection_up == 0
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Native {{ $labels.provider }} statistics collection failed'
+          description: Retained values may be stale. Inspect private collector configuration, permissions and provider readiness.
+      - alert: RustFSTelemetryUnavailable
+        expr: (platform_native_selected{provider="s3"} == 1) unless on(provider) (rustfs_runtime_readiness_ready{provider="s3"} == 1)
+        for: 3m
+        labels:
+          severity: warning
+        annotations:
+          summary: Selected RustFS has no healthy native telemetry observation
+      - alert: StoreContainerMemoryPressure
+        expr: platform_native_container_memory_bytes / (platform_native_container_memory_limit_bytes > 0) > 0.9
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'Store {{ $labels.provider }} container memory is near its limit'
+      - alert: OpenSearchThreadPoolRejected
+        expr: rate(platform_native_opensearch_thread_pool_rejected_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'OpenSearch {{ $labels.pool }} work is being rejected'
+      - alert: OpenSearchCircuitBreakerTripped
+        expr: increase(platform_native_opensearch_breaker_tripped_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: 'OpenSearch {{ $labels.breaker }} memory circuit breaker tripped'

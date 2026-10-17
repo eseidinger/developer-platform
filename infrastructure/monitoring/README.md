@@ -378,3 +378,49 @@ blocks. Filesystems without inode capacity have no inode ratio.
 and Prometheus containers. It verifies repeatable role setup, denied application
 reads/writes, aggregate privacy, database selection, absent/unlimited values and
 dashboard query readback using production collectors, SQL and metric filters.
+
+
+## Phase 7 store performance
+
+The named-resource overview links to PostgreSQL, RustFS S3, OpenSearch, Qdrant,
+Apache AGE, pgvector, DuckDB/Parquet and dedicated Neo4j Community dashboards.
+Regenerate reviewed definitions with `python3 scripts/generate-dashboards.py`.
+Native collection runs independently of lifecycle reconciliation and publishes
+bounded textfile metrics through the existing node exporter. Last-good readings
+remain visible after failure, with separate collection health/freshness. The
+operator-only dedicated-instance controller reads Docker statistics; API/relay
+containers do not receive its Docker socket. This operator service has host-level
+Docker authority and must be restricted to the fixed API source and private key.
+
+OpenSearch uses the `platform_monitor` native role for selected cluster/index
+statistics, with document and identity administration denied. Qdrant uses the
+separate `STORE_MONITOR_PASSWORD` as a native read-only key for metrics; its
+edition does not provide a metrics-only key, so keep that operator credential
+private. Resource mappings come from the catalog, not arbitrary native labels.
+RustFS 1.0.2 exports metrics over OTLP/HTTP to Alloy's private port 4320; the
+allowlist aggregates away unreviewed dimensions before export. Its object keys,
+paths, logs and trace payloads do not enter this new metrics pipeline.
+
+The PostgreSQL dashboard now includes shared WAL/checkpoint statistics. The
+separate collector connects read-only as `platform_monitor` to named databases,
+at most eight per pass, and publishes aggregate table/vacuum/vector-index and
+index-build statistics without SQL, user or index-name labels. Named-resource
+provisioning grants this operator identity CONNECT when present; prepare existing
+named databases through reviewed operator maintenance. These additions extend
+the earlier platform-only exporter scope described above.
+
+AGE/pgvector/Neo4j query latency and DuckDB/job profiling require explicit
+application instrumentation. The [collector example](../../examples/store-observability/metrics.py)
+opens no listener and returns Prometheus text for an application's existing
+protected metrics route. Enable the normal application metrics opt-in; its
+reviewed allowlist now accepts these bounded metric families. Only numeric
+DuckDB profile fields are exported. Missing application observations are unknown,
+not proof of zero traffic or completed external integration. Shared-server
+CPU/I/O is labeled separately from attributable resource/workload signals.
+
+Run `scripts/verify-store-metric-pipeline.py` for real signed RustFS I/O through
+production Alloy into disposable Prometheus, sensitive-dimension exclusion and
+parsing all store-dashboard queries. Native OpenSearch/Qdrant fixtures additionally
+verify collector permissions and release-specific metric schemas. Alert fixtures
+include `tests/native-stores.test.yaml`; thresholds are operational starting
+points to tune against observed workloads, not store-adoption requirements.

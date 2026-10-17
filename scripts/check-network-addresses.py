@@ -11,6 +11,7 @@ from env import settings
 
 NETWORK = "developer-platform"
 FIXED_SERVICES = {
+    "neo4j-controller": ("NEO4J_CONTROLLER_IP", "172.30.80.31"),
     "postgres-exporter": ("POSTGRES_EXPORTER_IP", "172.30.80.30"),
     "postgres": ("POSTGRES_IP", "172.30.80.10"),
     "platform-api": ("PLATFORM_API_IP", "172.30.80.11"),

@@ -150,6 +150,9 @@ async def lifespan(app):
     access_worker.start()
     stores_worker = threading.Thread(target=store_worker.loop, args=(stop, sys.modules[__name__]), daemon=True)
     stores_worker.start()
+    from .stores import native_monitoring
+    native_metrics_worker = threading.Thread(target=native_monitoring.loop, args=(stop, sys.modules[__name__]), daemon=True)
+    native_metrics_worker.start()
     try:
         yield
     finally:
@@ -161,6 +164,7 @@ async def lifespan(app):
         credential_cleanup_worker.join(timeout=6)
         access_worker.join(timeout=6)
         stores_worker.join(timeout=6)
+        native_metrics_worker.join(timeout=6)
         tracing.shutdown()
 
 app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)

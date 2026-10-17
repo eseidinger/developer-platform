@@ -38,11 +38,13 @@ def main():
     name = 'named-qdrant-' + uuid4().hex[:12]
     volume = name + '-data'
     key = secrets.token_hex(32)
-    env = {**os.environ, 'QDRANT__SERVICE__API_KEY': key}
+    monitor_key = secrets.token_hex(32)
+    os.environ['STORE_MONITOR_PASSWORD'] = monitor_key
+    env = {**os.environ, 'QDRANT__SERVICE__API_KEY': key, 'QDRANT__SERVICE__READ_ONLY_API_KEY': monitor_key}
     try:
         command('docker', 'run', '-d', '--name', name, '--memory', '512m', '--cpus', '1',
             '--mount', f'type=volume,src={volume},dst=/qdrant/storage', '-e', 'QDRANT__SERVICE__API_KEY',
-            '-e', 'QDRANT__SERVICE__JWT_RBAC=true', '-e', 'QDRANT__TELEMETRY_DISABLED=true',
+            '-e', 'QDRANT__SERVICE__READ_ONLY_API_KEY', '-e', 'QDRANT__SERVICE__JWT_RBAC=true', '-e', 'QDRANT__TELEMETRY_DISABLED=true',
             '-p', '127.0.0.1::6333', IMAGE, env=env)
         port = int(command('docker', 'port', name, '6333/tcp').rsplit(':', 1)[1])
         endpoint = f'http://127.0.0.1:{port}'
@@ -67,6 +69,13 @@ def main():
             provider.issue(first, cred)
             provider.probe(first, cred)
             credentials.append(cred)
+        from app.stores.native_monitoring import qdrant as native_metrics
+        output = native_metrics(provider, [{**first,'state':'active','owner_project':'fixture'}, {**other,'state':'active','owner_project':'other'}])
+        assert any('platform_native_qdrant_collection_points' in item for item in output)
+        assert any('platform_native_qdrant_memory_resident_bytes' in item for item in output)
+        monitor = PrivateJSON(endpoint, {'api-key': monitor_key})
+        denied(lambda: monitor.request('PUT', '/collections/not-allowed', {'vectors':{'size':1,'distance':'Dot'}}))
+        print('PASS bounded native metrics and read-only monitoring identity write denial')
         writer, reader = credentials
         rw = PrivateJSON(endpoint, {'api-key': provider.token(first, writer)})
         ro = PrivateJSON(endpoint, {'api-key': provider.token(first, reader)})
@@ -92,7 +101,7 @@ def main():
         provider.validate_recovery(first)
         assert provider.usage(first) >= 0
         with restored(name, volume, '/qdrant/storage', IMAGE, ['--memory', '512m', '--cpus', '1',
-                '-e', 'QDRANT__SERVICE__API_KEY', '-e', 'QDRANT__SERVICE__JWT_RBAC=true',
+                '-e', 'QDRANT__SERVICE__API_KEY', '-e', 'QDRANT__SERVICE__READ_ONLY_API_KEY', '-e', 'QDRANT__SERVICE__JWT_RBAC=true',
                 '-e', 'QDRANT__TELEMETRY_DISABLED=true', '-p', '127.0.0.1::6333'], env) as recovered_name:
             recovered_port = int(command('docker', 'port', recovered_name, '6333/tcp').rsplit(':', 1)[1])
             recovered = Qdrant(f'http://127.0.0.1:{recovered_port}', key)

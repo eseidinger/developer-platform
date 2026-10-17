@@ -29,6 +29,7 @@ for profile in "${store_profiles[@]}"; do
   case "$profile" in
     s3) store_services+=(rustfs) ;;
     qdrant) store_services+=(qdrant) ;;
+    neo4j) docker pull neo4j:2026.09.0-community@sha256:d6269a020149934597c8c3df926d080a612796dbbb48861ca9d5b1109cabf0d8; store_services+=(neo4j-controller) ;;
     opensearch) store_services+=(opensearch); docker compose up -d opensearch-init ;;
   esac
 done

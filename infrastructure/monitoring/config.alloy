@@ -232,3 +232,70 @@ otelcol.exporter.otlphttp "ai_metrics" {
     max_elapsed_time = "30s"
   }
 }
+
+// Pinned RustFS emits OTLP/HTTP metrics, not a native Prometheus scrape route.
+// Separate listener accepts no traces/logs. Never retain object paths or keys.
+otelcol.receiver.otlp "rustfs_metrics" {
+  http {
+    endpoint = "0.0.0.0:4320"
+    max_request_body_size = "2MiB"
+  }
+  output { metrics = [otelcol.processor.memory_limiter.rustfs_metrics.input] }
+}
+otelcol.processor.memory_limiter "rustfs_metrics" {
+  check_interval = "1s"
+  limit = "32MiB"
+  spike_limit = "8MiB"
+  output { metrics = [otelcol.processor.filter.rustfs_metrics.input] }
+}
+otelcol.processor.filter "rustfs_metrics" {
+  error_mode = "propagate"
+  metrics {
+    metric = [`not IsMatch(name, "^rustfs_(http_server_(requests_total|active_requests|request_duration_seconds|request_body_bytes_total|response_body_bytes_total)|io_(timeout_events_total|get_object_completed_total|get_object_concurrent_requests)|runtime_readiness_ready|start_total|cluster_capacity_(used_bytes|free_bytes|usable_total_bytes)|heal_mrf_queue_depth|scanner_(cycles_total|cycle_duration_seconds)|backpressure_rejections)$")`]
+  }
+  output { metrics = [otelcol.processor.transform.rustfs_metrics.input] }
+}
+otelcol.processor.transform "rustfs_metrics" {
+  error_mode = "propagate"
+  metric_statements {
+    context = "resource"
+    statements = [
+      `keep_keys(attributes, [])`,
+      `set(attributes["service.name"], "rustfs")`,
+    ]
+  }
+  metric_statements {
+    context = "metric"
+    statements = [`aggregate_on_attributes("sum", ["operation", "method", "status", "status_code", "api", "http.request.method", "http.response.status_code"])`]
+  }
+  metric_statements {
+    context = "datapoint"
+    statements = [
+      `truncate_all(attributes, 64)`,
+      `set(attributes["provider"], "s3")`,
+      `set(attributes["scope"], "shared")`,
+    ]
+  }
+  output { metrics = [otelcol.processor.batch.rustfs_metrics.input] }
+}
+otelcol.processor.batch "rustfs_metrics" {
+  send_batch_size = 128
+  timeout = "2s"
+  output { metrics = [otelcol.exporter.otlphttp.rustfs_metrics.input] }
+}
+otelcol.exporter.otlphttp "rustfs_metrics" {
+  client {
+    endpoint = "http://prometheus:9090/api/v1/otlp"
+    timeout = "2s"
+  }
+  sending_queue {
+    enabled = true
+    queue_size = 16
+    num_consumers = 1
+    block_on_overflow = false
+  }
+  retry_on_failure {
+    enabled = true
+    max_elapsed_time = "15s"
+  }
+}

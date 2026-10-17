@@ -39,6 +39,8 @@ class Postgres:
                 .format(sql.Identifier(name), sql.Identifier(owner)))
             conn.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}")
                 .format(sql.Identifier(name), sql.Identifier(reader)))
+            if conn.execute("SELECT 1 FROM pg_roles WHERE rolname='platform_monitor'").fetchone():
+                conn.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO platform_monitor").format(sql.Identifier(name)))
         with self.connection(name) as conn, conn.transaction():
             conn.execute(sql.SQL("CREATE SCHEMA IF NOT EXISTS public AUTHORIZATION {}").format(sql.Identifier(owner)))
             conn.execute("REVOKE ALL ON SCHEMA public FROM PUBLIC")

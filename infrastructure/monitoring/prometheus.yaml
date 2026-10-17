@@ -26,7 +26,7 @@ scrape_configs:
       - targets: ["postgres-exporter:9187"]
     metric_relabel_configs:
       - source_labels: [__name__]
-        regex: 'pg_up|pg_exporter_last_scrape_error|pg_postmaster_start_time_seconds|pg_platform_settings_max_connections|pg_platform_activity_(connections|lock_waits|max_transaction_seconds)|pg_database_(size_bytes|connection_limit)|pg_stat_database_(numbackends|xact_commit|xact_rollback|blks_read|blks_hit|tup_returned|tup_fetched|tup_inserted|tup_updated|tup_deleted|conflicts|temp_files|temp_bytes|deadlocks|blk_read_time|blk_write_time)|pg_locks_count'
+        regex: 'pg_platform_(wal|checkpointer)_.+|pg_up|pg_exporter_last_scrape_error|pg_postmaster_start_time_seconds|pg_platform_settings_max_connections|pg_platform_activity_(connections|lock_waits|max_transaction_seconds)|pg_database_(size_bytes|connection_limit)|pg_stat_database_(numbackends|xact_commit|xact_rollback|blks_read|blks_hit|tup_returned|tup_fetched|tup_inserted|tup_updated|tup_deleted|conflicts|temp_files|temp_bytes|deadlocks|blk_read_time|blk_write_time)|pg_locks_count'
         action: keep
       - action: labelkeep
         regex: '__name__|job|instance|datname|state|mode'
@@ -125,7 +125,7 @@ scrape_configs:
         regex: proxy_path
     metric_relabel_configs:
       - source_labels: [__name__]
-        regex: 'http_server_requests_seconds_(count|sum|bucket)|http_requests_total|http_request_duration_seconds_(count|sum|bucket)|jvm_memory_(used_bytes|committed_bytes|max_bytes|usage_after_gc)|jvm_buffer_(count_buffers|memory_used_bytes|total_capacity_bytes)|jvm_gc_(live_data_size_bytes|max_data_size_bytes|memory_allocated_bytes_total|memory_promoted_bytes_total|overhead|pause_seconds_(count|sum|max))|jvm_threads_(live_threads|daemon_threads|peak_threads|states_threads|started_threads_total)|jvm_classes_(loaded_classes|unloaded_classes_total)|process_(cpu_usage|uptime_seconds|start_time_seconds|files_open_files|files_max_files)|system_(cpu_usage|cpu_count|load_average_1m)'
+        regex: 'platform_store_workload_(duration_seconds_(bucket|sum|count)|cpu_seconds|peak_memory_bytes|spill_bytes|rows_scanned|rows_returned|transfer_bytes|projection_lag_seconds|pending_updates|last_validation_timestamp_seconds|last_collection_timestamp_seconds)|http_server_requests_seconds_(count|sum|bucket)|http_requests_total|http_request_duration_seconds_(count|sum|bucket)|jvm_memory_(used_bytes|committed_bytes|max_bytes|usage_after_gc)|jvm_buffer_(count_buffers|memory_used_bytes|total_capacity_bytes)|jvm_gc_(live_data_size_bytes|max_data_size_bytes|memory_allocated_bytes_total|memory_promoted_bytes_total|overhead|pause_seconds_(count|sum|max))|jvm_threads_(live_threads|daemon_threads|peak_threads|states_threads|started_threads_total)|jvm_classes_(loaded_classes|unloaded_classes_total)|process_(cpu_usage|uptime_seconds|start_time_seconds|files_open_files|files_max_files)|system_(cpu_usage|cpu_count|load_average_1m)'
         action: keep
       # Runtime dimensions belong only to reviewed JVM metrics, never HTTP request IDs.
       - source_labels: [__name__]
@@ -157,4 +157,4 @@ scrape_configs:
         target_label: pool
         replacement: ''
       - action: labelkeep
-        regex: '__name__|job|instance|project|environment|application|component|namespace|method|status|outcome|le|area|id|state|gc|action|cause|pool'
+        regex: '__name__|job|instance|project|environment|application|component|namespace|method|status|outcome|le|area|id|state|gc|action|cause|pool|resource_id|provider|operation'
