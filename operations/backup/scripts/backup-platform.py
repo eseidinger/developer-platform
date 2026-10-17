@@ -110,10 +110,10 @@ class Job:
                 raise BackupError('service restart failed; recovery intent retained')
             path.unlink()
 
-    def service_state(self, bundle):
+    def volume_state(self, bundle, services):
         containers = []
         mounts = []
-        for service, targets in [('proxy', ['/data', '/config']), ('grafana', ['/var/lib/grafana'])]:
+        for service, targets in services:
             ids = self.compose('ps', '-q', service).decode().split()
             if len(ids) != 1:
                 raise BackupError('required service unavailable')
@@ -136,6 +136,19 @@ class Job:
         finally:
             self.resume()
 
+    def service_state(self, bundle):
+        self.volume_state(bundle, [('proxy', ['/data', '/config']), ('grafana', ['/var/lib/grafana'])])
+
+    def data_store_state(self, bundle):
+        manifest = json.loads((bundle / 'store-recovery.json').read_text())
+        providers = {row['provider'] for row in manifest['resources'] if row['state'] != 'purged'} - {'postgresql'}
+        volumes = {'s3': ('rustfs', ['/data']), 'qdrant': ('qdrant', ['/qdrant/storage']),
+                   'opensearch': ('opensearch', ['/usr/share/opensearch/data'])}
+        if providers - volumes.keys():
+            raise BackupError('Data-store provider has no protected volume capture')
+        if providers:
+            self.volume_state(bundle, [volumes[p] for p in sorted(providers)])
+
     def postgres_argv(self, *arguments):
         return [self.docker, 'compose', 'exec', '-T', 'postgres', *arguments]
 
@@ -143,14 +156,37 @@ class Job:
     def catalog_snapshot(self):
         """Freeze resource/grant lifecycle across database enumeration and intent capture.
 
-        Data queries continue. Relay deadlines remain independent of this lock.
+        Non-PostgreSQL resources require a coordinated pause of managed data
+        leases across the SQL dump and stopped-service volume capture. The pause
+        expires after 35 minutes even if the process is killed. Deadlines continue.
         Closing the psql stdin releases the session lock even after interruption.
         """
         process = subprocess.Popen(self.postgres_argv('psql','-X','-qAt','-v','ON_ERROR_STOP=1',
             '-U','postgres','-d','platform'), cwd=self.root, stdin=subprocess.PIPE,
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
         try:
-            process.stdin.write(b"SET lock_timeout='30s'; SET idle_session_timeout='35min'; SELECT pg_advisory_lock(731904);\n\\echo STORE_CATALOG_SNAPSHOT\n")
+            process.stdin.write(b"""SET lock_timeout='30s'; SET idle_session_timeout='35min'; SELECT pg_advisory_lock(731904);
+DO $$ BEGIN
+ IF to_regclass('public.store_resources') IS NOT NULL THEN
+  UPDATE store_control SET backup_until=now()+interval '35 minutes' WHERE singleton AND EXISTS(
+   SELECT 1 FROM store_resources WHERE provider<>'postgresql' AND state<>'purged');
+ END IF;
+END $$;
+DO $$ BEGIN
+ IF to_regclass('public.store_control') IS NOT NULL THEN
+  IF EXISTS(SELECT 1 FROM store_control WHERE singleton AND backup_until>now()) THEN
+   PERFORM pg_sleep(5);
+   IF EXISTS(WITH managed AS MATERIALIZED (
+    SELECT pid FROM pg_stat_activity WHERE datname ~ '^resource_[a-f0-9]{32}$'
+     AND usename ~ '^credential_[a-f0-9]{32}$')
+    SELECT 1 FROM managed WHERE NOT pg_terminate_backend(pid,5000)) THEN
+     RAISE EXCEPTION 'managed store sessions did not quiesce';
+   END IF;
+  END IF;
+ END IF;
+END $$;
+\\echo STORE_CATALOG_SNAPSHOT
+""")
             process.stdin.flush()
             with selectors.DefaultSelector() as selector:
                 selector.register(process.stdout, selectors.EVENT_READ)
@@ -167,7 +203,7 @@ class Job:
             yield
         finally:
             try:
-                process.communicate(b'SELECT pg_advisory_unlock(731904);\n\\q\n', timeout=5)
+                process.communicate(b"DO $$ BEGIN IF to_regclass('public.store_control') IS NOT NULL THEN UPDATE store_control SET backup_until=NULL WHERE singleton; END IF; END $$; SELECT pg_advisory_unlock(731904);\n\\q\n", timeout=5)
             except Exception:
                 process.kill(); process.wait(timeout=5)
             if process.returncode:
@@ -278,9 +314,14 @@ class Job:
         self.stage = 'database capture'
         with self.catalog_snapshot():
             self.check_graph_sources()
-            self.dump(bundle)
             self.stage = 'store recovery intent capture'
             self.store_recovery_manifest(bundle)
+            self.stage = 'coordinated data-store volume capture'
+            self.data_store_state(bundle)
+            # A clean service stop resolves any in-flight non-SQL writes before
+            # the SQL snapshot. Managed leases remain paused after restart.
+            self.stage = 'database capture'
+            self.dump(bundle)
         self.stage = 'project secret capture'
         self.project_secrets(bundle)
         self.stage = 'configuration capture'
@@ -296,6 +337,9 @@ class Job:
             if backup_scripts.exists():
                 archive.add(backup_scripts, arcname='operations/backup/scripts',
                             filter=lambda item: None if '__pycache__' in Path(item.name).parts else item)
+            store_configuration = self.root / '.runtime/stores'
+            if store_configuration.exists():
+                archive.add(store_configuration, arcname='.runtime/stores')
         config_dir = Path(self.config.get('config_dir', '/etc/developer-platform'))
         with tarfile.open(bundle / 'host-config.tar.gz', 'w:gz') as archive:
             archive.add(config_dir, arcname='etc/developer-platform')

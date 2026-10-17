@@ -24,6 +24,7 @@ def initialize(conn):
         singleton BOOLEAN PRIMARY KEY DEFAULT true CHECK(singleton),
         recovery_required BOOLEAN NOT NULL DEFAULT false)""")
     conn.execute("INSERT INTO store_control(singleton) VALUES(true) ON CONFLICT DO NOTHING")
+    conn.execute("ALTER TABLE store_control ADD COLUMN IF NOT EXISTS backup_until TIMESTAMPTZ")
     conn.execute("REVOKE ALL ON store_control FROM PUBLIC")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_project_retirements (
         project TEXT PRIMARY KEY REFERENCES projects(name) ON DELETE CASCADE, retired_at TIMESTAMPTZ NOT NULL DEFAULT now())""")

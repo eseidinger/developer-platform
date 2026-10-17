@@ -5,6 +5,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
+from contextlib import contextmanager
 from unittest.mock import patch
 
 spec = importlib.util.spec_from_file_location('backup_platform', Path(__file__).parents[1] / 'scripts/backup-platform.py')
@@ -77,6 +78,43 @@ class BackupTests(unittest.TestCase):
         self.assertIn([self.job.docker, 'start', 'proxy'], calls)
         self.assertIn([self.job.docker, 'start', 'grafana'], calls)
         self.assertFalse((self.job.state / 'resume.json').exists())
+
+    def test_retained_shared_store_volumes_are_required_and_unknown_providers_fail_closed(self):
+        bundle = self.root / 'bundle'; bundle.mkdir()
+        path = bundle / 'store-recovery.json'
+        backup.atomic_json(path, {'resources': [
+            {'provider': provider, 'state': state} for provider, state in
+            [('postgresql', 'active'), ('s3', 'retired'), ('qdrant', 'active'), ('opensearch', 'purging'), ('neo4j', 'purged')]]})
+        with patch.object(self.job, 'volume_state') as volumes:
+            self.job.data_store_state(bundle)
+        self.assertEqual(volumes.call_args.args[1], [('opensearch', ['/usr/share/opensearch/data']),
+            ('qdrant', ['/qdrant/storage']), ('rustfs', ['/data'])])
+        backup.atomic_json(path, {'resources': [{'provider': 'neo4j', 'state': 'active'}]})
+        with patch.object(self.job, 'volume_state') as volumes, self.assertRaises(backup.BackupError):
+            self.job.data_store_state(bundle)
+        volumes.assert_not_called()
+
+    def test_shared_data_capture_and_sql_dump_share_the_pause_and_lifecycle_lock(self):
+        events = []
+        @contextmanager
+        def fenced():
+            events.append('paused')
+            try:
+                yield
+            finally:
+                events.append('resumed')
+        def dump(bundle):
+            self.assertEqual(events, ['paused', 'intents', 'stopped-volume-capture'])
+            events.append('sql')
+        with patch.object(self.job, 'catalog_snapshot', side_effect=fenced), \
+                patch.object(self.job, 'check_graph_sources'), \
+                patch.object(self.job, 'store_recovery_manifest', side_effect=lambda bundle: events.append('intents')), \
+                patch.object(self.job, 'data_store_state', side_effect=lambda bundle: events.append('stopped-volume-capture')), \
+                patch.object(self.job, 'dump', side_effect=dump), \
+                patch.object(self.job, 'project_secrets', side_effect=RuntimeError('stop fixture before host config capture')):
+            with self.assertRaises(RuntimeError):
+                self.job.capture(self.root)
+        self.assertEqual(events, ['paused', 'intents', 'stopped-volume-capture', 'sql', 'resumed'])
 
     def kubectl_listing(self, items):
         (self.root / '.runtime').mkdir(exist_ok=True)

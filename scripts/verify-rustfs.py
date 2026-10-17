@@ -15,6 +15,7 @@ from app.stores import catalog
 from app.stores.http_relay import access_key
 from app.stores.relay import Relay
 from app.stores.s3 import S3, bucket, client, StoreError, parent
+from store_volume_fixture import restored
 
 IMAGE = 'rustfs/rustfs:1.0.2@sha256:7e948dad4748bda48f8985fda7195f8cf2e4259427011f6120acc2c9acf51587'
 
@@ -39,12 +40,13 @@ def denied(operation, invalid_key=False):
 
 def main():
     name = 'named-rustfs-' + uuid4().hex[:12]
+    volume = name + '-data'
     key, secret = secrets.token_hex(10), secrets.token_hex(32)
     os.environ['DATABASE_KEY'] = secrets.token_hex(32)
     env = {**os.environ, 'RUSTFS_ACCESS_KEY': key, 'RUSTFS_SECRET_KEY': secret}
     try:
         command('docker', 'run', '-d', '--name', name, '--memory', '768m', '--cpus', '1',
-            '--tmpfs', '/data:rw,uid=10001,gid=10001,size=128m', '--tmpfs', '/logs:rw,uid=10001,gid=10001,size=16m',
+            '--mount', f'type=volume,src={volume},dst=/data', '--tmpfs', '/logs:rw,uid=10001,gid=10001,size=16m',
             '-e', 'RUSTFS_ACCESS_KEY', '-e', 'RUSTFS_SECRET_KEY', '-e', 'RUSTFS_VOLUMES=/data',
             '-e', 'RUSTFS_SCANNER_CYCLE=1',
             '-e', 'RUSTFS_OBS_LOG_DIRECTORY=/logs', '-p', '127.0.0.1::9000', IMAGE, env=env)
@@ -80,8 +82,8 @@ def main():
             credentials.append(cred)
         writer, reader = credentials
 
-        def scoped(cred, url=endpoint):
-            return client(url, access_key(cred['credential_id']), catalog.secret_for(cred['credential_id']))
+        def scoped(cred, url=None):
+            return client(url or endpoint, access_key(cred['credential_id']), catalog.secret_for(cred['credential_id']))
 
         rw, ro = scoped(writer), scoped(reader)
         bucket_name = bucket(first)
@@ -154,6 +156,45 @@ def main():
         rw.put_object(Bucket=bucket_name, Key='after-approved-increase.bin', Body=b'q' * (17 * 1024 * 1024))
         assert provider.usage(first) > 0
         provider.validate_recovery(first)
+        with restored(name, volume, '/data', IMAGE, ['--memory', '768m', '--cpus', '1',
+                '--tmpfs', '/logs:rw,uid=10001,gid=10001,size=16m', '-e', 'RUSTFS_ACCESS_KEY', '-e', 'RUSTFS_SECRET_KEY',
+                '-e', 'RUSTFS_VOLUMES=/data', '-e', 'RUSTFS_OBS_LOG_DIRECTORY=/logs',
+                '-p', '127.0.0.1::9000'], env) as recovered_name:
+            recovered_port = int(command('docker', 'port', recovered_name, '9000/tcp').rsplit(':', 1)[1])
+            recovered = S3(f'http://127.0.0.1:{recovered_port}', key, secret)
+            for _ in range(100):
+                try:
+                    recovered.validate_recovery(first)
+                    break
+                except Exception:
+                    time.sleep(.2)
+            else:
+                raise AssertionError('Restored RustFS bucket did not become ready')
+            for old in credentials:
+                recovered.revoke(first, old)
+            old_reader = client(recovered.endpoint, access_key(reader['credential_id']), catalog.secret_for(reader['credential_id']))
+            denied(lambda: old_reader.list_objects_v2(Bucket=bucket_name), invalid_key=True)
+            fresh = {'credential_id': str(uuid4()), 'mode': 'read-only',
+                'expires_at': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
+            recovered.issue(first, fresh)
+            fresh_reader = client(recovered.endpoint, access_key(fresh['credential_id']), catalog.secret_for(fresh['credential_id']))
+            assert fresh_reader.get_object(Bucket=bucket_name, Key='source.parquet', VersionId=first_version)['Body'].read() == b'first-version'
+            assert fresh_reader.get_object(Bucket=bucket_name, Key='after-approved-increase.bin')['ContentLength'] == 17 * 1024 * 1024
+            denied(lambda: fresh_reader.list_objects_v2(Bucket=bucket(other)))
+            recovered.validate_recovery(other)
+        print('PASS RustFS stopped-volume capture and empty-volume restore: versions/data/IAM retained; recovered keys revoked; fresh scoped approval reads retained data')
+        port = int(command('docker', 'port', name, '9000/tcp').rsplit(':', 1)[1])
+        endpoint = f'http://127.0.0.1:{port}'
+        provider = S3(endpoint, key, secret)
+        rw, ro = scoped(writer), scoped(reader)
+        for _ in range(100):
+            try:
+                provider.validate_recovery(first)
+                break
+            except Exception:
+                time.sleep(.2)
+        else:
+            raise AssertionError('Original RustFS did not recover after capture')
         expiring = {'credential_id': str(uuid4()), 'mode': 'read-only',
             'expires_at': (datetime.now(timezone.utc) + timedelta(seconds=2)).isoformat()}
         provider.issue(first, expiring)
@@ -175,6 +216,7 @@ def main():
         print('PASS pinned RustFS: isolated versioned buckets, RO/RW, native expiry/revocation, denied credential administration, idempotent lifecycle, signed streaming relay, hard quota/retained reads/cleanup/approved increase, measured usage and isolated version purge')
     finally:
         subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True, timeout=30)
+        subprocess.run(['docker', 'volume', 'rm', volume], capture_output=True, timeout=30)
 
 
 if __name__ == '__main__':

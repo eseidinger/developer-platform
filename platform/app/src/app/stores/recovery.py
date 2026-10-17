@@ -105,7 +105,7 @@ def reconcile(conn, manifest, apply=False):
                 observed_state=%s,version=%s,configuration=%s,error_code=NULL,updated_at=now() WHERE resource_id=%s""",
                 (row['name'], row['quota_bytes'], state, state, row['version'] + 1,
                  Jsonb(row['configuration']), identity))
-    conn.execute('UPDATE store_control SET recovery_required=false WHERE singleton')
+    conn.execute('UPDATE store_control SET recovery_required=false,backup_until=NULL WHERE singleton')
     plan['applied'] = True
     return plan
 

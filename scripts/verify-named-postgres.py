@@ -420,11 +420,35 @@ def main():
                         with patch.object(job, "compose", side_effect=psql), patch.object(job, "notify"), \
                                 patch.object(job, "postgres_argv", side_effect=postgres_argv), \
                                 patch.object(job, "capture", side_effect=capture_database_intent):
+                            # A temporary metadata-only S3 placeholder exercises
+                            # the actual cross-store pause without a live service.
+                            conn.execute("UPDATE store_resources SET provider='s3' WHERE resource_id=%s", (beta['resource_id'],))
+                            with conn.transaction():
+                                pause_grant = catalog.create_human_grant(conn, alpha,
+                                    HumanGrant(issuer='https://fixture.invalid', subject='backup-quiescence', mode='read-only'), 'fixture-admin')
+                                pause_credential = catalog.issue(conn, pause_grant)
+                            provider.issue(alpha, pause_credential)
+                            held_pause = login(pause_credential)
                             try:
-                                with job.catalog_snapshot():
-                                    raise RuntimeError("synthetic interrupted capture")
-                            except RuntimeError:
-                                pass
+                                try:
+                                    with job.catalog_snapshot():
+                                        assert conn.execute('SELECT backup_until>now() FROM store_control WHERE singleton').fetchone()[0]
+                                        from app.stores.relay import snapshot as paused_snapshot
+                                        with patch('app.stores.relay.connect', return_value=nullcontext(conn)):
+                                            assert paused_snapshot() == {}
+                                        try:
+                                            held_pause.execute('SELECT 1')
+                                        except psycopg.OperationalError:
+                                            pass
+                                        else:
+                                            raise AssertionError('A managed SQL session survived coordinated quiescence')
+                                        raise RuntimeError("synthetic interrupted capture")
+                                except RuntimeError:
+                                    pass
+                                assert conn.execute('SELECT backup_until IS NULL FROM store_control WHERE singleton').fetchone()[0]
+                            finally:
+                                held_pause.close()
+                                conn.execute("UPDATE store_resources SET provider='postgresql' WHERE resource_id=%s", (beta['resource_id'],))
                             assert conn.execute("SELECT pg_try_advisory_lock(731904)").fetchone()[0]
                             conn.execute("SELECT pg_advisory_unlock(731904)")
                             if alpha["extensions"]:

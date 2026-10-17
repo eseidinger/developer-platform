@@ -43,6 +43,8 @@ def snapshot():
     with connect() as conn:
         if recovery.required(conn):
             return {}
+        if conn.execute('SELECT COALESCE(backup_until>now(),false) FROM store_control WHERE singleton').fetchone()[0]:
+            return {}
         rows = conn.execute("""SELECT c.relay_port,c.credential_id,c.expires_at,r.resource_id,r.provider
             FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
             JOIN projects p ON p.name=r.owner_project

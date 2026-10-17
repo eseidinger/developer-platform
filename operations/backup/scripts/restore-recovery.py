@@ -71,6 +71,23 @@ def check_import_errors(stderr):
         raise RuntimeError('Unexpected SQL restore diagnostics; inspect private SQL logs')
 
 
+def store_volume_restore_targets(bundle):
+    path = bundle / 'store-recovery.json'
+    if not path.exists():
+        return []
+    manifest = json.loads(path.read_text())
+    providers = {row['provider'] for row in manifest['resources'] if row['state'] != 'purged'} - {'postgresql'}
+    mapping = {'s3': ('rustfs', 'rustfs_data', 'rustfs-data.tar.gz'),
+        'qdrant': ('qdrant', 'qdrant_data', 'qdrant-storage.tar.gz'),
+        'opensearch': ('opensearch', 'opensearch_data', 'opensearch-data.tar.gz')}
+    if providers - mapping.keys():
+        raise RuntimeError('No protected restore adapter for a retained data-store provider')
+    result = [mapping[provider] for provider in sorted(providers)]
+    if any(not (bundle / filename).is_file() for _, _, filename in result):
+        raise RuntimeError('A retained data-store volume is missing from this recovery bundle')
+    return result
+
+
 def quarantine_hosted_access(compose):
     """A restored authorization catalog must not activate routes before explicit reconciliation."""
     statement = b"""DO $$ BEGIN
@@ -182,9 +199,10 @@ https://*.apps.localhost {
             raise RuntimeError('Named-store restore requires quarantine-capable source before services may start')
         store_intents = latest_store_intents()
 
-    run(compose + ['create', 'proxy', 'grafana'], ROOT, timeout=900)
+    store_volumes = store_volume_restore_targets(bundle)
+    run(compose + ['create', 'proxy', 'grafana', *[service for service, _, _ in store_volumes]], ROOT, timeout=900)
     for volume, filename in [('caddy_data', 'proxy-data.tar.gz'), ('caddy_config', 'proxy-config.tar.gz'),
-                              ('grafana', 'grafana-grafana.tar.gz')]:
+                              ('grafana', 'grafana-grafana.tar.gz'), *[(volume, filename) for _, volume, filename in store_volumes]]:
         destination = Path(run(['docker', 'volume', 'inspect', '--format', '{{ .Mountpoint }}',
                                'developer-platform_' + volume]).decode().strip())
         if any(not p.is_dir() or p.is_symlink() for p in destination.rglob('*')):

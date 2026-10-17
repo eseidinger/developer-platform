@@ -15,6 +15,7 @@ from app.stores.opensearch import OpenSearch, index, authorization
 from app.stores.relay import Relay
 from app.stores import catalog
 from app.stores.s3 import StoreError
+from store_volume_fixture import restored
 
 IMAGE = 'opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c'
 
@@ -37,6 +38,7 @@ def denied(operation):
 
 def main():
     name = 'named-search-' + uuid4().hex[:12]
+    volume = name + '-data'
     password = 'Aa9!' + secrets.token_hex(32)
     os.environ['DATABASE_KEY'] = secrets.token_hex(32)
     env = {**os.environ, 'OPENSEARCH_INITIAL_ADMIN_PASSWORD': password}
@@ -44,7 +46,7 @@ def main():
         # The image's demo certificates are used only for internal transport in
         # this loopback-only fixture. Production requires an operator-owned CA.
         command('docker', 'run', '-d', '--name', name, '--memory', '1536m', '--cpus', '1',
-            '--tmpfs', '/usr/share/opensearch/data:rw,uid=1000,gid=1000,size=128m',
+            '--mount', f'type=volume,src={volume},dst=/usr/share/opensearch/data',
             '-e', 'OPENSEARCH_INITIAL_ADMIN_PASSWORD', '-e', 'discovery.type=single-node',
             '-e', 'OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m', '-e', 'node.store.allow_mmap=false',
             '-e', 'plugins.security.ssl.http.enabled=false', '-p', '127.0.0.1::9200', IMAGE, env=env)
@@ -102,6 +104,45 @@ def main():
         assert bulk['errors'] and bulk['items'][0]['index']['status'] in {200, 201}
         assert bulk['items'][1]['index']['status'] == 403
         assert provider.usage(first) > 0
+        with restored(name, volume, '/usr/share/opensearch/data', IMAGE, ['--memory', '1536m', '--cpus', '1',
+                '-e', 'OPENSEARCH_INITIAL_ADMIN_PASSWORD', '-e', 'discovery.type=single-node',
+                '-e', 'OPENSEARCH_JAVA_OPTS=-Xms256m -Xmx256m', '-e', 'node.store.allow_mmap=false',
+                '-e', 'plugins.security.ssl.http.enabled=false', '-p', '127.0.0.1::9200'], env) as recovered_name:
+            recovered_port = int(command('docker', 'port', recovered_name, '9200/tcp').rsplit(':', 1)[1])
+            recovered = OpenSearch(f'http://127.0.0.1:{recovered_port}', password)
+            for _ in range(120):
+                try:
+                    recovered.validate_recovery(first)
+                    break
+                except Exception:
+                    time.sleep(.4)
+            else:
+                raise AssertionError('Restored OpenSearch did not become ready')
+            for old in credentials:
+                recovered.revoke(first, old)
+                denied(lambda c=old: recovered.probe(first, c))
+            fresh = {'credential_id': str(uuid4()), 'mode': 'read-only',
+                'expires_at': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
+            recovered.issue(first, fresh)
+            fresh_reader = recovered.scoped(fresh)
+            hits = fresh_reader.request('POST', prefix + '/_search', {'query': {'match': {'title': 'energy'}}})
+            assert hits['hits']['hits'][0]['_id'] == 'one'
+            assert fresh_reader.request('GET', prefix + '/_mapping')[index(first)]['mappings']['properties']['kind']['type'] == 'keyword'
+            denied(lambda: fresh_reader.request('GET', foreign + '/_search'))
+            denied(lambda: fresh_reader.request('PUT', prefix + '/_doc/forbidden', {'title': 'denied'}))
+            recovered.validate_recovery(other)
+        print('PASS OpenSearch stopped-volume capture and empty-volume restore: documents/mappings/IAM retained; recovered users revoked; fresh scoped reader query succeeds')
+        port = int(command('docker', 'port', name, '9200/tcp').rsplit(':', 1)[1])
+        endpoint = f'http://127.0.0.1:{port}'
+        provider = OpenSearch(endpoint, password)
+        for _ in range(120):
+            try:
+                provider.validate_recovery(first)
+                break
+            except Exception:
+                time.sleep(.4)
+        else:
+            raise AssertionError('Original OpenSearch did not recover after capture')
 
         async def relay_access():
             lease = {**reader, 'resource_id': first['resource_id'], 'provider': 'opensearch',
@@ -137,6 +178,7 @@ def main():
         print('PASS pinned OpenSearch: index-scoped readers/writers, mapping DDL, ranked/filter/facet queries, foreign/index-purge/admin/alias/settings denial, idempotent credentials/revocation, lease enforcement, measured usage and isolated purge')
     finally:
         subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True, timeout=30)
+        subprocess.run(['docker', 'volume', 'rm', volume], capture_output=True, timeout=30)
 
 
 if __name__ == '__main__':

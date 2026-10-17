@@ -13,6 +13,26 @@ spec.loader.exec_module(restore)
 
 
 class RestoreRecoveryTests(unittest.TestCase):
+    def test_retained_store_archives_are_required_before_creating_restore_services(self):
+        with tempfile.TemporaryDirectory() as directory:
+            bundle = Path(directory)
+            manifest = {'resources': [{'provider': 's3', 'state': 'retired'},
+                {'provider': 'qdrant', 'state': 'active'}, {'provider': 'opensearch', 'state': 'purging'},
+                {'provider': 'neo4j', 'state': 'purged'}]}
+            (bundle / 'store-recovery.json').write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(RuntimeError, 'volume is missing'):
+                restore.store_volume_restore_targets(bundle)
+            for filename in ('rustfs-data.tar.gz', 'qdrant-storage.tar.gz', 'opensearch-data.tar.gz'):
+                (bundle / filename).write_bytes(b'synthetic archive identity')
+            self.assertEqual(restore.store_volume_restore_targets(bundle), [
+                ('opensearch', 'opensearch_data', 'opensearch-data.tar.gz'),
+                ('qdrant', 'qdrant_data', 'qdrant-storage.tar.gz'),
+                ('rustfs', 'rustfs_data', 'rustfs-data.tar.gz')])
+            manifest['resources'].append({'provider': 'neo4j', 'state': 'active'})
+            (bundle / 'store-recovery.json').write_text(json.dumps(manifest))
+            with self.assertRaisesRegex(RuntimeError, 'No protected restore adapter'):
+                restore.store_volume_restore_targets(bundle)
+
     def test_restored_access_is_quarantined_before_services_start(self):
         with patch.object(restore, 'run') as run:
             restore.quarantine_hosted_access(['docker', 'compose'])

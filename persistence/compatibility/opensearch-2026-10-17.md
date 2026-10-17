@@ -46,3 +46,5 @@ and authenticated Dashboards/session integration are ready. No live resources
 were changed. Native role boundaries follow the
 [OpenSearch role guide](https://docs.opensearch.org/latest/security/access-control/users-roles/)
 and [permission reference](https://docs.opensearch.org/latest/security/access-control/permissions/).
+
+The fixture additionally captures the stopped service’s real Docker volume and restores it into an empty second volume/server. Retained object versions, vectors/payload indexes, or search documents/mappings and native access metadata survive as applicable. Recovered native credentials are revoked before fresh scoped reader approval; unrelated resources remain intact. The common backup code now contains coordinated lease-pause, stopped-volume capture and required-archive restore adapters. Combined deployed encrypted multi-store recovery and browser/session acceptance remain open.

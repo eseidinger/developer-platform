@@ -13,6 +13,7 @@ from app.stores.qdrant import Qdrant, collection, VALIDATION
 from app.stores.http_client import PrivateJSON
 from app.stores.relay import Relay
 from app.stores.s3 import StoreError
+from store_volume_fixture import restored
 
 IMAGE = 'qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad'
 
@@ -35,11 +36,12 @@ def denied(operation):
 
 def main():
     name = 'named-qdrant-' + uuid4().hex[:12]
+    volume = name + '-data'
     key = secrets.token_hex(32)
     env = {**os.environ, 'QDRANT__SERVICE__API_KEY': key}
     try:
         command('docker', 'run', '-d', '--name', name, '--memory', '512m', '--cpus', '1',
-            '--tmpfs', '/qdrant/storage:rw,size=128m', '-e', 'QDRANT__SERVICE__API_KEY',
+            '--mount', f'type=volume,src={volume},dst=/qdrant/storage', '-e', 'QDRANT__SERVICE__API_KEY',
             '-e', 'QDRANT__SERVICE__JWT_RBAC=true', '-e', 'QDRANT__TELEMETRY_DISABLED=true',
             '-p', '127.0.0.1::6333', IMAGE, env=env)
         port = int(command('docker', 'port', name, '6333/tcp').rsplit(':', 1)[1])
@@ -89,6 +91,44 @@ def main():
         assert [item['name'] for item in listing] == [collection(first)]
         provider.validate_recovery(first)
         assert provider.usage(first) >= 0
+        with restored(name, volume, '/qdrant/storage', IMAGE, ['--memory', '512m', '--cpus', '1',
+                '-e', 'QDRANT__SERVICE__API_KEY', '-e', 'QDRANT__SERVICE__JWT_RBAC=true',
+                '-e', 'QDRANT__TELEMETRY_DISABLED=true', '-p', '127.0.0.1::6333'], env) as recovered_name:
+            recovered_port = int(command('docker', 'port', recovered_name, '6333/tcp').rsplit(':', 1)[1])
+            recovered = Qdrant(f'http://127.0.0.1:{recovered_port}', key)
+            for _ in range(100):
+                try:
+                    recovered.validate_recovery(first)
+                    break
+                except Exception:
+                    time.sleep(.2)
+            else:
+                raise AssertionError('Restored Qdrant did not become ready')
+            for old in credentials:
+                recovered.revoke(first, old)
+                denied(lambda c=old: recovered.probe(first, c))
+            fresh = {'credential_id': str(uuid4()), 'mode': 'read-only',
+                'expires_at': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
+            recovered.issue(first, fresh)
+            fresh_reader = PrivateJSON(recovered.endpoint, {'api-key': recovered.token(first, fresh)})
+            restored_query = fresh_reader.request('POST', prefix + '/points/query',
+                {'query': [1, 0, 0, 0], 'limit': 1, 'filter': {'must': [{'key': 'kind', 'match': {'value': 'reviewed'}}]}})
+            assert restored_query['result']['points'][0]['id'] == 1
+            assert fresh_reader.request('GET', prefix)['result']['payload_schema']['kind']['data_type'] == 'keyword'
+            denied(lambda: fresh_reader.request('GET', foreign))
+            recovered.validate_recovery(other)
+        print('PASS Qdrant stopped-volume capture and empty-volume restore: vectors/payload indexes/validation records retained; recovered keys revoked; fresh scoped query succeeds')
+        port = int(command('docker', 'port', name, '6333/tcp').rsplit(':', 1)[1])
+        endpoint = f'http://127.0.0.1:{port}'
+        provider = Qdrant(endpoint, key)
+        for _ in range(100):
+            try:
+                provider.validate_recovery(first)
+                break
+            except Exception:
+                time.sleep(.2)
+        else:
+            raise AssertionError('Original Qdrant did not recover after capture')
 
         async def relay_access():
             lease = {**reader, 'resource_id': first['resource_id'], 'provider': 'qdrant',
@@ -127,6 +167,7 @@ def main():
         print('PASS pinned Qdrant: exact collection JWT RBAC, reader/writer/payload schema, filtered retrieval, foreign and validation-collection denial, native revocation/expiry, strict relay expiry, measured disk usage and isolated purge')
     finally:
         subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True, timeout=30)
+        subprocess.run(['docker', 'volume', 'rm', volume], capture_output=True, timeout=30)
 
 
 if __name__ == '__main__':

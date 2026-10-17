@@ -128,7 +128,10 @@ class S3:
         key, user = access_key(credential['credential_id']), parent(credential)
         # RustFS 1.0.2 returns 400 for an already absent service-account DELETE;
         # its info endpoint provides an unambiguous 404 for idempotent cleanup.
-        if self.admin('GET', 'info-service-account', missing=True, accessKey=key) is not None:
+        existing = self.admin('GET', 'info-service-account', missing=True, accessKey=key)
+        if existing is not None:
+            if existing.get('parentUser') != user:
+                raise StoreError('Derived credential ownership mismatch')
             self.admin('DELETE', 'delete-service-account', accessKey=key)
         if self.admin('GET', 'user-info', missing=True, accessKey=user) is not None:
             self.admin('DELETE', 'remove-user', accessKey=user)

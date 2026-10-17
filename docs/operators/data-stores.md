@@ -187,6 +187,33 @@ acceptance remain open.
 
 ## Retention and capacity
 
+Shared-store backup adapters now capture retained RustFS, Qdrant and OpenSearch
+volumes, including native access metadata, with the SQL catalog. For a bundle
+containing non-PostgreSQL resources, capture holds the lifecycle lock and sets a
+35-minute bounded lease pause. The relay closes managed access, and the backup
+terminates only named-resource PostgreSQL credential sessions before capturing
+data. Shared services stop for volume capture and restart using persisted recovery
+instructions, while managed leases stay paused until the SQL dump completes.
+Application credential clocks continue throughout. Applications must tolerate
+this scheduled maintenance interruption and reconnect/retry afterward.
+
+These guarantees cover platform-managed lease paths. Operators must pause their
+own direct administrative writers; the platform cannot coordinate external data
+access that bypasses its resource contract. PostgreSQL-only bundles retain their
+existing online logical-dump behavior. A pause clears on ordinary capture failure
+and expires after 35 minutes on a hard interruption; loss of the held snapshot
+connection fails the backup instead of verifying a partially quiesced capture.
+Restores require each retained provider's matching archive and restore its volume
+before startup/quarantine reconciliation. Generated operator store configuration
+under `.runtime/stores` is included in the encrypted source bundle when present.
+
+Local fixtures pass a real stopped-volume capture and empty-volume restore for
+all three native providers, including retained data/schema/native access metadata,
+recovered-key revocation and fresh scoped approval. The real PostgreSQL fixture
+also verifies relay denial, termination of a held managed SQL session, preservation
+of the control connection and pause cleanup after interruption. This is not a
+deployed coordinated multi-store restore or off-host throughput/RPO/RTO acceptance.
+
 Binding/application removal revokes consumer access and retains resource data.
 Resource/project retirement revokes affected access and retains data. Purge is a
 separate resource action after observed retirement/access cleanup; its preview

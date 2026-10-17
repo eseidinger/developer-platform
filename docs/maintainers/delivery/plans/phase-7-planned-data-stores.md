@@ -5,6 +5,16 @@ resources/private access/console are implemented in source with disposable local
 evidence; deployed integration/recovery acceptance remains open in package 7.1.
 Additional shared-store providers have no operational acceptance recorded here.
 
+The owner requested continued implementation as far as possible with regular
+commits. Source/local provider work continues while deployed acceptance remains
+open; this does not accept the earlier package's deployed gate or enable a service.
+Native RustFS, OpenSearch and Qdrant adapters now pass real isolation, credential,
+query and empty-volume recovery fixtures. They remain unregistered while
+Compose/configuration, authenticated consoles and combined acceptance are completed.
+See the [RustFS](../../../../persistence/compatibility/rustfs-2026-10-17.md),
+[OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md) and
+[Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) records.
+
 ## Implementation checkpoint — October 17, 2026
 
 Source work has started in `app.stores`: independent resource/grant/credential
