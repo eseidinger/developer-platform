@@ -2333,6 +2333,7 @@ export interface components {
         };
         /** ResourceCreate */
         ResourceCreate: {
+            configuration?: components["schemas"]["VectorConfiguration"] | null;
             /** Extensions */
             extensions?: ("vector" | "age")[];
             /** Name */
@@ -2567,6 +2568,20 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
+        };
+        /** VectorConfiguration */
+        VectorConfiguration: {
+            /**
+             * Distance
+             * @default Cosine
+             * @enum {string}
+             */
+            distance: "Cosine" | "Dot" | "Euclid" | "Manhattan";
+            /**
+             * Vector Size
+             * @default 384
+             */
+            vector_size: number;
         };
         /** Version */
         Version: {

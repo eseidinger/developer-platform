@@ -44,7 +44,8 @@ def initialize(conn):
         ADD COLUMN IF NOT EXISTS usage_attempt_at TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS usage_error BOOLEAN NOT NULL DEFAULT false,
         ADD COLUMN IF NOT EXISTS purge_backup_version BIGINT,
-        ADD COLUMN IF NOT EXISTS purge_backup_snapshot TEXT""")
+        ADD COLUMN IF NOT EXISTS purge_backup_snapshot TEXT,
+        ADD COLUMN IF NOT EXISTS configuration JSONB NOT NULL DEFAULT '{}'""")
     conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_resource_names
         ON store_resources(owner_project,name) WHERE state<>'purged'""")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_grants (
@@ -113,9 +114,10 @@ def active_project(conn, project):
 def create_resource(conn, project, body):
     active_project(conn, project)
     resource_id = uuid4()
-    conn.execute("""INSERT INTO store_resources(resource_id,owner_project,name,provider,extensions,quota_bytes,state)
-        VALUES (%s,%s,%s,%s,%s,%s,'active')""",
-        (resource_id, project, body.name, body.provider, Jsonb(body.extensions), body.quota_bytes))
+    conn.execute("""INSERT INTO store_resources(resource_id,owner_project,name,provider,extensions,quota_bytes,configuration,state)
+        VALUES (%s,%s,%s,%s,%s,%s,%s,'active')""",
+        (resource_id, project, body.name, body.provider, Jsonb(body.extensions), body.quota_bytes,
+         Jsonb(body.configuration.model_dump() if body.configuration is not None else {})))
     return resource(conn, resource_id)
 
 

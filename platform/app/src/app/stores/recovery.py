@@ -32,6 +32,7 @@ def validate_manifest(value):
         version: int = Field(ge=1)
         quota_bytes: int = Field(gt=0)
         extensions: list[Literal['vector', 'age']]
+        configuration: dict = Field(default_factory=dict)
 
     class Manifest(BaseModel):
         model_config = ConfigDict(extra='forbid')
@@ -40,6 +41,10 @@ def validate_manifest(value):
         resources: list[Resource] = Field(max_length=100000)
 
     result = Manifest.model_validate(value).model_dump(mode='json')
+    from .contract import ResourceCreate
+    for row in result['resources']:
+        ResourceCreate(name=row['name'], provider=row['provider'], extensions=row['extensions'],
+            configuration=row['configuration'] if row['configuration'] else None)
     ids = [row['resource_id'] for row in result['resources']]
     if len(ids) != len(set(ids)):
         raise ValueError('Duplicate recovery identity')
@@ -49,6 +54,7 @@ def validate_manifest(value):
 def reconcile(conn, manifest, apply=False):
     """Never restore an old grant. Fresh explicit approval follows recovery."""
     from . import catalog, providers
+    from psycopg.types.json import Jsonb
     manifest = validate_manifest(manifest)
     if not required(conn):
         raise catalog.Conflict('Recovery quarantine must be set before reconciliation')
@@ -96,8 +102,9 @@ def reconcile(conn, manifest, apply=False):
             state = row['state']
         if identity in current:
             conn.execute("""UPDATE store_resources SET name=%s,quota_bytes=%s,state=%s,
-                observed_state=%s,version=%s,error_code=NULL,updated_at=now() WHERE resource_id=%s""",
-                (row['name'], row['quota_bytes'], state, state, row['version'] + 1, identity))
+                observed_state=%s,version=%s,configuration=%s,error_code=NULL,updated_at=now() WHERE resource_id=%s""",
+                (row['name'], row['quota_bytes'], state, state, row['version'] + 1,
+                 Jsonb(row['configuration']), identity))
     conn.execute('UPDATE store_control SET recovery_required=false WHERE singleton')
     plan['applied'] = True
     return plan

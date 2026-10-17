@@ -12,16 +12,24 @@ class Strict(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class VectorConfiguration(Strict):
+    vector_size: int = Field(default=384, ge=1, le=65536)
+    distance: Literal['Cosine', 'Dot', 'Euclid', 'Manhattan'] = 'Cosine'
+
+
 class ResourceCreate(Strict):
     name: str = Field(pattern=NAME, max_length=32)
     provider: Provider
     quota_bytes: int = Field(default=1_073_741_824, ge=1_048_576, le=1_099_511_627_776)
     extensions: list[Literal["vector", "age"]] = Field(default_factory=list, max_length=2)
+    configuration: VectorConfiguration | None = None
 
     @model_validator(mode="after")
     def extensions_only_on_postgres(self):
         if self.extensions and (self.provider != "postgresql" or len(set(self.extensions)) != len(self.extensions)):
             raise ValueError("unique extensions apply only to PostgreSQL resources")
+        if self.configuration is not None and self.provider != 'qdrant':
+            raise ValueError('Vector configuration applies only to Qdrant resources')
         return self
 
 

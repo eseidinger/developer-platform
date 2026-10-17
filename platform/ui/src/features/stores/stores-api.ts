@@ -17,6 +17,7 @@ const leaseMetadata = credential.omit({ connection: true, ssh: true })
 const context = z.object({ manage: z.boolean(), platform_admin: z.boolean(), providers: z.array(z.object({ id: z.string(), enabled: z.boolean() })) })
 const preview = z.object({ resource_id: z.uuid(), owner_project: z.string(), name: z.string(), version: z.number(), effect: z.string() })
 export type Resource = z.infer<typeof resource>
+export type Provider = components['schemas']['ResourceCreate']['provider']
 export type Grant = z.infer<typeof grant>
 export type Credential = z.infer<typeof credential>
 export type Preview = z.infer<typeof preview>

@@ -217,7 +217,7 @@ class Job:
                 'resources',COALESCE(jsonb_agg(jsonb_build_object('resource_id',resource_id,
                 'owner_project',owner_project,'name',name,'quota_bytes',quota_bytes,
                 'provider',provider,'state',state,'version',version,
-                'extensions',extensions) ORDER BY resource_id),'[]'::jsonb)) FROM store_resources""")
+                'extensions',extensions,'configuration',configuration) ORDER BY resource_id),'[]'::jsonb)) FROM store_resources""")
             manifest = json.loads(data)
         elif exists == b'f':
             manifest = {'format': 1, 'resources': []}
