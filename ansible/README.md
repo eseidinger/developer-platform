@@ -103,7 +103,15 @@ SQL authorization/revocation, then retains the projects for explicit review
 and retirement. See the [human database acceptance procedure](../docs/operators/validation/access-and-authorization.md#human-postgresql-access-acceptance-playbook).
 
 Rerunning the playbook reapplies sources and endpoints and reconciles the running
-platform. After validating the transferred Compose configuration and confirming
+platform. It explicitly writes `PLATFORM_TRACE_SAMPLE_RATE=1.0`, including on
+installations whose previous `.env` selected 10% sampling. Existing tracing-enabled
+application declarations must be reapplied so their sampler environment changes
+too; an API restart alone cannot change a running application's sampler.
+An already installed `/usr/local/sbin/platform-backup` is refreshed from the
+matching transferred source before the API starts. Its configuration, credentials,
+schedule and verified history are retained; this does not install or enable a new
+backup service. Fresh backup setup still uses the operations playbook.
+After validating the transferred Compose configuration and confirming
 that no backup or availability drill is active, deployment performs a controlled
 full outage of the Compose services. It stops and removes their containers, but
 preserves named volumes, `.env`, the k3d cluster, and the shared Docker network.

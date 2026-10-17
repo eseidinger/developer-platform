@@ -14,6 +14,7 @@
       IMAGE_REGISTRIES: "{{ platform_image_registries }}"
       DRIFT_SCAN_INTERVAL_SECONDS: "{{ platform_drift_scan_interval_seconds }}"
       REVISION_RETENTION: "{{ platform_revision_retention }}"
+      PLATFORM_TRACE_SAMPLE_RATE: "1.0"
       CAPACITY_ADMISSION_ENABLED: "{{ (platform_capacity_admission_enabled | bool) | ternary('true', 'false') }}"
       CAPACITY_RESERVE_CPU_MILLICORES: "{{ platform_capacity_reserve_cpu_millicores | int }}"
       CAPACITY_RESERVE_MEMORY_MIB: "{{ platform_capacity_reserve_memory_mib | int }}"
@@ -289,6 +290,26 @@
             fail_msg: >-
               Deployment cannot overlap an active backup or availability drill:
               {{ platform_maintenance_units.stdout | trim }}
+
+        - name: Inspect an existing backup runner
+          ansible.builtin.stat:
+            path: /usr/local/sbin/platform-backup
+          register: platform_installed_backup_runner
+
+        - name: Require the managed backup runner to be a regular file
+          ansible.builtin.assert:
+            that: not platform_installed_backup_runner.stat.exists or platform_installed_backup_runner.stat.isreg | default(false)
+            fail_msg: Inspect the non-regular platform-backup path before updating its recovery code.
+
+        - name: Refresh installed backup code before enabling named-store changes
+          ansible.builtin.copy:
+            src: "{{ platform_install_dir }}/operations/backup/scripts/backup-platform.py"
+            dest: /usr/local/sbin/platform-backup
+            remote_src: true
+            owner: root
+            group: root
+            mode: '0700'
+          when: platform_installed_backup_runner.stat.exists
 
         - name: Stop existing Compose services cleanly
           ansible.builtin.command:

@@ -42,6 +42,11 @@ changes. Deploy matching API, backup/recovery scripts, identity/relay/console
 configuration and pinned PostgreSQL image together using the established
 [installation procedure](../../../ansible/README.md). That procedure causes a
 controlled Compose outage and preserves volumes. Never use `down --volumes`.
+It refreshes an installed backup runner before enabling resource changes; local
+bootstrap operators must update that installed runner separately from the source
+checkout. Reapply tracing-enabled application declarations to pick up the selected
+100% sampler environment, then verify emitted traces; existing Pods retain their
+previous environment until rollout.
 For a PostgreSQL major-version change, prepare and validate a supported logical
 restore or `pg_upgrade` procedure; never mount an existing data directory under a
 different major version and assume compatibility.
