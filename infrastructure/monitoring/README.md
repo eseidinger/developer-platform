@@ -397,6 +397,10 @@ statistics, with document and identity administration denied. Qdrant uses the
 separate `STORE_MONITOR_PASSWORD` as a native read-only key for metrics; its
 edition does not provide a metrics-only key, so keep that operator credential
 private. Resource mappings come from the catalog, not arbitrary native labels.
+The native collector prepares OpenSearch's restricted monitoring account once per
+process before collecting, including on an installation with no named resources.
+Failed setup is retried on the next pass; subsequent statistics requests use the
+restricted account, without requiring a project to provision an index first.
 RustFS 1.0.2 exports metrics over OTLP/HTTP to Alloy's private port 4320; the
 allowlist aggregates away unreviewed dimensions before export. Its object keys,
 paths, logs and trace payloads do not enter this new metrics pipeline.

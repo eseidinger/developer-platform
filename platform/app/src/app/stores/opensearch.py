@@ -34,7 +34,7 @@ class OpenSearch:
         self.root = PrivateJSON(self.endpoint, {'Authorization': authorization('admin',
             password or os.environ['OPENSEARCH_ADMIN_PASSWORD'])}, self.ca_file)
 
-    def provision(self, resource):
+    def ensure_monitoring(self):
         monitor_password = os.environ.get('STORE_MONITOR_PASSWORD')
         if monitor_password:
             self.root.request('PUT', '/_plugins/_security/api/roles/platform_monitor', {
@@ -45,6 +45,9 @@ class OpenSearch:
                 {'password': monitor_password, 'backend_roles': []})
             self.root.request('PUT', '/_plugins/_security/api/rolesmapping/platform_monitor',
                 {'users': ['platform_monitor'], 'backend_roles': [], 'hosts': []})
+
+    def provision(self, resource):
+        self.ensure_monitoring()
         name = index(resource)
         self.root.request('PUT', '/_plugins/_security/api/tenants/' + tenant(resource),
             {'description': 'Named resource console workspace'})

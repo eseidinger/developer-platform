@@ -229,7 +229,7 @@ def postgres(provider, resources):
 
 def loop(stop, control):
     from ..monitoring import atomic_write
-    cache = {}
+    cache, prepared = {}, set()
     while not stop.is_set():
         try:
             with control.connect() as conn:
@@ -246,7 +246,12 @@ def loop(stop, control):
                     continue
                 up = 0
                 try:
-                    readings = collect(providers.get(name), [r for r in resources if r['provider'] == name])
+                    provider = providers.get(name)
+                    if name == 'opensearch' and name not in prepared:
+                        # Cluster monitoring must work before the first named resource.
+                        provider.ensure_monitoring()
+                        prepared.add(name)
+                    readings = collect(provider, [r for r in resources if r['provider'] == name])
                     cache[name] = (now, readings)
                     up = 1
                 except Exception:

@@ -65,6 +65,11 @@ def main():
         else:
             # Fixed diagnostics only: container logs may include credentials.
             raise AssertionError('Disposable OpenSearch did not become ready')
+        from app.stores.native_monitoring import opensearch as native_metrics
+        provider.ensure_monitoring()
+        empty_metrics = native_metrics(provider, [])
+        assert any('platform_native_opensearch_heap_used_bytes' in item for item in empty_metrics)
+        print('PASS restricted cluster monitoring before the first named resource')
         first, other = ({'resource_id': str(uuid4())} for _ in range(2))
         for resource in (first, other):
             provider.provision(resource)

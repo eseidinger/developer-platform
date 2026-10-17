@@ -61,6 +61,21 @@ class NativeMetricsTests(TestCase):
         self.assertIn('platform_native_collection_up{provider="opensearch"} 0',text)
         self.assertNotIn('private-marker',text)
 
+    def test_empty_installation_prepares_monitoring_once_and_retries_failed_setup(self):
+        control=MagicMock();control.connect.return_value.__enter__.return_value.execute.return_value.fetchall.return_value=[]
+        stop=Mock();stop.is_set.side_effect=[False,False,False,True]
+        provider=Mock();provider.ensure_monitoring.side_effect=[ValueError('private-marker'),None]
+        with patch.dict('os.environ',{'STORE_ENABLED_PROVIDERS':'opensearch','MONITORING_DISCOVERY_DIR':'/unused'}), \
+                patch.object(native,'postgres',return_value=[]),patch.object(native,'opensearch',return_value=[]) as collect, \
+                patch.object(native,'containers',return_value=[]),patch.object(native.providers,'get',return_value=provider), \
+                patch('app.monitoring.atomic_write') as write:
+            native.loop(stop,control)
+        self.assertEqual(provider.ensure_monitoring.call_count,2)
+        self.assertEqual(collect.call_count,2)
+        collect.assert_called_with(provider,[])
+        self.assertIn('platform_native_collection_up{provider="opensearch"} 1',write.call_args.args[1])
+        self.assertNotIn('private-marker',write.call_args.args[1])
+
 
 class WorkloadMetricTests(TestCase):
     def test_operation_histograms_record_errors_without_diagnostics(self):
