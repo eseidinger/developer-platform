@@ -59,6 +59,22 @@ native access catalog and refuses to overwrite a damaged one. Repeat preparation
 preserves keys. Address changes, partial configuration or certificates with less
 than one day remaining require explicit operator repair/renewal before deployment.
 Node/admin certificates expire after one year; the CA expires after ten years.
+Generated certificates include explicit CA/leaf constraints, key usage and key
+identifiers for strict TLS verification in the production Python runtime.
+Legacy profiles are refused before deployment until explicitly renewed:
+
+```bash
+cd /opt/developer-platform
+sudo python3 scripts/prepare-stores.py --renew-opensearch-certificates
+sudo docker compose up -d --no-deps --force-recreate --wait --wait-timeout 240 opensearch
+```
+
+Renewal preserves the CA, node and administrator private keys, subjects, native
+identities and data. It stages and strictly verifies the complete public chain
+before replacing certificates and refreshing the mounted public CA. Recreate the
+OpenSearch container to load the new files; its named volume is retained. Confirm
+API native collection and scoped queries after restart. Keep the previous public
+chain with the pre-maintenance configuration backup.
 Keep those configuration files in the encrypted recovery bundle. No provider has
 a raw published host port; the API has native administrative credentials and no
 Docker socket. This source wiring does not constitute deployed acceptance.

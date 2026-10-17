@@ -2,6 +2,9 @@
 """Exercise the actual generated TLS and idempotent non-demo realm initializer."""
 import importlib.util
 import os
+import json
+import ssl
+from unittest.mock import patch
 from pathlib import Path
 import secrets
 import subprocess
@@ -38,6 +41,21 @@ def main():
         original_ca = (private / 'ca.pem').read_bytes()
         preparation.prepare(root, {'COMPOSE_PROFILES': 'opensearch', 'OPENSEARCH_IP': '127.0.0.1'})
         assert (private / 'ca.pem').read_bytes() == original_ca
+        keys = {filename: (private / filename).read_bytes() for filename in ('ca-key.pem', 'node-key.pem', 'admin-key.pem')}
+        identity = json.loads((private / 'identity.json').read_text())
+        identity.pop('tls_profile')
+        (private / 'identity.json').write_text(json.dumps(identity))
+        try:
+            preparation.prepare(root, {'COMPOSE_PROFILES': 'opensearch', 'OPENSEARCH_IP': '127.0.0.1'})
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError('Legacy TLS profile must require explicit renewal')
+        assert (private / 'ca.pem').read_bytes() == original_ca
+        preparation.prepare(root, {'COMPOSE_PROFILES': 'opensearch', 'OPENSEARCH_IP': '127.0.0.1'}, renew_certificates=True)
+        assert (private / 'ca.pem').read_bytes() != original_ca
+        assert all((private / filename).read_bytes() == value for filename, value in keys.items())
+        print('PASS strict certificate profiles and explicit renewal preserve all private keys')
         mounts = []
         for filename in ('ca.pem', 'node.pem', 'node-key.pem', 'opensearch.yml'):
             mounts += ['-v', f'{private / filename}:/usr/share/opensearch/config/{filename}:ro']
@@ -76,20 +94,19 @@ def main():
             assert 'already initialized; retained' in output
             provider.probe(resource, credential)
             print('PASS generated operator CA/server/admin TLS, verified hostname, non-demo native realm initialization, exact resource roles, repeat preparation and retained users on second initialization')
-        except Exception:
-            result = subprocess.run(['docker', 'logs', '--tail', '35', name], capture_output=True, text=True, timeout=5)
-            print(result.stdout + result.stderr)
-            result = subprocess.run(['docker', 'logs', name + '-init'], capture_output=True, text=True, timeout=5)
-            print(result.stdout + result.stderr)
-            diagnostic = root / 'init.log'
-            copied = subprocess.run(['docker', 'cp', name + '-init:/tmp/security-init.log', str(diagnostic)], capture_output=True, timeout=5)
-            if copied.returncode == 0:
-                print('\n'.join(diagnostic.read_text().splitlines()[-24:]))
-            raise
+        except Exception as error:
+            print('Native TLS fixture failed (' + type(error).__name__ + ')')
+            raise SystemExit(1) from None
         finally:
             subprocess.run(['docker', 'rm', '-f', '-v', name + '-init'], capture_output=True, timeout=30)
             subprocess.run(['docker', 'rm', '-f', '-v', name], capture_output=True, timeout=30)
 
 
 if __name__ == '__main__':
-    main()
+    original_context = ssl.create_default_context
+    def strict_context(*args, **kwargs):
+        context = original_context(*args, **kwargs)
+        context.verify_flags |= ssl.VERIFY_X509_STRICT
+        return context
+    with patch('ssl.create_default_context', strict_context):
+        main()
