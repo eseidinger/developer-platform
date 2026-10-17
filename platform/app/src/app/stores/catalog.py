@@ -25,6 +25,9 @@ def initialize(conn):
         recovery_required BOOLEAN NOT NULL DEFAULT false)""")
     conn.execute("INSERT INTO store_control(singleton) VALUES(true) ON CONFLICT DO NOTHING")
     conn.execute("REVOKE ALL ON store_control FROM PUBLIC")
+    conn.execute("""CREATE TABLE IF NOT EXISTS store_project_retirements (
+        project TEXT PRIMARY KEY REFERENCES projects(name) ON DELETE CASCADE, retired_at TIMESTAMPTZ NOT NULL DEFAULT now())""")
+    conn.execute("REVOKE ALL ON store_project_retirements FROM PUBLIC")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_resources (
         resource_id UUID PRIMARY KEY, owner_project TEXT NOT NULL REFERENCES projects(name),
         name TEXT NOT NULL, provider TEXT NOT NULL CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant')),
@@ -34,11 +37,14 @@ def initialize(conn):
         version BIGINT NOT NULL DEFAULT 1, created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT now(), used_bytes BIGINT,
         usage_measured_at TIMESTAMPTZ, usage_attempt_at TIMESTAMPTZ,
-        usage_error BOOLEAN NOT NULL DEFAULT false)""")
+        usage_error BOOLEAN NOT NULL DEFAULT false, purge_backup_version BIGINT,
+        purge_backup_snapshot TEXT)""")
     conn.execute("""ALTER TABLE store_resources ADD COLUMN IF NOT EXISTS used_bytes BIGINT,
         ADD COLUMN IF NOT EXISTS usage_measured_at TIMESTAMPTZ,
         ADD COLUMN IF NOT EXISTS usage_attempt_at TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS usage_error BOOLEAN NOT NULL DEFAULT false""")
+        ADD COLUMN IF NOT EXISTS usage_error BOOLEAN NOT NULL DEFAULT false,
+        ADD COLUMN IF NOT EXISTS purge_backup_version BIGINT,
+        ADD COLUMN IF NOT EXISTS purge_backup_snapshot TEXT""")
     conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_resource_names
         ON store_resources(owner_project,name) WHERE state<>'purged'""")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_grants (
@@ -98,8 +104,9 @@ def assert_version(row, version):
 
 
 def active_project(conn, project):
-    row = conn.execute("SELECT status FROM projects WHERE name=%s FOR UPDATE", (project,)).fetchone()
-    if not row or row[0] == "retired":
+    row = conn.execute("""SELECT p.status,EXISTS(SELECT 1 FROM store_project_retirements s WHERE s.project=p.name)
+        FROM projects p WHERE name=%s FOR UPDATE""", (project,)).fetchone()
+    if not row or row[0] == "retired" or row[1]:
         raise Conflict("Project is not active")
 
 
@@ -262,6 +269,9 @@ def change_mode(conn, row, body, actor):
 
 
 def retire_project(conn, project):
+    # Persist admission/access denial as soon as retirement starts, even while
+    # the namespace is terminating and projects.status is still applied.
+    conn.execute("INSERT INTO store_project_retirements(project) VALUES(%s) ON CONFLICT DO NOTHING", (project,))
     conn.execute("""UPDATE store_resources SET state='retired',observed_state='pending',version=version+1,
         updated_at=now() WHERE owner_project=%s AND state='active'""", (project,))
     conn.execute("""UPDATE store_grants SET state='revoked',observed_state='pending',version=version+1,updated_at=now()
@@ -281,6 +291,7 @@ def authorized_key(conn, fingerprint, relay_ip):
         JOIN projects p ON p.name=r.owner_project WHERE k.fingerprint=%s AND g.kind='human'
             AND g.state='active' AND r.state='active' AND r.observed_state='active' AND p.status<>'retired'
             AND c.state='active' AND c.grant_version=g.version AND c.expires_at>now()
+            AND NOT EXISTS(SELECT 1 FROM store_project_retirements retired WHERE retired.project=r.owner_project)
             AND c.relay_port IS NOT NULL ORDER BY c.relay_port LIMIT 65""", (fingerprint,)).fetchall()
     if not rows or len(rows) > 64:
         return None

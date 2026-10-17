@@ -35,6 +35,8 @@ def snapshot():
             WHERE c.state IN ('active','retiring') AND c.expires_at>now() AND c.grant_version=g.version
             AND g.state='active' AND r.state='active' AND r.observed_state='active' AND p.status<>'retired'
             AND (consumer.name IS NULL OR consumer.status<>'retired')
+            AND NOT EXISTS(SELECT 1 FROM store_project_retirements retired
+                WHERE retired.project IN (r.owner_project,g.consumer_project))
             AND c.relay_port IS NOT NULL LIMIT 512""").fetchall()
     return {row[0]: {"credential_id": str(row[1]), "expires_at": row[2], "resource_id": str(row[3]), "provider": row[4]}
             for row in rows}
@@ -50,7 +52,7 @@ def initialize_identity(conn):
     conn.execute(sql.SQL("ALTER ROLE platform_store_relay PASSWORD {}").format(sql.Literal(password)))
     conn.execute("GRANT CONNECT ON DATABASE platform TO platform_store_relay")
     conn.execute("GRANT USAGE ON SCHEMA public TO platform_store_relay")
-    conn.execute("GRANT SELECT ON store_control,store_credentials,store_grants,store_resources TO platform_store_relay")
+    conn.execute("GRANT SELECT ON store_control,store_project_retirements,store_credentials,store_grants,store_resources TO platform_store_relay")
     conn.execute("GRANT SELECT(name,status) ON projects TO platform_store_relay")
 
 

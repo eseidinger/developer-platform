@@ -57,6 +57,11 @@ class Postgres:
                     EXECUTE FUNCTION platform_control.guard_extensions()""")
             conn.execute(sql.SQL("ALTER SCHEMA public OWNER TO {}").format(sql.Identifier(owner)))
             conn.execute(sql.SQL("GRANT USAGE ON SCHEMA public TO {}").format(sql.Identifier(reader)))
+            # PostgreSQL otherwise grants PUBLIC execution on new functions.
+            # Readers must not accidentally gain writes through a writer's
+            # SECURITY DEFINER function; any function grants must be explicit.
+            conn.execute(sql.SQL("ALTER DEFAULT PRIVILEGES FOR ROLE {} REVOKE EXECUTE ON ROUTINES FROM PUBLIC")
+                .format(sql.Identifier(owner)))
             for target in ("TABLES", "SEQUENCES"):
                 conn.execute(sql.SQL("ALTER DEFAULT PRIVILEGES FOR ROLE {} GRANT SELECT ON " + target + " TO {}")
                     .format(sql.Identifier(owner), sql.Identifier(reader)))
@@ -90,11 +95,16 @@ class Postgres:
             if not conn.execute("SELECT 1 FROM pg_roles WHERE rolname=%s", (role,)).fetchone():
                 conn.execute(sql.SQL("CREATE ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS")
                     .format(sql.Identifier(role)))
-            conn.execute(sql.SQL("ALTER ROLE {} LOGIN PASSWORD {} VALID UNTIL {} CONNECTION LIMIT 20")
+            conn.execute(sql.SQL("ALTER ROLE {} LOGIN NOINHERIT PASSWORD {} VALID UNTIL {} CONNECTION LIMIT 20")
                 .format(sql.Identifier(role), sql.Literal(catalog.secret_for(credential["credential_id"])),
                         sql.Literal(credential["expires_at"])))
-            conn.execute(sql.SQL("GRANT {} TO {} WITH ADMIN FALSE")
+            conn.execute(sql.SQL("GRANT {} TO {} WITH ADMIN FALSE, INHERIT FALSE, SET TRUE")
                 .format(sql.Identifier(group), sql.Identifier(role)))
+            # CONNECT is checked before the default SET ROLE takes effect.
+            # NOINHERIT prevents RESET ROLE from creating objects owned by a
+            # credential generation instead of the shared resource writer.
+            conn.execute(sql.SQL("GRANT CONNECT ON DATABASE {} TO {}")
+                .format(sql.Identifier(name), sql.Identifier(role)))
             conn.execute(sql.SQL("ALTER ROLE {} IN DATABASE {} SET role TO {}")
                 .format(sql.Identifier(role), sql.Identifier(name), sql.Literal(group)))
             if resource["extensions"]:
@@ -108,6 +118,10 @@ class Postgres:
             if conn.execute("SELECT 1 FROM pg_roles WHERE rolname=%s", (role,)).fetchone():
                 conn.execute(sql.SQL("ALTER ROLE {} NOLOGIN PASSWORD NULL").format(sql.Identifier(role)))
                 conn.execute("SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE usename=%s AND pid<>pg_backend_pid()", (role,))
+                name = catalog.identifier(resource["resource_id"])
+                if conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (name,)).fetchone():
+                    conn.execute(sql.SQL("REVOKE ALL ON DATABASE {} FROM {}")
+                        .format(sql.Identifier(name), sql.Identifier(role)))
                 # Revoked role membership must not retain schema authority.
                 for (group,) in conn.execute("""SELECT parent.rolname FROM pg_auth_members m
                     JOIN pg_roles parent ON parent.oid=m.roleid JOIN pg_roles member ON member.oid=m.member
@@ -140,3 +154,21 @@ class Postgres:
                 user=catalog.login(credential["credential_id"]), password=catalog.secret_for(credential["credential_id"]),
                 connect_timeout=2, options="-c statement_timeout=2000", autocommit=True) as conn:
             conn.execute("SELECT 1").fetchone()
+
+    def validate_recovery(self, resource):
+        """No empty replacement database; stale AGE graph OIDs keep quarantine closed."""
+        name = catalog.identifier(resource["resource_id"])
+        with self.connection("postgres") as conn:
+            if not conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (name,)).fetchone():
+                raise ValueError("Restored resource database is missing")
+        with self.connection(name) as conn:
+            installed = {row[0] for row in conn.execute("SELECT extname FROM pg_extension")}
+            if not set(resource["extensions"]).issubset(installed):
+                raise ValueError("Restored resource extension is missing")
+            if "age" in resource["extensions"]:
+                if conn.execute("SELECT 1 FROM ag_catalog.ag_graph WHERE graphid IS DISTINCT FROM namespace::oid LIMIT 1").fetchone():
+                    raise ValueError("AGE graph projection requires authoritative rebuild")
+                conn.execute("SET search_path=ag_catalog,public,platform_extensions")
+                for (graph,) in conn.execute("SELECT name::text FROM ag_catalog.ag_graph").fetchall():
+                    conn.execute(sql.SQL("SELECT * FROM ag_catalog.cypher({}, $$ MATCH (n) RETURN count(n) $$) AS (v ag_catalog.agtype)")
+                        .format(sql.Literal(graph))).fetchone()

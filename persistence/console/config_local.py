@@ -33,5 +33,7 @@ PROXY_X_HOST_COUNT = 1
 PROXY_X_PREFIX_COUNT = 1
 CONSOLE_LOG_LEVEL = 30
 FILE_LOG_LEVEL = 50
-# Query/data history is per-session only. Do not persist SQL/data on the console.
-MAX_QUERY_HIST_STORED = 0
+# Keep reviewed, bounded per-user/database SQL history. Zero in this release
+# retains the first entry and is not a disable switch. No query results are sent
+# into platform telemetry by this integration.
+MAX_QUERY_HIST_STORED = 20

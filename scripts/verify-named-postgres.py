@@ -75,13 +75,14 @@ def main():
                 writer.execute("CREATE SCHEMA another")
                 writer.execute("CREATE TABLE another.future(id INTEGER)")
                 writer.execute("INSERT INTO another.future VALUES(2)")
+                writer.execute("CREATE FUNCTION public.write_via_function() RETURNS void LANGUAGE sql SECURITY DEFINER AS $$ INSERT INTO public.shared(id) VALUES(44) $$")
             with login(b) as writer:
                 writer.execute("ALTER TABLE public.shared ADD COLUMN note TEXT")
                 writer.execute("UPDATE public.shared SET note='changed by second writer'")
             with login(reader) as ro:
                 assert ro.execute("SELECT id FROM public.shared").fetchone()[0] == 1
                 assert ro.execute("SELECT id FROM another.future").fetchone()[0] == 2
-                for query in ("INSERT INTO public.shared(id) VALUES(3)", "CREATE TABLE public.denied(id int)",
+                for query in ("SELECT public.write_via_function()", "INSERT INTO public.shared(id) VALUES(3)", "CREATE TABLE public.denied(id int)",
                               "ALTER TABLE public.shared ADD COLUMN denied int"):
                     try:
                         ro.execute(query)
@@ -95,8 +96,15 @@ def main():
             except psycopg.OperationalError:
                 pass
             with login(a) as writer:
-                writer.execute("RESET ROLE")
-                for query in ("CREATE EXTENSION IF NOT EXISTS plpgsql",
+                try:
+                    writer.execute("CREATE EXTENSION hstore")
+                except psycopg.errors.InsufficientPrivilege:
+                    pass
+                else:
+                    raise AssertionError("Resource writer installed a trusted extension")
+                writer.execute("SET ROLE NONE")
+                assert writer.execute("SELECT current_user").fetchone()[0] == catalog.login(a["credential_id"])
+                for query in ("CREATE TABLE public.wrong_owner(id int)", "CREATE SCHEMA wrong_owner",
                               sql.SQL("ALTER ROLE {} SUPERUSER").format(sql.Identifier(catalog.login(a["credential_id"]))),
                               sql.SQL("ALTER ROLE {} VALID UNTIL 'infinity'").format(sql.Identifier(catalog.login(a["credential_id"]))),
                               sql.SQL("DROP DATABASE {}").format(sql.Identifier(catalog.identifier(beta["resource_id"])))):
@@ -235,6 +243,59 @@ def main():
                         server.close(); control.close()
                         await server.wait_closed(); await control.wait_closed()
                 asyncio.run(console_check())
+            if os.environ.get("RESTIC_TEST_BINARY"):
+                import importlib.util
+                import tempfile
+                from pathlib import Path
+                from app.stores.contract import Purge
+                location = Path(__file__).resolve().parents[1] / "operations/backup/scripts/backup-platform.py"
+                spec = importlib.util.spec_from_file_location("store_fixture_backup", location)
+                backup = importlib.util.module_from_spec(spec); spec.loader.exec_module(backup)
+                with conn.transaction():
+                    doomed = catalog.create_resource(conn, "alpha", ResourceCreate(name="purge-intent", provider="postgresql"))
+                provider.provision(doomed)
+                conn.execute("UPDATE store_resources SET observed_state='active' WHERE resource_id=%s", (doomed["resource_id"],))
+                with conn.transaction():
+                    doomed = catalog.retire(conn, catalog.resource(conn, doomed["resource_id"]), 1)
+                    with patch("app.stores.providers.get", return_value=provider):
+                        worker.reconcile(conn)
+                    doomed = catalog.resource(conn, doomed["resource_id"])
+                    doomed = catalog.request_purge(conn, doomed, Purge(version=doomed["version"],
+                        confirm_resource_id=doomed["resource_id"], confirm_owner_project="alpha"))
+                with patch("app.stores.providers.get", return_value=provider):
+                    with conn.transaction():
+                        worker.reconcile(conn)
+                assert catalog.resource(conn, doomed["resource_id"])["error_code"] == "PurgeAwaitingVerifiedBackup"
+                assert conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (catalog.identifier(doomed["resource_id"]),)).fetchone()
+                with tempfile.TemporaryDirectory(prefix="store-intent-backup-") as directory:
+                    binary = os.environ["RESTIC_TEST_BINARY"]
+                    job = backup.Job({"platform_dir": directory, "state_dir": directory + "/state", "restic": binary,
+                        "instance": "store-fixture", "watchdog_url": "https://fixture.invalid/unused", "watchdog_token": "unused"})
+                    def psql(*arguments):
+                        cursor = conn.execute(arguments[-1])
+                        if cursor.description:
+                            value = cursor.fetchone()[0]
+                            return ("t" if value is True else "f" if value is False else json.dumps(value)).encode()
+                        return b""
+                    with patch.dict(os.environ, {"RESTIC_REPOSITORY": directory + "/repo", "RESTIC_PASSWORD": secrets.token_urlsafe(32), "RESTIC_CACHE_DIR": directory + "/cache"}):
+                        subprocess.run([binary, "init"], check=True, capture_output=True, timeout=30)
+                        with patch.object(job, "compose", side_effect=psql), patch.object(job, "notify"), \
+                                patch.object(job, "capture", side_effect=job.store_recovery_manifest):
+                            assert job.run() == 0
+                    backed = catalog.resource(conn, doomed["resource_id"])
+                    assert backed["purge_backup_version"] == backed["version"] and backed["purge_backup_snapshot"]
+                with patch("app.stores.providers.get", return_value=provider):
+                    with conn.transaction():
+                        worker.reconcile(conn)
+                assert catalog.resource(conn, doomed["resource_id"])["state"] == "purged"
+                assert not conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (catalog.identifier(doomed["resource_id"]),)).fetchone()
+                verified_purge_intent = catalog.resource(conn, doomed["resource_id"])
+                # Model an older data/catalog snapshot reintroducing an already
+                # purged resource. Latest verified intent must delete it again.
+                provider.provision(doomed)
+                conn.execute("UPDATE store_resources SET state='active',observed_state='active',version=1 WHERE resource_id=%s",
+                    (doomed["resource_id"],))
+                print("PASS purge waits for encrypted restic upload/readback/verification before worker deletion (local intent-only repository)")
             from app.stores import monitoring as store_monitoring, recovery
             from app.stores.relay import snapshot
             with patch("app.stores.providers.get", return_value=provider):
@@ -262,13 +323,51 @@ def main():
                 with conn.transaction():
                     worker.reconcile(conn)
                 assert conn.execute("SELECT count(*) FROM store_credentials WHERE state<>'revoked'").fetchone()[0] == 0
-            print("PASS measured nonzero usage; retained stale reading on failure; recovered issuance/relay denial and provider cleanup")
+            manifest = {"format": 1, "captured_at": datetime.now(timezone.utc).isoformat(), "resources": []}
+            for (record,) in conn.execute("SELECT row_to_json(r) FROM store_resources r").fetchall():
+                if os.environ.get("RESTIC_TEST_BINARY") and record["resource_id"] == doomed["resource_id"]:
+                    record = verified_purge_intent
+                manifest["resources"].append({key: record[key] for key in (
+                    "resource_id", "owner_project", "name", "provider", "state", "version", "quota_bytes", "extensions")})
+            with patch("app.stores.providers.get", return_value=provider):
+                with conn.transaction():
+                    plan = recovery.reconcile(conn, manifest)
+                    assert not plan["applied"] and recovery.required(conn)
+                    assert recovery.reconcile(conn, manifest, apply=True)["applied"]
+            assert not recovery.required(conn)
+            if os.environ.get("RESTIC_TEST_BINARY"):
+                assert not conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (catalog.identifier(doomed["resource_id"]),)).fetchone()
+                assert catalog.resource(conn, doomed["resource_id"])["state"] == "purged"
+            assert not conn.execute("SELECT 1 FROM store_grants WHERE state='active' LIMIT 1").fetchone()
+            with conn.transaction():
+                renewed = catalog.create_human_grant(conn, catalog.resource(conn, alpha["resource_id"]),
+                    HumanGrant(issuer="https://fixture.invalid", subject="fresh-approval", mode="read-only"), "fixture-admin")
+                fresh = catalog.issue(conn, renewed)
+            provider.issue(alpha, fresh)
+            with login(fresh) as client:
+                assert client.execute("SELECT id FROM public.shared").fetchone()[0] == 1
+            try:
+                with login(active):
+                    raise AssertionError("A recovered old credential was resurrected")
+            except psycopg.OperationalError:
+                pass
+            print("PASS measured nonzero usage; retained stale reading on failure; recovered issuance/relay denial; latest intents replayed; only fresh approval restores access")
             # Retiring/purging one resource must not touch the other database.
             all_credentials = conn.execute("SELECT row_to_json(c) FROM store_credentials c JOIN store_grants g USING(grant_id) WHERE g.resource_id=%s", (alpha["resource_id"],)).fetchall()
             for (cred,) in all_credentials:
                 provider.revoke(alpha, cred)
             provider.purge(alpha)
             assert conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (catalog.identifier(beta["resource_id"]),)).fetchone()
+            with conn.transaction():
+                catalog.retire_project(conn, "beta")
+            assert conn.execute("SELECT status FROM projects WHERE name='beta'").fetchone()[0] == "applied"
+            try:
+                catalog.active_project(conn, "beta")
+            except catalog.Conflict:
+                pass
+            else:
+                raise AssertionError("Retiring project admitted a new resource while namespace cleanup was pending")
+            print("PASS project-retirement fence denies admission before project status changes")
         print("PASS named PostgreSQL: separate databases; cross-writer DDL; future-schema reads; read-only write/DDL denial; foreign-resource denial; no admin/expiry escalation; revoked session closure; expired login denial; 30-day worker rotation/retry/one-hour deadline; real relay authentication/session expiry; isolated purge")
     finally:
         subprocess.run(["docker", "rm", "-f", "-v", name], capture_output=True, timeout=30)

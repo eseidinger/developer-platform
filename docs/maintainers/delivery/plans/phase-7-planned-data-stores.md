@@ -25,6 +25,12 @@ denial, expired reconnect and anonymous denial. Production console network/TLS
 and deployed access acceptance remain open. The backend suite ran
 461 tests successfully (16 skipped); relay and portal tests cover expiry, denial,
 explicit issuance and secret-cache exclusion. No live resources were changed.
+Source now includes bounded usage measurements/alerts, the named-store dashboard,
+restore quarantine, and version-pinned purge acknowledgment after verified
+backup upload/readback. A real encrypted local restic intent fixture passes
+purge gating and latest-tombstone replay after an older-state simulation; recovery
+requires fresh explicit approval. This is not a full data restore or deployed
+RPO/RTO acceptance. AGE authoritative rebuild remains open.
 PLAN-026/036 and Phase 7 acceptance remain open.
 
 ## Goal and scope

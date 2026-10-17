@@ -377,7 +377,7 @@ class Drill:
                 and connection["PGDATABASE"] == workload_role
                 and 86390 <= (datetime.fromisoformat(lease["expires_at"]) - datetime.fromisoformat(lease["issued_at"])).total_seconds() <= 86400)
             self.report.check("human-grant-and-distinct-credential", valid)
-            self.destination = self.relay_ip + ":" + str(credential["ssh"]["destination_port"])
+            self.destination = self.relay_ip + ":" + connection["PGPORT"]
             command = ssh_command(key_path, self.args.known_hosts_file, self.args.bastion_host,
                 self.args.bastion_port, local_port, self.destination)
             self.tunnel = subprocess.Popen(command, stdin=subprocess.DEVNULL,

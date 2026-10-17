@@ -294,3 +294,20 @@ identities before starting services; never send recovery-test signals to the
 production watchdog channel. Then follow the isolated SQL import/reapply procedure
 above, verify data markers, permissions, ingress and alerts, and measure RPO/RTO.
 The backup job's automatic readback validates bytes, not these application outcomes.
+
+## Named data-store recovery
+
+Named-store purge intent is now part of each verified bundle as
+`store-recovery.json`. A pending purge cannot delete provider data until this
+intent has been encrypted, uploaded and read-back verified; the backup job then
+acknowledges the exact resource/version/snapshot. Deploy the updated backup job
+with the store implementation. The schedule and retained backup copies keep their
+existing policy.
+
+A named-store restore stays quarantined until current resource dispositions are
+read from the **latest verified** off-host bundle, independently of the selected
+data snapshot. Recovered grants and credentials are revoked; purge tombstones
+are replayed before access is enabled. Fresh owner approval/new component bindings
+are required afterward. AGE recovery additionally requires authoritative graph
+rebuild and Cypher validation. See the [named-store operator workflow](data-stores.md).
+Local encrypted intent fixtures are not a complete deployed recovery or RTO test.

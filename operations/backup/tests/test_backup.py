@@ -35,6 +35,27 @@ class BackupTests(unittest.TestCase):
         self.assertEqual(status['result'], 'failure')
         self.assertFalse((self.job.state / 'work').exists())
 
+    def test_purge_intents_are_captured_privately_and_acknowledgment_is_version_pinned(self):
+        bundle = self.root / 'bundle'; bundle.mkdir()
+        manifest = {'format': 1, 'captured_at': '2026-10-17T00:00:00Z', 'resources': [
+            {'resource_id': '11111111-1111-1111-1111-111111111111', 'state': 'purging', 'version': 3}]}
+        with patch.object(self.job, 'compose', side_effect=[b't', json.dumps(manifest).encode()]):
+            self.job.store_recovery_manifest(bundle)
+        self.assertEqual((bundle / 'store-recovery.json').stat().st_mode & 0o777, 0o600)
+        with patch.object(self.job, 'compose') as compose:
+            self.job.acknowledge_store_purges(bundle, 'a' * 64)
+        sql = compose.call_args.args[-1]
+        self.assertIn("r.state='purging'", sql)
+        self.assertIn("r.version=(c.item->>'version')::bigint", sql)
+        self.assertNotIn('11111111-1111', sql)  # JSON travels as hex, not interpolated literals.
+
+    def test_upload_failure_cannot_acknowledge_purge_intent(self):
+        with patch.object(self.job, 'capture', side_effect=lambda p: (p / 'data').write_text('data')), \
+                patch.object(self.job, 'notify'), patch.object(self.job, 'command', side_effect=backup.BackupError()), \
+                patch.object(self.job, 'acknowledge_store_purges') as acknowledge:
+            self.assertEqual(self.job.run(), 1)
+        acknowledge.assert_not_called()
+
     def test_capture_failure_restarts_both_services(self):
         bundle = self.root / 'bundle'; bundle.mkdir()
         volumes = {}
@@ -130,7 +151,8 @@ class BackupTests(unittest.TestCase):
     def test_real_restic_roundtrip_retention_and_notification_failure(self):
         binary = os.environ['RESTIC_TEST_BINARY']
         self.job.restic = binary
-        environment = {'RESTIC_REPOSITORY': str(self.root / 'repository'), 'RESTIC_PASSWORD': 'local-test-password'}
+        environment = {'RESTIC_REPOSITORY': str(self.root / 'repository'), 'RESTIC_PASSWORD': 'local-test-password',
+                       'RESTIC_CACHE_DIR': str(self.root / 'cache')}
         with patch.dict(os.environ, environment):
             subprocess.run([binary, 'init'], check=True, stdout=subprocess.DEVNULL)
             pending = self.root / 'unverified-data'; pending.write_text('pending marker')

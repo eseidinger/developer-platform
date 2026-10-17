@@ -20,7 +20,22 @@ class RestoreRecoveryTests(unittest.TestCase):
         self.assertIn('platform', args.args[0])
         self.assertIn('ON_ERROR_STOP=1', args.args[0])
         self.assertIn(b"recovery-required", args.kwargs['data'])
+        self.assertIn(b"store_control", args.kwargs['data'])
+        self.assertIn(b"expires_at=LEAST(expires_at,now())", args.kwargs['data'])
         self.assertIn(b"to_regclass", args.kwargs['data'])  # Older bundles without hosted access remain supported.
+
+    def test_latest_verified_intent_is_independent_of_selected_data_snapshot_and_checked(self):
+        import hashlib
+        intent = b'{"format":1,"resources":[]}'
+        latest = {'id': 'b' * 64, 'time': '2026-10-17T12:00:00Z', 'paths': ['/safe/bundle']}
+        older = {'id': 'a' * 64, 'time': '2026-10-16T12:00:00Z', 'paths': ['/safe/bundle']}
+        manifest = {'sha256': {'store-recovery.json': hashlib.sha256(intent).hexdigest()}}
+        with patch.object(restore, 'run', side_effect=[json.dumps([latest,older]).encode(), json.dumps(manifest).encode(), intent]) as run:
+            self.assertEqual(restore.latest_store_intents(), intent)
+        self.assertEqual(run.call_args_list[1].args[0][-2:], ['b' * 64, '/safe/bundle/manifest.json'])
+        with patch.object(restore, 'run', side_effect=[json.dumps([latest]).encode(), json.dumps(manifest).encode(), b'corrupt']):
+            with self.assertRaisesRegex(RuntimeError, 'checksum mismatch'):
+                restore.latest_store_intents()
 
     def test_only_known_bootstrap_duplicates_are_accepted(self):
         restore.check_import_errors('ERROR:  role "postgres" already exists\nERROR:  database "platform" already exists\n')

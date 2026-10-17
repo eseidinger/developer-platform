@@ -90,6 +90,25 @@ def quarantine_hosted_access(compose):
                    '-U', 'postgres', '-d', 'platform'], ROOT, data=statement)
 
 
+def latest_store_intents(instance='node-01'):
+    """Read purge intents from the latest verified point, even for an older data restore."""
+    restic = '/usr/local/sbin/platform-restic'
+    snapshots = json.loads(run([restic, 'snapshots', '--json', '--host', instance,
+        '--tag', 'developer-platform,verified']))
+    if not snapshots:
+        raise RuntimeError('No verified recovery intent snapshot')
+    from datetime import datetime
+    latest = max(snapshots, key=lambda row: datetime.fromisoformat(row['time'].replace('Z','+00:00')))
+    if not re.fullmatch('[0-9a-f]{64}', latest['id']) or len(latest.get('paths', [])) != 1:
+        raise RuntimeError('Ambiguous recovery intent snapshot')
+    prefix = latest['paths'][0].rstrip('/')
+    manifest = json.loads(run([restic, 'dump', latest['id'], prefix + '/manifest.json']))
+    data = run([restic, 'dump', latest['id'], prefix + '/store-recovery.json'])
+    if hashlib.sha256(data).hexdigest() != manifest.get('sha256', {}).get('store-recovery.json'):
+        raise RuntimeError('Latest verified store intent checksum mismatch')
+    return data
+
+
 def recover(bundle, projects):
     verify(bundle)
     if ROOT.exists():
@@ -155,6 +174,14 @@ https://*.apps.localhost {
                 proc.wait()
     check_import_errors((logs / 'restore.stderr').read_text())
     quarantine_hosted_access(compose)
+    has_named_stores = run(compose + ['exec','-T','postgres','psql','-X','-A','-t','-U','postgres',
+        '-d','platform','-c',"SELECT to_regclass('public.store_resources') IS NOT NULL"], ROOT).strip() == b't'
+    store_intents = None
+    if has_named_stores:
+        if not (ROOT / 'platform/app/src/app/stores/recovery.py').is_file():
+            raise RuntimeError('Named-store restore requires quarantine-capable source before services may start')
+        store_intents = latest_store_intents()
+
     run(compose + ['create', 'proxy', 'grafana'], ROOT, timeout=900)
     for volume, filename in [('caddy_data', 'proxy-data.tar.gz'), ('caddy_config', 'proxy-config.tar.gz'),
                               ('grafana', 'grafana-grafana.tar.gz')]:
@@ -188,10 +215,17 @@ https://*.apps.localhost {
     headers = {'Authorization': 'Bearer ' + access_token, 'Content-Type': 'application/json'}
     with urllib.request.urlopen(urllib.request.Request('http://127.0.0.1:8000/projects', headers=headers), timeout=15) as response:
         catalog = json.load(response)
+    if store_intents is not None:
+        checksum = hashlib.sha256(store_intents).hexdigest()
+        run(compose + ['exec','-T','platform-api','python','-m','app.stores.recovery',
+            '--apply','--manifest-sha256',checksum], ROOT, data=store_intents, timeout=900)
+        print('Named stores reconciled; all recovered grants remain revoked. Fresh owner approval/bindings are required.')
     for name in projects:
         selected = [p for p in catalog if p['name'] == name and p['spec']['name'] == name]
         if len(selected) != 1:
             raise RuntimeError('Selected project absent from restored catalog')
+        if any(c.get('bindings') for c in selected[0]['spec'].get('components', [])):
+            raise RuntimeError('Recovered store consumers require fresh explicit approval and updated bindings before reapply')
         request = urllib.request.Request('http://127.0.0.1:8000/projects/' + name,
                                          headers=headers, data=json.dumps(selected[0]['spec']).encode(), method='PUT')
         with urllib.request.urlopen(request, timeout=30) as response:

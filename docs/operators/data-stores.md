@@ -58,6 +58,9 @@ Historical inspection/revocation remains available for operator cleanup.
 Application and human writers share a resource-scoped schema owner, so they can
 manage each other's tables/indexes and future schemas. They do not own the
 PostgreSQL database, cannot purge it, manage global roles or install extensions.
+Credential logins do not inherit schema authority after `SET ROLE NONE`; normal
+connections use the shared resource role. New functions have no PUBLIC execute
+grant, preventing accidental reader writes through writer SECURITY DEFINER code.
 Readers receive future-object access without data/schema write rights. An
 operator-owned event trigger prevents data identities from installing even
 trusted extensions; extension objects live outside writer-owned schemas.
@@ -89,7 +92,13 @@ Human credentials expire after 24 hours. Early renewal issues an independent
 retirement and permission changes invalidate all affected generations immediately
 in the catalog. Provider cleanup completion is separately observed/retried.
 
-Use the existing restricted SSH account/port (`platform-db`, 2222). Returned
+Use the existing restricted SSH account/port (`platform-db`, 2222). The bastion
+installer defaults to loopback. For remote native access, configure its deliberate
+listener with `platform_database_bastion_bind_ip`/`platform_database_bastion_port`,
+then set `STORE_SSH_HOST`/`STORE_SSH_PORT` to the reachable matching entry point.
+An empty host omits remote SSH instructions; it never guesses that the public
+platform hostname has a reachable SSH service. Browser access remains available.
+Returned
 connection instructions identify a private relay destination; the client connects
 to a local forwarded port. Neither the relay nor database has a published host
 port. The bastion allows forwarding only to relay ports authorized for the human's
@@ -125,8 +134,8 @@ In pgAdmin, register **Host name/address** `store-access`, **Port** the credenti
 `Disable`. Supply your own `PGPASSWORD`. The lease relay verifies the exact
 user/database and closes the backend connection at expiry, revoke or downgrade.
 Renew and register/update the new lease port/user to reconnect. Password saving,
-PSQL shell and shared administrator server registrations are disabled. Query
-history is not persisted. User registrations/settings live in the console volume;
+PSQL shell and shared administrator server registrations are disabled. SQL query history is bounded to 20 entries per user/database in the console
+volume; it is not a platform telemetry export. User registrations/settings live in the console volume;
 these disposable preferences do not authorize restored data access.
 
 The console has no host port and joins only the internal `store-consoles` network.
@@ -149,7 +158,13 @@ operator-owned `ag_catalog`; application graphs remain resource-scoped.
 Binding/application removal revokes consumer access and retains resource data.
 Resource/project retirement revokes affected access and retains data. Purge is a
 separate resource action after observed retirement/access cleanup; its preview
-pins UUID, owner and version. Other consumers and the shared service remain intact.
+pins UUID, owner and version. Accepted purge requests wait in `purging` with
+`PurgeAwaitingVerifiedBackup` until the scheduled backup captures their intent,
+uploads it encrypted off-host and verifies readback. Only then does the backup job
+acknowledge that exact resource version/snapshot, allowing the worker to delete
+its data. Operators may run the existing backup job early. Backup failure leaves
+data retained and access revoked; retries never bypass verification. Install the
+updated backup job together with this source before using purge. Other consumers and the shared service remain intact.
 Existing project-catalog purge retains named-store ownership/consumer records and
 the reserved project identity; it never implicitly purges named stores.
 
@@ -216,5 +231,26 @@ Restore now sets an explicit named-store quarantine before services start.
 The API denies credential/admin changes, the relay exposes no leases, and the
 worker only revokes recovered credentials until reconciliation completes. Unbound
 applications can still deploy. Older snapshots do not automatically reactivate
-old grants. The provider-specific reconciliation/rebuild and verified off-host
-purge-intent workflow is being completed; do not manually clear this guard.
+old grants. Restore reads the latest verified `store-recovery.json` from the
+configured off-host repository even when an older data snapshot was selected.
+Its hash must match the verified bundle manifest. Every recovered generation is
+revoked in the provider; every recovered grant is revoked. Latest purging/purged
+UUIDs are deleted again, retired resources remain retained, and surviving data
+must pass provider validation. A data snapshot missing a newer retained resource
+is refused instead of silently creating an empty database.
+
+The guarded operator command is `python -m app.stores.recovery --manifest-sha256
+SHA256 [--apply]` inside the API container, with the verified manifest on stdin.
+Without `--apply` it reviews the plan. The restore script uses this command before
+project reapply and requires fresh owner approval/new binding declarations for
+store consumers. It never reactivates old grants for a transparent restart.
+Do not manually clear the guard. AGE graph-OID/query validation keeps recovery
+closed until its authoritative projection rebuild succeeds. Source-only fixtures
+do not satisfy the four-hour deployed recovery target.
+
+Set `RESTIC_TEST_BINARY` to an installed restic executable when running the named
+PostgreSQL fixture to exercise an encrypted **local intent-only** repository:
+verification before purge, latest-intent replay after a simulated older catalog/data
+restore, all-grant revocation, and fresh approval before access. This does not use
+the real off-host repository, send notifications or demonstrate a full data restore.
+The backup suite also exercises real encrypted roundtrip/retention locally.

@@ -60,6 +60,10 @@ def reconcile(conn, control=None):
                 if held or pending_grant:
                     return
                 if res["state"] == "purging":
+                    if res.get("purge_backup_version") != res["version"] or not res.get("purge_backup_snapshot"):
+                        conn.execute("UPDATE store_resources SET error_code='PurgeAwaitingVerifiedBackup' WHERE resource_id=%s",
+                            (res["resource_id"],))
+                        return
                     provider.purge(res)
             state = "purged" if res["state"] == "purging" else res["state"]
             conn.execute("UPDATE store_resources SET state=%s,observed_state=%s,error_code=NULL WHERE resource_id=%s",

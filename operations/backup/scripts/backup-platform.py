@@ -149,6 +149,46 @@ class Job:
                 if process.wait() != 0:
                     raise BackupError('database capture failed')
 
+    def store_recovery_manifest(self, bundle):
+        """Purge intent becomes durable off-host BEFORE the data is deleted."""
+        arguments = ('exec', '-T', 'postgres', 'psql', '-X', '-A', '-t', '-v', 'ON_ERROR_STOP=1',
+                     '-U', 'postgres', '-d', 'platform', '-c')
+        exists = self.compose(*arguments, "SELECT to_regclass('public.store_resources') IS NOT NULL").strip()
+        if exists == b't':
+            data = self.compose(*arguments, """SELECT jsonb_build_object('format',1,'captured_at',now(),
+                'resources',COALESCE(jsonb_agg(jsonb_build_object('resource_id',resource_id,
+                'owner_project',owner_project,'name',name,'quota_bytes',quota_bytes,
+                'provider',provider,'state',state,'version',version,
+                'extensions',extensions) ORDER BY resource_id),'[]'::jsonb)) FROM store_resources""")
+            manifest = json.loads(data)
+        elif exists == b'f':
+            manifest = {'format': 1, 'resources': []}
+        else:
+            raise BackupError('store recovery catalog unavailable')
+        target = bundle / 'store-recovery.json'
+        atomic_json(target, manifest)
+        target.chmod(0o600)
+
+    def acknowledge_store_purges(self, bundle, snapshot):
+        path = bundle / 'store-recovery.json'
+        if not path.exists():
+            return  # Legacy bundles and isolated backup-unit fixtures.
+        manifest = json.loads(path.read_text())
+        pending = [r for r in manifest['resources'] if r['state'] == 'purging']
+        if not pending:
+            return
+        # Only JSON from the immutable, read-back verified bundle is acknowledged.
+        # Hex avoids shell/SQL quoting of display names and arbitrary source text.
+        payload = json.dumps({'snapshot': snapshot, 'resources': pending}).encode().hex()
+        statement = """WITH manifest AS (SELECT convert_from(decode('%s','hex'),'UTF8')::jsonb AS value),
+            captured AS (SELECT entry.item,m.value->>'snapshot' AS snapshot FROM manifest m
+                CROSS JOIN LATERAL jsonb_array_elements(m.value->'resources') AS entry(item))
+            UPDATE store_resources r SET purge_backup_version=r.version,purge_backup_snapshot=c.snapshot
+            FROM captured c WHERE r.resource_id=(c.item->>'resource_id')::uuid
+                AND r.version=(c.item->>'version')::bigint AND r.state='purging'""" % payload
+        self.compose('exec', '-T', 'postgres', 'psql', '-X', '-v', 'ON_ERROR_STOP=1',
+            '-U', 'postgres', '-d', 'platform', '-c', statement)
+
     def project_secrets(self, bundle):
         """Write every project's app-secrets into the bundle; restic encrypts the bundle before upload.
 
@@ -179,11 +219,13 @@ class Job:
     def capture(self, bundle):
         self.stage = 'database capture'
         self.dump(bundle)
+        self.stage = 'store recovery intent capture'
+        self.store_recovery_manifest(bundle)
         self.stage = 'project secret capture'
         self.project_secrets(bundle)
         self.stage = 'configuration capture'
         with tarfile.open(bundle / 'platform-files.tar.gz', 'w:gz') as archive:
-            for name in ['compose.yaml', '.env', 'scripts', 'platform', 'infrastructure', 'persistence']:
+            for name in ['compose.yaml', '.env', 'scripts', 'platform', 'infrastructure', 'persistence', 'identity']:
                 source = self.root / name
                 if not source.exists():
                     raise BackupError('required source missing')
@@ -283,6 +325,8 @@ class Job:
             snapshot = snapshots[0]['id']
             status.update(last_verified_capture=started, last_verified_snapshot=snapshot)
             atomic_json(self.state / 'status.json', status)
+            self.stage = 'verified store purge acknowledgment'
+            self.acknowledge_store_purges(bundle, snapshot)
             self.stage = 'retention'
             self.retention()
             status.update(running=False, result='success', stage='complete', finished=int(time.time()))

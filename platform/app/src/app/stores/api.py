@@ -1,7 +1,6 @@
 """Resource administration and explicit human data-access APIs."""
 from contextlib import contextmanager
 import os
-import ipaddress
 from uuid import UUID
 from fastapi import Depends, HTTPException
 from fastapi.encoders import jsonable_encoder
@@ -67,7 +66,7 @@ def install(app, control):
         control.require_permission(principal, "manage", project)
         with control.connect() as conn:
             rows = conn.execute("""SELECT row_to_json(r) FROM store_resources r
-                WHERE owner_project=%s ORDER BY created_at,resource_id LIMIT 128""", (project,)).fetchall()
+                WHERE owner_project=%s AND state<>'purged' ORDER BY created_at,resource_id LIMIT 128""", (project,)).fetchall()
         return reply({"resources": [r[0] for r in rows]})
 
     @app.post("/v1/projects/{project}/resources", status_code=202)
@@ -267,6 +266,7 @@ def install(app, control):
             cred = catalog._object(conn, "store_credentials", "credential_id", credential_id)
             row = own_human(conn, cred["grant_id"], principal)
             res = catalog.resource(conn, row["resource_id"])
+            catalog.active_project(conn, res["owner_project"])
             valid = conn.execute("""SELECT expires_at>now() FROM store_credentials
                 WHERE credential_id=%s""", (credential_id,)).fetchone()[0]
             if (valid and cred["state"] == "issuing" and row["state"] == "active" and res["state"] == "active"
@@ -280,6 +280,4 @@ def install(app, control):
             connection = providers.connection(res, cred)
             return reply({**cred, "provider": res["provider"], "connection": connection,
                 "transport": "private SSH tunnel or isolated console; relay closes at credential expiry",
-                "ssh": {"user": "platform-db", "host": os.environ.get("PLATFORM_DOMAIN", "platform.localhost"),
-                    "port": 2222, "destination": os.environ.get("STORE_RELAY_IP", "172.30.80.15"),
-                    "destination_port": cred["relay_port"]}})
+                **({"ssh": providers.ssh_connection(cred)} if os.environ.get("STORE_SSH_HOST") else {})})

@@ -15,8 +15,11 @@ def get(name):
 
 
 def budget(name):
-    values = json.loads((os.environ.get("STORE_CAPACITY_BYTES") or '{"postgresql":17179869184}'))
-    amount = values.get(name)
+    try:
+        values = json.loads((os.environ.get("STORE_CAPACITY_BYTES") or '{"postgresql":17179869184}'))
+        amount = values.get(name)
+    except (ValueError, AttributeError, TypeError):
+        raise ProviderUnavailable("Operator store capacity allocation is invalid") from None
     if type(amount) is not int or amount <= 0:
         raise ProviderUnavailable("Operator store capacity allocation is unavailable")
     return amount
@@ -47,3 +50,28 @@ def console_url(provider):
     if provider == "postgresql" and os.environ.get("STORE_CONSOLE_POSTGRES_ENABLED") == "true":
         return "/store-console/postgresql/"
     return None
+
+
+def ssh_connection(credential):
+    """Advertise only an operator-selected reachable bastion, never assume public DNS."""
+    import ipaddress
+    import re
+    host = os.environ.get("STORE_SSH_HOST", "")
+    if not host:
+        return None
+    try:
+        address = ipaddress.ip_address(host)
+        if address.is_unspecified:
+            raise ProviderUnavailable("A reachable private access host is required")
+    except ValueError:
+        if len(host) > 253 or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?", host):
+            raise ProviderUnavailable("Invalid private access configuration") from None
+    try:
+        port = int(os.environ.get("STORE_SSH_PORT", "2222"))
+    except ValueError:
+        raise ProviderUnavailable("Invalid private access configuration") from None
+    if not 1024 <= port <= 65535:
+        raise ProviderUnavailable("Invalid private access configuration")
+    return {"user": "platform-db", "host": host, "port": port,
+        "destination": str(ipaddress.ip_address(os.environ.get("STORE_RELAY_IP", "172.30.80.15"))),
+        "destination_port": credential["relay_port"]}
