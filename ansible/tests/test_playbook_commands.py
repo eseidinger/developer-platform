@@ -25,7 +25,7 @@ class PlaybookCommandTests(unittest.TestCase):
         reconcile = source.index("Reconcile Compose services and Kubernetes cluster")
         self.assertLess(validate, stop)
         self.assertLess(stop, reconcile)
-        self.assertIn("--validate-only", source[validate:stop])
+        self.assertIn("--validate-networks", source[validate:stop])
 
     def test_command_argv_never_contains_yaml_null(self):
         """An unquoted standalone dash is YAML null, not kubectl's stdin path."""

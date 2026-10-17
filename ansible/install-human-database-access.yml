@@ -18,6 +18,15 @@
           - database_bastion_port | int <= 65535
         fail_msg: Set a specific IPv4 bind address and unprivileged port for the database bastion.
 
+    - name: Validate advertised SSH settings against the selected listener
+      ansible.builtin.set_fact:
+        database_advertised_settings: "{{ database_inventory_options | platform_inventory_settings }}"
+      vars:
+        database_inventory_options:
+          store_ssh_host: "{{ platform_store_ssh_host | default(none) }}"
+          bastion_bind_ip: "{{ database_bastion_bind_ip }}"
+          bastion_port: "{{ platform_database_bastion_port | default(2222) }}"
+
     - name: Install OpenSSH server and Python
       ansible.builtin.apt:
         name: [openssh-server, python3]
@@ -33,6 +42,9 @@
       ansible.builtin.set_fact:
         database_bastion_token: "{{ (database_environment.content | b64decode | regex_search('(?m)^DATABASE_BASTION_TOKEN=([A-Fa-f0-9]{64})$', '\\1')) | first | default('') }}"
         database_postgres_ip: "{{ (database_environment.content | b64decode | regex_search('(?m)^POSTGRES_IP=([0-9.]+)$', '\\1')) | first | default('') }}"
+        database_store_relay_ip: "{{ (database_environment.content | b64decode | regex_search('(?m)^STORE_RELAY_IP=([0-9.]+)$', '\\1')) | default([], true) | first | default('172.30.80.15') }}"
+        database_deployed_ssh_port: "{{ (database_environment.content | b64decode | regex_search('(?m)^STORE_SSH_PORT=([0-9]+)$', '\\1')) | default([], true) | first | default('2222') }}"
+        database_deployed_ssh_host: "{{ (database_environment.content | b64decode | regex_search('(?m)^STORE_SSH_HOST=([^\\r\\n]*)$', '\\1')) | default([], true) | first | default('') }}"
       no_log: true
 
     - name: Require generated token and fixed PostgreSQL address
@@ -41,7 +53,11 @@
           - database_bastion_token is match('^[A-Fa-f0-9]{64}$')
           - database_postgres_ip is match('^[0-9.]+$')
           - database_postgres_ip != '0.0.0.0'
-        fail_msg: Run scripts/init.py on the installation and set POSTGRES_IP before installing database access.
+          - database_store_relay_ip is match('^[0-9.]+$')
+          - database_store_relay_ip != '0.0.0.0'
+          - database_deployed_ssh_port | int == database_bastion_port | int
+          - platform_store_ssh_host is not defined or database_deployed_ssh_host == platform_store_ssh_host
+        fail_msg: Deploy first; require generated credentials, private database/relay addresses and a matching advertised SSH port.
       no_log: true
 
     - name: Create noninteractive forwarding account
@@ -118,7 +134,7 @@
           AuthorizedKeysCommand /usr/local/libexec/platform-db-authorized-key %f
           AuthorizedKeysCommandUser platform-db-keylookup
           AllowTcpForwarding local
-          PermitOpen {{ database_store_relay_ip | default("172.30.80.15") }}:*
+          PermitOpen {{ database_store_relay_ip }}:*
           PermitListen none
           AllowStreamLocalForwarding no
           AllowAgentForwarding no

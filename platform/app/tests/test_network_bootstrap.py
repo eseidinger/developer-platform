@@ -1,6 +1,7 @@
 import importlib.util
 import ipaddress
 import io
+import json
 from pathlib import Path
 import sys
 import unittest
@@ -47,6 +48,23 @@ class NetworkBootstrapTests(unittest.TestCase):
                 patch.object(network_addresses, "docker") as docker, redirect_stdout(io.StringIO()):
             network_addresses.check()
         docker.assert_not_called()
+
+    def test_pre_outage_validation_allows_recreatable_container_address_conflicts(self):
+        self.network['Containers'] = {'fixture': {'IPv4Address': '172.30.80.11/24', 'Name': 'compose-peer'}}
+        with patch.object(network_addresses, 'settings', return_value={}), \
+                patch.object(sys, 'argv', ['check-network-addresses.py', '--validate-networks']), \
+                patch.object(network_addresses, 'docker', side_effect=['developer-platform', json.dumps([self.network])]) as docker, \
+                redirect_stdout(io.StringIO()):
+            network_addresses.check()
+        self.assertEqual(docker.call_count, 2)
+
+    def test_pre_outage_validation_refuses_existing_network_subnet_change(self):
+        self.network['IPAM']['Config'][0]['Subnet'] = '10.55.8.0/24'
+        with patch.object(network_addresses, 'settings', return_value={}), \
+                patch.object(sys, 'argv', ['check-network-addresses.py', '--validate-networks']), \
+                patch.object(network_addresses, 'docker', side_effect=['developer-platform', json.dumps([self.network])]), \
+                self.assertRaisesRegex(ValueError, 'separate migration'):
+            network_addresses.check()
 
     def test_search_console_network_is_separate_and_has_fixed_non_gateway_members(self):
         subnet, fixed = network_addresses.console_addresses({})

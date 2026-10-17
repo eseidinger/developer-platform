@@ -40,10 +40,15 @@ kubectl is also installed at `/usr/local/bin/kubectl` for host administration.
 For example, run `sudo kubectl --kubeconfig /opt/developer-platform/.runtime/admin.kubeconfig get nodes`.
 
 Existing `.env` secrets, volumes, and project state are preserved. Inventory values
-manage only `PLATFORM_DOMAIN`, `APPS_DOMAIN`, `IDENTITY_DOMAIN`, `TLS_EMAIL`, and `EDGE_BIND_IP`.
-Other settings retain their generated or existing values. For a custom subnet or
-K3S image, prepare the target `.env` using `scripts/init.py` and edit it before the
-first deployment. Existing clusters are not automatically upgraded by bootstrap.
+manage endpoints, registries, drift/revision limits, workload capacity admission,
+egress policy and 100% tracing. Optional structured store/network groups and the
+version/bootstrap/private-access settings below manage additional non-secret
+values only when supplied. Omitted optional settings preserve the remote values;
+explicit empty selections clear them. The example declares defaults, so review
+those values before applying it to an existing installation. Generated service
+credentials are never supplied through these inventory groups. Existing clusters
+are not automatically upgraded by bootstrap; selecting another K3S image is a pin
+for cluster creation, not a cluster upgrade procedure.
 Back up `.env`, especially `DATABASE_KEY`, as described in [operations](../docs/operators/backup-and-recovery.md).
 
 Human PostgreSQL access is a separate opt-in installation. After the API and
@@ -76,6 +81,75 @@ Useful inventory overrides:
 | `platform_capacity_reserve_memory_mib` | `8192` | Memory excluded from workload admission accounting for the platform and operating margin |
 | `platform_allowed_egress_cidrs` | empty | Comma-separated external CIDRs that components may request; empty denies external component egress |
 | `platform_allowed_egress_ports` | empty | Comma-separated TCP ports that components may request; empty denies external component egress |
+
+<a id="additional-deployment-options"></a>
+
+Additional deployment options:
+
+| Variable | Default when omitted | Purpose |
+| --- | --- | --- |
+| `platform_stores` | Preserve remote selection/settings | Explicit `profiles` list, `capacity_bytes` mapping and optional `neo4j` limits |
+| `platform_network` | Preserve remote settings | Private IPv4 `/24` and optional fixed service-address overrides |
+| `platform_search_console_network` | Preserve remote settings | Separate private IPv4 `/29` and optional console-address overrides |
+| `platform_k3s_image` | Preserve remote pin | Supported `rancher/k3s:v1.35/36/37.<patch>-k3s<release>` pin, optionally with a SHA-256 digest; kubectl must be within one minor version |
+| `platform_bootstrap_subject` | Preserve remote subject | Immutable Keycloak subject for initial administrator bootstrap; clearing it does not revoke existing grants |
+| `platform_store_ssh_host` | Preserve remote advertisement | Reachable management hostname/IPv4; empty disables advertisement |
+| `platform_database_bastion_bind_ip` | `127.0.0.1` in the separate installer | Specific IPv4 listener; wildcard binding is rejected |
+| `platform_database_bastion_port` | `2222` in the separate installer | Port 1024–65535; when supplied, also manages the portal's advertised SSH port |
+| `platform_bootstrap_timeout_seconds` | `3600` | Maximum build/bootstrap runtime, range 60–14400 seconds |
+| `platform_readiness_timeout_seconds` | `300` | API readiness retry window, range 5–3600 seconds; probes run every five seconds |
+
+For example, select all optional providers with explicit data budgets:
+
+```yaml
+platform_stores:
+  profiles: [s3, qdrant, opensearch, neo4j]
+  capacity_bytes:
+    postgresql: 17179869184
+    s3: 8589934592
+    qdrant: 4294967296
+    opensearch: 4294967296
+    neo4j: 4294967296
+  neo4j:
+    max_instances: 4
+    memory_bytes: 1610612736
+```
+
+These are example data allocations, not a host sizing guarantee. Every selected
+provider and PostgreSQL require positive integer byte budgets. Profiles must be a
+list containing only `s3`, `qdrant`, `opensearch`, `neo4j`, with no duplicates.
+`profiles: []` selects PostgreSQL only. Neo4j limits apply to retained instances
+platform-wide (1–64) and memory per instance (1–16 GiB). Review combined service,
+workload, telemetry and recovery requirements before enabling them. Removing a
+selection does not purge data or authorize bypassing resource retirement.
+
+Network groups require `subnet` and accept an optional `addresses` mapping keyed
+by Compose service name, such as `postgres`, `store-access` or `neo4j-controller`.
+Unspecified addresses are derived from standard offsets in the selected subnet;
+the full service list is in [the inventory renderer](filter_plugins/platform_inventory.py).
+The search-console group accepts `platform-api` and `opensearch-dashboards`.
+Addresses must be distinct, inside their subnet, and exclude the network, broadcast
+and gateway addresses. The two subnets must not overlap. Deployment validates the
+merged remote configuration before its outage and refuses to change an existing
+Docker network's subnet. Choose networks before first installation; later network
+migration needs a separate operator procedure. External host/VPN/Kubernetes subnet
+conflicts still require review.
+
+To advertise private access, set `platform_store_ssh_host`, an explicit non-loopback
+`platform_database_bastion_bind_ip` and `platform_database_bastion_port` together.
+Deploy the platform, configure the management firewall, then run the separate
+`install-human-database-access.yml` playbook. It reads the actual relay address
+from the deployed `.env` and refuses a port mismatch. Rerun it after changing the
+relay address or listener settings. Advertising an endpoint does not install the
+bastion or configure its firewall.
+
+Dashboards are provisioned automatically. Tracing stays at 100%; deployment also
+checks that the transferred Tempo configuration retains traces for 24 hours.
+Existing tracing-enabled applications still need their declarations reapplied to
+pick up sampler changes. Keep secrets generated on the host; use the existing
+protected/Vault-backed secret files for separate operations playbooks. Backups,
+alert delivery and watchdog configuration remain in their own inventories and
+are not enabled by the main platform inventory.
 
 For an existing host with Docker, prefer `platform_install_docker: false` to
 avoid changing its package source. Conflicting distribution Docker packages are

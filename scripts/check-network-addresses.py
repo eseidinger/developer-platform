@@ -99,6 +99,7 @@ def docker(*arguments):
 def check():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--validate-only", action="store_true", help="Validate settings without Docker inspection")
+    parser.add_argument("--validate-networks", action="store_true", help="Also refuse changes to existing network subnets, without checking container ownership")
     args = parser.parse_args()
     config = settings()
     subnet, fixed = addresses(config)
@@ -116,13 +117,19 @@ def check():
             ('developer-platform-search-consoles', search_subnet, search_fixed)):
         if name in existing:
             network = json.loads(docker('network', 'inspect', name))[0]
-            errors.extend(conflicts(selected_subnet, selected_fixed, network, labels))
+            if args.validate_networks:
+                configured = network.get('IPAM', {}).get('Config', [])
+                if not any(item.get('Subnet') == str(selected_subnet) for item in configured):
+                    raise ValueError('Existing Docker network subnet differs from configuration; network changes require a separate migration before deployment.')
+            else:
+                errors.extend(conflicts(selected_subnet, selected_fixed, network, labels))
     if errors:
         raise ValueError("Fixed Docker address conflict: " + "; ".join(errors) + ". "
                          "For Compose-owned conflicts, redeploy with ansible/deploy.yml to stop and "
                          "remove Compose containers while preserving volumes and the k3d network. "
                          "Other owners require operator intervention; bootstrap never disconnects them.")
-    print("Fixed Docker addresses are available or held by their intended services.")
+    print("Fixed settings and existing Docker network subnets are valid." if args.validate_networks else
+          "Fixed Docker addresses are available or held by their intended services.")
 
 
 if __name__ == "__main__":

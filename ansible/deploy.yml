@@ -58,6 +58,29 @@
           - (platform_allowed_egress_ports | string) is match('^$|^[0-9]+(?:,[0-9]+)*$')
         fail_msg: Use Ubuntu 22.04 or newer on amd64/arm64 and kubectl compatible with Kubernetes 1.36.
 
+    - name: Validate and render explicitly managed deployment options
+      ansible.builtin.set_fact:
+        platform_managed_settings: "{{ platform_inventory_options | platform_inventory_settings }}"
+      vars:
+        platform_inventory_options:
+          stores: "{{ platform_stores | default(none) }}"
+          network: "{{ platform_network | default(none) }}"
+          search_console_network: "{{ platform_search_console_network | default(none) }}"
+          k3s_image: "{{ platform_k3s_image | default(none) }}"
+          kubectl_version: "{{ platform_kubectl_version }}"
+          bootstrap_subject: "{{ platform_bootstrap_subject | default(none) }}"
+          store_ssh_host: "{{ platform_store_ssh_host | default(none) }}"
+          bastion_bind_ip: "{{ platform_database_bastion_bind_ip | default(none) }}"
+          bastion_port: "{{ platform_database_bastion_port | default(none) }}"
+          bootstrap_timeout_seconds: "{{ platform_bootstrap_timeout_seconds | default(3600) }}"
+          readiness_timeout_seconds: "{{ platform_readiness_timeout_seconds | default(300) }}"
+
+    - name: Require the selected trace retention policy
+      ansible.builtin.assert:
+        that:
+          - (lookup('ansible.builtin.file', platform_source_dir ~ '/infrastructure/monitoring/tempo.yaml') | from_yaml)['backend_worker']['compaction']['block_retention'] == '24h'
+        fail_msg: Deployment requires the selected 24-hour trace retention policy.
+
     - name: Validate environment values
       ansible.builtin.assert:
         that:
@@ -202,7 +225,7 @@
             owner: root
             group: root
             mode: '0600'
-          loop: "{{ platform_settings | dict2items }}"
+          loop: "{{ (platform_settings | combine(platform_managed_settings)) | dict2items }}"
           no_log: true
           diff: false
 
@@ -280,7 +303,7 @@
 
         - name: Validate fixed Docker addresses before stopping services
           ansible.builtin.command:
-            argv: [python3, scripts/check-network-addresses.py, --validate-only]
+            argv: [python3, scripts/check-network-addresses.py, --validate-networks]
             chdir: "{{ platform_install_dir }}"
           changed_when: false
 
@@ -335,16 +358,19 @@
             argv: [bash, scripts/up.sh]
             chdir: "{{ platform_install_dir }}"
           changed_when: true
+          async: "{{ platform_bootstrap_timeout_seconds | default(3600) }}"
+          poll: 10
           # Bootstrap can emit Kubernetes token diagnostics on failure.
           no_log: true
 
         - name: Wait for the platform API
           ansible.builtin.uri:
             url: http://127.0.0.1:8000/readyz
+            timeout: 5
             status_code: 200
           register: platform_health
           until: platform_health.status | default(0) == 200
-          retries: 30
+          retries: "{{ ((platform_readiness_timeout_seconds | default(300) | int) / 5) | round(0, 'ceil') | int }}"
           delay: 5
 
         - name: Resolve the source revision being installed
@@ -413,4 +439,7 @@
                 platform_capacity_reserve_memory_mib: "{{ platform_capacity_reserve_memory_mib | int }}"
                 platform_install_docker: "{{ platform_install_docker | bool }}"
                 platform_kubectl_version: "{{ platform_kubectl_version }}"
+                managed_environment: "{{ platform_managed_settings }}"
+                platform_bootstrap_timeout_seconds: "{{ platform_bootstrap_timeout_seconds | default(3600) | int }}"
+                platform_readiness_timeout_seconds: "{{ platform_readiness_timeout_seconds | default(300) | int }}"
               versions: "{{ platform_versions.stdout_lines | select('match', '^[a-z0-9._-]+=') | map('regex_replace', '^([^=]+)=(.*)$', '\\1: \\2') | list }}"
