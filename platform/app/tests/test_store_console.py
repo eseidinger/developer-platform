@@ -1,8 +1,9 @@
 import os
+import asyncio
 from pathlib import Path
 import tempfile
 from datetime import datetime, timedelta, timezone
-from unittest import TestCase
+from unittest import TestCase, IsolatedAsyncioTestCase
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ import httpx2 as httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from starlette.routing import Host
+from starlette.requests import Request
 from app.stores import console
 
 
@@ -149,3 +151,67 @@ class ConsoleBoundaryTests(TestCase):
             self.assertEqual(self.client.get('/rustfs/console/').status_code, 503)
             self.current = None
             self.assertEqual(self.client.get('/rustfs/console/browser/').status_code, 401)
+
+    def test_dashboards_forwards_only_native_cookie_and_injects_authoritative_lease(self):
+        from app.stores import dashboards
+        self.row['provider'] = 'opensearch'
+        seen = []
+        async def handler(request):
+            seen.append(dict(request.headers))
+            return httpx.Response(200, stream=Bytes(b'console'), headers={
+                'Set-Cookie': dashboards.COOKIE + '=Fe26.2*native; Path=/wrong; Domain=foreign.invalid'})
+        real_client = httpx.AsyncClient
+        with patch.dict(os.environ, {'OPENSEARCH_DASHBOARDS_IP': '127.0.0.4'}), patch(
+                'app.stores.console.httpx.AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)):
+            self.launch()
+            self.client.cookies.set('unrelated', 'never-forward')
+            response = self.client.get('/', headers={dashboards.HEADER: str(uuid4())})
+            self.assertEqual(response.status_code, 200)
+            self.assertIn('Secure', response.headers['set-cookie'])
+            self.assertNotIn('Domain=', response.headers['set-cookie'])
+            self.assertIn('Path=/', response.headers['set-cookie'])
+            self.client.get('/')
+        self.assertNotIn('cookie', seen[0])
+        self.assertEqual(seen[0][dashboards.HEADER], self.row['credential_id'])
+        self.assertEqual(seen[1]['cookie'], dashboards.COOKIE + '=Fe26.2*native')
+        self.assertNotIn(console.COOKIE, seen[1]['cookie'])
+
+
+class DashboardsStreamingTests(IsolatedAsyncioTestCase):
+    async def check_fence(self, expire):
+        class Held(httpx.AsyncByteStream):
+            async def __aiter__(self):
+                yield b'first'
+                await asyncio.Event().wait()
+        cid = str(uuid4())
+        row = {'credential_id': cid, 'relay_port': 20000, 'provider': 'opensearch',
+            'issuer': 'https://identity.fixture.invalid', 'subject': 'human',
+            'expires_at': datetime.now(timezone.utc) + timedelta(hours=24)}
+        current = [dict(row)]
+        with patch.dict(os.environ, {'DATABASE_KEY': 's' * 32, 'APPS_DOMAIN': 'apps.fixture.invalid',
+                'OPENSEARCH_DASHBOARDS_IP': '127.0.0.4'}):
+            app = console.create_gateway(lambda cid: current[0])
+            request = Request({'type': 'http', 'method': 'GET', 'scheme': 'https', 'path': '/held',
+                'raw_path': b'/held', 'query_string': b'', 'path_params': {'port': 20000},
+                'headers': [(b'host', b'console-20000.apps.fixture.invalid'),
+                    (b'cookie', (console.COOKIE + '=' + console.assertion(row, 'session', 86400)).encode())],
+                'client': ('127.0.0.1', 12345)})
+            async def handler(request): return httpx.Response(200, stream=Held())
+            real_client = httpx.AsyncClient
+            with patch('app.stores.console.httpx.AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)):
+                endpoint = next(route.endpoint for route in app.routes if getattr(route, 'path', None) == '/{path:path}')
+                response = await endpoint(request, 'held')
+                iterator = response.body_iterator
+                self.assertEqual(await asyncio.wait_for(anext(iterator), 1), b'first')
+                if expire:
+                    current[0]['expires_at'] = datetime.now(timezone.utc) + timedelta(milliseconds=100)
+                else:
+                    current[0] = None
+                with self.assertRaises(StopAsyncIteration):
+                    await asyncio.wait_for(anext(iterator), 1)
+
+    async def test_already_streaming_frontend_closes_on_revocation(self):
+        await self.check_fence(False)
+
+    async def test_already_streaming_frontend_closes_at_lease_deadline(self):
+        await self.check_fence(True)

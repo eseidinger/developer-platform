@@ -47,6 +47,9 @@ if [[ ",${COMPOSE_PROFILES:-}," == *,opensearch,* ]]; then
     fi
     sleep 2
   done
+  # Reserve the console's isolated address before any dynamically addressed peer.
+  # Its native backend becomes available when the API starts later in bootstrap.
+  docker compose up -d --no-deps opensearch-dashboards
 fi
 python3 scripts/cluster_config.py > .runtime/k3d.yaml
 if ! k3d cluster list -o json | python3 -c 'import json,sys; sys.exit(not any(c["name"] == "workloads" for c in json.load(sys.stdin)))'; then

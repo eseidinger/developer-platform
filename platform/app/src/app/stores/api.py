@@ -33,6 +33,8 @@ def install(app, control):
 
     app.router.routes.insert(0, Host('console-{port:int}.' + os.environ.get('APPS_DOMAIN', 'apps.localhost'),
         app=console.create_gateway(console_lease, register=register_console_session)))
+    from . import dashboards
+    app.router.routes.insert(0, Host(dashboards.HOST, app=dashboards.create_backend(console_lease)))
 
     def human(conn, principal):
         # Known automation records are insufficient: an unregistered service

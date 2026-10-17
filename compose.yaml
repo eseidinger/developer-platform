@@ -7,6 +7,12 @@ include:
   - identity/compose.yaml
   - platform/compose.yaml
 networks:
+  search-consoles:
+    name: developer-platform-search-consoles
+    internal: true
+    ipam:
+      config:
+        - subnet: ${STORE_SEARCH_CONSOLE_SUBNET:-172.30.81.0/29}
   store-consoles:
     internal: true
   platform:

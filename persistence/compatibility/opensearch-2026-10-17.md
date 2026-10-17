@@ -56,3 +56,28 @@ an unprivileged initializer and working health checks. Repeated preparation keep
 the CA and a second initialization retains existing scoped users. Issue/probe
 checks require the exact expected resource role, rejecting ambient broader role
 mappings. These checks do not validate deployed TLS renewal or Dashboards.
+
+The candidate Dashboards 3.9.0 image is pinned to
+`sha256:4bdb8ded547ce7f4c379a10261f1b4aad58726900c215be570a7d1fe86f2a7d8`.
+It runs on a separate internal network with the API bridge, no host port, no raw
+store network membership and no operator administrator key. A real positive/negative
+TCP control reaches the native listener from the store network and cannot reach
+the same listener from an isolated console network. The private bridge requires
+the exact source service IP and binds human Basic identities to the launched
+credential generation before using its native relay. Only the restricted
+`kibanaserver` identity performs background system-metadata initialization over
+verified native TLS. The official login page makes an anonymous native login-settings read; that
+exact GET is preserved only under an active launched human lease, separately from
+authenticated data operations. Cookie isolation, cross-lease identity denial, source-IP
+checks, stale/non-human denial, and held frontend-stream expiry/revocation pass
+local tests. No native human role is widened. The official login page is
+`/app/login`; `/auth/login` is its submission endpoint.
+
+Human browser acceptance remains open. The source-identified anonymous native
+configuration read is now represented by a narrow bridge exception; it does not
+inject a native credential or alter data permissions. The resource
+grant/session/tenant lifecycle and usable data browsing must pass
+before advertising browser launch. `console.PROVIDERS` therefore continues to
+exclude OpenSearch. The source service/configuration are candidates, not deployed
+console acceptance. Use `STORE_DASHBOARDS_FIXTURE=1 STORE_CONSOLE_VERIFY_PENDING=1`
+with the existing Compose fixture to reproduce without touching live services.

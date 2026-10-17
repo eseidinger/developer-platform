@@ -13,6 +13,7 @@ import os
 import time
 import re
 from pathlib import Path
+from http.cookies import SimpleCookie
 from datetime import datetime, timezone
 from xml.etree import ElementTree
 from urllib.parse import parse_qs
@@ -23,7 +24,7 @@ import h11
 import jwt
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
-from . import catalog, recovery
+from . import catalog, recovery, dashboards
 
 COOKIE = '__Host-store-console'
 PROVIDERS = {'s3', 'qdrant'}
@@ -84,9 +85,23 @@ def assertion(row, kind, lifetime):
 
 
 def backend(row, static):
+    if row['provider'] == 'opensearch':
+        return os.environ['OPENSEARCH_DASHBOARDS_IP'], 5601
     if not static:
         return os.environ['STORE_RELAY_IP'], row['relay_port']
     return (os.environ['RUSTFS_IP'], 9001) if row['provider'] == 's3' else (os.environ['QDRANT_IP'], 6333)
+
+
+def landing(provider):
+    return {'s3': '/rustfs/console/', 'qdrant': '/dashboard/', 'opensearch': '/'}[provider]
+
+
+def dashboards_cookie(value):
+    # Exactly one native encrypted cookie, never the portal cookie or a caller's
+    # arbitrary cookie. Scope/security attributes are set by the gateway.
+    if len(value) > 16384 or any(character in value for character in '\r\n;'):
+        raise ValueError('Invalid native console cookie')
+    return value
 
 
 def session_metadata(raw, row):
@@ -148,6 +163,7 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
         if error.status_code == 401:
             result.headers['Clear-Site-Data'] = '"cache", "storage"'
             result.delete_cookie(COOKIE, secure=True, httponly=True, samesite='strict', path='/')
+            result.delete_cookie(dashboards.COOKIE, secure=True, httponly=True, samesite='strict', path='/')
         return result
 
     async def authorize(token, kind, port):
@@ -192,13 +208,16 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             except (ValueError, UnicodeError, KeyError):
                 raise HTTPException(400) from None
             row = await authorize(token, 'launch', port)
-            target = '/rustfs/console/' if row['provider'] == 's3' else '/dashboard/'
+            target = landing(row['provider'])
             response = RedirectResponse(target, status_code=303, headers={'Cache-Control': 'no-store',
                 'Referrer-Policy': 'no-referrer', 'Clear-Site-Data': '"cache", "storage"'})
             response.set_cookie(COOKIE, assertion(row, 'session', 86400), secure=True, httponly=True,
                 samesite='strict', path='/', max_age=max(0, int(row['expires_at'].timestamp() - time.time())))
+            if row['provider'] == 'opensearch':
+                response.delete_cookie(dashboards.COOKIE, secure=True, httponly=True, samesite='strict', path='/')
             return response
         row = await authorize(request.cookies.get(COOKIE), 'session', port)
+        frontend = row['provider'] == 'opensearch'
         if row['provider'] == 's3' and path == 'rustfs/admin/v3/is-admin':
             # Every platform console identity is a non-administrator. Native
             # admin discovery itself requires global rights in this release;
@@ -221,8 +240,8 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
                   or (row['provider'] == 'qdrant' and (path == 'dashboard' or path.startswith('dashboard/'))))
         native_auth = (request.headers.get('authorization') or request.headers.get('api-key')
             or b'X-Amz-Credential=' in request.scope['query_string'])
-        if path == '' and request.method in {'GET', 'HEAD'} and not native_auth:
-            return RedirectResponse('/rustfs/console/' if row['provider'] == 's3' else '/dashboard/', 303)
+        if path == '' and request.method in {'GET', 'HEAD'} and not native_auth and not frontend:
+            return RedirectResponse(landing(row['provider']), 303)
         if static:
             if any(part in {'.', '..'} for part in path.split('/')):
                 raise HTTPException(400)
@@ -246,7 +265,7 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
         address = str(ipaddress.IPv4Address(address))
         raw = request.scope['raw_path'] + (b'?' + request.scope['query_string'] if request.scope['query_string'] else b'')
         authorization = {}
-        if not static:
+        if not static and not frontend:
             from .http_relay import identity
             try:
                 authorization = identity(h11.Request(method=request.method, target=raw, headers=request.headers.raw), row)
@@ -269,8 +288,13 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             return Response(ElementTree.tostring(tree), media_type='application/xml', headers={'Cache-Control': 'no-store'})
         url = httpx.URL(scheme='http', host=address, port=backend_port, raw_path=raw)
         headers = [(name, value) for name, value in request.headers.items() if name.lower() not in HOP
-                   and not name.lower().startswith('x-forwarded-')]
+                   and not name.lower().startswith(('x-forwarded-', 'x-platform-store-'))]
         headers.append(('Host', request.headers['host']))
+        if frontend:
+            headers.append((dashboards.HEADER, str(row['credential_id'])))
+            headers.append(('X-Forwarded-Proto', 'https'))
+            if dashboards.COOKIE in request.cookies:
+                headers.append(('Cookie', dashboards.COOKIE + '=' + dashboards_cookie(request.cookies[dashboards.COOKIE])))
         if request.method in {'GET', 'HEAD'} and (request.headers.get('transfer-encoding')
                 or request.headers.get('content-length', '0') != '0'):
             raise HTTPException(400, 'Console reads cannot carry a body')
@@ -282,6 +306,7 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             raise HTTPException(503, 'Console capacity is occupied') from None
         transport = httpx.AsyncClient(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(60, connect=3))
         upstream = None
+        native_cookies = []
         try:
             upstream = await transport.send(transport.build_request(request.method, url, headers=headers,
                 content=None if request.method in {'GET', 'HEAD'} else request.stream()), stream=True)
@@ -302,6 +327,11 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
                 await transport.aclose()
                 slots.release()
                 return result
+            if frontend:
+                for raw_cookie in upstream.headers.get_list('set-cookie'):
+                    parsed = SimpleCookie(); parsed.load(raw_cookie)
+                    if dashboards.COOKIE in parsed:
+                        native_cookies.append(dashboards_cookie(parsed[dashboards.COOKIE].value))
         except BaseException as error:
             slots.release()
             with contextlib.suppress(asyncio.CancelledError, TimeoutError):
@@ -311,10 +341,30 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
             raise HTTPException(502, 'Console connection unavailable') from None
 
         async def stream():
+            async def alive():
+                while True:
+                    current = await asyncio.to_thread(load, UUID(row['credential_id']))
+                    deadline = min(current['expires_at'], row['expires_at']) if current else datetime.now(timezone.utc)
+                    if deadline <= datetime.now(timezone.utc):
+                        return
+                    await asyncio.sleep(min(.5, max(0, (deadline - datetime.now(timezone.utc)).total_seconds())))
+            guard = asyncio.create_task(alive()) if frontend else None
+            pending = None
             try:
-                async for part in upstream.aiter_raw():
-                    yield part
+                iterator = upstream.aiter_raw().__aiter__()
+                while True:
+                    pending = asyncio.create_task(anext(iterator))
+                    if guard:
+                        done, _ = await asyncio.wait((guard, pending), return_when=asyncio.FIRST_COMPLETED)
+                        if guard in done: return
+                    try:
+                        yield await pending
+                    except StopAsyncIteration:
+                        break
             finally:
+                for task in (guard, pending):
+                    if task: task.cancel()
+                await asyncio.gather(*(task for task in (guard, pending) if task), return_exceptions=True)
                 slots.release()
                 async def close():
                     with contextlib.suppress(Exception):
@@ -329,7 +379,10 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
         result.headers.update({'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
             'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin',
             'Content-Security-Policy': ("frame-ancestors 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'"
-                if static else "sandbox; default-src 'none'; frame-ancestors 'none'"), 'X-Frame-Options': 'DENY'})
+                if static or frontend else "sandbox; default-src 'none'; frame-ancestors 'none'"), 'X-Frame-Options': 'DENY'})
+        for value in native_cookies:
+            result.set_cookie(dashboards.COOKIE, value, path='/', secure=True, httponly=True, samesite='strict',
+                max_age=max(0, int(row['expires_at'].timestamp() - time.time())) if value else 0)
         if not static and row['provider'] == 's3' and not result.headers.get('content-type', '').startswith(('application/json', 'application/xml')):
             result.headers['Content-Disposition'] = 'attachment'
         return result

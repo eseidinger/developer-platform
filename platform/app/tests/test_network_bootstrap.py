@@ -48,6 +48,18 @@ class NetworkBootstrapTests(unittest.TestCase):
             network_addresses.check()
         docker.assert_not_called()
 
+    def test_search_console_network_is_separate_and_has_fixed_non_gateway_members(self):
+        subnet, fixed = network_addresses.console_addresses({})
+        self.assertFalse(subnet.overlaps(self.subnet))
+        self.assertEqual(str(fixed['opensearch-dashboards']), '172.30.81.3')
+        for config in ({'STORE_SEARCH_API_IP': '172.30.81.3'}, {'OPENSEARCH_DASHBOARDS_IP': '172.30.81.1'},
+                {'OPENSEARCH_DASHBOARDS_IP': '172.30.80.31'}, {'STORE_SEARCH_CONSOLE_SUBNET': 'private-value'},
+                {'STORE_SEARCH_CONSOLE_SUBNET': '172.30.80.0/24', 'STORE_SEARCH_API_IP': '172.30.80.2',
+                    'OPENSEARCH_DASHBOARDS_IP': '172.30.80.3'}):
+            with self.assertRaises(ValueError) as denied:
+                network_addresses.addresses(config)
+            self.assertNotIn('private-value', str(denied.exception))
+
     def test_daemon_failure_never_forwards_arbitrary_diagnostics(self):
         with patch.object(network_addresses.subprocess, "run", return_value=Mock(
                 returncode=1, stdout="", stderr="private-secret-value")):

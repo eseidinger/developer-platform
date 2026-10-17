@@ -242,6 +242,16 @@ permission. All object operations remain native-authorized. OpenSearch Dashboard
 remains unadvertised until server-account and per-human session integration is
 verified.
 
+The candidate Dashboards service is pinned to 3.9.0 and uses a separate internal
+`search-consoles` network with the API. It has no host port, raw-store network
+membership or administrator key. `STORE_SEARCH_CONSOLE_SUBNET`,
+`STORE_SEARCH_API_IP` and `OPENSEARCH_DASHBOARDS_IP` must be distinct from the
+platform/cluster networks; bootstrap validates fixed members and existing owners.
+Run `scripts/init.py` to generate the separate missing console-cookie key without
+replacing existing secrets. Human launch remains disabled until the local browser
+and tenant-lifecycle fixture passes. See the
+[compatibility record](../../persistence/compatibility/opensearch-2026-10-17.md).
+
 ## PostgreSQL browser console
 
 The portal opens `/store-console/postgresql/`. pgAdmin 9.18 uses Keycloak SSO

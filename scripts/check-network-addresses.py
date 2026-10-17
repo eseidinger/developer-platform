@@ -47,6 +47,22 @@ def addresses(config):
     for service, address in result.items():
         if address not in subnet or address in (subnet.network_address, subnet.broadcast_address):
             raise ValueError(f"The fixed address for {service} must be a usable address in PLATFORM_SUBNET.")
+    search_subnet, _ = console_addresses(config)
+    if subnet.overlaps(search_subnet):
+        raise ValueError('The isolated search-console subnet must not overlap PLATFORM_SUBNET.')
+    return subnet, result
+
+
+def console_addresses(config):
+    try:
+        subnet = ipaddress.IPv4Network(config.get('STORE_SEARCH_CONSOLE_SUBNET', '172.30.81.0/29'))
+        result = {'platform-api': ipaddress.IPv4Address(config.get('STORE_SEARCH_API_IP', '172.30.81.2')),
+            'opensearch-dashboards': ipaddress.IPv4Address(config.get('OPENSEARCH_DASHBOARDS_IP', '172.30.81.3'))}
+        if len(set(result.values())) != 2 or any(address not in subnet or address in
+                (subnet.network_address, subnet.broadcast_address, subnet.network_address + 1) for address in result.values()):
+            raise ValueError()
+    except ValueError:
+        raise ValueError('Search-console addresses must be distinct usable IPv4 addresses in their isolated subnet, excluding its gateway.') from None
     return subnet, result
 
 
@@ -83,20 +99,23 @@ def check():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--validate-only", action="store_true", help="Validate settings without Docker inspection")
     args = parser.parse_args()
-    subnet, fixed = addresses(settings())
+    config = settings()
+    subnet, fixed = addresses(config)
     if args.validate_only:
         print("Fixed Docker address settings are valid.")
         return
-    existing = docker("network", "ls", "--filter", f"name=^{NETWORK}$", "--format", "{{.Name}}").splitlines()
-    if NETWORK not in existing:
-        print("Platform Docker network will be created during bootstrap.")
-        return
-    network = json.loads(docker("network", "inspect", NETWORK))[0]
+    existing = docker("network", "ls", "--format", "{{.Name}}").splitlines()
 
     def labels(container_id):
         return json.loads(docker("inspect", container_id, "--format", "{{json .Config.Labels}}")) or {}
 
-    errors = conflicts(subnet, fixed, network, labels)
+    search_subnet, search_fixed = console_addresses(config)
+    errors = []
+    for name, selected_subnet, selected_fixed in ((NETWORK, subnet, fixed),
+            ('developer-platform-search-consoles', search_subnet, search_fixed)):
+        if name in existing:
+            network = json.loads(docker('network', 'inspect', name))[0]
+            errors.extend(conflicts(selected_subnet, selected_fixed, network, labels))
     if errors:
         raise ValueError("Fixed Docker address conflict: " + "; ".join(errors) + ". "
                          "For Compose-owned conflicts, redeploy with ansible/deploy.yml to stop and "

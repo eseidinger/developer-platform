@@ -1,0 +1,20 @@
+server.host: "0.0.0.0"
+server.name: platform-store-console
+opensearch.hosts: ["${STORE_OPENSEARCH_BACKEND_URL}"]
+opensearch.username: kibanaserver
+opensearch.password: "${OPENSEARCH_DASHBOARDS_PASSWORD}"
+opensearch.customHeaders:
+  Host: opensearch-store-backend.internal
+opensearch.requestHeadersAllowlist: [authorization, securitytenant, x-platform-store-lease]
+opensearch_security.auth.type: basicauth
+opensearch_security.cookie.name: __Host-store-dashboards-auth
+opensearch_security.cookie.password: "${STORE_OPENSEARCH_CONSOLE_COOKIE_KEY}"
+opensearch_security.cookie.secure: true
+opensearch_security.cookie.isSameSite: Strict
+opensearch_security.cookie.ttl: 86400000
+opensearch_security.session.ttl: 86400000
+opensearch_security.session.keepalive: false
+opensearch_security.multitenancy.tenants.enable_global: false
+opensearch_security.multitenancy.tenants.enable_private: true
+opensearch_security.multitenancy.tenants.preferred: [Private]
+logging.silent: true

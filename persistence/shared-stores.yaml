@@ -101,3 +101,31 @@ services:
     cpus: 1
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+
+  opensearch-dashboards:
+    profiles: [opensearch]
+    image: opensearchproject/opensearch-dashboards:3.9.0@sha256:4bdb8ded547ce7f4c379a10261f1b4aad58726900c215be570a7d1fe86f2a7d8
+    restart: unless-stopped
+    environment:
+      STORE_OPENSEARCH_BACKEND_URL: http://${STORE_SEARCH_API_IP:-172.30.81.2}:8000
+      OPENSEARCH_DASHBOARDS_PASSWORD: ${OPENSEARCH_DASHBOARDS_PASSWORD:-}
+      STORE_OPENSEARCH_CONSOLE_COOKIE_KEY: ${STORE_OPENSEARCH_CONSOLE_COOKIE_KEY:-}
+    volumes:
+      - ./opensearch-dashboards.yaml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
+    networks:
+      search-consoles:
+        ipv4_address: ${OPENSEARCH_DASHBOARDS_IP:-172.30.81.3}
+    depends_on:
+      opensearch-init:
+        condition: service_completed_successfully
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:size=64m"]
+    mem_limit: 1g
+    cpus: 1
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:5601/app/login]
+      interval: 15s
+      timeout: 5s
+      start_period: 120s
+      retries: 12

@@ -34,7 +34,7 @@ async def run(providers, endpoints, static_ports):
     if os.environ.get('STORE_CONSOLE_VERIFY_PENDING') != '1':
         providers = {name: provider for name, provider in providers.items() if name in console.PROVIDERS}
     os.environ.update({'DATABASE_KEY': secrets.token_hex(32), 'STORE_CONSOLE_HTTP_ENABLED': 'true',
-        'STORE_ENABLED_PROVIDERS': 's3,qdrant', 'APPS_DOMAIN': 'apps.fixture.test',
+        'STORE_ENABLED_PROVIDERS': 's3,qdrant,opensearch', 'APPS_DOMAIN': 'apps.fixture.test',
         'PLATFORM_DOMAIN': 'platform.fixture.test', 'PROXY_IP': '127.0.0.1'})
     rows, resources, credentials, issued = {}, {}, {}, {}
     variants = [(name, provider, mode) for name, provider in providers.items()
@@ -63,6 +63,9 @@ async def run(providers, endpoints, static_ports):
         if name == 's3':
             from app.stores.s3 import bucket
             await asyncio.to_thread(provider.root.put_object, Bucket=bucket(resource), Key='fixture.txt', Body=b'console fixture')
+        if name == 'opensearch':
+            from app.stores.opensearch import index
+            await asyncio.to_thread(provider.root.request, 'PUT', '/' + index(resource) + '/_doc/fixture?refresh=true', {'title': 'console fixture', 'kind': 'scoped'})
     relay = Relay(load=lambda: {port: {**row, 's3_sessions': dict(row['s3_sessions'])} for port, row in rows.items()}, backend=lambda row: ('127.0.0.1', endpoints[row['provider']]), host='127.0.0.1')
     async def refresh():
         while True:
@@ -86,7 +89,7 @@ async def run(providers, endpoints, static_ports):
         raise RuntimeError('Relay did not observe the console child session')
     app = FastAPI()
     app.router.routes.append(Host('console-{port:int}.apps.fixture.test', app=console.create_gateway(load,
-        destination=lambda row, static: ('127.0.0.1', static_ports[row['provider']] if static else row['relay_port']),
+        destination=lambda row, static: ('127.0.0.1', static_ports[row['provider']] if static or row['provider'] == 'opensearch' else row['relay_port']),
         register=register, acknowledge=acknowledge)))
     @app.post('/expire/{port}')
     def expire(port: int):
@@ -138,7 +141,11 @@ async def run(providers, endpoints, static_ports):
     proxy = await asyncio.start_server(tunnel, '127.0.0.1', 0)
     proxy_port = proxy.sockets[0].getsockname()[1]
     running = asyncio.create_task(server.serve(sockets=[server_socket]))
+    stack = contextlib.AsyncExitStack()
     try:
+        if 'opensearch' in providers:
+            from store_dashboards_fixture import running as running_dashboards
+            static_ports['opensearch'] = await stack.enter_async_context(running_dashboards(load, providers['opensearch']))
         for _ in range(100):
             if server.started and len(relay.servers) == len(rows): break
             await asyncio.sleep(.05)
@@ -148,7 +155,7 @@ async def run(providers, endpoints, static_ports):
             variant = row['provider'] + '-' + row['mode']
             other = row['provider'] + '-' + ('read-only' if row['mode'] == 'read-write' else 'read-write')
             config['providers'][variant] = {'origin': console.origin(port), 'provider': row['provider'], 'mode': row['mode'],
-                'foreign': credentials[other].get('S3_BUCKET', credentials[other].get('QDRANT_COLLECTION')),
+                'foreign': credentials[other].get('S3_BUCKET', credentials[other].get('QDRANT_COLLECTION', credentials[other].get('OPENSEARCH_INDEX'))),
                 'launch': console.assertion(row, 'launch', 30), 'port': port,
                 'connection': credentials[variant]}
         try:
@@ -166,6 +173,7 @@ async def run(providers, endpoints, static_ports):
             await asyncio.to_thread(provider.probe, resource, credential)
         print(result.stdout.strip())
     finally:
+        await stack.aclose()
         server.should_exit = True
         await running
         proxy.close(); await proxy.wait_closed()

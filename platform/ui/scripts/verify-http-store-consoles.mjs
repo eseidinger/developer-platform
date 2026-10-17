@@ -48,7 +48,8 @@ try {
       const value = document.createElement('input'); value.name = 'launch'; value.value = launch; form.append(value)
       document.body.append(form); form.submit()
     }, provider)
-    await page.waitForURL(provider.provider === 's3' ? '**/rustfs/console/**' : '**/dashboard/**')
+    await page.waitForURL(url => provider.provider === 's3' ? url.pathname.startsWith('/rustfs/console/') :
+      provider.provider === 'qdrant' ? url.pathname.startsWith('/dashboard/') : url.pathname.includes('/app/login'))
     stage = name + '-native-login'
     if (provider.provider === 's3') {
       await page.getByPlaceholder('Please enter account').fill(provider.connection.RUSTFS_CONSOLE_ACCESS_KEY)
@@ -78,7 +79,7 @@ try {
       const destroy = await signedS3(page, provider.origin, session, 'DELETE', own)
       if (foreign.status !== 403 || destroy.status !== 403) throw Error()
       console.log('PASS RustFS ' + provider.mode + ' official console login, STS binding, refresh, object permissions and foreign/admin denial')
-    } else {
+    } else if (provider.provider === 'qdrant') {
       await page.locator('input[type="password"]').fill(provider.connection.QDRANT_API_KEY)
       await page.getByRole('button', { name: 'Apply', exact: true }).click()
       await page.getByText(provider.connection.QDRANT_COLLECTION, { exact: true }).first().waitFor({ timeout: 10000 })
@@ -98,6 +99,44 @@ try {
       }, provider)
       if (!denied) throw Error()
       console.log('PASS Qdrant ' + provider.mode + ' official console login, scoped collection, point permissions and foreign/admin denial')
+    } else {
+      stage = name + '-username-field'
+      await page.locator('input').first().fill(provider.connection.OPENSEARCH_USERNAME)
+      stage = name + '-password-field'
+      await page.locator('input[type="password"]').fill(provider.connection.OPENSEARCH_PASSWORD)
+      stage = name + '-login-submit'
+      await page.getByRole('button', { name: /log in/i }).click()
+      stage = name + '-authenticated-navigation'
+      await page.waitForURL(url => !url.pathname.includes('/app/login'), { timeout: 20000 })
+      stage = name + '-native-data-proxy'
+      const result = await page.evaluate(async ({ connection, foreign, mode }) => {
+        const request = async (method, path, value) => {
+          const response = await fetch('/api/console/proxy?path=' + encodeURIComponent(path) + '&method=' + method, {
+            method: 'POST', headers: { 'osd-xsrf': 'true', 'Content-Type': 'application/json' },
+            ...(value ? { body: JSON.stringify(value) } : {}) })
+          return { status: response.status, text: await response.text() }
+        }
+        const index = connection.OPENSEARCH_INDEX
+        const read = await request('GET', index + '/_search')
+        const write = await request('PUT', index + '/_doc/browser', { title: 'browser fixture' })
+        const other = await request('GET', foreign + '/_search')
+        const drop = await request('DELETE', index)
+        return { read: read.status, hasFixture: read.text.includes('console fixture'), write: write.status,
+          other: other.status, drop: drop.status, expectedWrite: mode === 'read-write' ? 201 : 403 }
+      }, provider)
+      if (result.read !== 200 || !result.hasFixture || result.write !== result.expectedWrite || result.other !== 403 || result.drop !== 403) {
+        console.log('Synthetic Dashboards native status: ' + JSON.stringify(result)); throw Error()
+      }
+      stage = name + '-private-saved-objects'
+      const saved = await page.evaluate(async connection => {
+        const headers = { 'osd-xsrf': 'true', 'Content-Type': 'application/json' }
+        const prior = await fetch('/api/saved_objects/index-pattern/fixture', { headers })
+        const created = await fetch('/api/saved_objects/index-pattern/fixture', { method: 'POST', headers,
+          body: JSON.stringify({ attributes: { title: connection.OPENSEARCH_INDEX } }) })
+        return { prior: prior.status, created: created.status }
+      }, provider.connection)
+      if (saved.prior !== 404 || saved.created !== 200) { console.log('Synthetic saved-object status: ' + JSON.stringify(saved)); throw Error() }
+      console.log('PASS OpenSearch Dashboards ' + provider.mode + ' native login, scoped data, foreign/admin denial and private saved-object isolation')
     }
     stage = name + '-active-console-revocation'
     const end = provider.mode === 'read-write' ? 'expire' : 'revoke'
@@ -111,11 +150,13 @@ try {
     await context.close()
   }
 } catch {
-  if (activePage && activeProvider.provider === 's3') {
+  if (activePage && ['s3', 'opensearch'].includes(activeProvider.provider)) {
     let text = await activePage.innerText('body', { timeout: 3000 })
     for (const value of Object.values(activeProvider.connection)) text = text.replaceAll(value, '[redacted]')
     console.log('Scoped synthetic console view: ' + new URL(activePage.url()).pathname + ' ' + text.slice(0, 700))
     console.log(statuses.join('|'))
+    if (activeProvider.provider === 'opensearch') console.log('Login field metadata: ' + JSON.stringify(
+      await activePage.locator('input').evaluateAll(elements => elements.map(element => ({ type: element.type, name: element.name, placeholder: element.placeholder })))))
   }
   console.log(stage)
   process.exitCode = 1
