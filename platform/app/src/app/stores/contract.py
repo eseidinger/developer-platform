@@ -1,7 +1,7 @@
 """Versioned data resource requests; endpoints and admin credentials are operator owned."""
 from typing import Literal
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 NAME = r"^[a-z][a-z0-9-]{0,30}[a-z0-9]$|^[a-z]$"
 Mode = Literal["read-only", "read-write"]
@@ -53,6 +53,11 @@ class HumanGrant(Strict):
     issuer: str = Field(min_length=1, max_length=512)
     subject: str = Field(min_length=1, max_length=256)
     mode: Mode
+
+    @field_validator("issuer", "subject", mode="before")
+    @classmethod
+    def trim_identity(cls, value):
+        return value.strip() if isinstance(value, str) else value
 
 
 class BindingRequest(Strict):

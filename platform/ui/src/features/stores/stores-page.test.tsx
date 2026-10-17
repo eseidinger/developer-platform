@@ -98,7 +98,7 @@ test('Neo4j human grants expose full access and never offer a read-only downgrad
   expect(within(form).queryByRole('option', { name: 'Read-only' })).not.toBeInTheDocument()
   expect(within(form).getByRole('option', { name: 'Full instance access (data, schema and native accounts)' })).toBeInTheDocument()
   await user.type(within(form).getByLabelText('Issuer'), 'https://fixture.invalid')
-  await user.type(within(form).getByLabelText('Subject ID'), 'native-writer')
+  await user.type(within(form).getByLabelText('Subject ID'), '  native-writer  ')
   await user.click(button)
   await waitFor(() => expect(api.createHuman).toHaveBeenCalledWith(resource.resource_id, { issuer: 'https://fixture.invalid', subject: 'native-writer', mode: 'read-write' }))
   expect(screen.queryByRole('button', { name: 'Change permissions' })).not.toBeInTheDocument()
