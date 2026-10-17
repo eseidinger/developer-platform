@@ -1,6 +1,7 @@
 """Render explicitly managed, non-secret inventory options before host mutations."""
 import ipaddress
 import json
+import math
 import re
 
 from ansible.errors import AnsibleFilterError
@@ -149,6 +150,23 @@ def platform_inventory_settings(options):
     return result
 
 
+def platform_trace_settings(settings):
+    mapping(settings, {'sample_rate', 'retention'}, 'Tracing settings')
+    value = settings.get('sample_rate', 1.0)
+    try:
+        if isinstance(value, bool) or not isinstance(value, (str, int, float)):
+            raise ValueError()
+        rate = float(value)
+        if not math.isfinite(rate) or not 0 <= rate <= 1:
+            raise ValueError()
+    except (ValueError, TypeError, OverflowError):
+        fail('platform_trace_sample_rate must be a finite number between 0 and 1')
+    retention = settings.get('retention', '24h')
+    if not isinstance(retention, str) or not re.fullmatch(r'[1-9][0-9]{0,5}h', retention):
+        fail('platform_trace_retention must be positive whole hours, such as 24h or 168h (maximum 999999h)')
+    return {'sample_rate': str(rate), 'retention': retention}
+
+
 class FilterModule:
     def filters(self):
-        return {'platform_inventory_settings': platform_inventory_settings}
+        return {'platform_inventory_settings': platform_inventory_settings, 'platform_trace_settings': platform_trace_settings}

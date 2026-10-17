@@ -41,7 +41,7 @@ For example, run `sudo kubectl --kubeconfig /opt/developer-platform/.runtime/adm
 
 Existing `.env` secrets, volumes, and project state are preserved. Inventory values
 manage endpoints, registries, drift/revision limits, workload capacity admission,
-egress policy and 100% tracing. Optional structured store/network groups and the
+egress policy and tracing (default 100% sampling and 24-hour retention). Optional structured store/network groups and the
 version/bootstrap/private-access settings below manage additional non-secret
 values only when supplied. Omitted optional settings preserve the remote values;
 explicit empty selections clear them. The example declares defaults, so review
@@ -96,6 +96,8 @@ Additional deployment options:
 | `platform_store_ssh_host` | Preserve remote advertisement | Reachable management hostname/IPv4; empty disables advertisement |
 | `platform_database_bastion_bind_ip` | `127.0.0.1` in the separate installer | Specific IPv4 listener; wildcard binding is rejected |
 | `platform_database_bastion_port` | `2222` in the separate installer | Port 1024–65535; when supplied, also manages the portal's advertised SSH port |
+| `platform_trace_sample_rate` | `1.0` | Finite fraction from 0 (off) to 1 (100%); applied to the API and platform-managed application sampler configuration |
+| `platform_trace_retention` | `24h` | Tempo retention as positive whole hours (maximum `999999h`); review bounded trace-disk capacity |
 | `platform_bootstrap_timeout_seconds` | `3600` | Maximum build/bootstrap runtime, range 60–14400 seconds |
 | `platform_readiness_timeout_seconds` | `300` | API readiness retry window, range 5–3600 seconds; probes run every five seconds |
 
@@ -143,10 +145,13 @@ from the deployed `.env` and refuses a port mismatch. Rerun it after changing th
 relay address or listener settings. Advertising an endpoint does not install the
 bastion or configure its firewall.
 
-Dashboards are provisioned automatically. Tracing stays at 100%; deployment also
-checks that the transferred Tempo configuration retains traces for 24 hours.
-Existing tracing-enabled applications still need their declarations reapplied to
-pick up sampler changes. Keep secrets generated on the host; use the existing
+Dashboards are provisioned automatically. Deployment always applies the tracing
+settings, defaulting to the chosen 100% sampling and 24-hour retention. Sampling
+is written to `.env`; retention is rendered into the transferred Tempo YAML while
+preserving the rest of its configuration. Both values are recorded in the
+installation record. Existing tracing-enabled applications still need their
+declarations reapplied to pick up sampler changes. Longer retention increases
+trace-storage demand; the bounded Tempo filesystem is not resized automatically. Keep secrets generated on the host; use the existing
 protected/Vault-backed secret files for separate operations playbooks. Backups,
 alert delivery and watchdog configuration remain in their own inventories and
 are not enabled by the main platform inventory.
@@ -177,8 +182,9 @@ SQL authorization/revocation, then retains the projects for explicit review
 and retirement. See the [human database acceptance procedure](../docs/operators/validation/access-and-authorization.md#human-postgresql-access-acceptance-playbook).
 
 Rerunning the playbook reapplies sources and endpoints and reconciles the running
-platform. It explicitly writes `PLATFORM_TRACE_SAMPLE_RATE=1.0`, including on
-installations whose previous `.env` selected 10% sampling. Existing tracing-enabled
+platform. It writes the selected `platform_trace_sample_rate` to
+`PLATFORM_TRACE_SAMPLE_RATE`, defaulting to `1.0` even when a previous `.env`
+selected 10% sampling. Existing tracing-enabled
 application declarations must be reapplied so their sampler environment changes
 too; an API restart alone cannot change a running application's sampler.
 An already installed `/usr/local/sbin/platform-backup` is refreshed from the

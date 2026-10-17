@@ -89,6 +89,18 @@ class InventorySettingsTests(unittest.TestCase):
                 render({**options, **change})
         self.assertEqual(render({'store_ssh_host': ''}), {'STORE_SSH_HOST': ''})
 
+    def test_tracing_defaults_and_overrides(self):
+        self.assertEqual(plugin.platform_trace_settings({}), {'sample_rate': '1.0', 'retention': '24h'})
+        self.assertEqual(plugin.platform_trace_settings({'sample_rate': .25, 'retention': '168h'}),
+                         {'sample_rate': '0.25', 'retention': '168h'})
+        self.assertEqual(plugin.platform_trace_settings({'sample_rate': 0})['sample_rate'], '0.0')
+        for value in [True, -1, 1.01, 'NaN', float('inf'), '1.0\nKEY=value', None]:
+            with self.subTest(sample=value), self.assertRaises(AnsibleFilterError):
+                plugin.platform_trace_settings({'sample_rate': value})
+        for value in ['0h', '-24h', '24d', '24h\nKEY=value', '1000000h', 24, None]:
+            with self.subTest(retention=value), self.assertRaises(AnsibleFilterError):
+                plugin.platform_trace_settings({'retention': value})
+
     def test_version_subject_and_timeout_validation(self):
         self.assertEqual(render({'k3s_image': 'rancher/k3s:v1.36.4-k3s1', 'bootstrap_subject': 'human-id'})['PLATFORM_BOOTSTRAP_SUBJECT'], 'human-id')
         for options in [{'k3s_image': 'rancher/k3s:latest'}, {'k3s_image': 'other:v1.36.4'},
@@ -114,7 +126,7 @@ class InventorySettingsTests(unittest.TestCase):
         with tempfile.TemporaryDirectory(prefix='inventory-offline-') as directory:
             path = Path(directory) / 'play.yml'
             env = {**os.environ, 'ANSIBLE_LOCAL_TEMP': directory, 'ANSIBLE_FILTER_PLUGINS': str(ROOT / 'ansible/filter_plugins'), 'ANSIBLE_NOCOLOR': '1'}
-            for mode in ['default', 'all', 'omitted', 'invalid']:
+            for mode in ['default', 'all', 'omitted', 'tracing', 'invalid']:
                 configured = copy.deepcopy(variables)
                 expected = copy.deepcopy(assertions)
                 if mode == 'invalid':
@@ -125,12 +137,22 @@ class InventorySettingsTests(unittest.TestCase):
                     expected['ansible.builtin.assert']['that'] += [
                         "platform_managed_settings['STORE_CAPACITY_BYTES'] is string",
                         "(platform_managed_settings['STORE_CAPACITY_BYTES'] | from_json)['neo4j'] == 4294967296"]
+                elif mode == 'tracing':
+                    configured['platform_trace_sample_rate'] = .25
+                    configured['platform_trace_retention'] = '168h'
+                    expected['ansible.builtin.assert']['that'][3] = "platform_settings['PLATFORM_TRACE_SAMPLE_RATE'] == '0.25'"
                 elif mode == 'omitted':
                     for key in ['platform_stores', 'platform_network', 'platform_search_console_network',
                                 'platform_k3s_image', 'platform_store_ssh_host',
-                                'platform_database_bastion_bind_ip', 'platform_database_bastion_port']:
+                                'platform_database_bastion_bind_ip', 'platform_database_bastion_port',
+                                'platform_trace_sample_rate', 'platform_trace_retention']:
                         configured.pop(key, None)
                     expected = {'ansible.builtin.assert': {'that': ['platform_managed_settings == {}']}}
+                expected['ansible.builtin.assert']['that'] += [
+                    "platform_tracing_settings['retention'] == '" + configured.get('platform_trace_retention', '24h') + "'",
+                    "platform_tempo_configuration['backend_worker']['compaction']['block_retention'] == platform_tracing_settings['retention']",
+                    "platform_tempo_configuration['storage']['trace']['backend'] == 'local'",
+                    "(platform_tempo_configuration | to_nice_yaml(indent=2) | from_yaml) == platform_tempo_configuration"]
                 play = [{'hosts': 'localhost', 'connection': 'local', 'gather_facts': False,
                          'vars': {**deployment['vars'], **configured}, 'tasks': deployment['pre_tasks'] + [expected]}]
                 path.write_text(yaml.safe_dump(play, sort_keys=False))

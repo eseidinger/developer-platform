@@ -26,7 +26,10 @@ build/start and readiness timeouts, and consistent advertised/bastion SSH settin
 The bastion itself remains a separate opt-in installation. See the
 [option reference](../../ansible/README.md#additional-deployment-options) and the
 [data-store workflow](data-stores.md#selecting-shared-services). Dashboards are
-provisioned automatically, with 100% tracing and 24-hour trace retention.
+provisioned automatically. `platform_trace_sample_rate: 1.0` and
+`platform_trace_retention: 24h` expose the chosen defaults; deployment applies them
+to the API/application sampler configuration and Tempo respectively. Reapply
+existing tracing-enabled application declarations after changing sampling.
 
 ```bash
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml

@@ -14,7 +14,7 @@
       IMAGE_REGISTRIES: "{{ platform_image_registries }}"
       DRIFT_SCAN_INTERVAL_SECONDS: "{{ platform_drift_scan_interval_seconds }}"
       REVISION_RETENTION: "{{ platform_revision_retention }}"
-      PLATFORM_TRACE_SAMPLE_RATE: "1.0"
+      PLATFORM_TRACE_SAMPLE_RATE: "{{ platform_tracing_settings.sample_rate }}"
       CAPACITY_ADMISSION_ENABLED: "{{ (platform_capacity_admission_enabled | bool) | ternary('true', 'false') }}"
       CAPACITY_RESERVE_CPU_MILLICORES: "{{ platform_capacity_reserve_cpu_millicores | int }}"
       CAPACITY_RESERVE_MEMORY_MIB: "{{ platform_capacity_reserve_memory_mib | int }}"
@@ -75,11 +75,22 @@
           bootstrap_timeout_seconds: "{{ platform_bootstrap_timeout_seconds | default(3600) }}"
           readiness_timeout_seconds: "{{ platform_readiness_timeout_seconds | default(300) }}"
 
-    - name: Require the selected trace retention policy
-      ansible.builtin.assert:
-        that:
-          - (lookup('ansible.builtin.file', platform_source_dir ~ '/infrastructure/monitoring/tempo.yaml') | from_yaml)['backend_worker']['compaction']['block_retention'] == '24h'
-        fail_msg: Deployment requires the selected 24-hour trace retention policy.
+    - name: Validate tracing settings with the selected defaults
+      ansible.builtin.set_fact:
+        platform_tracing_settings: "{{ platform_trace_options | platform_trace_settings }}"
+      vars:
+        platform_trace_options:
+          sample_rate: "{{ platform_trace_sample_rate | default(1.0) }}"
+          retention: "{{ platform_trace_retention | default('24h') }}"
+
+    - name: Render Tempo configuration with inventory trace retention
+      ansible.builtin.set_fact:
+        platform_tempo_configuration: "{{ (lookup('ansible.builtin.file', platform_source_dir ~ '/infrastructure/monitoring/tempo.yaml') | from_yaml) | combine(platform_tempo_retention, recursive=true) }}"
+      vars:
+        platform_tempo_retention:
+          backend_worker:
+            compaction:
+              block_retention: "{{ platform_tracing_settings.retention }}"
 
     - name: Validate environment values
       ansible.builtin.assert:
@@ -267,6 +278,14 @@
             group: root
             mode: '0755'
 
+        - name: Configure Tempo trace retention
+          ansible.builtin.copy:
+            dest: "{{ platform_install_dir }}/infrastructure/monitoring/tempo.yaml"
+            content: "{{ platform_tempo_configuration | to_nice_yaml(indent=2) }}"
+            owner: root
+            group: root
+            mode: '0644'
+
         - name: Validate Compose configuration
           ansible.builtin.command:
             argv: [docker, compose, config, --quiet]
@@ -440,6 +459,7 @@
                 platform_install_docker: "{{ platform_install_docker | bool }}"
                 platform_kubectl_version: "{{ platform_kubectl_version }}"
                 managed_environment: "{{ platform_managed_settings }}"
+                tracing: "{{ platform_tracing_settings }}"
                 platform_bootstrap_timeout_seconds: "{{ platform_bootstrap_timeout_seconds | default(3600) | int }}"
                 platform_readiness_timeout_seconds: "{{ platform_readiness_timeout_seconds | default(300) | int }}"
               versions: "{{ platform_versions.stdout_lines | select('match', '^[a-z0-9._-]+=') | map('regex_replace', '^([^=]+)=(.*)$', '\\1: \\2') | list }}"

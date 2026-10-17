@@ -69,6 +69,8 @@ all:
         platform_database_bastion_bind_ip: 127.0.0.1
         platform_database_bastion_port: 2222
 
-        # Tracing stays at 100% with 24-hour retention; dashboards are auto-provisioned.
+        # Chosen tracing defaults; dashboards are auto-provisioned.
+        platform_trace_sample_rate: 1.0  # fraction from 0 (off) to 1 (100%)
+        platform_trace_retention: 24h  # positive whole hours; review bounded trace-disk capacity
         # Secrets are generated/preserved on the target. Keep backup, watchdog and
         # alert-delivery settings in their separate operations inventories.
