@@ -12,6 +12,7 @@ def quarantine(conn):
     # Desired grants are retained for review, but ALL recovered generations end.
     # A recovered human key never becomes a currently authorized lease by itself.
     conn.execute("UPDATE store_credentials SET expires_at=LEAST(expires_at,now()) WHERE state<>'revoked'")
+    conn.execute('DELETE FROM store_console_sessions')
 
 
 def validate_manifest(value):

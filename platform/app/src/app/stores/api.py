@@ -25,12 +25,14 @@ def install(app, control):
         with control.connect() as conn:
             return console.lease(conn, credential_id)
 
-    def console_port(port):
-        with control.connect() as conn:
-            return console.lease_at_port(conn, port)
+    def register_console_session(row, access, digest, expiry):
+        with control.connect() as conn, conn.transaction():
+            console.record_session(conn, row, access, digest, expiry)
+            control.required_audit(control.actor_for(Principal(row['issuer'], row['subject'])),
+                'store.console-session-issue', 'store-credential', str(row['credential_id']), 'succeeded')
 
     app.router.routes.insert(0, Host('console-{port:int}.' + os.environ.get('APPS_DOMAIN', 'apps.localhost'),
-        app=console.create_gateway(console_lease, find=console_port)))
+        app=console.create_gateway(console_lease, register=register_console_session)))
 
     def human(conn, principal):
         # Known automation records are insufficient: an unregistered service
@@ -294,7 +296,7 @@ def install(app, control):
                 raise HTTPException(409, "Credential is pending, expired, revoked or its grant changed")
             control.required_audit(control.actor_for(principal), "store.credential-reveal", "store-credential",
                 str(credential_id), "succeeded", {"project": res["owner_project"]})
-            connection = providers.connection(res, cred)
+            connection = providers.connection(res, {**cred, 'kind': row['kind']})
             return reply({**cred, "provider": res["provider"], "connection": connection,
                 "transport": "private SSH tunnel or isolated console; relay closes at credential expiry",
                 **({"ssh": providers.ssh_connection(cred)} if os.environ.get("STORE_SSH_HOST") else {})})

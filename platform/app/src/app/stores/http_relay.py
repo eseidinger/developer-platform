@@ -7,10 +7,13 @@ No URL, header, body or provider diagnostic is logged.
 """
 import asyncio
 import base64
+import hashlib
+import hmac
 import json
 import re
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
+from datetime import datetime, timezone
 
 import h11
 from . import catalog
@@ -18,6 +21,10 @@ from . import catalog
 
 def access_key(credential_id):
     return 'P' + UUID(str(credential_id)).hex[:19].upper()
+
+
+def console_user(credential_id):
+    return 'console-' + UUID(str(credential_id)).hex
 
 
 def identity(request, lease):
@@ -45,8 +52,21 @@ def identity(request, lease):
             if not match:
                 raise ValueError('Signed S3 request required')
             key = match[1]
-        if key != access_key(lease['credential_id']):
-            raise ValueError('Lease identity mismatch')
+        if key == access_key(lease['credential_id']):
+            pass
+        elif lease.get('kind') == 'human' and key == console_user(lease['credential_id']):
+            headers['_console_login'] = True
+        else:
+            session = lease.get('s3_sessions', {}).get(key) if lease.get('kind') == 'human' else None
+            tokens = query.get('X-Amz-Security-Token', [])
+            if b'x-amz-security-token' in headers:
+                if tokens:
+                    raise ValueError('Ambiguous session token')
+                tokens = [headers[b'x-amz-security-token'].decode('ascii')]
+            if (session is None or len(tokens) != 1 or session['expires_at'] <= datetime.now(timezone.utc)
+                    or not hmac.compare_digest(hashlib.sha256(tokens[0].encode()).hexdigest(), session['token_sha256'])):
+                raise ValueError('Lease identity mismatch')
+            headers['_session'] = (key, session['token_sha256'])
     elif lease['provider'] == 'opensearch':
         if not auth.startswith('Basic '):
             raise ValueError('Basic authentication required')
@@ -80,12 +100,14 @@ async def _event(connection, reader):
         connection.receive_data(data)
 
 
-async def exchange(reader, writer, lease, backend, tls=None):
+async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
     front = h11.Connection(h11.SERVER, max_incomplete_event_size=16384)
     request = await asyncio.wait_for(_event(front, reader), 5)
     if not isinstance(request, h11.Request):
         raise ValueError('HTTP request required')
     headers = identity(request, lease)
+    if authorized is not None:
+        authorized(headers.get('_session'))
     # Forbid pipelining/reuse. Every subsequent request must open its own socket
     # and pass fresh catalog/identity checks. Never proxy WebSocket or CONNECT.
     if request.method not in {b'GET', b'HEAD', b'POST', b'PUT', b'PATCH', b'DELETE', b'OPTIONS'}:

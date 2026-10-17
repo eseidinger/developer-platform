@@ -84,7 +84,8 @@ def main():
                     str(path / 'stores/public/opensearch-ca.pem')).root.request('GET', '/_cluster/health')
             if consoles:
                 from store_http_console_fixture import run as verify_consoles
-                asyncio.run(verify_consoles({'qdrant': Qdrant(endpoint('qdrant', 6333), config['QDRANT_API_KEY'])},
+                asyncio.run(verify_consoles({'s3': S3(endpoint('rustfs', 9000), config['RUSTFS_ACCESS_KEY'], config['RUSTFS_SECRET_KEY']),
+                    'qdrant': Qdrant(endpoint('qdrant', 6333), config['QDRANT_API_KEY'])},
                     {'s3': int(endpoint('rustfs', 9000).rsplit(':', 1)[1]), 'qdrant': int(endpoint('qdrant', 6333).rsplit(':', 1)[1])},
                     {'s3': int(endpoint('rustfs', 9001).rsplit(':', 1)[1]), 'qdrant': int(endpoint('qdrant', 6333).rsplit(':', 1)[1])}))
             print('PASS selected production Compose services: persistent volumes, resource limits, actual health checks and native administration; provider-only disposable fixture')

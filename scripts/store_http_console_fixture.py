@@ -29,6 +29,10 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 async def run(providers, endpoints, static_ports):
+    # Keep normal CI aligned with supported runtime adapters. Pending provider
+    # experiments remain explicit, disposable and separate from acceptance.
+    if os.environ.get('STORE_CONSOLE_VERIFY_PENDING') != '1':
+        providers = {name: provider for name, provider in providers.items() if name in console.PROVIDERS}
     os.environ.update({'DATABASE_KEY': secrets.token_hex(32), 'STORE_CONSOLE_HTTP_ENABLED': 'true',
         'STORE_ENABLED_PROVIDERS': 's3,qdrant', 'APPS_DOMAIN': 'apps.fixture.test',
         'PLATFORM_DOMAIN': 'platform.fixture.test', 'PROXY_IP': '127.0.0.1'})
@@ -43,16 +47,16 @@ async def run(providers, endpoints, static_ports):
             except Exception:
                 if attempt == 99: raise
                 await asyncio.sleep(.25)
-        credential = {'credential_id': str(uuid4()), 'mode': 'read-write',
+        credential = {'credential_id': str(uuid4()), 'mode': 'read-write', 'kind': 'human',
             'expires_at': (datetime.now(timezone.utc) + timedelta(hours=24)).isoformat()}
         await asyncio.to_thread(provider.issue, resource, credential)
         row = {**credential, 'expires_at': datetime.fromisoformat(credential['expires_at']),
                'relay_port': 20000 + index, 'issuer': 'https://identity.fixture.test', 'subject': 'human',
-               'provider': name, 'resource_id': resource['resource_id']}
+               'provider': name, 'resource_id': resource['resource_id'], 'created_at': datetime.now(timezone.utc), 's3_sessions': {}}
         rows[row['relay_port']] = row
         resources[name] = resource
         credentials[name] = provider.credentials(resource, credential)
-    relay = Relay(load=lambda: rows.copy(), backend=lambda row: ('127.0.0.1', endpoints[row['provider']]), host='127.0.0.1')
+    relay = Relay(load=lambda: {port: {**row, 's3_sessions': dict(row['s3_sessions'])} for port, row in rows.items()}, backend=lambda row: ('127.0.0.1', endpoints[row['provider']]), host='127.0.0.1')
     async def refresh():
         while True:
             await relay.refresh()
@@ -61,10 +65,22 @@ async def run(providers, endpoints, static_ports):
     def load(cid):
         return next((r for r in rows.values() if r['credential_id'] == str(cid)
             and r['expires_at'] > datetime.now(timezone.utc)), None)
+    def register(row, access, digest, expiry):
+        assert load(row['credential_id']) is not None
+        rows[row['relay_port']]['s3_sessions'][access] = {'token_sha256': digest, 'expires_at': expiry}
+    health = await asyncio.start_server(relay.health, '127.0.0.1', 0)
+    async def acknowledge(row, access, digest):
+        import httpx2 as httpx
+        url = f'http://127.0.0.1:{health.sockets[0].getsockname()[1]}/session/{row["relay_port"]}/{access}/{digest}'
+        async with httpx.AsyncClient(trust_env=False) as transport:
+            for _ in range(50):
+                if (await transport.get(url)).status_code == 200: return
+                await asyncio.sleep(.1)
+        raise RuntimeError('Relay did not observe the console child session')
     app = FastAPI()
     app.router.routes.append(Host('console-{port:int}.apps.fixture.test', app=console.create_gateway(load,
         destination=lambda row, static: ('127.0.0.1', static_ports[row['provider']] if static else row['relay_port']),
-        find=lambda port: load(rows[port]['credential_id']) if port in rows else None)))
+        register=register, acknowledge=acknowledge)))
     @app.post('/expire/{port}')
     def expire(port: int):
         rows.pop(port, None)
@@ -121,8 +137,13 @@ async def run(providers, endpoints, static_ports):
             config['providers'][row['provider']] = {'origin': console.origin(port),
                 'launch': console.assertion(row, 'launch', 30), 'port': port,
                 'connection': credentials[row['provider']]}
-        result = await asyncio.to_thread(subprocess.run, ['node', str(ROOT / 'platform/ui/scripts/verify-http-store-consoles.mjs')],
+        try:
+            result = await asyncio.to_thread(subprocess.run, ['node', str(ROOT / 'platform/ui/scripts/verify-http-store-consoles.mjs')],
             input=json.dumps(config), text=True, capture_output=True, timeout=120)
+        except subprocess.TimeoutExpired as error:
+            output = error.stdout or b''
+            if isinstance(output, bytes): output = output.decode(errors='replace')
+            raise RuntimeError('Synthetic console fixture timed out at: ' + output[-2000:]) from None
         if result.returncode:
             raise RuntimeError('Official console fixture failed: ' + result.stdout.strip()[:1200])
         print(result.stdout.strip())
@@ -130,6 +151,7 @@ async def run(providers, endpoints, static_ports):
         server.should_exit = True
         await running
         proxy.close(); await proxy.wait_closed()
+        health.close(); await health.wait_closed()
         directory.cleanup()
         refreshing.cancel()
         await asyncio.gather(refreshing, return_exceptions=True)

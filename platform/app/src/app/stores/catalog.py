@@ -81,6 +81,19 @@ def initialize(conn):
     conn.execute("REVOKE ALL ON store_human_keys FROM PUBLIC")
     conn.execute("CREATE INDEX IF NOT EXISTS store_credentials_expiry ON store_credentials(expires_at) WHERE state<>'revoked'")
     conn.execute("REVOKE ALL ON store_resources,store_grants,store_credentials FROM PUBLIC")
+    conn.execute("""CREATE TABLE IF NOT EXISTS store_console_sessions (
+        native_access_key TEXT PRIMARY KEY CHECK(length(native_access_key) BETWEEN 16 AND 128),
+        credential_id UUID NOT NULL REFERENCES store_credentials(credential_id),
+        token_sha256 TEXT NOT NULL CHECK(token_sha256 ~ '^[a-f0-9]{64}$'),
+        expires_at TIMESTAMPTZ NOT NULL)""")
+    conn.execute("CREATE INDEX IF NOT EXISTS store_console_sessions_lease ON store_console_sessions(credential_id,expires_at)")
+    conn.execute("REVOKE ALL ON store_console_sessions FROM PUBLIC")
+
+
+def console_sessions(conn, credential_id):
+    rows = conn.execute("""SELECT native_access_key,token_sha256,expires_at FROM store_console_sessions
+        WHERE credential_id=%s AND expires_at>now() ORDER BY expires_at LIMIT 16""", (credential_id,)).fetchall()
+    return {key: {'token_sha256': digest, 'expires_at': expiry} for key, digest, expiry in rows}
 
 
 def _object(conn, table, field, identity, lock=False):

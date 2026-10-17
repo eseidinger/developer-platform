@@ -308,6 +308,46 @@ def main():
                     catalog.lock(conn); worker.reconcile(conn)
                 assert conn.execute("SELECT state FROM store_credentials WHERE credential_id=%s", (previous,)).fetchone()[0] == "revoked"
                 active = conn.execute("SELECT row_to_json(c) FROM store_credentials c WHERE grant_id=%s AND state='active'", (binding["grant_id"],)).fetchone()[0]
+            # Real catalog constraints for native console child sessions. Relabel
+            # only inside a rolled-back metadata transaction; no S3 service or
+            # live resource is touched by this database fixture.
+            from app.stores import console as store_console
+            with conn.transaction(force_rollback=True), patch.dict(os.environ, {
+                    'STORE_CONSOLE_HTTP_ENABLED': 'true', 'STORE_ENABLED_PROVIDERS': 'postgresql,s3'}), \
+                    patch.object(store_console, 'PROVIDERS', {'s3', 'qdrant'}):
+                conn.execute("UPDATE store_resources SET provider='s3' WHERE resource_id=%s", (alpha['resource_id'],))
+                personal = store_console.lease(conn, reader['credential_id'])
+                assert personal is not None and personal['kind'] == 'human'
+                for index in range(16):
+                    store_console.record_session(conn, personal, f'C{index:019d}', f'{index:064x}',
+                        datetime.now(timezone.utc) + timedelta(hours=48))
+                assert conn.execute('SELECT max(expires_at) FROM store_console_sessions').fetchone()[0] == personal['expires_at']
+                store_console.record_session(conn, personal, 'C' + '0' * 19, '0' * 64, personal['expires_at'])
+                try:
+                    store_console.record_session(conn, personal, 'X' * 20, 'a' * 64, personal['expires_at'])
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError('Console child-session capacity was not enforced')
+                other_human = store_console.lease(conn, b['credential_id'])
+                assert other_human is not None
+                try:
+                    store_console.record_session(conn, other_human, 'C' + '0' * 19, '0' * 64, other_human['expires_at'])
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError('A native session was retargeted to another human lease')
+                conn.execute('UPDATE store_grants SET version=version+1 WHERE grant_id=%s', (reader['grant_id'],))
+                assert store_console.lease(conn, reader['credential_id']) is None
+                try:
+                    store_console.record_session(conn, personal, 'Y' * 20, 'b' * 64, personal['expires_at'])
+                except ValueError:
+                    pass
+                else:
+                    raise AssertionError('A changed grant registered a stale console session')
+            assert conn.execute('SELECT count(*) FROM store_console_sessions').fetchone()[0] == 0
+            assert conn.execute('SELECT provider FROM store_resources WHERE resource_id=%s', (alpha['resource_id'],)).fetchone()[0] == 'postgresql'
+            print('PASS real console-session catalog: exact ownership, idempotent registration, 16-session cap, original deadline clamp and stale-grant denial')
             # Real PG authentication and a real query through the identity-bound
             # relay; closure at expiry does not depend on the cleanup worker.
             async def relay_check():

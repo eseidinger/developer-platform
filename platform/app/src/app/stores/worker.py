@@ -71,11 +71,14 @@ def reconcile(conn, control=None):
             conn.execute("UPDATE store_resources SET state=%s,observed_state=%s,error_code=NULL WHERE resource_id=%s",
                          (state, state, res["resource_id"]))
         _attempt(conn, "store_resources", "resource_id", resource["resource_id"], apply_resource)
-    pending = conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
+    conn.execute("""DELETE FROM store_console_sessions s USING store_credentials c
+        WHERE s.credential_id=c.credential_id AND (s.expires_at<=now() OR c.state='revoked')""")
+    pending = conn.execute("""SELECT row_to_json(c),row_to_json(r),g.kind FROM store_credentials c
         JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
         WHERE c.state='issuing' AND c.grant_version=g.version AND g.state='active' AND r.state='active'
             AND r.observed_state='active' AND c.expires_at>now() ORDER BY c.issued_at LIMIT 64""").fetchall()
-    for credential, resource in pending:
+    for credential, resource, kind in pending:
+        credential = {**credential, 'kind': kind}
         def activate(c=credential, r=resource):
             providers.get(r["provider"]).issue(r, c)
             conn.execute("UPDATE store_credentials SET state='active',observed_state='active',error_code=NULL WHERE credential_id=%s",

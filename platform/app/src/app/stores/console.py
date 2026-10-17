@@ -11,6 +11,9 @@ import hmac
 import ipaddress
 import os
 import time
+import re
+from datetime import datetime, timezone
+from xml.etree import ElementTree
 from urllib.parse import parse_qs
 from uuid import UUID
 
@@ -18,8 +21,8 @@ import httpx2 as httpx
 import h11
 import jwt
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
-from . import recovery
+from fastapi.responses import JSONResponse, RedirectResponse, Response, StreamingResponse
+from . import catalog, recovery
 
 COOKIE = '__Host-store-console'
 PROVIDERS = {'qdrant'}  # RustFS native-key → STS session binding is not yet accepted.
@@ -46,7 +49,7 @@ def lease(conn, credential_id):
         return None
     if conn.execute('SELECT COALESCE(backup_until>now(),false) FROM store_control WHERE singleton').fetchone()[0]:
         return None
-    row = conn.execute("""SELECT c.credential_id,c.relay_port,c.expires_at,g.issuer,g.subject,r.provider
+    row = conn.execute("""SELECT c.credential_id,c.relay_port,c.expires_at,g.issuer,g.subject,r.provider,r.resource_id,r.created_at
         FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
         JOIN projects p ON p.name=r.owner_project
         WHERE c.credential_id=%s AND c.state='active' AND c.expires_at>now() AND c.grant_version=g.version
@@ -56,7 +59,8 @@ def lease(conn, credential_id):
         (credential_id,)).fetchone()
     if not row or not enabled(row[5]):
         return None
-    return dict(zip(('credential_id', 'relay_port', 'expires_at', 'issuer', 'subject', 'provider'), row))
+    value = dict(zip(('credential_id', 'relay_port', 'expires_at', 'issuer', 'subject', 'provider', 'resource_id', 'created_at'), row))
+    return {**value, 'kind': 'human', 's3_sessions': catalog.console_sessions(conn, row[0]) if row[5] == 's3' else {}}
 
 
 def origin(port):
@@ -84,7 +88,55 @@ def backend(row, static):
     return (os.environ['RUSTFS_IP'], 9001) if row['provider'] == 's3' else (os.environ['QDRANT_IP'], 6333)
 
 
-def create_gateway(load, destination=backend, find=None):
+def session_metadata(raw, row):
+    """Only public key IDs and a token hash leave the transient STS response."""
+    from .http_relay import console_user
+    fields = ElementTree.fromstring(raw).find('.//{*}Credentials')
+    if fields is None:
+        raise ValueError('Missing native credentials')
+    access = fields.findtext('{*}AccessKeyId')
+    token = fields.findtext('{*}SessionToken')
+    expiry = datetime.fromisoformat(fields.findtext('{*}Expiration').replace('Z', '+00:00'))
+    if not access or not re.fullmatch('[A-Za-z0-9]{20}', access) or not token or len(token) > 16384:
+        raise ValueError('Invalid native session')
+    claims = jwt.decode(token, options={'verify_signature': False})
+    if claims.get('parent') != console_user(row['credential_id']) or expiry.tzinfo is None or expiry <= datetime.now(timezone.utc):
+        raise ValueError('Different native parent')
+    return access, hashlib.sha256(token.encode()).hexdigest(), min(expiry, row['expires_at'])
+
+
+def record_session(conn, row, access, digest, expiry):
+    conn.execute("SET LOCAL statement_timeout='3000ms'")
+    conn.execute("SET LOCAL lock_timeout='2000ms'")
+    catalog.lock(conn)
+    current = lease(conn, row['credential_id'])
+    if not current or current['provider'] != 's3':
+        raise ValueError('Inactive console grant')
+    existing = conn.execute('SELECT credential_id,token_sha256 FROM store_console_sessions WHERE native_access_key=%s', (access,)).fetchone()
+    if existing and (str(existing[0]) != str(row['credential_id']) or existing[1] != digest):
+        raise ValueError('Native session ownership mismatch')
+    if not existing and len(current['s3_sessions']) >= 16:
+        raise ValueError('Console session capacity is occupied')
+    conn.execute("""INSERT INTO store_console_sessions(native_access_key,credential_id,token_sha256,expires_at)
+        VALUES(%s,%s,%s,%s) ON CONFLICT(native_access_key) DO UPDATE SET expires_at=LEAST(store_console_sessions.expires_at,excluded.expires_at)""",
+        (access, row['credential_id'], digest, min(expiry, current['expires_at'])))
+
+
+async def acknowledged(row, access, digest):
+    address = str(ipaddress.IPv4Address(os.environ['STORE_RELAY_IP']))
+    url = f'http://{address}:19999/session/{row["relay_port"]}/{access}/{digest}'
+    async with httpx.AsyncClient(trust_env=False, timeout=.5) as client:
+        for _ in range(30):
+            try:
+                if (await client.get(url)).status_code == 200:
+                    return
+            except httpx.HTTPError:
+                pass
+            await asyncio.sleep(.1)
+    raise ValueError('Private relay did not observe the native session')
+
+
+def create_gateway(load, destination=backend, register=None, acknowledge=acknowledged):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     slots = asyncio.Semaphore(32)
 
@@ -145,20 +197,14 @@ def create_gateway(load, destination=backend, find=None):
             response.set_cookie(COOKIE, assertion(row, 'session', 86400), secure=True, httponly=True,
                 samesite='strict', path='/', max_age=max(0, int(row['expires_at'].timestamp() - time.time())))
             return response
-        signed_s3 = (request.headers.get('authorization', '').startswith('AWS4-HMAC-SHA256 ')
-            or b'X-Amz-Credential=' in request.scope['query_string'])
-        if not request.cookies.get(COOKIE) and signed_s3 and find is not None:
-            # Browser S3 SDKs explicitly omit cookies. Their native signature
-            # authenticates data requests; never inject a credential or expose
-            # console assets through this path. Only current human leases qualify.
-            try:
-                row = await asyncio.to_thread(find, port)
-            except Exception:
-                row = None
-            if not row or row['provider'] != 's3' or path.startswith('rustfs/console'):
-                raise HTTPException(401, 'An active human S3 lease is required')
-        else:
-            row = await authorize(request.cookies.get(COOKIE), 'session', port)
+        row = await authorize(request.cookies.get(COOKIE), 'session', port)
+        if row['provider'] == 's3' and path == 'rustfs/admin/v3/is-admin':
+            # Every platform console identity is a non-administrator. Native
+            # admin discovery itself requires global rights in this release;
+            # report the adapter's invariant without granting those rights.
+            if request.method != 'GET' or request.scope['query_string']:
+                raise HTTPException(405)
+            return JSONResponse({'is_admin': False}, headers={'Cache-Control': 'no-store'})
         if row['provider'] == 's3' and path == 'rustfs/admin/v3/oidc/providers':
             # The platform portal supplies OIDC. This adapter supports only
             # the explicitly granted native resource login, so advertise no
@@ -184,15 +230,28 @@ def create_gateway(load, destination=backend, find=None):
         address, backend_port = destination(row, static)
         address = str(ipaddress.IPv4Address(address))
         raw = request.scope['raw_path'] + (b'?' + request.scope['query_string'] if request.scope['query_string'] else b'')
+        authorization = {}
         if not static:
             from .http_relay import identity
             try:
-                identity(h11.Request(method=request.method, target=raw, headers=request.headers.raw), row)
+                authorization = identity(h11.Request(method=request.method, target=raw, headers=request.headers.raw), row)
             except (ValueError, h11.LocalProtocolError):
                 # Native consoles need an authentication response to display
                 # their login form. Keep the separate portal session intact.
                 return JSONResponse({'detail': 'Enter the native credential for this lease'},
                     status_code=401, headers={'Cache-Control': 'no-store'})
+        if row['provider'] == 's3' and not static and path == '' and request.method == 'GET':
+            # A named-resource console lists its one catalog-authorized bucket.
+            # This is portal metadata, already available through the resource API;
+            # native signatures still authorize every actual object/data request.
+            # Do not grant global ListAllMyBuckets merely to populate navigation.
+            from .s3 import bucket
+            tree = ElementTree.Element('ListAllMyBucketsResult', xmlns='http://s3.amazonaws.com/doc/2006-03-01/')
+            buckets = ElementTree.SubElement(tree, 'Buckets')
+            entry = ElementTree.SubElement(buckets, 'Bucket')
+            ElementTree.SubElement(entry, 'Name').text = bucket(row)
+            ElementTree.SubElement(entry, 'CreationDate').text = row['created_at'].isoformat()
+            return Response(ElementTree.tostring(tree), media_type='application/xml', headers={'Cache-Control': 'no-store'})
         url = httpx.URL(scheme='http', host=address, port=backend_port, raw_path=raw)
         headers = [(name, value) for name, value in request.headers.items() if name.lower() not in HOP
                    and not name.lower().startswith('x-forwarded-')]
@@ -211,6 +270,23 @@ def create_gateway(load, destination=backend, find=None):
         try:
             upstream = await transport.send(transport.build_request(request.method, url, headers=headers,
                 content=None if request.method in {'GET', 'HEAD'} else request.stream()), stream=True)
+            if path == '' and request.method == 'POST' and authorization.get('_console_login') and upstream.status_code == 200:
+                if register is None:
+                    raise ValueError('Native console sessions are not configured')
+                raw_session = bytearray()
+                async for part in upstream.aiter_bytes(chunk_size=16384):
+                    raw_session.extend(part)
+                    if len(raw_session) > 65536:
+                        raise ValueError('Native session response exceeded its limit')
+                access, digest, expiry = session_metadata(raw_session, row)
+                await asyncio.to_thread(register, row, access, digest, expiry)
+                await acknowledge(row, access, digest)
+                result = Response(bytes(raw_session), media_type='application/xml', headers={'Cache-Control': 'no-store',
+                    'Content-Security-Policy': "sandbox; default-src 'none'; frame-ancestors 'none'"})
+                await upstream.aclose()
+                await transport.aclose()
+                slots.release()
+                return result
         except BaseException as error:
             slots.release()
             with contextlib.suppress(asyncio.CancelledError, TimeoutError):

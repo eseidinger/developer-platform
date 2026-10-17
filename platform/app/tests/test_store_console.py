@@ -25,7 +25,8 @@ class ConsoleBoundaryTests(TestCase):
         self.patch.start(); self.addCleanup(self.patch.stop)
         self.row = {'credential_id': str(uuid4()), 'relay_port': 20000,
             'expires_at': datetime.now(timezone.utc) + timedelta(hours=24),
-            'issuer': 'https://identity.fixture.invalid', 'subject': 'human', 'provider': 's3'}
+            'issuer': 'https://identity.fixture.invalid', 'subject': 'human', 'provider': 's3',
+            'resource_id': str(uuid4()), 'created_at': datetime.now(timezone.utc)}
         self.current = self.row
         self.app = FastAPI()
         self.app.router.routes.append(Host('console-{port:int}.apps.fixture.invalid',
@@ -94,8 +95,10 @@ class ConsoleBoundaryTests(TestCase):
         self.assertEqual(body, b'payload')
         for name in ('cookie', 'x-forwarded-host', 'baggage'):
             self.assertNotIn(name, headers)
-        self.assertEqual(seen[1][0], 'http://127.0.0.1:20000/')
-        self.assertNotIn('transfer-encoding', seen[1][1])
+        self.assertEqual(len(seen), 1)
+        from app.stores.s3 import bucket
+        self.assertIn(bucket(self.row), listing.text)
+        self.assertNotIn('transfer-encoding', listing.headers)
         self.assertEqual(response.headers['content-disposition'], 'attachment')
         self.assertIn("default-src 'none'", response.headers['content-security-policy'])
 
@@ -120,25 +123,8 @@ class ConsoleBoundaryTests(TestCase):
         self.assertEqual(seen, ['http://127.0.0.3:6333/dashboard/assets/index.js'])
         self.assertEqual(self.client.put('/dashboard/assets/index.js', headers={'Origin': console.origin(20000)}).status_code, 405)
 
-    def test_cookie_omitting_s3_sdk_still_requires_native_identity_and_a_current_human_lease(self):
-        find = Mock(return_value=self.row)
-        app = FastAPI()
-        app.router.routes.append(Host('console-{port:int}.apps.fixture.invalid', app=console.create_gateway(lambda cid: None, find=find)))
-        client = TestClient(app, base_url=console.origin(20000))
-        self.addCleanup(client.close)
+    def test_web_native_requests_and_assets_always_require_the_portal_cookie(self):
         from app.stores.http_relay import access_key
         auth = f'AWS4-HMAC-SHA256 Credential={access_key(self.row["credential_id"])}/20261017/us-east-1/s3/aws4_request, SignedHeaders=host, Signature=' + 'a' * 64
-        seen = []
-        async def handler(request):
-            seen.append(request.headers['authorization'])
-            return httpx.Response(200, stream=Bytes(b'native-result'))
-        real_client = httpx.AsyncClient
-        with patch('app.stores.console.httpx.AsyncClient', side_effect=lambda **kw: real_client(transport=httpx.MockTransport(handler), **kw)):
-            self.assertEqual(client.get('/', headers={'Authorization': auth}).status_code, 200)
-            self.assertEqual(client.get('/rustfs/console/', headers={'Authorization': auth}).status_code, 401)
-            self.assertEqual(client.get('/bucket').status_code, 401)
-            foreign = auth.replace(access_key(self.row['credential_id']), access_key(uuid4()))
-            self.assertEqual(client.get('/bucket', headers={'Authorization': foreign}).status_code, 401)
-            find.return_value = None  # Revoked/expired/application grants never qualify.
-            self.assertEqual(client.get('/', headers={'Authorization': auth}).status_code, 401)
-        self.assertEqual(seen, [auth])
+        self.assertEqual(self.client.get('/', headers={'Authorization': auth}).status_code, 401)
+        self.assertEqual(self.client.get('/rustfs/console/', headers={'Authorization': auth}).status_code, 401)

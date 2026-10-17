@@ -16,7 +16,7 @@ from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from . import catalog
-from .http_relay import access_key
+from .http_relay import access_key, console_user
 
 
 class StoreError(Exception):
@@ -34,6 +34,11 @@ def bucket(resource):
 
 def parent(credential):
     return 'parent-' + UUID(str(credential['credential_id'])).hex
+
+
+def console_secret(credential):
+    return hmac.new(os.environ['DATABASE_KEY'].encode(),
+        ('native-s3-console-v1:' + str(UUID(str(credential['credential_id'])))).encode(), hashlib.sha256).hexdigest()
 
 
 def client(endpoint, key, secret):
@@ -57,6 +62,13 @@ def policy(resource, mode):
           for family in ('admin', 'sts', 'kms')],
         {'Effect': 'Allow', 'Action': listing, 'Resource': ['arn:aws:s3:::' + name]},
         {'Effect': 'Allow', 'Action': objects, 'Resource': ['arn:aws:s3:::' + name + '/*']}]}
+
+
+def console_policy(resource, mode):
+    value = policy(resource, mode)
+    value['Statement'] = [item for item in value['Statement'] if item['Action'] != ['sts:*']]
+    value['Statement'].append({'Effect': 'Allow', 'Action': ['sts:AssumeRole'], 'Resource': ['arn:aws:s3:::*']})
+    return value
 
 
 class S3:
@@ -102,8 +114,14 @@ class S3:
             raise StoreError('Bucket quota readiness or configuration mismatch')
         for mode in ('read-only', 'read-write'):
             self.admin('PUT', 'add-canned-policy', policy(resource, mode), name=name + '-' + mode)
+            self.admin('PUT', 'add-canned-policy', console_policy(resource, mode), name=name + '-' + mode + '-console')
 
     def issue(self, resource, credential):
+        if credential.get('kind') == 'human':
+            user = console_user(credential['credential_id'])
+            self.admin('PUT', 'add-user', {'secretKey': console_secret(credential), 'status': 'enabled'}, accessKey=user)
+            self.admin('PUT', 'set-user-or-group-policy', policyName=bucket(resource) + '-' + credential['mode'] + '-console',
+                userOrGroup=user, isGroup='false')
         user, key = parent(credential), access_key(credential['credential_id'])
         secret = catalog.secret_for(credential['credential_id'])
         parent_secret = hmac.new(secret.encode(), b'non-disclosed-parent-v1', hashlib.sha256).hexdigest()
@@ -135,11 +153,16 @@ class S3:
             self.admin('DELETE', 'delete-service-account', accessKey=key)
         if self.admin('GET', 'user-info', missing=True, accessKey=user) is not None:
             self.admin('DELETE', 'remove-user', accessKey=user)
+        console = console_user(credential['credential_id'])
+        if self.admin('GET', 'user-info', missing=True, accessKey=console) is not None:
+            self.admin('DELETE', 'remove-user', accessKey=console)
 
     def credentials(self, resource, credential):
         return {'AWS_ACCESS_KEY_ID': access_key(credential['credential_id']),
             'AWS_SECRET_ACCESS_KEY': catalog.secret_for(credential['credential_id']),
-            'AWS_DEFAULT_REGION': 'us-east-1', 'AWS_ENDPOINT_URL_S3': self.endpoint, 'S3_BUCKET': bucket(resource)}
+            'AWS_DEFAULT_REGION': 'us-east-1', 'AWS_ENDPOINT_URL_S3': self.endpoint, 'S3_BUCKET': bucket(resource),
+            **({'RUSTFS_CONSOLE_ACCESS_KEY': console_user(credential['credential_id']),
+                'RUSTFS_CONSOLE_SECRET_KEY': console_secret(credential)} if credential.get('kind') == 'human' else {})}
 
     def probe(self, resource, credential):
         scoped = client(self.endpoint, access_key(credential['credential_id']), catalog.secret_for(credential['credential_id']))
@@ -165,22 +188,28 @@ class S3:
         try:
             page = self.root.list_object_versions(Bucket=name, MaxKeys=500)
         except ClientError as error:
-            if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
-                return
-            raise
-        keys = [{'Key': item['Key'], 'VersionId': item['VersionId']}
-                for item in page.get('Versions', []) + page.get('DeleteMarkers', [])]
-        if keys:
-            result = self.root.delete_objects(Bucket=name, Delete={'Objects': keys, 'Quiet': True})
-            if result.get('Errors'):
-                raise StoreError('Version cleanup incomplete')
-            # Keep each worker pass bounded. Retry after progress before deletion.
-            raise StoreError('Version cleanup in progress')
-        uploads = self.root.list_multipart_uploads(Bucket=name, MaxUploads=16).get('Uploads', [])
-        for upload in uploads:
-            self.root.abort_multipart_upload(Bucket=name, Key=upload['Key'], UploadId=upload['UploadId'])
-        if uploads:
-            raise StoreError('Upload cleanup in progress')
-        self.root.delete_bucket(Bucket=name)
+            if error.response['ResponseMetadata']['HTTPStatusCode'] != 404:
+                raise
+            page = None
+        if page is not None:
+            keys = [{'Key': item['Key'], 'VersionId': item['VersionId']}
+                    for item in page.get('Versions', []) + page.get('DeleteMarkers', [])]
+            if keys:
+                result = self.root.delete_objects(Bucket=name, Delete={'Objects': keys, 'Quiet': True})
+                if result.get('Errors'):
+                    raise StoreError('Version cleanup incomplete')
+                raise StoreError('Version cleanup in progress')
+            uploads = self.root.list_multipart_uploads(Bucket=name, MaxUploads=16).get('Uploads', [])
+            for upload in uploads:
+                self.root.abort_multipart_upload(Bucket=name, Key=upload['Key'], UploadId=upload['UploadId'])
+            if uploads:
+                raise StoreError('Upload cleanup in progress')
+            self.root.delete_bucket(Bucket=name)
+        # A previous pass may have deleted the bucket before policy cleanup failed.
+        # Native policy DELETE reports missing entries as an internal error; its
+        # read endpoint supplies an unambiguous 404 for idempotent recovery.
         for mode in ('read-only', 'read-write'):
-            self.admin('DELETE', 'remove-canned-policy', missing=True, name=name + '-' + mode)
+            for suffix in ('', '-console'):
+                identity = name + '-' + mode + suffix
+                if self.admin('GET', 'info-canned-policy', missing=True, name=identity) is not None:
+                    self.admin('DELETE', 'remove-canned-policy', name=identity)

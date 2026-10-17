@@ -104,3 +104,40 @@ class HTTPRelayTests(IsolatedAsyncioTestCase):
             reader, _ = await self.client(packet)
             self.assertEqual(await asyncio.wait_for(reader.read(), 1), b'')
         self.assertEqual(self.observed, [])
+
+    async def test_registered_child_session_revocation_closes_an_existing_stream_without_revoking_its_parent(self):
+        import hashlib
+        token, child = 'synthetic-native-session-token', 'A' * 20
+        self.lease.update({'provider': 's3', 'kind': 'human', 's3_sessions': {
+            child: {'token_sha256': hashlib.sha256(token.encode()).hexdigest(),
+                    'expires_at': datetime.now(timezone.utc) + timedelta(seconds=5)}}})
+        auth = f'AWS4-HMAC-SHA256 Credential={child}/20261017/us-east-1/s3/aws4_request, SignedHeaders=host;x-amz-security-token, Signature=' + 'a' * 64
+        reader, _ = await self.client(('GET /bucket/file HTTP/1.1\r\nHost: fixture\r\nAuthorization: ' + auth
+            + '\r\nX-Amz-Security-Token: ' + token + '\r\n\r\n').encode())
+        await reader.readuntil(b'\r\n\r\n')
+        self.lease['s3_sessions'].clear()
+        self.assertLess(len(await asyncio.wait_for(reader.read(), 1)), 65536)
+        self.assertTrue(self.relay.allowed(20000, self.lease))
+
+    async def test_private_session_acknowledgment_requires_the_exact_current_key_hash_and_fresh_catalog(self):
+        import hashlib
+        child, digest = 'A' * 20, hashlib.sha256(b'synthetic-token').hexdigest()
+        self.lease['s3_sessions'] = {}
+        health = await asyncio.start_server(self.relay.health, '127.0.0.1', 0)
+        self.addAsyncCleanup(health.wait_closed)
+        self.addCleanup(health.close)
+        async def status():
+            reader, writer = await asyncio.open_connection('127.0.0.1', health.sockets[0].getsockname()[1])
+            writer.write(f'GET /session/20000/{child}/{digest} HTTP/1.1\r\nHost: private-relay\r\n\r\n'.encode())
+            await writer.drain()
+            result = await reader.read()
+            writer.close(); await writer.wait_closed()
+            return result.split(b'\r\n', 1)[0]
+        self.assertIn(b'503', await status())
+        self.lease['s3_sessions'][child] = {'token_sha256': digest, 'expires_at': datetime.now(timezone.utc) + timedelta(seconds=5)}
+        self.assertIn(b'200', await status())
+        self.lease['s3_sessions'][child]['token_sha256'] = '0' * 64
+        self.assertIn(b'503', await status())
+        self.lease['s3_sessions'][child]['token_sha256'] = digest
+        self.relay.last_success = 0
+        self.assertIn(b'503', await status())
