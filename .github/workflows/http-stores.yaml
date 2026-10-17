@@ -12,6 +12,7 @@ jobs:
           python-version: "3.12"
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --locked
+      - run: sudo apt-get update && sudo apt-get install -y acl
       - run: uv run --project platform/app python scripts/verify-shared-store-compose.py
       - run: uv run --project platform/app python scripts/verify-opensearch-tls.py
 

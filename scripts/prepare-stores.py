@@ -37,9 +37,21 @@ def password_hash(value):
     return hashes[0]
 
 
+def service_permissions(path):
+    # Bind individual keys/configuration only; the CA signing key stays private.
+    # Reapply after recovery because portable source archives omit POSIX ACLs.
+    files = [path / 'node-key.pem', path / 'admin-key.pem', *(path / 'bootstrap').iterdir()]
+    if os.getuid() == 0:
+        os.chown(path / 'bootstrap', 1000, 1000)
+        for filename in files:
+            os.chown(filename, 1000, 1000)
+    elif os.getuid() != 1000:
+        command(['setfacl', '-m', 'u:1000:rx', str(path / 'bootstrap')])
+        for filename in files:
+            command(['setfacl', '-m', 'u:1000:r', str(filename)])
+
+
 def prepare_search(root, config):
-    if os.getuid() not in {0, 1000}:
-        raise RuntimeError('Prepare OpenSearch configuration as root or the image UID 1000')
     address = str(ipaddress.IPv4Address(config.get('OPENSEARCH_IP', '172.30.80.17')))
     destination = root / 'opensearch'
     required = ['ca.pem', 'ca-key.pem', 'node.pem', 'node-key.pem', 'admin.pem', 'admin-key.pem',
@@ -51,6 +63,7 @@ def prepare_search(root, config):
         if identity.get('address') != address:
             raise RuntimeError('OpenSearch address changed; plan certificate renewal before deployment')
         command(['openssl', 'x509', '-in', str(destination / 'node.pem'), '-checkend', '86400', '-noout'])
+        service_permissions(destination)
         shutil.copy2(destination / 'ca.pem', root / 'public/opensearch-ca.pem')
         (root / 'public/opensearch-ca.pem').chmod(0o644)
         return
@@ -72,8 +85,6 @@ def prepare_search(root, config):
                 '-extfile', str(stage / (name + '.ext')), '-out', str(stage / (name + '.pem'))])
         for path in stage.glob('*.pem'):
             path.chmod(0o600 if path.name.endswith('-key.pem') else 0o644)
-        if os.getuid() == 0:
-            os.chown(stage / 'node-key.pem', 1000, 1000)
         bootstrap = stage / 'bootstrap'; bootstrap.mkdir(mode=0o700)
         # Public image templates supply the native built-in roles/action groups.
         # Replace all demo users and mappings before the first initialization.
@@ -93,11 +104,7 @@ def prepare_search(root, config):
             'authc': {'basic_internal_auth_domain': {'http_enabled': True, 'transport_enabled': True, 'order': 0,
                 'http_authenticator': {'type': 'basic', 'challenge': True}, 'authentication_backend': {'type': 'intern'}}}}}}
         write(bootstrap / 'config.yml', json.dumps(basic, indent=2))
-        if os.getuid() == 0:
-            os.chown(stage / 'admin-key.pem', 1000, 1000)
-            os.chown(bootstrap, 1000, 1000)
-            for path in bootstrap.iterdir():
-                os.chown(path, 1000, 1000)
+        service_permissions(stage)
         server = {'cluster.name': 'platform-stores', 'network.host': '0.0.0.0', 'discovery.type': 'single-node',
             'node.store.allow_mmap': False, 'action.destructive_requires_name': True,
             'plugins.security.ssl.transport.pemcert_filepath': 'node.pem',
