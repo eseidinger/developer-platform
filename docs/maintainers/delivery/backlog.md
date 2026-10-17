@@ -1314,6 +1314,14 @@ Added October 17, 2026 from the [data store roadmap](../../product/data-store-ro
   These checks do not close domain comparisons or deployed integration/recovery
   acceptance. See the [Phase 7 checkpoint](plans/phase-7-planned-data-stores.md).
 - [ ] **PLAN-029 · 7.4** — Graph Data. Required outcome: PostgreSQL/AGE/Neo4j equivalence and provider operational evidence. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.4](plans/phase-7-planned-data-stores.md#74-graph-data).
+  **Owner-selected Neo4j Community decision (October 17, 2026):** Dedicated Docker
+  instance/volume per named resource, initially one per project, with explicit
+  component bindings and full instance access only; reject read-only grants.
+  Preserve credential expiry/rotation and session fencing, private/Browser paths,
+  per-instance capacity/monitoring, retained-data lifecycle and verified offline
+  backup/recovery. Verify native administration cannot bypass platform access
+  controls. This exception is planned, not implemented; keep the provider gated
+  until fixtures pass. See the [decision](plans/data-store-expansion.md#neo4j-community-dedicated-instance-decision).
 - [ ] **PLAN-030 · 7.5** — Vector Retrieval and AI Memory. Required outcome: pgvector/Qdrant quality comparison and scoped lifecycle/rebuild evidence. Accountable role: platform API / operations, with external application/experiment owners. See [package 7.5](plans/phase-7-planned-data-stores.md#75-vector-retrieval-and-ai-memory).
 - [ ] **PLAN-031 · 8.1** — Time Series and OLAP. Required outcome: Realistic-load PostgreSQL/TimescaleDB/ClickHouse comparison with DuckDB reference. Accountable role: platform API / operations, with external application/experiment owners. See [package 8.1](plans/phase-8-deferred-data-stores.md#81-time-series-and-olap).
 - [ ] **PLAN-032 · 8.2** — Caching and Realtime. Required outcome: Valkey comparison including invalidation, consistency, memory and operations. Accountable role: platform API / operations, with external application/experiment owners. See [package 8.2](plans/phase-8-deferred-data-stores.md#82-caching-and-realtime).

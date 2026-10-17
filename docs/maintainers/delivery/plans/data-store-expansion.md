@@ -91,6 +91,56 @@ This is a persistence placement decision, not activation of Phase 6's optional
 Docker compute adapter or service extraction. Product selection, endpoint details,
 volume sizing, implementation and operational acceptance remain open.
 
+## Neo4j Community dedicated-instance decision
+
+**Owner-selected exception (October 17, 2026; PLAN-029/036):** Integrate Neo4j
+Community Edition using a dedicated Docker instance and persistent volume for
+each named Neo4j resource, initially limited to one Neo4j resource per project.
+Create the instance when requested and keep it running until explicitly retired;
+retain its data until separately confirmed purge. Multiple applications/components
+may share that resource through explicit bindings. Isolation is between instances,
+not labels or query filters inside a shared Community database. This is a
+Neo4j-specific exception to shared-service placement; other stores keep their
+selected shared-service model.
+
+Community provides one user database per instance and full access for all native
+users, as documented in the
+[edition comparison](https://neo4j.com/docs/cypher-manual/25/introduction/cypher-neo4j/).
+Expose an explicit **full instance access only** capability for Neo4j Community.
+Reject read-only grants/bindings as unsupported; never silently promote them.
+Full access includes graph data and schema changes and the edition's available
+native administration capabilities. This is an explicit exception to the common
+read-only/read-write distinction and restriction on native administration within
+that dedicated instance; it grants no platform, Docker-host or other-instance
+administration. Other providers' grant semantics remain unchanged. Do not claim
+separate permission boundaries between humans/components sharing this resource.
+
+Preserve platform resource ownership and explicit grant/binding approval,
+including owner approval for cross-project consumers. Issue separate human and
+application identities. Retain 24-hour human credentials, 30-day application
+rotation with at most one-hour overlap, and active-session closure at
+expiry/revocation/retirement through both private native access and Neo4j Browser.
+Before enabling the provider, verify that native user creation/password changes
+and other full-access capabilities cannot bypass those platform controls. A
+simple TCP tunnel or arbitrary-Cypher filtering is not sufficient evidence.
+
+Use private per-instance endpoints, separate volumes and secrets, pinned images,
+per-instance CPU/memory/storage accounting, health checks and monitoring. Add
+capacity admission and operator-controlled instance provisioning/reconciliation;
+this decision does not authorize a Docker socket in the API or relay. Extend
+backup/recovery, retirement/purge and upgrade workflows to each instance.
+Community's supported database dump is offline; scheduled backup interruptions
+are accepted for this provider and must be documented and tested, including
+security/configuration recovery and fresh access approval. See the
+[backup modes](https://neo4j.com/docs/operations-manual/current/backup-restore/modes/).
+No commercial edition or license is selected.
+
+**Status:** Decision recorded, not implemented or operationally accepted. Keep
+Neo4j unavailable until dedicated-instance provisioning, capability rejection,
+identity/session enforcement, console isolation, capacity and recovery fixtures
+pass. The prior shared-instance incompatibility finding remains valid; this
+explicit resource mapping and access exception replace that proposed deployment.
+
 ## Shared-store upgrade decision
 
 **Owner-selected policy (October 17, 2026):** Shared data-store upgrades are
@@ -374,7 +424,10 @@ These are Phase 7 requirements, not implemented behavior.
 **Owner-requested scope (October 17, 2026; PLAN-036):** Deliver both private
 native-client access and browser-console access for named resources in Phase 7.
 Neither replaces the other. Both use the same current human grant and its
-read-only/read-write mode, including the selected resource-scoped schema powers.
+supported mode, including the selected resource-scoped schema powers. The
+[Neo4j Community exception](#neo4j-community-dedicated-instance-decision) exposes
+full instance access only and rejects read-only grants; other providers retain
+their read-only/read-write distinction.
 Build the common access contract with PostgreSQL in package 7.1, then implement
 the provider-specific adapters as packages 7.2–7.5 introduce stores. No new access
 path or console is delivered by this planning amendment.
@@ -405,7 +458,7 @@ administrator or application credentials, or silently widen a resource grant.
 | Apache AGE | SQL/Cypher access through the PostgreSQL console with verified session setup; a dedicated graph visualization tool is optional. |
 | S3-compatible storage | Integrate the official RustFS console with resource-scoped human access. Verify pinned-release login, permission boundaries, expiry and session revocation. |
 | OpenSearch | OpenSearch Dashboards with provider-side index permissions mapped to the named resource. |
-| Neo4j | Neo4j Browser with permissions supported by the selected edition and resource mapping. |
+| Neo4j | Neo4j Browser for a dedicated Community instance per resource, initially one per project; explicit full access only, with unsupported read-only grants rejected. See the [dedicated-instance decision](#neo4j-community-dedicated-instance-decision). |
 | Qdrant | Qdrant Web UI with the selected deployment's resource-scoped authorization. |
 
 Choose and pin supported console releases, record their licenses, and integrate

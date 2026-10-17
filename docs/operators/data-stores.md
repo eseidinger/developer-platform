@@ -36,8 +36,11 @@ Ansible prepares configuration before the existing maintenance outage. The API
 advertises a provider only when selection, required configuration and a positive
 capacity allocation are present. This reports configuration readiness; native
 provisioning/reconciliation reports actual service failures separately. Neo4j
-Community Edition stays unavailable because it cannot satisfy the selected
-shared-resource authorization contract.
+Community Edition remains unavailable pending implementation of the selected
+[dedicated-instance model](../maintainers/delivery/plans/data-store-expansion.md#neo4j-community-dedicated-instance-decision):
+one Docker instance/volume per named resource, initially one per project, with
+explicit full instance access only. Read-only grants will be rejected. This is a
+planned Neo4j-specific exception; no current Compose profile enables it.
 
 `scripts/prepare-stores.py` generates an operator-owned OpenSearch CA, verified
 server/client certificates and a non-demo access realm under `.runtime/stores`.

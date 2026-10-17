@@ -266,12 +266,21 @@ versioned VEF dependency fixtures; Bot Social experiments additionally require C
 **Implementation constraint verified October 17, 2026:** The current Neo4j
 [edition comparison](https://neo4j.com/docs/cypher-manual/25/introduction/cypher-neo4j/)
 limits Community Edition to one user database and gives every user full access.
-It therefore cannot satisfy the selected shared-service named-resource isolation
-and independent read-only/read-write grant contract. Keep the managed Neo4j
-provider unavailable unless a compatible edition/resource mapping is explicitly
-selected and verified. Community Edition remains a graph comparison target;
-do not weaken grants, filter arbitrary Cypher as a substitute for native
-authorization, or silently introduce a commercial license.
+It therefore cannot satisfy the original shared-instance isolation and independent
+read-only/read-write grant contract.
+
+**Owner-selected integration decision (October 17, 2026):** Use a dedicated
+Community Docker instance and persistent volume per named Neo4j resource,
+initially one resource per project, shared through explicit component bindings.
+Keep provisioned instances running until retirement. Advertise full instance
+access only and reject unsupported read-only grants; this is an explicit
+Neo4j-specific placement/access exception. Implement private native access and
+Neo4j Browser, separate human/application identities, existing expiry/rotation
+and active-session fencing, per-instance capacity/monitoring, offline backup
+interruptions and verified recovery/purge. Verify native full-access capabilities
+cannot bypass platform identity or lease controls. No Docker socket in the API
+or commercial edition is selected. Keep the provider unavailable until these
+fixtures pass. See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
 
 - Compare relational PostgreSQL/recursive CTEs, Apache AGE, and Neo4j Community
   Edition for transitive dependencies, cycles, and change-impact analysis in VEF.
