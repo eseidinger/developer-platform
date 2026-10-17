@@ -104,3 +104,32 @@ counter value of seven, stripped private labels/resources, rejected an unreviewe
 metric and parsed all 20 AI panel queries. Alloy configuration validation passed.
 No deployment, real external-model call, elapsed retention or host-capacity
 acceptance is claimed by these checks.
+
+### Deployed smoke check — October 17, 2026
+
+On `node-01`, all three provisioned AI dashboards and their 20 PromQL targets
+were queried against the running Grafana/Prometheus installation. The direct
+metric heartbeat was fresh and configured root sampling read back as 1.0.
+The owner-triggered `vareng` explanation
+`da177516-9e60-476e-87ec-932e8ab14f5f` completed with one tool call. Tempo trace
+`387241728ec4bacad045cb96c6e3694c` contained one run, two model and one tool span,
+with the run ID and model/tool parentage verified. AI spans had only reviewed
+attribute keys and no events/status messages. Trace usage and direct metric
+totals matched: 1,241 input tokens, 206 output tokens, no cached tokens and
+$0.004542 estimated cost, also matching the durable run record. Prompts, answers,
+native credentials and tool payloads were not printed by the diagnostics.
+
+The check exposed an incorrect metric-queue selector. The dashboard now selects
+the pinned Alloy component ID and `data_type="metrics"`; the disposable pipeline
+fixture scrapes Alloy and requires that panel to return exactly one metric-signal
+series, in addition to the existing filtering and query checks.
+
+Two observed limitations remain explicit. Range `increase()` panels cannot
+recover work preceding the first sample of a new counter; this first run's raw
+totals were correct while its range increases were zero. Verify subsequent runs
+against an already collected baseline; durable records remain authoritative.
+The trace-filesystem panel is unavailable because node-exporter reports
+`permission denied` for the Tempo mount. This needs a bounded filesystem-metric
+access fix; missing storage data is not a healthy free-space reading.
+This smoke check does not establish collector-failure/recovery isolation,
+elapsed 24-hour retention, sustained capacity or full PLAN-034/035 acceptance.

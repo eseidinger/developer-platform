@@ -301,7 +301,7 @@
       "targets": [
         {
           "refId": "A",
-          "expr": "otelcol_exporter_queue_size{exporter=\"otlphttp/ai_metrics\"}",
+          "expr": "otelcol_exporter_queue_size{component_id=\"otelcol.exporter.otlphttp.ai_metrics\",data_type=\"metrics\"}",
           "legendFormat": "{{operation}} {{outcome}} {{tool}} {{token_type}} {{model}} {{pricing_version}} {{completeness}}"
         }
       ],

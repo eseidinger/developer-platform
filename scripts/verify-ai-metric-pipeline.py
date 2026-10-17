@@ -44,7 +44,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix="ai-metric-pipeline-") as directory:
         tmp = Path(directory)
         tmp.chmod(0o755)
-        (tmp / "prom.yml").write_text('global:\n  scrape_interval: 5s\nscrape_configs: []\n')
+        (tmp / "prom.yml").write_text('global:\n  scrape_interval: 5s\nscrape_configs:\n  - job_name: alloy\n    static_configs:\n      - targets: [127.0.0.1:12345]\n')
         source = (ROOT / "infrastructure/monitoring/config.alloy").read_text()
         config = source[source.index('// Private platform spans'):].replace(
             'http://prometheus:9090/api/v1/otlp', 'http://127.0.0.1:9090/api/v1/otlp')
@@ -102,7 +102,11 @@ def main():
                         for variable in ("project", "action", "provider", "model"):
                             expr = expr.replace("$" + variable, ".*")
                         expr = expr.replace("$__range", "1h")
-                        query(expr)
+                        if panel["title"] == "Metric export queue":
+                            queue = wait(lambda: query(expr))
+                            assert len(queue) == 1 and queue[0]["metric"]["data_type"] == "metrics", queue
+                        else:
+                            query(expr)
                         count += 1
             print(f"PASS direct OTLP -> production Alloy filter/translation -> Prometheus: value=7; private labels and unreviewed metric dropped; {count} dashboard queries parsed")
         finally:
