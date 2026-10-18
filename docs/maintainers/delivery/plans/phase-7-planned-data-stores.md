@@ -1,14 +1,13 @@
 # Phase 7 — Planned Data Stores
 
-Status: implementation in progress as of October 18, 2026. PostgreSQL named
-resources/private access/console have disposable local and partial deployed
-evidence. The deployed lifecycle purge completed after a verified backup;
-package 7.1 remains open for the other providers and remaining integration work.
-Additional shared-store providers have no operational acceptance recorded here.
+Status: implementation in progress as of October 18, 2026. The scoped 7.1
+PostgreSQL acceptance gate has local and deployed evidence, including active
+pgAdmin Query Tool session fencing and verified-backup-gated purge (EV-52–67).
+Additional shared-store providers have no combined deployed acceptance recorded here.
 
 The owner requested continued implementation as far as possible with regular
-commits. Source/local provider work continues while deployed acceptance remains
-open; this does not accept the earlier package's deployed gate or enable a service.
+commits. Source/local provider work continues while their deployed acceptance remains
+open; passing the PostgreSQL gate does not enable another service.
 Native RustFS, OpenSearch, Qdrant and dedicated Neo4j Community adapters now pass
 real isolation, credential, query and empty-volume recovery fixtures. Opt-in pinned Compose services,
 configuration/capacity-gated provider registration and non-demo OpenSearch TLS
@@ -274,6 +273,16 @@ and browser-console paths; a versioned cross-project resource-binding acceptance
 and reproducible PostgreSQL reference establish the gate for additional stores. Local-only
 integration or the imported roadmap's starting-point claims do not satisfy it.
 
+**Deterministic exit accepted (October 18, 2026):** EV-52–67 cover deployed
+provisioning, independent lifecycle and verified-backup-gated purge, native and
+browser read-only/read-write access, active pgAdmin Query Tool termination on
+grant revocation/downgrade and resource retirement, application binding and
+rotation, versioned cross-project approval/rejection and ownership, quota
+admission, monitoring failure/recovery, plus the reproducible PostgreSQL
+reference and focused API/CLI/portal fixtures. Phase 9 packages 9.11/9.12 retain
+their explicit restore, elapsed-time and operator-reviewed work. This accepts
+the 7.1 entry gate for 7.2, not Phase 7 as a whole.
+
 **Owner scope change (October 18, 2026):** Deployed off-host PostgreSQL restore
 acceptance is a [Phase 9 leftover](phase-9-anytime-leftovers.md#911--verify-deployed-named-postgresql-restore-plan-026-follow-up),
 not a package 7.1 exit gate. The local encrypted restore fixture remains evidence,
@@ -286,8 +295,8 @@ PostgreSQL acceptance now. Real 24-hour/30-day/one-hour elapsed-time observation
 operator-reviewed live upgrade and human presentation/security reviews are
 [Phase 9 package 9.12](phase-9-anytime-leftovers.md#912--complete-time-dependent-and-operator-reviewed-postgresql-acceptance-plan-026plan-036-follow-up),
 not package 7.1 exit gates. Existing controlled-clock fixture results remain
-evidence only for their simulated conditions. Unrun deterministic checks,
-remain Phase 7 work until executed. The deployed pgAdmin Query Tool write,
+evidence only for their simulated conditions. Any newly discovered deterministic
+gap remains Phase 7 work. The deployed pgAdmin Query Tool write,
 lifecycle and verified-backup-gated purge, quota/admission requests,
 cross-project scope-change/rejection, and exporter outage/recovery checks have
 dated evidence in EV-65/66; PostgreSQL byte quota enforcement remains advisory.
