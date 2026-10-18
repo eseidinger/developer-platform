@@ -6,7 +6,9 @@ pgAdmin Query Tool session fencing and verified-backup-gated purge (EV-52–67).
 The four shared-store providers have combined deterministic deployed acceptance
 through test personas (EV-68). Deployed AGE/pgvector selection and scoped queries
 have a separate disposable check (EV-69). An October 18 local rerun of native,
-analytics and official browser fixtures passed (EV-70). Domain comparisons and quantitative
+analytics and official browser fixtures passed (EV-70). A deployed synthetic
+application flow now verifies artifact metadata/outbox and search updates (EV-71).
+Domain comparisons and quantitative
 performance verification are now [Phase 9](phase-9-store-measurement-and-comparison.md);
 deployed store restore and rebuild acceptance are
 [Phase 10 package 10.13](phase-10-anytime-leftovers.md#1013-verify-deployed-data-store-recovery-plan-027plan-033-follow-up).
@@ -289,8 +291,10 @@ tables and local/versioned-S3 Parquet against a deterministic Python oracle for
 daily/monthly aggregation, weather joins, windows and scenario costs. Engine
 timings and transfer/checksum cost are separate observations without adoption
 thresholds. DuckDB is confined to applications and the optional fixture group.
-The 180-row synthetic fixture is not ODIP domain/large-volume acceptance; application
-metadata/outbox integration remains open. Deployed recovery is Phase 10 work.
+The 180-row synthetic fixture is not ODIP domain/large-volume acceptance. A
+deployed bound-component fixture now verifies atomic PostgreSQL metadata/outbox
+publication with an exact-version RustFS artifact (EV-71); domain application
+integration remains externally owned. Deployed recovery is Phase 10 work.
 
 - Implement owner-selected [RustFS](data-store-expansion.md#object-storage-selection-priority)
   as a shared, continuously running Docker Compose service with its official
@@ -320,7 +324,9 @@ foreign-resource denial, workspace isolation and renewal, and already-open
 session expiry/revocation. Resource-scoped saved views are editable in both
 modes; read-only document/schema access remains enforced natively. Native
 fixtures pass empty-volume restoration with fresh scoped approval and isolated
-workspace/data purge. Application source-of-truth/update semantics remain open.
+workspace/data purge. A deployed synthetic bound-component fixture verifies
+PostgreSQL-authoritative create, update and delete projection behavior (EV-71);
+domain application integration remains externally owned.
 Deployed rebuild and recovery acceptance are Phase 10 package 10.13; judged
 domain comparisons are Phase 9 work.
 See the [compatibility evidence](../../../../persistence/compatibility/opensearch-2026-10-17.md).
