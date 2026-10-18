@@ -3,11 +3,14 @@
 Status: implementation in progress as of October 18, 2026. The scoped 7.1
 PostgreSQL acceptance gate has local and deployed evidence, including active
 pgAdmin Query Tool session fencing and verified-backup-gated purge (EV-52–67).
-Additional shared-store providers have no combined deployed acceptance recorded here.
+The four shared-store providers have combined deterministic deployed acceptance
+through test personas (EV-68). Deployed AGE/pgvector selection and scoped queries
+have a separate disposable check (EV-69). Domain comparisons, deployed restore,
+elapsed-time behavior and operator/browser review remain open.
 
 The owner requested continued implementation as far as possible with regular
-commits. Source/local provider work continues while their deployed acceptance remains
-open; passing the PostgreSQL gate does not enable another service.
+commits. Source/local provider work continues alongside remaining deployed and
+domain acceptance; passing the PostgreSQL gate does not enable another service.
 Native RustFS, OpenSearch, Qdrant and dedicated Neo4j Community adapters now pass
 real isolation, credential, query and empty-volume recovery fixtures. Opt-in pinned Compose services,
 configuration/capacity-gated provider registration and non-demo OpenSearch TLS
@@ -15,13 +18,46 @@ initialization are implemented. The actual production Compose definitions pass
 disposable health/administration checks. RustFS, Qdrant and OpenSearch Dashboards
 native browser login, RO/RW isolation and active-session expiry/revocation now
 pass local TLS fixtures. OpenSearch resource workspaces survive human renewal
-and are included in usage, backup/recovery and isolated purge. Combined deployed
-acceptance remains open; PostgreSQL is the default selection. Neo4j uses the
+and are included in usage, backup/recovery and isolated purge. Deterministic
+deployed provider evidence is recorded in EV-68; PostgreSQL is the default
+selection. Neo4j uses the
 recorded full-instance-access exception, initially one retained resource per project.
 See the [RustFS](../../../../persistence/compatibility/rustfs-2026-10-17.md),
 [OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md),
 [Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) and
 [Neo4j](../../../../persistence/compatibility/neo4j-2026-10-17.md) records.
+
+## Deployed deterministic checkpoint — October 18, 2026
+
+EV-68 records a disposable three-project, six-persona run on node-01 with
+RustFS, OpenSearch, Qdrant, Neo4j and a PostgreSQL application binding. It
+covered provisioning; role and project isolation; same-project and owner-approved
+cross-project bindings; rejection, no in-place read-only escalation and native
+read-only write denial; component-only managed Secrets with `envPrefix`; native
+application writes and reads; hard S3 quota and operator quota admission; native
+metrics; native revocation; retirement; and verified-backup-gated isolated purge.
+The verified snapshot was `4ff4ea9903b96f9c708e1e0825fa07666657105611a41b97e378dd0461a5e038`.
+All five resource states reached `purged/purged`, and their live database,
+bucket, collection, index and Neo4j instance were absent. The disposable projects
+were retired and their application catalogs purged; named-store history keeps
+their reserved project names. All six personas and the runner were revoked.
+
+EV-69 records a separate deployed plain-versus-AGE/pgvector resource check:
+scoped writer and reader credentials verified extension selection, an HNSW vector
+index, a protected graph projection, nearest-neighbor and transitive graph reads,
+and denial of reader writes and unselected extension installation. Both resources
+were retired, held at the purge gate until verified backup
+`a6cc0515a10cbedaeb00caa06e7616f963470b05fa919d6021b46fea620396b7`,
+then reached `purged/purged` with their native databases absent. Their project
+catalog, two personas and runner were cleaned up.
+
+The RustFS console Date-header repair and API resource-detail quota-mode repair
+were deployed and verified by the relevant fixture and live API checks. A fresh
+interactive browser upload against the deployed console remains unverified. The
+local empty-volume recovery fixtures and synthetic analytics comparisons do not
+establish deployed off-host restore or domain-quality results. The previously
+deferred PostgreSQL time handling and restore checks remain in Phase 9 packages
+9.11/9.12; the ODIP-to-VEF check remains omitted from 7.1.
 
 ## Implementation checkpoint — October 17, 2026
 

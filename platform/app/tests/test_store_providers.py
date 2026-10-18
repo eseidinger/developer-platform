@@ -6,6 +6,16 @@ from app.stores import providers
 
 
 class ProviderSelectionTests(TestCase):
+    def test_all_provider_quota_modes_are_available_to_resource_detail(self):
+        from app.stores.postgres import Postgres
+        from app.stores.s3 import S3
+        from app.stores.opensearch import OpenSearch
+        from app.stores.qdrant import Qdrant
+        from app.stores.neo4j import Neo4j
+        self.assertEqual([kind.quota_enforcement for kind in (Postgres, S3, OpenSearch, Qdrant, Neo4j)],
+                         ['advisory: PostgreSQL has no hard per-database byte quota',
+                          'hard', 'advisory', 'advisory', 'advisory'])
+
     def test_default_has_only_postgresql_and_never_infers_other_services(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual([p['id'] for p in providers.availability() if p['enabled']], ['postgresql'])

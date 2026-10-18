@@ -19,6 +19,8 @@ def options(resource):
 
 
 class Qdrant:
+    quota_enforcement = 'advisory'
+
     def __init__(self, endpoint=None, key=None):
         self.endpoint = endpoint or 'http://' + os.environ['QDRANT_IP'] + ':6333'
         self.key = key or os.environ['QDRANT_API_KEY']

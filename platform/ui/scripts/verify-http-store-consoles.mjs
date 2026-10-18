@@ -19,7 +19,7 @@ async function signedS3(page, origin, credentials, method, path, payload = '') {
   headers.Authorization = `AWS4-HMAC-SHA256 Credential=${credentials.AccessKeyId}/${scope}, SignedHeaders=${names.join(';')}, Signature=${signature}`
   return page.evaluate(async ({ url, method, headers, payload }) => {
     const response = await fetch(url, { method, headers, ...(payload ? { body: payload } : {}) })
-    return { status: response.status, text: await response.text() }
+    return { status: response.status, date: response.headers.get('date'), text: await response.text() }
   }, { url: url.toString(), method, headers, payload })
 }
 let input = ''
@@ -72,8 +72,19 @@ try {
       await page.reload()
       await page.getByText(provider.connection.S3_BUCKET, { exact: true }).first().waitFor()
       const own = '/' + provider.connection.S3_BUCKET
+      if (provider.mode === 'read-write') {
+        stage = 's3-console-upload'
+        await page.goto(provider.origin + '/rustfs/console/browser/?bucket=' + encodeURIComponent(provider.connection.S3_BUCKET))
+        await page.getByRole('button', { name: /Upload File/ }).first().click()
+        await page.locator('input[name="upload-files"]').setInputFiles({ name: 'fixture-upload.txt', mimeType: 'text/plain', buffer: Buffer.from('console upload fixture') })
+        const uploadResponse = page.waitForResponse(response => response.request().method() === 'PUT' && new URL(response.url()).pathname.endsWith('/fixture-upload.txt'), { timeout: 15000 })
+        await page.getByRole('button', { name: 'Start Upload' }).click()
+        if ((await uploadResponse).status() !== 200) throw Error()
+        const uploaded = await signedS3(page, provider.origin, session, 'GET', own + '/fixture-upload.txt')
+        if (uploaded.status !== 200 || uploaded.text !== 'console upload fixture') throw Error()
+      }
       const read = await signedS3(page, provider.origin, session, 'GET', own + '/fixture.txt')
-      if (read.status !== 200 || read.text !== 'console fixture') throw Error()
+      if (read.status !== 200 || read.text !== 'console fixture' || Number.isNaN(Date.parse(read.date))) throw Error()
       const write = await signedS3(page, provider.origin, session, 'PUT', own + '/written.txt', 'browser fixture')
       if (write.status !== (provider.mode === 'read-write' ? 200 : 403)) throw Error()
       const removed = await signedS3(page, provider.origin, session, 'DELETE', own + '/written.txt')

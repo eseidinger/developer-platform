@@ -73,6 +73,8 @@ def console_policy(resource, mode):
 
 
 class S3:
+    quota_enforcement = 'hard'
+
     def __init__(self, endpoint=None, key=None, secret=None):
         self.endpoint = endpoint or 'http://' + os.environ['RUSTFS_IP'] + ':9000'
         self.key = key or os.environ['RUSTFS_ACCESS_KEY']

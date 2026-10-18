@@ -26,6 +26,8 @@ def authorization(user, password):
 
 
 class OpenSearch:
+    quota_enforcement = 'advisory'
+
     def __init__(self, endpoint=None, password=None, ca_file=None):
         self.endpoint = endpoint or 'https://' + os.environ['OPENSEARCH_IP'] + ':9200'
         self.ca_file = ca_file or os.environ.get('OPENSEARCH_CA_FILE')

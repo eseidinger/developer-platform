@@ -447,8 +447,11 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
                     await asyncio.shield(asyncio.wait_for(close(), 3))
 
         result = StreamingResponse(stream(), status_code=upstream.status_code)
+        # Uvicorn supplies Date. Forwarding the provider's Date adds a second
+        # value, which browsers combine into an invalid timestamp. AWS SDK then
+        # poisons its clock offset and cannot sign subsequent object uploads.
         result.raw_headers = [(name, value) for name, value in upstream.headers.raw
-            if name.decode('latin1').lower() not in HOP | {'set-cookie', 'access-control-allow-origin', 'access-control-allow-credentials'}]
+            if name.decode('latin1').lower() not in HOP | {'date', 'set-cookie', 'access-control-allow-origin', 'access-control-allow-credentials'}]
         result.headers.update({'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
             'X-Content-Type-Options': 'nosniff', 'Cross-Origin-Resource-Policy': 'same-origin',
             'X-Frame-Options': 'DENY'})

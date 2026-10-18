@@ -44,6 +44,18 @@ class StoreApiTests(TestCase):
         self.assertEqual(response.status_code, 403)
         self.control.require_permission.assert_called_once_with(self.principal, "manage", "alpha")
 
+    def test_resource_detail_reports_each_provider_quota_mode(self):
+        modes = {'s3': 'hard', 'qdrant': 'advisory', 'opensearch': 'advisory',
+                 'neo4j': 'advisory', 'postgresql': 'advisory: PostgreSQL has no hard per-database byte quota'}
+        for provider, expected in modes.items():
+            with self.subTest(provider=provider), patch.object(catalog, 'resource', return_value={
+                    'resource_id': str(self.resource_id), 'owner_project': 'alpha', 'provider': provider}), \
+                    patch.object(api.providers, 'get') as selected:
+                selected.return_value.quota_enforcement = expected
+                response = self.client.get(f'/v1/resources/{self.resource_id}')
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.json()['quota_enforcement'], expected)
+
     def test_platform_admin_does_not_implicitly_receive_another_humans_credential(self):
         credential_id = uuid4()
         with patch.object(catalog, "_object", return_value={"grant_id": str(self.grant_id)}), \
