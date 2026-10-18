@@ -6,6 +6,16 @@ delegated the Phase 4 implementation choices. Acceptance still requires the
 source, local, and deployed evidence in the
 [Phase 4 plan](../../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md).
 
+## Implementation status note — October 18, 2026
+
+Phase 4 was completed for lab sequencing by the owner's October 16 exception;
+remaining acceptance is in Phase 10.9. Current opted-in workloads export to a
+Pod-local OTLP forwarder; only that forwarder mounts and refreshes the bound token
+before sending to the gateway. The backend, scoped reads and dashboards are
+implemented, with selected deployed/AI readback in the evidence register.
+See the [current trace reference](../../../infrastructure/monitoring/TRACING.md).
+The decision and its unverified operational requirements below are preserved.
+
 ## Context
 
 The lab has one host, a Compose monitoring stack outside k3d, project workloads

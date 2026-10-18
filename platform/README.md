@@ -1,452 +1,177 @@
-# Docker-based Developer Platform Lab: platform guide
+# Platform implementation reference
 
-This is the source-adjacent Platform API reference for maintainers. Application
-developers should use the canonical [developer guide](../docs/developers/README.md),
-and administrators should use the [operator guide](../docs/operators/README.md).
-Implementation ownership and validation are summarized in the
-[Platform API maintainer guide](../docs/maintainers/platform-api.md).
+The platform is one Python/FastAPI control plane, with a React portal at `/`
+and a separate `devplat` CLI. Canonical workflows are in the
+[developer guide](../docs/developers/README.md) and
+[operator guide](../docs/operators/README.md). This page describes source ownership
+and local maintainer commands.
 
-The platform API provisions applications on the lab's Kubernetes cluster and
-manages independent named PostgreSQL resources with explicit component bindings.
-Applications without bindings receive no database credentials. The current interface includes a
-small browser portal plus a REST API with interactive documentation. Both enforce
-individual OIDC identities and platform-owned project grants.
+## Runtime and state
 
-For installation and prerequisites, start with the [main README](../README.md).
-See [architecture](../docs/architecture/deployment-topology.md) for isolation and availability limits,
-and [backup and recovery](../docs/operators/backup-and-recovery.md) for operational procedures.
+Docker Compose runs the API, telemetry gateway, Keycloak, PostgreSQL, edge and
+monitoring. Kubernetes/k3d runs application services/scheduled components and the
+shared hosted-access authorizers with per-policy browser proxies. The API uses
+in-process workers with durable
+PostgreSQL records for deployments, hosted access and named stores.
 
-## Access the platform
+The catalog stores project/application identities, grants, revisions, operations,
+credential metadata, store resources and grants, AI runs/proposals, audit and
+retirement records. Kubernetes stores application secret values. Store credentials
+are derived from protected operator keys and lease identities, then injected only
+into explicitly bound components. Keycloak owns identity-provider accounts and
+clients. See the [platform database model](../docs/platform-model/platform-database.md).
 
-After `bash scripts/up.sh` completes, these local endpoints are available:
+Stores have an independent lifecycle. The default provider is PostgreSQL;
+operator-selected RustFS S3, OpenSearch, Qdrant and dedicated Neo4j Community
+providers are also implemented. No deployment format provisions an implicit
+project database or `database` Secret. New consumers use approved `v1alpha2`
+component bindings. Application removal and resource retirement retain data;
+resource purge requires scoped confirmation and verified off-host backup intent.
+See the [named-store reference](../docs/operators/data-stores.md).
+
+## Local endpoints
+
+After [bootstrap](../docs/operators/install-local.md):
 
 | Endpoint | Purpose |
 | --- | --- |
-| `http://localhost:8000/` | Keycloak login and human access-validation portal |
+| `http://localhost:8000/` | React control-plane portal |
 | `http://localhost:8000/docs` | Interactive API documentation |
-| `http://localhost:8000/openapi.json` | OpenAPI schema |
+| `http://localhost:8000/openapi.json` | Live generated OpenAPI contract |
 | `http://localhost:8000/healthz` | API process health |
-| `http://localhost:8000/readyz` | Database and Kubernetes connectivity |
-| `http://identity.localhost` | Keycloak reference identity service |
-| `http://localhost:3000` | Grafana; username `admin`, password from `.env` |
-| `http://localhost:9090` | Prometheus |
+| `http://localhost:8000/readyz` | PostgreSQL and Kubernetes connectivity |
+| `http://identity.localhost` | Keycloak reference identity provider |
+| `http://localhost:3000` | Operator Grafana |
+| `http://localhost:9090` | Operator Prometheus |
 
-The API and monitoring host ports bind to loopback. For a public deployment, Caddy
-routes the configured `PLATFORM_DOMAIN` to the API over HTTPS. Application requests
-follow Caddy → k3d load balancer → Traefik → project Service → application pod.
+API and monitoring host ports bind to loopback. Caddy serves the configured
+platform and identity domains; public deployments use HTTPS. Protected
+`v1alpha2` application traffic follows Caddy → k3d/Traefik → hosted-access
+boundary → application Service. Separate store console routes expose only
+authorized human leases. Local `.localhost` HTTP routes are development paths.
 
-Project endpoints require a short-lived OIDC access token. In the interactive
-documentation, use **Authorize** to supply that token. The API validates its issuer,
-signature, audience and lifetime, then uses the issuer/subject pair to look up a
-platform-owned grant. It does not accept the old shared administrator token and does
-not return database passwords in project responses.
+<a id="access-validation-portal"></a>
+<a id="api-reference"></a>
 
-The reference Keycloak realm is `platform` and its public client is `platform-cli`.
-Create individual users in Keycloak; never create a shared developer account. Before
-the first API start, set `PLATFORM_BOOTSTRAP_SUBJECT` to the immutable Keycloak user
-ID (`sub`) for the first platform administrator. The API writes this one-time grant
-to PostgreSQL and will not recreate it on later starts. Remove the bootstrap setting
-after recording the controlled setup evidence.
+## Identity and API contracts
 
-For the full local bootstrap, Device Authorization with PKCE, scoped-role, and
-revocation evidence procedure, see the [human access and authorization validation runbook](../docs/operators/validation/access-and-authorization.md).
+Humans use the `platform-portal` Authorization Code + PKCE client or
+`platform-cli` Device Authorization + PKCE client. Before the first API start,
+set `PLATFORM_BOOTSTRAP_SUBJECT` to the first human administrator's immutable
+Keycloak subject. After the one-time grant is persisted, remove the setting.
+The API validates issuer, signature, audience and lifetime, then checks current
+platform-owned grants. A platform or project role grants no hosted-application
+membership and no direct store data access.
 
-## Access-validation portal
+Project deployment credentials authorize CI deployments and inspection within
+their scope. Hosted service-access credentials authorize application routes.
+Human store grants authorize expiring native credentials. These are separate
+credential lifecycles. Follow the [identity guide](../docs/operators/identity-and-access.md)
+and [API guide](../docs/developers/api.md).
 
-Open the platform root URL after Keycloak bootstrap completes. The portal uses
-the `platform-portal` public Keycloak client with Authorization Code + PKCE; it
-keeps the access token only in browser memory and never displays it. On each
-deployment, `keycloak-realm-init` reconciles the client to the configured exact
-`PLATFORM_DOMAIN` redirect URI and web origin.
+The preferred deployment body is `platform.example/v1alpha2`. Earlier
+`v1alpha1` and flat forms remain accepted for unbound applications; their public
+routes retain legacy behavior. The [declaration reference](../docs/developers/application-spec.md)
+covers component counts, probes, resources, bindings, telemetry and egress.
+The [committed OpenAPI schema](../docs/api/openapi.json) lists all public operations.
 
-The portal can create/reapply disposable projects, grant or revoke project and
-platform roles, list accessible projects, and call the restricted
-operator-inspection and redacted audit-export endpoints. Create distinct test
-users in Keycloak first, then sign in separately as each user to record the
-viewer/developer/project-admin denial matrix. It does not administer Keycloak
-users or store test subjects, evidence, or credentials.
+Accepted deployments return `202` with an operation ID, revision and status URL.
+The durable worker rechecks authority and revision freshness before applying
+resources. `succeeded` describes apply completion; live readiness is separate.
+Use `If-Match` to avoid overwriting concurrent revisions. Rollback reuses a
+retained declaration as a new revision and does not restore data, migrations or
+historical secret values. Hosted-access ETags and store body versions have
+separate concurrency contracts.
 
-## Create an application
+## Runtime boundaries
 
-Run commands from the repository root. Export a short-lived access token from the
-configured OIDC client; do not put it in `.env`:
+Workloads run as UID/GID 10001, with a read-only root filesystem, dropped
+capabilities, RuntimeDefault seccomp and writable ephemeral `/tmp` (64 MiB).
+Ordinary pods receive no Kubernetes ServiceAccount token. Tracing opt-in projects
+a short-lived Pod-bound token for the telemetry audience only.
 
-```bash
-export PLATFORM_ACCESS_TOKEN='…'
-```
+Private components communicate within their namespace. Protected public backends
+accept authorizer traffic; sibling components use approved HTTPS service access
+for the public route. Store egress is scoped to bound components and lease ports.
+External CIDR/DNS TCP destinations require declaration and operator approval;
+DNS addresses are pinned at apply time. Persistent volume declarations and private
+image-registry credentials are unsupported.
 
-Create the legacy flat example application (its route is not protected by the
-new hosted-access capability). For new applications use the
-[`v1alpha2` declaration guide](../docs/developers/application-spec.md) and
-[hosted access policy flow](../docs/developers/api.md#hosted-application-access):
+Project configuration is revisioned; application secrets are write-only API
+resources in Kubernetes and can reach every component in a project. Store Secrets
+are scoped to the bound component. Private PostgreSQL/Bolt transport is plaintext
+inside the restricted relay boundary; remote native access uses SSH. This is a
+single-host trusted-workload lab without high availability or hostile-tenant
+isolation.
 
-```bash
-curl --fail-with-body -X PUT http://127.0.0.1:8000/projects/hello \
-  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
-  -H 'Content-Type: application/json' \
-  --data-binary @examples/project.json
-```
+## Observation and AI
 
-The [example specification](../examples/project.json) is:
+The API exposes authorized readiness, component status, inventory, usage, drift,
+bounded pod/retained logs, HTTP metrics and project-filtered traces. Missing or
+failed observations are explicit states. Drift is reported rather than silently
+repaired. Alloy centralizes minimized workload envelopes; free-text application
+logs remain kubelet best effort. Prometheus/Loki retention is configured for
+seven days (Prometheus also has a 4 GB cap); Tempo defaults to 24 hours.
+Operator dashboards are provisioned from source.
 
-```json
-{
-  "name": "hello",
-  "image": "hashicorp/http-echo:1.0.0",
-  "port": 5678
-}
-```
+AI assistance uses minimized project evidence for explanations, incident
+investigation and curated development guidance. Runs require an eligible human
+identity, Public/Internal classification and configured model-processing
+eligibility. The implemented write path is a reviewed rollback proposal with
+an exact diff hash, a human approval expiring after 15 minutes, and fresh
+authorization/revision checks. The [AI operations reference](../infrastructure/monitoring/AI.md)
+records configuration and evidence limits.
 
-With the default application domain, a successful response is:
+Audit writes use a restricted append function; ordinary API audit exports require
+platform administration and use a separate reader role. Records are append-only
+with no automatic pruning. Host/root and PostgreSQL superusers remain trusted
+administrators. See [security and authorization](../docs/architecture/security-and-authorization.md).
 
-```json
-{
-  "operation_id": "69fb09ef-5136-4c8a-8ec1-c57467192b9a",
-  "state": "queued",
-  "revision": 1,
-  "status_url": "/v1/operations/69fb09ef-5136-4c8a-8ec1-c57467192b9a"
-}
-```
+<a id="configuration"></a>
 
-The API returns `202 Accepted` after atomically persisting the desired revision
-and operation. The in-process worker applies the resources and the operation
-status reports `succeeded` or a sanitized failure code. The separate live
-`readiness` snapshot reports desired/ready replicas, the desired and applied
-Deployment images, images and image IDs running in ready pods, and a diagnostic reason.
-Readiness does not change the operation's apply outcome:
+## Source ownership
 
-```bash
-OPERATION_ID=69fb09ef-5136-4c8a-8ec1-c57467192b9a
-curl --fail-with-body "http://127.0.0.1:8000/v1/operations/$OPERATION_ID" \
-  -H "Authorization: ******"
-curl --fail-with-body -H 'Host: hello.apps.localhost' http://127.0.0.1/
-```
-
-The operation response keeps the apply outcome separate from live observation.
-For example:
-
-```json
-{
-  "state": "succeeded",
-  "readiness": {
-    "state": "progressing",
-    "desired_replicas": 1,
-    "ready_replicas": 0,
-    "desired_image": "hashicorp/http-echo:1.0.0",
-    "deployment_image": "hashicorp/http-echo:1.0.0",
-    "active_images": [],
-    "active_image_ids": [],
-    "reason": "ImagePullBackOff",
-    "observed_at": "2026-10-03T12:00:00+00:00"
-  }
-}
-```
-
-You can also open [hello.apps.localhost](http://hello.apps.localhost) if the local
-resolver supports wildcard localhost names. Public applications use
-`https://<name>.<APPS_DOMAIN>` after DNS and TLS are configured.
-
-## Project specification
-
-`PUT /projects/{name}` accepts `platform.example/v1alpha2` (the preferred
-component-based format), the earlier `v1alpha1` envelope, or the flat legacy body
-below. All use `kind: Application` in envelope form and map to the same revision
-and operation lifecycle. Legacy forms remain supported without a sunset date.
-Use the [application declaration reference](../docs/developers/application-spec.md)
-for field-level syntax and [ApplicationSpec](../docs/architecture/application-contract.md)
-for the ownership boundary. The generated contract is
-[docs/api/openapi.json](../docs/api/openapi.json); verify it with
-`scripts/export_openapi.py --check` after API changes.
-
-The following table describes the flat legacy body only:
-
-| Field | Required | Contract |
-| --- | --- | --- |
-| `name` | Yes | 1–32 lowercase letters, digits, or hyphens; start with a letter and end with a letter or digit. Must match the URL path. |
-| `image` | Yes | Public container image reference, 1–512 characters under the current regex. Accepted tags resolve to a registry digest; an explicit digest is recommended for reproducibility. |
-| `port` | No | Container TCP port, 1024–65535; defaults to 8080. |
-| `probe_profile` | No | `status` (default) or `hello-world`; root-path availability/content check. |
-| `configuration` | No | Map of up to 50 non-secret environment values; reserved/secret-like names, key material and oversized values are rejected. Managed secrets use separate endpoints. |
-| `resources` | No | `{"requests": {"cpu", "memory"}, "limits": {"cpu", "memory"}}`; CPU as `250m` or `0.25`, memory as `Mi`/`Gi`. Omitted values default to requests `100m`/`128Mi` and limits `500m`/`256Mi`. Requests must not exceed limits; maxima are requests 1 CPU/1Gi and limits 2 CPU/2Gi (a rolling update briefly runs two pods within the namespace quota). Invalid values return 422. Spec rejections return 422 with a stable `code`: `unsupported_capability` (a field or value outside the declared capabilities) or `invalid_spec` (anything else malformed). Stored canonically (`250m`, `512Mi`), so equivalent spellings reuse the revision. |
-
-Unknown fields are rejected with `422` before catalog or provider side effects.
-Accepted images must be public and from the operator-allowed registries; tags
-are resolved to immutable digests before acceptance and deployment. Pin a registry
-digest explicitly for reproducibility. Image resolution does not prove that the
-container will start or satisfy readiness. Private image pull credentials and
-persistent filesystem/object-storage declarations are unsupported.
-
-The `v1alpha2` schema supports up to five service/scheduled components, one public
-service, bounded per-component resources, replicas, command/args, configuration,
-HTTP readiness and explicitly approved CIDR/DNS TCP egress. The public route is
-`https://<component>-<project>.<APPS_DOMAIN>` and traverses the hosted-access
-boundary; a separate active policy and approved groups are required. Neither
-readiness nor a Platform API deployment credential grants hosted access. Legacy
-single-service routes keep their existing behavior and must migrate to `v1alpha2`
-for hosted protection. See the [hosted API guide](../docs/developers/api.md#hosted-application-access)
-and [EV-45 core evidence](../docs/operators/validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026);
-the full gate remains open.
-
-For the flat legacy project `hello`, provisioning creates:
-
-| Resource | Name or behavior |
+| Source | Responsibility |
 | --- | --- |
-| PostgreSQL database and login role | `project_hello`; hyphens in project names become underscores |
-| Namespace | `project-hello`, with Kubernetes 1.36 restricted Pod Security enforcement |
-| Secret | `database`, containing PostgreSQL connection environment variables |
-| Deployment | `hello`, with one replica |
-| Service | `hello`, port 80 forwarding to the specified application port |
-| Ingress | `hello`, routing `<name>.<APPS_DOMAIN>` through Traefik |
-| ResourceQuota and LimitRange | `budget` and `defaults` |
-| NetworkPolicy | `isolation` |
+| `app/src/app/main.py` | Core HTTP endpoints, identity bootstrap and worker lifecycle |
+| `app/src/app/spec.py`, `manifests.py`, `operations.py` | Declaration validation, Kubernetes resources and durable deployment execution |
+| `app/src/app/access_*.py` | Hosted policy, identity projection, authorizer and access reconciliation |
+| `app/src/app/stores/` | Named providers, grants, leases, private relay, consoles, monitoring and recovery |
+| `app/src/app/ai_*.py` | AI evidence, bounded model calls, durable runs and approved proposals |
+| `app/src/app/telemetry_*.py`, `tracing.py`, `trace_read.py` | Authenticated telemetry collection and bounded reads |
+| `cli/`, `ui/` | Public API clients and their tests |
+| `compose.yaml`, `../scripts/up.sh` | Runtime wiring and cluster bootstrap |
 
-## Update and recover a project
-
-Send another PUT to the same URL with the complete specification to update its
-image or port. PUT accepts an optional `If-Match: <revision>` header (`0` for a new project); when it differs from the current desired revision the request returns 409 with `code: revision_conflict` and `current_revision`, with no side effects, and without the header the last writer wins. Each new revision prunes older ones beyond `REVISION_RETENTION` (default 25); the current revision, revisions with queued or running operations and the last successful restart (which also keeps the revision it ran at) are kept, and the pruned revisions' finished operations (and their status URLs) are removed with them. PUT is idempotent: repeating the same request reapplies the desired
-resources without deleting the database or changing its password, provided
-`DATABASE_KEY` remains unchanged.
-
-List stored projects and their latest specifications:
-
-```bash
-curl --fail-with-body http://127.0.0.1:8000/projects \
-  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"
-```
-
-Each list entry contains `name`, `spec`, and `status`, ordered by project name.
-The stored status describes provisioning rather than ongoing application health:
-
-| Status | Meaning | Next step |
-| --- | --- | --- |
-| `provisioning` | A desired revision is queued or being applied. A worker restart reclaims interrupted operations. | Follow its operation ID; retry the same request after resolving a failure. |
-| `applied` | The request completed resource application. | Check rollout and application behavior. |
-| `failed` | Provisioning encountered an error and recorded the failure. | Resolve the cause and repeat the same PUT. |
-| `retired` | Administrator acknowledged namespace removal; monitoring ended and SQL data/spec remain. | PUT explicitly reactivates the application. |
-
-Revision and operation acceptance are serialized with a PostgreSQL advisory lock
-and committed together. The in-process worker executes provider changes outside
-that transaction under an operation lock and the shared lifecycle lock. Retrying
-an interrupted operation starts again from idempotent ensure steps. The separate
-monitoring-only loop republishes application probe targets but does not reconcile
-workloads.
-
-Retirement is a two-step, confirmed action. `GET /projects/{name}/retirement-preview` lists what would be removed (the project namespace and the objects in it, and the public route), what is kept (database, role, catalog and revisions), any blockers, and a `scope_token`. `POST /projects/{name}/retire` with `{"confirm_name":"<name>","scope_token":"<token>"}` then deletes the namespace, records retirement, persists the retained inventory and removes monitoring while retaining SQL data and the catalog. A new revision invalidates the token (409 `scope_changed`). While the namespace is still terminating the call answers 202 `retiring`; repeat the same request. Without `scope_token` the request keeps its earlier meaning: it only records retirement after you removed the namespace manually. Retirement is rejected while a deployment operation is queued or running. See [application monitoring and retirement](../infrastructure/monitoring/README.md). For a complete lab reset, use
-`bash scripts/down.sh --volumes`, then bootstrap again. Running `down.sh` without
-`--volumes` retains the stored project catalog and databases, but removes Kubernetes
-workloads. Reapply the saved specifications after bootstrap as described in
-[recovery](../docs/operators/backup-and-recovery.md).
-
-## Automatic availability monitoring
-
-Legacy single-service discovery registers a root-path HTTP 200 check
-(`probe_profile: "status"`); `hello-world` additionally checks the smoke response
-body. Failed deployments stay monitored; explicit retirement removes the target.
-Local `.localhost` installations use HTTP through Caddy; public domains use
-verified HTTPS from the platform host. Component declarations now discover the
-public component hostname/health path and omit private-only applications.
-Protected probes check expected access-boundary denial/login without credentials;
-Kubernetes readiness is separate. Alloy collects minimized operational envelopes
-from project pods into seven-day configured Loki storage. Authorized
-`GET /projects/{name}/retained-logs` reads them with fixed project scope.
-Deployed component probes/readiness and immediate central correlation reads
-passed in [EV-46](../docs/operators/validation/access-and-authorization.md#executed-hosted-access-monitoring-acceptance-october-11-2026)
-after the collector permission/readiness repair. Post-retirement/restart log
-readback and elapsed-retention acceptance remain open; EV-45 remains historical.
-See [monitoring configuration and limits](../infrastructure/monitoring/README.md)
-and the [energy enablement plan](../docs/maintainers/delivery/plans/energy-system-integration.md).
-
-## Application runtime contract
-
-Applications must listen on the configured port on all container interfaces and
-run as UID/GID 10001. The root filesystem is read-only, Linux capabilities are
-dropped, privilege escalation is disabled, and no Kubernetes ServiceAccount token
-is mounted. `/tmp` is writable ephemeral storage with a 64 MiB size limit.
-Store durable application data in PostgreSQL; persistent volume claims are disabled.
-
-The table below describes default legacy single-service settings. `v1alpha2`
-supports the per-component resource, replica, readiness and schedule fields in
-the [application reference](../docs/developers/application-spec.md); namespace
-quotas and aggregate admission still constrain the combined deployment.
-
-| Setting | Value |
-| --- | --- |
-| Replicas | 1 |
-| CPU request / limit | 100m / 500m |
-| Memory request / limit | 128 MiB / 256 MiB |
-| Readiness probe | TCP connection to the application port every 5 seconds |
-| Liveness probe | TCP connection to the application port, initial delay 30 seconds |
-| Namespace CPU requests / limits | 2 / 4 cores |
-| Namespace memory requests / limits | 2 GiB / 4 GiB |
-| Namespace object limits | 10 pods, 5 Services, no LoadBalancer or NodePort Services, no PVCs |
-
-TCP probes verify an open port, not application-level correctness. Namespace quotas
-are upper bounds; they do not reserve host capacity.
-
-The `database` Secret supplies `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`, and
-`PGPASSWORD`. Each project role owns its database and has no superuser, database
-creation, or role creation privileges. Passwords are derived from `DATABASE_KEY`;
-changing that key requires coordinated credential rotation.
-
-Private services retain in-project connectivity. Default egress permits project
-connectivity, cluster DNS and PostgreSQL; external component egress requires a
-CIDR/DNS-and-TCP-port declaration within the operator allow-list. DNS addresses
-are pinned at apply time and require reapply when they change. A protected
-`v1alpha2` public backend accepts only authorizer traffic, not direct Traefik or
-same-project access. Legacy routes retain direct ingress. New pods may briefly
-have outbound access before network rules converge; this lab is intended for
-trusted workloads. Project credentials may be visible to every component, and
-application-to-PostgreSQL transport is not TLS-protected in the initial profile.
-
-## API reference
-
-| Method and path | Authentication | Response |
-| --- | --- | --- |
-| `GET /healthz` | None | 200 with `{"status":"ok"}` when the process responds |
-| `GET /readyz` | None | 200 with `{"status":"ready"}` when database and Kubernetes checks pass; otherwise 503 |
-| `GET /projects` | OIDC `viewer` or stronger grant | 200 with only authorized projects |
-| `GET /projects/{name}/drift` | `view` grant | Compares the live Deployment (image, replicas, CPU/memory) with the desired revision and returns `in_sync`, `drifted` with per-field differences, `not_found` or `unknown`. Report only: it never changes the cluster; drift is audited as `project.drift.detected`; a background scan (every `DRIFT_SCAN_INTERVAL_SECONDS`, default 300) audits only changes for applied projects, as `project.drift.detected` and `project.drift.resolved` by actor `system`/`drift-scan`. Re-apply with PUT or restart |
-| `GET /v1/capabilities` | Any authenticated principal | Declared capabilities per environment (runtime, endpoints, scaling, resources, health, external resources, configuration; `secrets: true` means secrets exist through the secrets endpoints, never inside the spec) and the allowed image registries |
-| `PUT /projects/{name}` | OIDC `developer` or stronger project grant; platform-admin creates projects | 202 with queued operation ID, desired revision, and status URL; the image tag is first resolved to a digest (422 unknown tag/unsupported registry, 503 registry unreachable) |
-| `GET /v1/operations/{id}` | OIDC `viewer` or stronger grant on the owning project | 200 with apply outcome, revision, redacted result, and live readiness snapshot (replica counts, images, diagnostic reason) |
-| `GET /projects/{name}/revisions` | `view` grant | Lists the retained revisions, newest first, with creation time, resolved image, port and resources; marks the current one |
-| `GET /projects/{name}/resource-usage` | `view` grant | Current CPU (millicores) and memory (bytes) per pod and in total from the Kubernetes metrics API; `state` is `ok`, `stale` (samples older than 120 s), `missing` (no samples) or `unavailable` (metrics API not queryable), never a silent zero |
-| `GET /projects/{name}/logs` | `view` grant | Recent timestamped log lines with pod/container attribution, merged by time. `tail` (1-1000), `since_seconds`, `component`, exact pod `instance`, case-insensitive `search`, and lexical RFC3339 `after`/`before` bound the read. Repeat with returned `next_cursor` as `after` to poll for new lines. Terminal pods remain readable while their kubelet logs remain available; `retention` reports that best-effort boundary. Credentials are redacted on a best-effort basis and lines are capped at 2000 characters. |
-| `GET /projects/{name}/resources` | `view` grant | Current Kubernetes topology: deployments (including declared container requests/limits), instances, Services, routes, quota/limit-range settings, and the project’s managed PostgreSQL attachment. `declared_totals` aggregates requests/limits across desired replicas; `usage` supplies labelled live metrics, allowing direct comparison. Provider failure is `state: unavailable`, never an empty inventory. |
-| `GET /operator/capacity` | platform-admin | Kubernetes node capacity/usage plus exact aggregate request-admission accounting (`allocatable`, active-pod `requested`, configured `reserve`, and computed `available`) with explicit units and unavailable/disabled states; this does not claim host-process, shared-service, or storage usage. |
-| `GET /projects/{name}/configuration` | `view` grant | Current desired configuration values, the revision, and `activation` (`active`, `rolling_out`, `pending` until the Deployment carries the values, or `unknown`). Values are visible to every viewer, so secrets must not be stored here
-| `PUT /projects/{name}/configuration` | `change` grant | Body `{"values": {NAME: "value"}}` replaces the set (add, update, remove). Validated first: names are env-var names, not `PG*`, `KUBERNETES_*`, `PLATFORM_*` or secret-like (`PASSWORD`, `TOKEN`, ...), at most 50 values of 1024 characters; otherwise 422 `invalid_configuration`. Creates a new revision (optional `If-Match`) and rolls the pods; the 202 reports `rollout_required`. Also accepted as `spec.configuration.values` in the envelope or `configuration` in the flat body. Audit records names, never values |
-| `GET /projects/{name}/secrets` | `view` grant | Secret names, versions, states and change times only, never values, plus `activation` (`active`, `rolling_out`, `pending`, `unknown`) for whether the pods run the current version
-| `PUT /projects/{name}/secrets/{NAME}` | `change` grant | Body `{"value": "..."}` creates or rotates one write-only secret (name rules as configuration but secret-like names are allowed; at most 50 secrets, 8192 characters each; 422 `invalid_secret`, 409 `name_in_use` if the name is a configuration value). The value lives only in the project's `app-secrets` Kubernetes Secret, is injected as an environment variable, and is never stored in revisions or audit records. Pods restart to pick it up (`rollout_required`). Rotating keeps the replaced value in the unmounted `app-secrets-previous` Secret (listing shows `version` and `state` `rotating`) until `confirm` or the next `revert`. Retiring a project deletes the Secret with the namespace |
-| `POST /projects/{name}/secrets/{NAME}/confirm` | `change` grant | Revokes the previous value once the pods run the new version; 409 `not_adopted` before that, 409 `no_previous_version` when none is held |
-| `POST /projects/{name}/secrets/{NAME}/revert` | `change` grant | Makes the previous value current again as a new version and restarts the pods; 409 `no_previous_version` when none is held |
-| `DELETE /projects/{name}/secrets/{NAME}` | `change` grant | Removes one secret and restarts the pods; 404 if it does not exist |
-| `POST /projects/{name}/rollback` | `change` grant | Body `{"revision": N}`. Re-applies retained revision N's stored spec (including its image digest) as a new revision and queues a normal deploy, so history stays append-only; 202 as for PUT; optional `If-Match`; 404 unknown or pruned revision; 409 retired project. Only the application changes: database contents and roles are never rolled back or migrated |
-| `POST /projects/{name}/restart` | OIDC `developer` or stronger project grant | 202 with a queued `restart` operation that rolls the current deployed revision without changing the spec; repeats reuse the pending operation; 404 unknown, 409 unless applied |
-| `GET /projects/{name}/retirement-preview` | OIDC `project-admin` or `platform-admin` | Objects removed, data retained, blockers and `scope_token` |
-| `POST /projects/{name}/retire` | OIDC `project-admin` or `platform-admin`, plus matching `confirm_name` and optional `scope_token` | With a token: deletes the namespace; 200 retired, 202 `retiring` while it terminates, 409 `scope_changed` for a stale token. Without a token: 200 after manual removal, 409 while the namespace exists. 409 while an operation is active; data is always retained |
-| `PUT` / `DELETE /projects/{name}/grants` | OIDC `project-admin` or `platform-admin` for that project | Create, change, or revoke a project grant |
-| `PUT` / `DELETE /platform/grants` | OIDC `platform-admin` | Create or revoke another platform-admin grant |
-| `GET /internal/tls?domain=...` | None; used by Caddy | 200 for a project host whose stored status is `applied`; 403 for an unauthorized host |
-
-The TLS authorization route is excluded from OpenAPI and does not provision projects.
-A missing or invalid bearer token is rejected. PUT returns 400 if the URL and body
-names differ, 422 for invalid request fields, and 503 when operation acceptance or
-its required audit record fails.
-
-## Configuration
-
-`python3 scripts/init.py` creates `.env` from the example and generates secrets.
-Rerunning it preserves the existing file. Review `.env.example` after version
-updates and apply relevant settings to `.env` explicitly.
-
-| Variable | Purpose |
-| --- | --- |
-| `PLATFORM_DOMAIN` | Hostname Caddy routes to the API; default `platform.localhost` |
-| `APPS_DOMAIN` | Application domain suffix; default `apps.localhost` |
-| `TLS_EMAIL` | Contact email Caddy uses for certificate authority registration |
-| `EDGE_BIND_IP` | Proxy bind address; default `127.0.0.1`, public host setting `0.0.0.0` |
-| `DATABASE_KEY` | Master secret for deterministic project passwords; at least 32 characters |
-| `PLATFORM_AUDIT_PASSWORD` | Password for the restricted audit-event writer; at least 32 characters |
-| `PLATFORM_AUDIT_READER_PASSWORD` | Password for the restricted audit-event reader used by security metrics; at least 32 characters |
-| `IDENTITY_DOMAIN` | Keycloak hostname through Caddy; default `identity.localhost` |
-| `KEYCLOAK_ADMIN_PASSWORD` | Keycloak bootstrap administrator password |
-| `KEYCLOAK_DB_PASSWORD` | Password for Keycloak's restricted PostgreSQL role |
-| `OIDC_ISSUER` | OIDC issuer; default `http://<IDENTITY_DOMAIN>/realms/platform` |
-| `OIDC_AUDIENCE` | Required access-token audience; default `platform-api` |
-| `OIDC_JWKS_URL` | Internal JWKS URL; default points to the Keycloak service |
-| `PLATFORM_BOOTSTRAP_SUBJECT` | One-time immutable subject for the first platform-admin grant; remove after bootstrap |
-| `POSTGRES_PASSWORD` | PostgreSQL administrator password |
-| `GRAFANA_PASSWORD` | Initial Grafana admin password |
-| `PLATFORM_SUBNET` | Private Docker subnet; default `172.30.80.0/24` |
-| `POSTGRES_IP` | Fixed PostgreSQL address within that subnet; default `172.30.80.10` |
-| `K3S_IMAGE` | Cluster image; currently `rancher/k3s:v1.36.4-k3s1` |
-
-Choose network settings before startup. Updating a domain or IP does not rewrite
-previously provisioned project resources until they are reapplied. Updating
-`K3S_IMAGE` does not replace an existing cluster. See the
-[recreation instructions](../docs/operators/backup-and-recovery.md) when changing lab versions.
-
-The API's internal `POSTGRES_HOST` and `KUBECONFIG` settings are supplied by
-[its Compose module](compose.yaml). Bootstrap generates the controller kubeconfig
-in `.runtime/controller.kubeconfig` and mounts it read-only into the API container.
-Keycloak uses its own PostgreSQL role and database, both included in the encrypted
-platform database backup.
-
-## Audit records and retention
-
-At startup, the API creates `platform_audit.events` and the no-login owner plus
-restricted reader and writer database roles. API event writes use only the writer login, which can call
-the security-definer append function but has no table read, update, delete, truncate,
-or schema privileges. The table rejects update, delete, and truncate statements.
-Project database roles cannot connect to the `platform` database. Only a
-`platform-admin` may call the `/operator/*` inspection endpoints: project-grant
-inspection, managed workload/network-security configuration inspection, and a
-bounded time-filtered audit export. The API reads exports through the separate
-reader login and redacts again before returning JSON or CSV. Project members,
-including project administrators, cannot access these endpoints.
-
-Event details recursively redact password, secret, token, authorization, credential,
-cookie, and key fields; bearer/basic credential strings are redacted as well. Store
-only stable actor identifiers, target/scope, action, result, and safe failure type;
-never put raw HTTP headers, access tokens, database passwords, or provider exception
-text into an event.
-
-The current retention policy is append-only with no automatic pruning: records remain
-online until an owner-approved retention procedure is introduced, and the scheduled
-encrypted platform backup captures the database state. This deliberately favors
-investigation durability over an unverified deletion job. PostgreSQL superusers and
-host/root operators remain a trusted administrative boundary and can bypass ordinary
-database controls; off-host encrypted backups and restricted host access are the
-current tamper-evidence and recovery safeguards. Record a controlled live check of
-the append-only permissions, backup coverage, and storage growth before closing
-OPS-001-T01.
-
-## Troubleshooting
-
-| Symptom | Check |
-| --- | --- |
-| Bootstrap waits for PostgreSQL | `docker compose logs --tail=100 postgres`; old major-version data needs migration or a fresh lab volume. |
-| Bootstrap waits for Kubernetes | `kubectl --kubeconfig .runtime/admin.kubeconfig get nodes -o wide`; verify readiness and the actual node version. |
-| API container is healthy but requests fail | Check `/readyz`; the container health check uses `/healthz`, which does not test dependencies. |
-| PUT returns 503 | Inspect `docker compose logs --tail=100 platform-api`, PostgreSQL, and audit availability. Resolve the acceptance failure and retry the same PUT. |
-| Project is applied but inaccessible | Check rollout, pod events, image pulls, listening port, and ingress hostname. |
-| Pod repeatedly restarts | Check logs for writes outside `/tmp`, permissions, probe failures, or memory limits. |
-| Application cannot reach an external API | Check its namespace NetworkPolicies; external egress is restricted by default. |
-
-Useful application diagnostics:
-
-```bash
-kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello get pods,svc,ingress
-kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello describe pods
-kubectl --kubeconfig .runtime/admin.kubeconfig -n project-hello logs deployment/hello
-```
+`app/pyproject.toml` and `app/uv.lock` define API dependencies (Python 3.12+);
+`Dockerfile` pins the container runtime. `../.env.example` is the documented
+operator input; `scripts/init.py` creates missing keys while preserving existing
+values. Choose network addresses before first startup. Domain/IP changes require
+review and application reapply; changing `K3S_IMAGE` does not migrate a cluster.
 
 ## Develop and validate
-
-[app/src/app/main.py](app/src/app/main.py) implements request validation, authentication, database
-provisioning, and request-driven Kubernetes apply. [app/src/app/manifests.py](app/src/app/manifests.py)
-defines the workload resources and can be tested without a live cluster. [app/src/app/monitoring.py](app/src/app/monitoring.py) rebuilds catalog-derived probe discovery. The implemented boundaries are recorded in [ADRs 012–015](../docs/architecture/decisions/README.md).
-[app/pyproject.toml](app/pyproject.toml) and [app/uv.lock](app/uv.lock) define the locked Python
-dependencies, while [Dockerfile](Dockerfile) defines the Python 3.14.7 API runtime.
 
 From the repository root:
 
 ```bash
-uv sync --project platform/app
+uv sync --project platform/app --locked
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
+uv run --project platform/app python scripts/export_openapi.py --check
+python3 scripts/generate-cli-contract.py --check
+python3 scripts/check-doc-links.py
 uv run --project platform/app python -m compileall -q platform/app/src/app scripts
 bash -n scripts/up.sh scripts/down.sh
 docker compose config --quiet
 ```
 
-After changing API code or dependencies, rebuild with `bash scripts/up.sh`.
-Then run the live checks:
+Some tests require explicitly configured disposable dependencies and otherwise
+skip. See [test boundaries](../docs/maintainers/testing-requirements.md),
+the [CLI README](cli/README.md), [UI README](ui/README.md) and CI workflows.
 
-```bash
-python3 scripts/smoke.py
-python3 scripts/isolation.py
-```
-
-These create or update the `smoke` and `isolation` projects and retain them for
-inspection. Run them only in a lab where those names are available for testing.
+Rebuild through `bash scripts/up.sh` only when updating the intended lab.
+Live smoke creates or updates a retained project; follow
+[acceptance](../docs/operators/validation/acceptance.md) and record the revision,
+scope and cleanup outcome. The legacy isolation/data-preservation helpers still
+expect implicit database Secrets and need adaptation for named stores; see the
+[review findings](../docs/maintainers/documentation-review.md#remaining-implementation-gaps-and-uncertainty).
+The backlog distinguishes source tests from deployed
+acceptance; a local pass does not close outstanding operational criteria.

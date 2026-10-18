@@ -3,7 +3,7 @@
 Status: source implementation, October 13, 2026. Deployed login and complete
 administration acceptance have not yet been recorded.
 
-`devplat` is a client for the public Developer Platform API. Install the Python
+`devplat` requires Python 3.12 or newer and is a client for the public Developer Platform API. Install the Python
 package and inspect the commands:
 
 ```bash
@@ -89,10 +89,11 @@ evidence and known costs and marks unavailable provider usage as incomplete.
 Use `--output json` for machine output on stdout. Progress, recovery IDs, and
 warnings go to stderr. `logs --follow` emits successive JSON objects while it
 runs. `--debug` shows only method, API path, status, timing, and request ID.
-Authentication, authorization, conflict, invalid input, unavailable service,
-failed durable operation, and interrupted watching use distinct exit codes;
-the [implementation plan](../maintainers/delivery/plans/cli.md#command-and-output-contract)
-defines them.
+Exit codes are `0` success, `2` local input/configuration error, `3` authentication,
+`4` authorization, `5` not found, `6` conflict or stale revision, `7` API validation
+or contract-coverage error, `8` unavailable service/transport, `9` failed durable
+operation, and `10` timeout or interrupted waiting. A timeout or interruption does not
+cancel work already accepted by the server.
 
 Updates to hosted access resources use the quoted ETag returned by an earlier
 read or create response:

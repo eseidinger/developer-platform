@@ -4,9 +4,10 @@ Status: selected single-host hybrid topology with one Python/FastAPI Platform AP
 
 ## Implemented platform
 
-The [FastAPI service](../../platform/app/src/app/main.py) authenticates human and machine callers, owns projects and grants, accepts declarative application specifications, persists desired revisions and operations, provisions PostgreSQL bindings, applies Kubernetes resources, and exposes runtime status and diagnostics. Its in-process worker recovers queued or interrupted work after restart.
+The [FastAPI service](../../platform/app/src/app/main.py) authenticates human and machine callers, owns projects and grants, accepts declarative application specifications, persists desired revisions and operations, manages named stores and explicit component bindings, applies Kubernetes resources, and exposes runtime status and diagnostics. Its in-process worker recovers queued or interrupted work after restart.
 
-Docker runs the platform API, Keycloak, PostgreSQL, edge, monitoring, and k3d containers. Docker is host infrastructure, not an application workload provider. Kubernetes/k3d is the only supported application compute environment.
+Docker runs the platform API, Keycloak, PostgreSQL, selected shared stores,
+dedicated Neo4j instances, edge, monitoring, and k3d containers. Docker is host infrastructure, not an application workload provider. Kubernetes/k3d is the only supported application compute environment.
 
 ```mermaid
 flowchart TB
@@ -15,10 +16,12 @@ flowchart TB
     Clients --> API
     API --> Identity[Keycloak / OIDC]
     API --> PlatformState[(Platform PostgreSQL)]
-    API --> ProjectDB[(Project databases)]
+    API --> StoreWorker[Named-store reconciliation]
+    StoreWorker --> Stores[(Named provider resources)]
+    Workloads --> Relay[Private lease relay] --> Stores
     API --> K8s[Kubernetes / k3d]
     K8s --> Workloads[Application services and scheduled jobs]
-    API --> Obs[Prometheus / Loki / Grafana / Alertmanager]
+    API --> Obs[Prometheus / Loki / Tempo / Alloy / Grafana / Alertmanager]
     Edge[Caddy / Traefik] --> API
     Edge --> Workloads
 ```
@@ -27,7 +30,7 @@ flowchart TB
 
 1. **Infrastructure foundation:** the host, Docker, Kubernetes/k3d, PostgreSQL, networking, edge/TLS, monitoring, backups, Keycloak, and the external watchdog.
 2. **Platform application:** one Python/FastAPI deployment owns metadata, authorization, deployment intent, durable operations, policy, infrastructure execution, runtime observation, diagnostics, and audit.
-3. **Developer experience:** API, CLI, CI, test automation, and later the portal and AI assistance use the same authorized Platform API.
+3. **Developer experience:** API, CLI, CI, test automation, the React portal, and bounded AI assistance use the same authorized Platform API.
 
 The Python code keeps catalog, authorization, lifecycle, operation, integration, and observation responsibilities modular. Those are internal boundaries, not separately deployed services or permission to duplicate authoritative state.
 
@@ -41,7 +44,10 @@ The public API uses platform concepts rather than Kubernetes kinds or Compose fi
 
 ## Infrastructure and lifecycle boundaries
 
-PostgreSQL data is independent of workload lifecycle. Removing or replacing Kubernetes resources does not implicitly remove project databases. Retirement and permanent deletion require explicit scoped decisions and auditable operations.
+PostgreSQL data is independent of workload lifecycle. Removing or replacing Kubernetes resources does not implicitly remove named stores.
+Only explicitly bound components receive resource credentials. Independent human
+grants provide expiring native/console access. Neo4j Community uses full-instance
+access; other supported providers offer read-only and read-write modes. Retirement and permanent deletion require explicit scoped decisions and auditable operations.
 
 The Platform API directly integrates with Kubernetes, PostgreSQL, monitoring discovery, routing configuration, and Keycloak administration needed for machine credentials. Backend failures are redacted for callers and correlated through durable operation and audit identifiers.
 

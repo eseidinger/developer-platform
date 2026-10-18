@@ -3,7 +3,9 @@
 The platform gives a project a controlled way to declare an application and
 manage its lifecycle. A project is the principal unit of ownership: it has a
 stable catalog identity, grants, a default environment, application revisions,
-a Kubernetes namespace, and a separate PostgreSQL database for application data.
+a Kubernetes namespace when deployed, and independently managed named data resources.
+Only approved component bindings supply store credentials; unbound applications
+receive no automatic database.
 The currently supported application declaration can describe container services
 and scheduled components. An exposed service also has an explicit access policy;
 being reachable on the public network does not itself grant callers access.
@@ -32,7 +34,8 @@ flowchart LR
 
     Workers --> Keycloak
     Workers --> K8s[Kubernetes API]
-    Workers --> PG[(Project databases)]
+    Workers --> PG[(Independent named stores)]
+    Workloads --> Relay[Component-scoped lease relay] --> PG
     K8s --> Workloads[Project workloads]
     K8s --> Boundary[Ingress and hosted-access boundary]
     Caller[Application caller] --> Boundary --> Workloads

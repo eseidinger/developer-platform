@@ -10,6 +10,24 @@ Run deployment commands from the repository root.
 
 [ADR-010](../../docs/architecture/decisions/ADR-010-single-environment-lab.md) selects the existing platform and watchdog for controlled, reversible checks. Do not create an additional test or recovery environment as a routine next step. The isolated recovery procedures below remain references for past drills or a future explicitly chosen exercise; new isolated drills are deferred, and their unverified acceptance criteria stay open.
 
+## Current implementation and recovery limits
+
+Scheduled capture includes the full PostgreSQL catalog and Keycloak database,
+current application Secrets, generated store configuration, named native volumes,
+Neo4j instance/image inventory and verified purge intent. Native-store bundles
+pause managed leases for at most 35 minutes and stop retained native instances
+for capture; applications must tolerate interruption and reconnect. Caddy and
+Grafana are also briefly stopped. See the [capture contract](../../docs/operators/data-stores.md#retention-and-capacity).
+
+The marker-seeding and generic `test-recovery.py` examples below preserve the
+legacy `project_<name>`/`database` Secret assumptions. They are not current
+acceptance for newly created named stores. The restore script handles store
+volumes and quarantine but refuses replay of recovered component bindings and
+still submits internal stored specs for selected-project reapply. Use reviewed
+public declarations and fresh grants/bindings as described in the
+[current recovery workflow](../../docs/operators/backup-and-recovery.md#reapply-restored-projects).
+Deployed off-host application reconnection remains unverified.
+
 ## Start with the playbooks
 
 Run these commands from the repository root on the **WSL/Ansible controller**.
@@ -294,7 +312,7 @@ playbook does **not** schedule capture, apply retention/prune, or perform a back
 or restore. Use [scheduled backup deployment](#scheduled-backups-and-independent-backup-alerts) for capture, retention and independent reporting. Live verification and restore remain OPS-006-T02/T03 work in the
 [delivery backlog](../../docs/maintainers/delivery/backlog.md). Preserve platform
 configuration, database roles/data, secrets and required service state in the
-future recovery bundle; a repository alone does not cover that inventory.
+recovery bundle; a repository alone does not cover that inventory.
 
 Validate without deploying:
 
@@ -316,7 +334,8 @@ After repository setup, [deploy-backup.yml](ansible/deploy-backup.yml) installs 
 runner and systemd units. The existing platform stays deployed. **Each backup
 briefly stops Caddy and Grafana while archiving their named volumes**, then starts
 the same containers before S3 upload. Public ingress and Grafana are interrupted
-during that capture window; PostgreSQL and workloads keep running. Avoid concurrent
+during that capture window. PostgreSQL keeps running; native-store capture also
+interrupts managed data access and stops native services/instances as described above. Avoid concurrent
 platform deployment, manual container replacement or configuration changes during
 backup capture. Measure this window on the first run.
 
@@ -384,10 +403,13 @@ Each encrypted recovery bundle contains:
   not a single transaction across databases; coordinate writes if cross-database
   consistency is required.
 - Deployed source/configuration (`compose.yaml`, `.env`, `scripts`, `platform`,
-  `infrastructure`, `persistence`), including `DATABASE_KEY` and database credentials.
+  `infrastructure`, `persistence`, `identity`), including `DATABASE_KEY` and database credentials.
 - `/etc/developer-platform`, including backup/heartbeat credentials; installed
   backup helper programs and systemd units. Keep independent copies of recovery
   credentials outside this host and repository so they are available to decrypt it.
+- Current `app-secrets` in `project-secrets.json`, excluding previous rotation values.
+- Retained native-store/Neo4j volume archives and `store-recovery.json`; generated
+  `.runtime/stores` configuration is included when present.
 - Stopped-service archives of Caddy data/config and Grafana state, including SQLite.
 - A manifest with capture start time, checksums, run identity and installation
   identity, plus installed restic/PostgreSQL versions, container image IDs/digests
@@ -442,7 +464,7 @@ Local validation:
 
 ```bash
 ansible-playbook -i operations/backup/ansible/inventory.backup.example.yml operations/backup/ansible/deploy-backup.yml --syntax-check
-python3 -m unittest discover -s tests -v
+python3 -m unittest discover -s operations/backup/tests -v
 php operations/watchdog/tests/backup.php
 ```
 
@@ -563,7 +585,7 @@ elapsed preparation and restoration time against the four-hour RTO.
 
 References: [Ubuntu cloud images](https://cloud-images.ubuntu.com/releases/noble/release/),
 [QEMU invocation](https://www.qemu.org/docs/master/system/invocation.html),
-[cloud-init SSH configuration](https://cloudinit.readthedocs.io/en/stable/reference/yaml_examples/ssh.html).
+[cloud-init SSH configuration](https://docs.cloud-init.io/en/latest/reference/yaml_examples/ssh.html).
 
 ### Remove the recovery VM or start a fresh drill
 

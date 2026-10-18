@@ -1,9 +1,12 @@
 # Data Store Expansion
 
-Status: planned and deferred work as of October 17, 2026. PostgreSQL provisioning
-is implemented; the additional data-store providers below are not implemented in
-the inspected platform source. No new deployment or benchmark was performed for
-this documentation update.
+Status: design and delivery plan, originally recorded October 17, 2026.
+The earlier source assessment is historical: named PostgreSQL, RustFS,
+OpenSearch, Qdrant and dedicated Neo4j Community providers are now implemented.
+See the [Phase 7 checkpoint](phase-7-planned-data-stores.md) and
+[current operator contract](../../../operators/data-stores.md) for delivered
+behavior and scoped EV-67–72 evidence. Deferred Phase 8 providers and outstanding
+acceptance remain planned; this documentation review ran no deployment or benchmark.
 
 The [data store roadmap](../../../product/data-store-roadmap.md) is organized into
 provider phases 7 and 8 plus a separate measurement phase 9:

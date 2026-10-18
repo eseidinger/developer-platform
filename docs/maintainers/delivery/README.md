@@ -1,6 +1,6 @@
 # Delivery status and plans
 
-Status: current delivery index as of October 17, 2026. Future phases are proposals
+Status: current delivery index as of October 18, 2026. Future phases are proposals
 without confirmed dates.
 
 ## Architectural evolution
@@ -33,6 +33,13 @@ without confirmed dates.
 ## Implementation status
 
 The [delivery backlog](backlog.md#evidence-conventions) is the source of truth for task status, implementation findings and acceptance evidence. Its imported September 26 baseline records a partial administrator-operated foundation. Phase 1A is complete under the accepted limitations in ADR-011, ADR-016, and ADR-017; Phase 1B is complete under its recorded owner-directed alert-delivery exception; Phase 1C is complete under the limits recorded in its October 3 gate audit. Phase 2A passed its deployed acceptance suite on October 4 under its recorded owner-accepted deferrals for database-row preservation, backup inventory, and representative capacity measurement. Phase 2B is accepted under its recorded deferrals for expiry, controlled identity-provider outage, and deployed backup coverage. Phase 2C is complete with the protected live-drill evidence and accepted single-lab limits recorded in the backlog. Phase 3 is complete under the owner-directed source/local scope and named deployed-acceptance exception in its [completion record](history/phase-3-developer-experience.md#completion-record-october-15-2026). [Phase 10 anytime leftovers](plans/phase-10-anytime-leftovers.md) collects unfinished contract, identity, monitoring, integration, recovery, portal, template, and human-database acceptance; it is listed last and may be done whenever capacity allows. Concrete energy-system declarations and domain assertions remain externally owned. The current delivery architecture remains the existing Kubernetes provider and one Python/FastAPI API application. Consult task notes and the verification register for revisions, environments and limits.
+
+Current store evidence as of October 18 includes PostgreSQL's scoped deterministic
+7.1 exit (EV-67), native provider/extension checks (EV-68/69), a synthetic
+artifact/outbox/search flow (EV-71), and real native console journeys (EV-72).
+Seven EV-71/72 purges remain awaiting a verified scheduled backup; this review
+adds no deletion, restore or elapsed-time acceptance. Details remain in the
+[verification register](backlog.md#verification-register).
 
 ## Work sequence and gates
 
@@ -79,7 +86,7 @@ flowchart LR
 | [2C](history/phase-2c-platform-capabilities.md) | Accepted Phase 2A and 2B vertical slices | Diagnostics, policy, scaling, connectivity, recovery, and retirement on the current Kubernetes provider and single Python API |
 | [3](history/phase-3-developer-experience.md) | Complete October 15, 2026 under owner-directed source/local scope | Portal, CLI, template, and human database source capabilities; deployed journey acceptance remains in Phase 10 |
 | [4](plans/phase-4-tracing-and-dashboards.md) | Complete October 16, 2026 by owner direction | Implemented tracing, application/JVM/PostgreSQL metrics and verified operator dashboards; remaining acceptance/fixes deferred to Phase 10 package 10.9 |
-| [5](plans/phase-5-ai-operations.md) | In progress; Phase 4 gate satisfied; PLAN-025 / 5.6 owner-accepted | Implemented scoped assistance and approved rollback with bounded live evidence; PLAN-010–015 broader acceptance remains open; OpenLIT instrumentation and AI Grafana dashboards planned as 5.7–5.8 |
+| [5](plans/phase-5-ai-operations.md) | In progress; Phase 4 gate satisfied; PLAN-025 / 5.6 owner-accepted | Implemented scoped assistance and approved rollback with bounded live evidence; PLAN-010–015 broader acceptance remains open; OpenLIT instrumentation and AI Grafana dashboards implemented/deployed with owner functional verification; remaining operational checks stay open |
 | [6](../../architecture/evolution.md) | Optional owner decision after Phase 5; demonstrated need for another compute provider or service boundary | Optional Docker compute adapter and/or polyglot service extraction, each gated by parity, migration, rollback, and operational evidence |
 | [7 – Planned Data Stores](plans/phase-7-planned-data-stores.md) | Existing PostgreSQL capabilities; package 7.1 integration acceptance before additional stores | PostgreSQL baseline, DuckDB/Parquet/S3 foundation and targeted OpenSearch, AGE/Neo4j, pgvector/Qdrant functional provider acceptance |
 | [8 – Deferred Data Stores](plans/phase-8-deferred-data-stores.md) | Owner-selected package, named implementation owner and resource budget | TimescaleDB/ClickHouse, Valkey and MongoDB/CouchDB providers when selected; operational policies still apply |

@@ -1,6 +1,6 @@
 # Product overview and vision
 
-Status: current product overview and target vision. Last reviewed October 9, 2026.
+Status: current product overview and target vision. Last reviewed October 18, 2026.
 
 The Developer Platform allows developers to describe an application and its required resources, then provision it reproducibly. It connects the application lifecycle, standardized platform services, and traceable architectural decisions.
 
@@ -10,15 +10,20 @@ The core promise is: **I describe what my application needs; the platform provis
 
 - Versioned declarations for multi-service applications and scheduled components.
 - A REST API and CLI with durable operation status and revision-aware updates.
-- Per-project PostgreSQL, configuration, secrets, routing, quotas, health checks,
+- Named PostgreSQL resources with explicit bindings, configuration, secrets, routing, quotas, health checks,
   diagnostics, rollback, and explicit retirement.
 - OIDC identities, project-scoped grants, revocable CI credentials, and redacted
   audit events.
 - Kubernetes workload restrictions, connectivity policy, monitoring, encrypted
   backups, and external availability signals.
 
-The browser portal is under active development. The current supported automation
-path is the Platform API and CLI.
+The React portal implements project lifecycle, hosted access, named stores and
+human leases, administration, and AI assistance. Optional RustFS S3, OpenSearch,
+Qdrant and dedicated Neo4j Community providers are implemented with scoped native
+and browser access. AI runs provide bounded project explanations/investigations
+and curated guidance; a separate approved proposal can execute a rollback.
+The API and CLI provide automation. Source implementation and local tests do not
+establish every deployed acceptance criterion; see the [roadmap](roadmap.md).
 
 ## Users and value
 
@@ -33,7 +38,9 @@ The platform also serves as a cohesive reference and portfolio project. Its curr
 
 ## Product boundaries
 
-The first usable vertical slice covers a project/environment, a containerized and largely stateless HTTP application, PostgreSQL, secrets, routing, and basic operations. Infrastructure is provisioned once as the platform foundation; a new project creates resources on that foundation, not a new cluster.
+The first usable vertical slice covers a project/environment, a containerized and largely stateless HTTP application, PostgreSQL, secrets, routing, and basic operations. Infrastructure is provisioned once as the platform foundation; a new project creates an ownership scope on that foundation. Stores are created
+independently and bound to consuming components; an empty project or unbound
+application creates no database.
 
 Labs comparing JSONB with MongoDB, relational with graph persistence, or pgvector with specialized vector stores remain extensions. They provide decision evidence but are not required MVP services.
 

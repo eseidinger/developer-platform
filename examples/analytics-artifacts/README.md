@@ -19,6 +19,10 @@ python artifacts.py publish input.parquet > snapshot-reference.json
 python artifacts.py read snapshot-reference.json verified.parquet
 ```
 
+Run these application commands from `examples/analytics-artifacts` with its
+requirements installed and the binding/lease environment configured. Run the
+later fixture commands from the repository root.
+
 Publication uses new UUID keys and requires native bucket versioning. The small
 reference identifies an exact manifest version, length and SHA-256; that manifest
 identifies an exact Parquet version, length and SHA-256. References contain no

@@ -19,9 +19,9 @@ These are module and data-ownership boundaries inside one deployable application
 
 ## Request and operation flow
 
-Each state-changing request authenticates the caller, checks the current platform grant, validates the public contract and supported capabilities, then atomically stores the desired revision and durable operation before returning `202 Accepted`. Repeated requests for an unchanged revision reuse its active operation. Expected-revision checks prevent stale updates.
+Each deployment request authenticates the caller, checks the current platform grant, validates the public contract and supported capabilities, then atomically stores the desired revision and durable operation before returning `202 Accepted`. Other mutations use their domain's resource/version and response contract. Repeated requests for an unchanged revision reuse its active operation. Expected-revision checks prevent stale updates.
 
-The in-process worker claims queued or interrupted operations using database locks, rechecks authorization and revision freshness, and executes the approved steps. It ensures the PostgreSQL database/login, generates Kubernetes resources, applies them with server-side apply, publishes monitoring discovery, and records a redacted result. The worker observes existing state before retrying operations whose outcome may be unknown.
+The in-process worker claims queued or interrupted operations using database locks, rechecks authorization and revision freshness, and executes the approved steps. It resolves approved named-store bindings, generates component-scoped Secrets and relay-port egress, applies Kubernetes resources with server-side apply, publishes monitoring discovery, and records a redacted result. A separate store worker provisions independent resources and reconciles grants and credential rotation; deployments never create an implicit project database. The worker observes existing state before retrying operations whose outcome may be unknown.
 
 Catalog, PostgreSQL, and Kubernetes changes are not one transaction. Partial failures therefore remain visible as durable operations. Idempotent `ensure`, observation, retry, rollback, and retirement behavior prevent blind recreation or implicit data deletion.
 
@@ -36,9 +36,10 @@ Technology independence is a contract constraint, not a requirement to implement
 The Python application integrates directly with the selected infrastructure:
 
 - Kubernetes/k3d for application services, scheduled components, Secrets, Services, and Ingress;
-- PostgreSQL outside k3d for platform state and project databases;
+- PostgreSQL outside k3d for platform state and named-resource databases;
+- operator-selected RustFS, OpenSearch, Qdrant and dedicated Neo4j Community for additional named resources;
 - Caddy and Traefik for edge and cluster routing;
-- Prometheus, Loki, Grafana, Alertmanager, and discovery files for observability;
+- Prometheus, Loki, Tempo, Alloy, Grafana, Alertmanager, and discovery files for observability;
 - Keycloak through the generic OIDC boundary for authentication and machine identities.
 
 There is no direct Docker application-workload adapter. Docker remains the host runtime for the platform, identity, persistence, monitoring, and k3d containers.

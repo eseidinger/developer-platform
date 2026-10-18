@@ -2,7 +2,10 @@
 
 Status: planned work index.
 
-Only unfinished, owned implementation plans belong here:
+This index contains active work and retained completion/exception records. The
+Phase 4 plan is a completed record kept at its existing path for evidence links;
+current behavior belongs in the canonical guides. A plan's unchecked criteria
+must not be read as proof that the corresponding source capability is absent:
 
 - [Deployed Platform API acceptance suite](deployed-api-acceptance.md) — proposed first installed-platform test stage
 - [Energy-system use-case enablement priority](energy-system-integration.md)

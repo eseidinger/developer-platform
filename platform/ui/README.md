@@ -12,18 +12,19 @@ is sequenced in the
 
 ## Status
 
-Foundation increment 0 is implemented in source: generated shadcn code lives under
-`src`, the Vite demo has been removed, strict type-aware linting is enabled, the
-application has a routed shell and TanStack Query provider, and API types are
-generated from the committed OpenAPI document. Lint, type checking, component tests,
-and the production build pass.
+The routed React portal implements project lifecycle and diagnostics, grants,
+deployment credentials, hosted application access, named stores and human leases,
+platform administration, and AI assistance. API types are generated from the
+committed OpenAPI document. Component and fixture browser tests exercise selected
+journeys; deployed acceptance is recorded separately in the delivery backlog.
 
 The browser authentication boundary uses `oidc-client-ts` for provider-neutral
 Authorization Code with PKCE. The public `/portal/config` endpoint supplies the
 issuer, client ID, and redirect URI. User and access-token state stays in memory;
 only the protocol transaction state needed across the redirect uses session storage.
-Live Keycloak validation, API feature queries, project lifecycle screens, and
-deployment integration are not implemented yet.
+The production API image builds and serves the portal. Vite development uses
+its configured API proxy; browser tests use deterministic intercepted APIs.
+These fixture tests do not prove a complete deployed Keycloak/lifecycle journey.
 
 ## Selected stack
 
@@ -37,9 +38,8 @@ deployment integration are not implemented yet.
 - Vitest, jsdom, Testing Library, and Playwright
 - ESLint and npm with the committed lockfile
 
-Authentication remains one bounded selection: no OIDC browser client is installed
-yet. It must implement Authorization Code with PKCE, keep access tokens in memory,
-and preserve the provider-neutral authorization boundary described in the ADR.
+Authentication uses the installed `oidc-client-ts` client. Portal tokens stay
+in memory; protocol transaction state uses session storage across the redirect.
 
 ## Current commands
 
@@ -65,8 +65,8 @@ npm run preview
 ## Contract and security boundaries
 
 The backend-generated contract is
-[`docs/api/openapi.json`](../../docs/api/openapi.json). The UI will generate types
-from that file and call the API through one adapter. FastAPI remains authoritative
+[`docs/api/openapi.json`](../../docs/api/openapi.json). The UI generates types
+from that file and calls the API through shared client adapters. FastAPI remains authoritative
 for authorization, validation, lifecycle, audit, and redaction. Client-side role
 checks only explain or hide unavailable actions; they never grant them.
 

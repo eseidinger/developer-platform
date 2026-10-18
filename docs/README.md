@@ -1,6 +1,6 @@
 # Developer Platform documentation
 
-Status: current documentation index. Last reviewed October 9, 2026.
+Status: current documentation index. Last reviewed October 18, 2026.
 
 Choose the path that matches what you are trying to do.
 
@@ -21,7 +21,8 @@ For administrators responsible for the shared installation:
 1. [Operator overview](operators/README.md)
 2. [Install locally](operators/install-local.md) or
    [install on a remote host](operators/install-remote.md)
-3. [Bootstrap identity and access](operators/identity-and-access.md)
+3. [Bootstrap identity and access](operators/identity-and-access.md) and
+   [manage named stores](operators/data-stores.md)
 4. [Monitor](operators/monitoring.md),
    [back up and recover](operators/backup-and-recovery.md), or
    [respond to an incident](operators/runbooks/README.md)
@@ -40,7 +41,8 @@ For contributors and maintainers changing platform code or delivery plans:
 
 For architects and reviewers:
 
-1. [Architecture overview](architecture/README.md)
+1. [System model](platform-model/README.md) and
+   [architecture overview](architecture/README.md)
 2. [Platform application](architecture/platform-application.md) and
    [application lifecycle](architecture/application-lifecycle.md)
 3. [Deployment topology](architecture/deployment-topology.md),

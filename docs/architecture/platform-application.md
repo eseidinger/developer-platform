@@ -19,7 +19,8 @@ flowchart LR
   API --> Auth[OIDC verifier and platform grants]
   API --> Catalog[PostgreSQL catalog and audit]
   API --> Worker[In-process operation worker]
-  Worker --> DB[Project PostgreSQL database/login]
+  Worker --> Bindings[Approved component bindings]
+  Stores[Named-store worker] --> DB[Independent provider resources and leases]
   Worker --> K8s[Kubernetes provisioner]
   Worker --> Discovery[Monitoring discovery]
   API --> Observe[Logs, metrics, readiness, drift]
@@ -52,7 +53,7 @@ sequenceDiagram
   A->>P: persist revision and queued operation atomically
   A-->>C: 202 operation ID
   W->>P: claim queued or interrupted operation
-  W->>P: ensure project database and role
+  W->>P: resolve approved component bindings and active credentials
   W->>K: server-side apply workload resources
   W->>P: record redacted result and observed state
 ```
@@ -68,8 +69,8 @@ database contents or migrations.
 
 The catalog has stable project, environment, and application IDs; immutable
 application revisions; operations; grants; credentials; append-only audit
-events; and retirement records. Project database data is deliberately separate
-from the catalog. Secrets are stored in project Kubernetes Secrets, returned
+events; and retirement records. Named-store data is deliberately separate from the catalog. Resources, grants,
+leases, recovery tombstones, AI runs and AI proposals also have catalog records. Secrets are stored in project Kubernetes Secrets, returned
 write-only, and redacted from API responses and audit detail.
 
 ```mermaid
@@ -91,16 +92,17 @@ cursors, resource inventory and usage, drift reporting, revisions, and
 operator capacity. Provider errors and missing metrics are explicit states,
 not zero values. Drift is reported and audited; it is not silently reverted.
 
-The process runs background loops for operations, monitoring discovery, security
-alerts, drift scans, and deployment-credential cleanup. They use the catalog as
+The process runs background loops for deployments, hosted access, named stores,
+native store metrics, monitoring discovery, security alerts, drift scans, and
+deployment-credential cleanup. They use the catalog as
 their durable source of truth; background work must recheck authorization and
 record safe, redacted outcomes.
 
 ## Lifecycle boundaries
 
 Retirement previews the scope, requires confirmation bound to a scope token,
-removes selected workload resources, and retains data unless an explicit future
-deletion policy says otherwise. Deployment credential revocation first removes
+removes selected workload resources, and retains named-store data. Resource purge is a separate confirmed action gated
+by observed cleanup and verified encrypted off-host backup intent. Deployment credential revocation first removes
 the platform grant, so an otherwise valid OIDC token is denied before identity
 provider cleanup completes.
 

@@ -76,11 +76,13 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/project
 | Finish a rotation | `POST $P/secrets/NAME/confirm` after the application works with the new value | 200, previous value revoked |
 | Undo a rotation | `POST $P/secrets/NAME/revert` while `rotating` | New version, pods restart |
 | Roll back a release | `GET $P/revisions`, inspect `dependencies`, then `POST $P/rollback` body `{"revision": N}` | New operation `succeeded` |
-| Retire | `GET $P/retirement-preview`, then `POST $P/retire` with the `scope_token` and `confirm_name` | Repeat the POST until `200 retired`; project grants are removed and deployment credentials enter provider cleanup; database, role and catalog are retained |
+| Retire | `GET $P/retirement-preview`, then `POST $P/retire` with the `scope_token` and `confirm_name` | Repeat the POST until `200 retired`; project grants are removed and deployment credentials enter provider cleanup; independent store data and catalog are retained |
 
 Failure responses: 401 no or expired token; 403 missing grant; 404 unknown project or secret; 400 retire confirmation does not match the project name; 409 `revision_conflict`, `scope_changed`, `name_in_use`, `not_adopted`, `no_previous_version` or a retired project; 422 `invalid_spec`, `unsupported_capability`, `invalid_configuration` or `invalid_secret`; 503 dependency unavailable, retry the same request. Secret values are never returned, logged or audited. Secrets are in the backup bundle (ADR-015); previous values are not.
 
-Revision `dependencies` reports `database: retained` and `application_secrets: current_only`. A rollback reapplies
+Revision `dependencies` still reports the legacy `database: retained` metadata
+and `application_secrets: current_only`; it is not an inventory or health check
+for independent named stores. Inspect actual bindings/resources separately. A rollback reapplies
 the retained application spec only: it neither reverses PostgreSQL contents/migrations nor restores historic secret
 values, because secret values are deliberately excluded from revisions. Restore those dependencies through their
 separate controlled procedures before declaring a rollback recovery complete.

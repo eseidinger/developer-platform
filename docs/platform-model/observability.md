@@ -61,7 +61,8 @@ use bounded readiness paths and probe profiles, rather than arbitrary probe
 URLs or credentials supplied by an application. Prometheus scrapes the
 blackbox exporter for route behavior, kube-state-metrics for Kubernetes object
 state, node-exporter for host state, and the monitoring services themselves.
-Grafana has Prometheus and Loki as data sources.
+Grafana has provisioned Prometheus, Loki and Tempo data sources and operator
+dashboards, including workload/capacity, PostgreSQL, application/JVM, AI and stores.
 
 The Phase 4 [application metrics capability](../architecture/application-contract.md#application-metrics-declaration-phase-4-implementation-in-progress)
 adds opt-in, private Prometheus-format scrapes for declared service components
@@ -70,7 +71,8 @@ Source implementation is available; complete framework-fixture acceptance remain
 
 The [application tracing capability](../architecture/application-contract.md#application-tracing-declaration-phase-4-implementation-in-progress)
 lets opted-in components propagate safe trace context and export spans to a
-private collector. The collector verifies workload identity and derives
+Pod-local forwarder and private gateway. Only the forwarder mounts the rotating
+Pod-bound token; the gateway verifies workload identity and derives
 project/component provenance before storage. Application OTLP export and a
 project-scoped trace read are implemented; full deployed acceptance remains open.
 

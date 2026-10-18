@@ -74,7 +74,8 @@ extension installation, access grants/default ACL changes and security-definer
 routines remain operator privileges. Shared writer ownership permits startup
 migrations and changes to other approved writers' tables in the same resource.
 
-Revoke through the portal or `stores grants revoke GRANT_UUID --file version.json`,
+Revoke through the portal or
+`devplat stores grants revoke GRANT_UUID --file version.json --confirm-grant-id GRANT_UUID`,
 where the file contains the current `version`. Revocation retains data and affects
 every credential generation. Resource purge is a separate confirmed action after
 retirement and cleanup, waiting for verified off-host purge intent before deletion.

@@ -1,6 +1,6 @@
 # Platform API guide
 
-Status: current. Last reviewed October 12, 2026.
+Status: current. Last reviewed October 18, 2026.
 
 The REST API is the authoritative boundary used by the UI, CLI, CI, and test
 automation. Its machine-readable contract is [OpenAPI](../api/openapi.json); this
@@ -14,7 +14,8 @@ Human and machine identities use the same authorization boundary but have
 different credential lifecycles.
 
 The main resources are projects, declarations and revisions, durable operations,
-grants, deployment credentials, diagnostics, and bounded operator surfaces.
+grants, deployment credentials, named-store resources/bindings/leases, AI
+runs/proposals, diagnostics, and bounded operator surfaces.
 Project routes are scoped by the project name; access to one project does not
 grant access to another.
 
@@ -68,6 +69,60 @@ configuration, not a certified retention drill. Only the
 is centralized; ordinary application text remains kubelet best effort.
 `GET /v1/capabilities` advertises these supported contracts in `observability`;
 it does not attest collector health or elapsed retention in the current environment.
+
+## Named data stores
+
+Resources have an independent lifecycle under `POST/GET /v1/projects/{project}/resources`
+and `/v1/resources/{resource_id}`. A resource-owning administrator grants human
+access or approves a component binding. Cross-project binding requests remain
+pending until owner approval. Only an active approved binding named in the
+consuming `v1alpha2` component supplies a store Secret and private relay egress.
+Unbound and legacy applications receive no implicit database.
+
+Store mutations use JSON `version` fields, distinct from hosted-access ETags and
+deployment revisions. Retirement retains data and revokes access; purge confirms
+resource UUID, owner and version and waits for verified off-host backup intent.
+Provider enablement and capacity come from operator settings. Neo4j Community
+supports full-instance `read-write` access only, rejecting read-only grants.
+
+Interactive humans inspect `/v1/store-access/me`, issue a 24-hour credential at
+`POST /v1/store-access/{grant_id}/credentials`, and reveal only their active lease
+at `/v1/store-access/credentials/{credential_id}`. Pending issuance returns 202;
+inspect that lease/history before retrying an uncertain creation. Console launch
+assertions are browser-only; raw provider endpoints remain private. See
+[resource lifecycle](../operators/data-stores.md) and
+[human connection instructions](database-access.md) for request bodies and provider limits.
+
+The legacy `database-access` grant/password issuance POSTs return 410. The older
+`data-services` diagnostic still inspects the implicit `project_<name>` database;
+use named resource state and binding/lease observations for current stores.
+
+## AI assistance
+
+Project-scoped `/projects/{name}/ai/` endpoints expose context, classification,
+run history and rollback proposals. Human project viewers can create a run with
+`{"kind":"explain_application"}`, `investigate_incident`, or
+`development_assistance`. Runs require Public/Internal classification and a
+configured eligible external provider. A human platform administrator changes the
+separate AI policy using `{"classification":"internal"}`; changing general
+project governance does not itself set the AI policy.
+
+Runs execute synchronously within a 90-second budget and save durable results,
+evidence, usage completeness and estimated cost. A disconnected request does not
+cancel server work, and a process interruption can leave a running record.
+Inspect history before retrying an uncertain POST. Automation can read authorized
+history but cannot start human assistance or approve writes.
+
+A completed sourced incident investigation bound to the current revision can
+create a proposal with `{"run_id":"RUN_UUID"}` when the latest apply failed or
+a server-observed runtime failure is confirmed. The target is a retained successful
+revision. Review its structural diff and exact `diff_sha256`; approval and execution
+are separate JSON POSTs carrying that hash. Human management authority, current
+revision and a single-use 15-minute approval are rechecked before the normal
+rollback operation is accepted. No database rollback or arbitrary model write is
+implemented. Poll the returned deployment operation and readiness separately.
+See [UI assistance](ui.md#use-ai-assistance) and the
+[AI telemetry reference](../../infrastructure/monitoring/AI.md).
 
 ## Hosted application access
 

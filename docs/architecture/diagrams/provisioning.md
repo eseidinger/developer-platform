@@ -19,7 +19,7 @@ sequenceDiagram
     API-->>Dev: 202 operation ID + status URL
     Worker->>PG: Claim queued or interrupted operation under advisory lock
     Worker->>PG: Recheck actor grant and latest revision
-    Worker->>PG: Publish monitoring and ensure database
+    Worker->>PG: Resolve approved bindings and publish monitoring
     Worker->>K8s: Server-side apply fixed resources
     Worker->>PG: Persist applied result or sanitized failure
     Dev->>API: GET /v1/operations/{id}
@@ -29,7 +29,10 @@ sequenceDiagram
     Note over Dev,K8s: Readiness is separate from the persisted apply outcome
 ```
 
-The worker reclaims a `running` operation when the prior process releases its session lock, retrying idempotent steps from the start. The monitoring-only thread also republishes discovery but does not reconcile workloads. Retirement separately acknowledges an already absent namespace, rejects active operations, and retains SQL/catalog data. See [ADR-012](../decisions/ADR-012-admin-provisioning-baseline.md) and [ADR-014](../decisions/ADR-014-catalog-availability-monitoring.md).
+The worker reclaims a `running` operation when the prior process releases its session lock, retrying idempotent steps from the start. The monitoring-only thread also republishes discovery but does not reconcile workloads. Retirement pins a preview scope, commits the named-store access fence, deletes
+the managed namespace and records retained data/catalog state. It rejects active
+operations. Without a scope token, the compatibility path only acknowledges an
+already absent namespace. See [ADR-012](../decisions/ADR-012-admin-provisioning-baseline.md) and [ADR-014](../decisions/ADR-014-catalog-availability-monitoring.md).
 
 ## Optional Phase 6 extracted-service contract
 

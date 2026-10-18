@@ -70,18 +70,32 @@ this guide explains execution and the scope of reported evidence.
 The following sections explain scope and manual fallback procedures. Use the
 current in-place playbooks for routine notification drills; isolated restore procedures require a later explicit decision or an actual recovery event under ADR-016.
 
+The marker-seeding and generic `test-recovery.py` checks above still assume the
+historical `project_<name>` database and project-wide `database` Secret.
+They are not runnable acceptance for newly created named stores. The current
+restore script has named-store volume/quarantine support, but refuses automatic
+reapply of recovered bound components until fresh approval and declarations.
+Use the [named-store recovery procedure](#named-data-store-recovery); a complete
+deployed off-host restore/reconnection remains open.
+
 ## Current backup scope
 
 | Data | Current mechanism | Remaining responsibility |
 | --- | --- | --- |
 | Project databases, roles and password hashes | Compressed `pg_dumpall` in encrypted restic bundle | Verify pre-backup data and application recovery |
-| Platform metadata | Same dump includes `platform.projects` with latest specs/status | No revision history, jobs, or audit records exist |
+| Platform metadata and identity | Full SQL dump includes catalog, revisions, operations, grants, audit, hosted-access/store/AI records and Keycloak's separate database | Restore authorization under quarantine; review current administrative authority |
 | `.env`, especially `DATABASE_KEY` and `POSTGRES_PASSWORD` | Deployment archive in encrypted bundle | Retain repository credentials/password independently of the host |
 | Caddy data/config and customized Grafana state | Stopped-service volume archives in encrypted bundle | Validate restored settings; disable production notifications in recovery |
 | Infrastructure, alert rules, workload image identities | Deployed sources/config in the encrypted bundle plus image metadata; images are not exported | Retain compatible images and record versions/digests |
+| Application Secrets | `project-secrets.json` captures current managed `app-secrets` values | Restore through the controlled path; prior rotation values are excluded |
+| Named-store data and recovery intent | SQL resource databases, retained native volumes, Neo4j image/volume inventory and `store-recovery.json` | Validate provider archives, latest verified intent, quarantine and fresh grants/bindings |
 | External watchdog MySQL/configuration | Separate hosting service | Back up through the hosting provider; PostgreSQL dump excludes it |
 
-The workload contract has no PVCs; durable application data belongs in PostgreSQL. Identity-provider state, job/revision metadata, and retained-resource inventories belong to the target architecture and are not current backup artifacts.
+The workload contract has no PVCs; durable data belongs in explicitly bound
+named resources. The source bundle includes generated operator store configuration
+under `.runtime/stores` when present. Telemetry stores and disposable pgAdmin
+preferences are not a substitute for application data/credential backups; Tempo's
+bounded filesystem is outside the backup.
 
 The implemented bundle, verification, retention and notification boundaries are recorded in [ADR-015](../architecture/decisions/ADR-015-verified-backup-bundles.md). Readback validates captured bytes; it does not establish SQL/application restoration.
 
@@ -117,7 +131,11 @@ sudo journalctl -u platform-backup.service -n 40 --no-pager
 sudo /usr/local/sbin/platform-restic snapshots --host node-01 --tag developer-platform,verified
 ```
 
-The service captures PostgreSQL roles/databases, deployment configuration, and service data; encrypts and uploads the bundle; verifies an exact-snapshot readback; and applies retention. Caddy and Grafana briefly stop during capture. Starting an already-running service does not create another backup.
+The service captures PostgreSQL roles/databases, deployment configuration, and service data; encrypts and uploads the bundle; verifies an exact-snapshot readback; and applies retention. Caddy and Grafana briefly stop during capture. Native-store bundles additionally
+pause managed leases and stop selected native services/Neo4j instances while
+capturing their retained volumes; PostgreSQL-only capture uses the existing online
+logical dump. The bounded 35-minute lease pause, restart recovery and limits are
+in [store backup semantics](data-stores.md#retention-and-capacity). Starting an already-running service does not create another backup.
 
 Confirm `result: success`, a recent capture timestamp, and the matching verified snapshot. Record its full identifier and source revision. Notification delivery can remain pending even after a verified backup; inspect the journal and status before retrying.
 
@@ -125,125 +143,65 @@ Follow [bundle retrieval](#retrieve-a-scheduled-recovery-bundle) to obtain the v
 
 ## Restore into an isolated installation
 
-Prefer [restore-recovery.yml](../../operations/backup/ansible/restore-recovery.yml) on a fresh recovery VM. The manual fallback below explains the underlying steps for diagnosis and environments outside that playbook’s supported scope.
+Select an explicit verified snapshot and a fresh host under the recovery scope
+above. Use `restore-recovery.yml` with its separate protected inventory. A second
+checkout or Compose project on the source host is insufficient isolation because
+cluster names, Docker networks and ports are fixed.
 
-Use a separate host or Docker daemon with no existing platform data. A different checkout or Compose project name on the source host is insufficient isolation: the Docker network, k3d cluster name, and host ports are fixed. This is a whole-instance restore, not a procedure for overwriting one project in an active installation.
+The script verifies bundle hashes, requires empty target volumes and compatible
+provider/image inventory, restores SQL and native archives, and sets hosted-access
+and named-store quarantine before starting services. It reads the latest verified
+store intent independently of the chosen data snapshot, revokes recovered grants
+and credentials, replays purge tombstones and validates surviving data. Preserve
+all operator keys from the original encrypted configuration. Never clear recovery
+guards manually or use an old data snapshot to reactivate revoked access.
 
-1. Install the prerequisites from [deployment](lifecycle.md). Check out the recorded source revision and use the same PostgreSQL major version for the first exercise; validate any version migration separately. Restore the original `.env` securely with mode 0600 and make the verified, decrypted dump available privately.
-2. Keep the recovery host isolated from production routing and external application side effects. Set `EDGE_BIND_IP=127.0.0.1`, `PLATFORM_DOMAIN=platform.localhost`, and `APPS_DOMAIN=apps.localhost` in its `.env`. Preserve `DATABASE_KEY` and `POSTGRES_PASSWORD`. Use a fresh shell with no old exported platform settings. Do not enable a sender that would impersonate the production heartbeat.
-3. From the recovery checkout, validate configuration and start only PostgreSQL:
-
-```bash
-docker compose config --quiet
-docker compose up -d --wait --wait-timeout 120 postgres
-```
-
-Confirm this is the empty recovery instance before proceeding. Only the initialized `postgres`/`platform` and template databases should exist; no project data should already be present:
-
-```bash
-docker compose exec -T postgres psql -X -U postgres -d postgres -c '\l'
-```
-
-4. Import the selected dump, keeping private logs for review:
-
-```bash
-set -o pipefail
-umask 077
-mkdir -p .runtime/recovery
-backup_file=/absolute/private/path/bundle/postgres.sql.gz
-gzip -t "$backup_file" && gzip -dc "$backup_file" | \
-  docker compose exec -T postgres psql -X -U postgres -d postgres \
-  > .runtime/recovery/restore.stdout 2> .runtime/recovery/restore.stderr
-```
-
-Replace the path before execution. The stock PostgreSQL container has already created the `postgres` role and `platform` database, so this archived full-dump approach can report duplicate-object errors for those initialization objects. It intentionally does not use `ON_ERROR_STOP`, which would stop at the expected duplicates. **A zero exit code is not import acceptance:** inspect both logs, account for every error, and verify all databases/roles/data. Do not blanket-ignore duplicate errors for project objects; they indicate a non-empty target or another problem. Logs can contain SQL and sensitive values; keep them private. If unexpected errors occur, stop and correct the recovery procedure in a fresh isolated target rather than importing repeatedly over partial state.
-
-5. Check that the recovery catalog is readable:
-
-```bash
-docker compose exec -T postgres psql -X -v ON_ERROR_STOP=1 -U postgres -d platform \
-  -c 'SELECT name, spec, status FROM projects ORDER BY name;'
-```
-
-A missing catalog table is a recovery problem unless the backed-up installation had never initialized the API. Review expected database names, ownership, and roles against the source inventory. The dump may restore the administrator password, so `.env` must match the original credentials before the API starts.
-
-6. Bootstrap the cluster and services, then reapply the catalog as below:
-
-```bash
-python3 scripts/install-k3d.py
-bash scripts/up.sh
-curl --fail-with-body http://127.0.0.1:8000/readyz
-```
-
-The API has no background workload reconciler. Bootstrap recreates cluster/controller credentials, but does not restore application workloads until PUT is repeated.
+The generic marker/test helper retains the earlier implicit-database assumptions
+described above. Review the selected project's declaration and the helper's scope
+before invoking it; its historical result is not current named-store acceptance.
+Current local provider restore fixtures are documented in
+[data-store operations](data-stores.md) and the
+[upgrade runbook](runbooks/store-upgrades.md). A deployed full restore still needs
+separate application data, authorization, reconnection and RPO/RTO evidence.
 
 ## Reapply restored projects
 
-The [recovery playbook](../../operations/backup/ansible/restore-recovery.yml) reapplies explicitly selected projects automatically. The following is a manual fallback.
+Bootstrap creates cluster/controller resources but does not replay all stored
+workloads automatically. Reapply each reviewed public declaration from the
+application's versioned deployment source. `GET /projects` returns internal
+normalized specifications, including resolved-image/runtime fields; copying those
+objects directly back to `PUT /projects/{name}` is not a supported declaration
+export and can return 422.
 
-Use this after SQL restore, or after cluster recreation with intact PostgreSQL volumes. The following commands target only the local API. They apply every non-retired stored project's latest spec, so review the catalog before running the Python block and ensure this is the intended recovery installation.
+For a full store restore, first complete quarantine reconciliation, obtain fresh
+owner approval for the consuming component, and update the declaration with its
+new binding UUID. Retain the restored data in the independent resource. Inspect
+empty and retired projects separately; do not blindly deploy `spec: null` or
+reactivate retired projects. Review original image digests, configuration,
+scheduled jobs and external side effects before reapplying.
+
+From a trusted shell with a fresh authorized human CLI session:
 
 ```bash
-umask 077
-mkdir -p .runtime/recovery
-eval "$(python3 scripts/env.py)"
-# Obtain and export a fresh authorized OIDC access token; do not save it in .env.
-export PLATFORM_ACCESS_TOKEN='…'
-curl --fail-with-body http://127.0.0.1:8000/projects \
-  -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" \
-  --output .runtime/recovery/projects.json
+devplat projects list --output json
+devplat stores list --project orders --output json
+# Review application.json and its new approved binding IDs first.
+devplat deploy apply --project orders --file application.json --wait --output json
+devplat components list --project orders --output json
 ```
 
-Review `.runtime/recovery/projects.json` for expected names, images, and ports. It is an external copy of the latest catalog, not a revision history. Then reapply:
+Use actual project names and declarations. Restore current write-only application
+Secrets from the protected bundle using the controlled recovery path before
+accepting application readiness; secret values are absent from revisions and
+ordinary API reads. Reconcile hosted access using the separate
+[human-admin recovery action](identity-and-access.md#hosted-application-access-installation-and-recovery)
+and verify authorizer readiness before opening traffic.
 
-```bash
-python3 - <<'PYTHON'
-import json
-import os
-import re
-import time
-import urllib.request
-from pathlib import Path
-
-projects = json.loads(Path('.runtime/recovery/projects.json').read_text())
-projects = [project for project in projects if project.get('status') != 'retired']
-for project in projects:
-    name = project['name']
-    if (not isinstance(name, str)
-            or not re.fullmatch(r'[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?', name)
-            or project['spec']['name'] != name):
-        raise ValueError('Invalid project identity in recovery catalog')
-for project in projects:
-    name = project['name']
-    request = urllib.request.Request(
-        'http://127.0.0.1:8000/projects/' + name,
-        data=json.dumps(project['spec']).encode(),
-        headers={'Authorization': 'Bearer ' + os.environ['PLATFORM_ACCESS_TOKEN'],
-                 'Content-Type': 'application/json'},
-        method='PUT',
-    )
-    with urllib.request.urlopen(request, timeout=180) as response:
-        accepted = json.load(response)
-    deadline = time.monotonic() + 300
-    while time.monotonic() < deadline:
-        status_request = urllib.request.Request(
-            'http://127.0.0.1:8000' + accepted['status_url'],
-            headers={'Authorization': 'Bearer ' + os.environ['PLATFORM_ACCESS_TOKEN']},
-        )
-        with urllib.request.urlopen(status_request, timeout=15) as response:
-            operation = json.load(response)
-        if operation['state'] == 'succeeded':
-            print(name + ': applied; rollout and data verification still required')
-            break
-        if operation['state'] == 'failed':
-            raise RuntimeError('Project reapply failed; operation ' + accepted['operation_id'])
-        time.sleep(2)
-    else:
-        raise TimeoutError('Project reapply timed out; operation ' + accepted['operation_id'])
-PYTHON
-```
-
-An error stops the loop. Earlier projects may already have been applied; inspect status/resources, fix the cause, and repeat safely with the same specs. A timeout does not prove the server stopped processing. Project passwords are derived from the restored `DATABASE_KEY`; provisioning does not reset existing role passwords.
+The automated restore script's selected-project replay still submits stored
+internal specs and refuses recovered bindings. It does not provide a complete
+automatic `v1alpha2` declaration export/fresh-binding workflow. Keep that
+implementation gap explicit when planning recovery; do not interpret SQL restore
+or an unbound echo rollout as store-backed application recovery.
 
 ## Recovery verification and evidence
 
@@ -262,7 +220,13 @@ A production routing switch is a separate operational step after acceptance. Res
 
 ## Target recovery capabilities
 
-Encrypted external backup automation and independent backup-age alerts now have an implementation in the scheduled backup playbook. The selected RPO is 24 hours and RTO four hours for node-01; successful deployment and marker recovery have operator-reported evidence; failure delivery, precise recovery measurement and application-level acceptance remain open. Once identity, durable jobs/revisions, and controlled deletion exist, extend backups and restore checks to those records and pause/resume workers explicitly. The current implementation has no worker or operation history to recover.
+Encrypted off-host backup automation and independent backup-age alerts are
+implemented. The selected RPO is 24 hours and RTO four hours for node-01;
+historical marker recovery and selected notification paths have recorded evidence.
+Identity, revisions, durable operations, store/access catalogs and purge intent
+are captured now. Recovery must quarantine worker-driven access and review current
+authority before traffic resumes. Precise recovery measurement and deployed
+store-backed application reconnection remain open.
 
 See [Deployment](lifecycle.md), [Runbook](runbooks/README.md), and [ADR-003](../architecture/decisions/ADR-003-postgresql-provisioning.md).
 

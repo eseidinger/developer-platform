@@ -33,6 +33,14 @@ An ADR records context, alternatives, a decision, consequences, and validation. 
 
 ADRs 012–015 record choices observable in source as of September 27, 2026. **Implemented** describes what the code does; it does not imply owner approval of these new records, acceptance of the future design, or completed operational validation. Alternatives describe tradeoffs, not a reconstructed history of owner decisions.
 
+Implementation notes dated October 18 qualify stale present-tense claims in
+ADRs 003, 012, 013, 019 and 021 without changing their decisions. The table above
+preserves each record's original decision/evidence status. Current deployment,
+named-store and telemetry behavior belongs in the
+[architecture](../README.md), [store guide](../../operators/data-stores.md) and
+[UI guide](../../developers/ui.md); pending validation in an old record does not
+mean the capability lacks source implementation.
+
 ## Decision process
 
 1. Define the problem, constraints, and affected requirements.

@@ -16,8 +16,9 @@ security and authorization-principles pages.
 3. **Kubernetes execution** occurs only through the Platform API's provisioner
    ServiceAccount after a platform permission check succeeds.
 4. **PostgreSQL authorization** is a separate database connection and privilege
-   decision. The API creates the project login/database and a workload connects
-   using that login; Keycloak tokens are never presented to PostgreSQL.
+   decision. Independent named resources and explicit grants supply scoped
+   lease credentials to bound components or humans; PostgreSQL never receives
+   Keycloak tokens.
 
 Keycloak roles and a valid JWT do not by themselves grant access to a project or
 to Kubernetes. Project users, CI clients, and application pods do not receive a
@@ -39,7 +40,7 @@ sequenceDiagram
   Catalog-->>API: Scoped permission decision
   API->>K8s: Provisioner ServiceAccount action
   K8s-->>API: Resource result
-  API->>DB: Administrator creates/reads catalog and project database
+  API->>DB: Administrator manages catalog and independent named resources
   API-->>DB: Never forwards caller OIDC token
   API-->>Caller: Redacted, authorized response
 ```
@@ -395,72 +396,66 @@ profile. See
 [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md) for the
 complete handling and retention decision.
 
-## PostgreSQL authorization
+## PostgreSQL and named-store authorization
 
-PostgreSQL is outside k3d on the shared Docker network. It is not an OIDC
-resource server in this implementation: it does not validate Keycloak JWTs and
-does not know the human or CI principal that requested a deployment. Its native
-authentication is the PostgreSQL role/password presented on a database
-connection. The Platform API therefore must not treat a successful OIDC request
-as authority to give the caller a database password or direct SQL access.
+PostgreSQL is outside k3d on the shared Docker network. It validates native
+database credentials, not Keycloak JWTs. The API uses trusted administrator
+authority to manage independent resource databases. A deployment never creates
+an implicit `project_<name>` database or `database` Secret.
 
-There are two distinct database authority paths:
-
-| Path | Database identity | Current authority |
-|---|---|---|
-| Platform control plane | `postgres`, held by the Platform API | Creates the catalog tables and project roles/databases; reads/writes platform grants, desired state and audit records |
-| Project workload | `project_<project-name>`, injected into that project's pods | Connects to its own project database and, because it owns that database, currently performs application SQL and schema migration |
-
-When an authorized create/update request provisions project `orders`, the API
-derives `project_orders` and a password from `DATABASE_KEY`, creates the login
-only if absent with `NOSUPERUSER`, `NOCREATEDB`, and `NOCREATEROLE`, creates its
-database with that role as owner if absent, and revokes `PUBLIC` access to that
-database. It creates the Kubernetes `database` Secret with `PGHOST`, `PGPORT`,
-`PGDATABASE`, `PGUSER`, and `PGPASSWORD`; the workload receives these values as
-environment variables. The Secret is not returned by platform read APIs.
+A named PostgreSQL resource has a stable UUID, database `resource_<uuid-without-hyphens>`,
+operator-controlled ownership and separate read-only/read-write resource roles.
+An approved component binding or explicit human grant produces independent
+credential generations. Only the bound component receives its Secret and relay
+egress. Platform administration permits grant management but confers no direct
+data access. A human must have their own grant and an interactive portal/CLI
+identity to obtain a lease; automation tokens cannot claim personal credentials.
 
 ```mermaid
 flowchart LR
-  Request[Authorized project deployment] --> API[Platform API]
-  API -->|postgres administrator connection| SQL[PostgreSQL]
-  API -->|writes database Secret| Secret[Kubernetes Secret]
-  Secret -->|env vars| Pod[Project pod]
-  Pod -->|project role + password| SQL
-  Caller[Human or CI OIDC token] -. never forwarded .-> SQL
-  Other[Other project pod] -. no project password .-> SQL
+  Admin[Authorized resource administrator] --> API[Platform API]
+  API --> Catalog[Resource and explicit grants]
+  Catalog --> Worker[Named-store worker]
+  Worker --> SQL[PostgreSQL resource roles and database]
+  Worker --> Secret[Bound component Secret]
+  Secret --> Pod[Bound component]
+  Human[Explicit human grant] --> Lease[24-hour credential]
+  Pod --> Relay[Private lease relay]
+  Lease --> Relay
+  Relay --> SQL
 ```
 
-Kubernetes controls delivery of the Secret to the pod; PostgreSQL controls
-whether the supplied role can connect and what it can do once connected. The
-network policy complements both: project workloads may make TCP/5432 egress
-only to the configured PostgreSQL IP, alongside same-namespace traffic and DNS.
-It is a reachability control, not a substitute for SQL authorization.
+Writers share resource-scoped schema ownership for application migrations and
+create/alter/drop. They do not own the database, manage global roles, install
+extensions, alter grants/default ACLs or create security-definer routines.
+Readers have existing/future table access without write authority. The relay
+checks the exact lease identity/database, its original deadline and current
+catalog state; expiry, downgrade, revocation and retirement fence held sessions.
+Application credentials rotate every 30 days with a component restart and at
+most one-hour predecessor overlap. Human leases last 24 hours; renewal does
+not extend older generations.
 
-### Current limits and lifecycle implications
+PostgreSQL transport inside the private relay boundary is plaintext. Remote
+native access uses restricted SSH; pgAdmin uses isolated networking and SSO.
+The console login grants no database authority and saved passwords are disabled.
+Keep operator keys and the PostgreSQL administrator credential protected.
+Changing `DATABASE_KEY` requires coordinated provider credential maintenance;
+redeploying with a new key alone is not rotation.
 
-The current per-project workload role owns its database, so it has broader
-schema power than a future least-privilege runtime role would. A separate
-read-only human role and restricted SSH forwarding path are implemented in
-source; [human database access](../developers/database-access.md) describes the
-grant and revocation model. Deployed isolation and session-revocation checks
-remain Phase 10 work. A distinct migration/owner role is not implemented.
-Project retirement retains the database and workload role, but disables human
-database logins; permanent purge removes those human roles.
+Optional RustFS, OpenSearch and Qdrant use corresponding native resource-scoped
+credentials through the private relay and isolated human consoles. Neo4j
+Community uses a dedicated instance per resource and supports full instance
+access only, including native account management; it rejects read-only grants.
+Its relay independently fences platform leases even if native accounts change.
 
-Passwords are deterministic while `DATABASE_KEY` remains unchanged. Changing
-only that key and redeploying changes the Kubernetes Secret but does **not**
-change an existing PostgreSQL role password; rotation must coordinate SQL, Secret
-update, and workload reconnection. PostgreSQL transport encryption is not
-configured in this single-host baseline. ADR-020 explicitly places
-application-to-PostgreSQL traffic outside the initial cross-project
-encrypted-channel requirement. Treat the database network and the Platform
-API's administrator credential as trusted infrastructure, do not claim that all
-application traffic is encrypted, and do not use this arrangement for hostile
-multi-tenant workloads or general Restricted business data.
-
-For the authoritative implementation limits and planned identity split, see
-[ADR-013](decisions/ADR-013-database-credential-lifecycle.md) and
-[ADR-003](decisions/ADR-003-postgresql-provisioning.md).
+Resource retirement retains data. Purge requires exact resource/owner/version
+confirmation, completed access cleanup and verified encrypted off-host backup
+intent. Restore quarantines recovered stores, revokes recovered grants and
+credentials, replays the latest verified purge intent, and requires fresh approval.
+See [named-store operations and recovery](../operators/data-stores.md) for limits
+and provider-specific evidence. [ADR-003](decisions/ADR-003-postgresql-provisioning.md)
+and [ADR-013](decisions/ADR-013-database-credential-lifecycle.md) preserve the
+earlier implicit-database decision and are historical baselines for that behavior.
 
 ## Kubernetes authority
 

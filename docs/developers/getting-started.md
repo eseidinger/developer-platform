@@ -1,6 +1,6 @@
 # Developer getting started
 
-Status: current. Last reviewed October 11, 2026.
+Status: current. Last reviewed October 18, 2026.
 
 This guide is for a developer deploying a containerized application to an existing
 Developer Platform project. It covers the supported non-interactive workflow:
@@ -39,13 +39,17 @@ Your container must:
 - use `/tmp` only for temporary data. It is writable but ephemeral and limited to
   64 MiB.
 
-The platform supplies PostgreSQL connection settings as `PGHOST`, `PGPORT`,
-`PGDATABASE`, `PGUSER`, and `PGPASSWORD`. Persistent volumes and arbitrary
+Applications receive store credentials only through explicit approved component
+bindings. A PostgreSQL binding supplies `PGHOST`, `PGPORT`, `PGDATABASE`, `PGUSER`,
+`PGPASSWORD`, and `PGSSLMODE`, optionally prefixed for multiple bindings. The
+unbound example below receives no database credentials. Create a named resource
+and binding using the [store workflow](../operators/data-stores.md#resource-and-binding-workflow)
+before adding a binding UUID to a component. Persistent volumes and arbitrary
 outbound network access are not part of the default profile.
 
 ## Install the CLI
 
-Install the published CLI in an isolated environment:
+Use Python 3.12 or newer. Install the published CLI in an isolated environment:
 
 ```bash
 python3 -m pip install --user pipx

@@ -30,7 +30,11 @@ Their data and projects are retained for explicit owner-reviewed retirement;
 the runner revokes its temporary human grant and test persona. Never run it
 against real application data.
 
-The current runner uses expiring named-resource credentials. Use a dedicated
+The current runner uses expiring named-resource credentials. Its SQL check expects
+the resource's effective `_reader` role: the issued `credential_*` login switches
+to that role by its operator-configured database default. Use the lease's `PGUSER`
+for authentication. The current full live wrapper rerun remains separate from
+EV-52–72's scoped native/browser evidence. Use a dedicated
 human administrator with no existing named-store grants or registered SSH key;
 it refuses to replace an operator's existing key or disrupt their leases. Historical
 evidence below describes the earlier implicit project-database model and does not

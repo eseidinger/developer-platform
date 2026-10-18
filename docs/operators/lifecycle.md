@@ -1,14 +1,14 @@
 # Platform lifecycle
 
 Status: current procedures with planned upgrade requirements called out
-explicitly. Last reviewed October 9, 2026.
+explicitly. Last reviewed October 18, 2026.
 
 Installation is covered separately for [local](install-local.md) and
 [remote](install-remote.md) environments.
 
 ## Stop and restart
 
-Stop the shared services and workload cluster without deleting data:
+Stop the Compose services and workload cluster without deleting data:
 
 ```bash
 docker compose stop
@@ -20,6 +20,9 @@ Start the existing installation or rebuild the API from current sources:
 ```bash
 bash scripts/up.sh
 ```
+
+Dedicated Neo4j instances are created outside Compose; stopping Compose does not
+stop those instances. Inspect their controller-owned state before host maintenance.
 
 Bootstrap starts an existing k3d cluster; it does not migrate the Kubernetes
 image or reapply saved application declarations automatically. Expected heartbeat
@@ -47,7 +50,10 @@ PostgreSQL and the platform catalog. Reapply the stored declarations and verify
 application data. Retaining a PostgreSQL volume is not a supported major-version
 upgrade by itself.
 
-`bash scripts/down.sh --volumes` deletes the cluster and persistent Compose data.
+`bash scripts/down.sh --volumes` deletes the cluster and persistent Compose named
+volumes, including shared-store data. It does not remove the host-bound Tempo
+filesystem or controller-created Neo4j instance volumes/networks. Those are outside
+Compose teardown and need separately scoped retirement/purge or operator cleanup.
 It is only for a deliberate disposable-lab reset. Both modes retain `.env`, local
 backup files, and installed tools.
 

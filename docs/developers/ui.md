@@ -1,12 +1,14 @@
 # UI guide
 
-Status: partially implemented. Last reviewed October 14, 2026.
+Status: implemented in source with capability-specific local/deployed evidence.
+Reviewed October 18, 2026; full installed-platform journey acceptance remains open.
 
 The Platform Control Plane portal is served at `/` on the Platform API
 origin. It uses OIDC Authorization Code with PKCE and calls the same API as the
-CLI. The project workspace has lifecycle, diagnostics, project-grant, human
-database access, and deployment-credential screens in source. Project-scoped application-access screens
-are also implemented in source at `/projects/{name}/application-access`.
+CLI. The project workspace has lifecycle, diagnostics, project grants and
+deployment credentials, with separate pages for **Application access**,
+**Data stores** and **AI assistance**. **My store access** lists the signed-in
+human's explicit store grants and leases across projects.
 Implementation and acceptance evidence
 are tracked in the [delivery backlog](../maintainers/delivery/backlog.md).
 
@@ -19,27 +21,54 @@ Until a workflow is available in the portal, use the [CLI](cli.md) or
 [API](api.md). For UI source, commands, and tests, see the
 [UI maintainer guide](../maintainers/ui.md).
 
-## Manage human database access
+## Manage named stores and human access
 
-Open a project and find **Human database access**. Project administrators can
-list active and revoked grants, add a named human using the exact OIDC issuer,
-subject, and bare `ssh-ed25519` public key, and confirm revocation. A revoked
-SQL role is disabled and its active PostgreSQL sessions are terminated. The
-administrator never sees that person's SQL password.
+Open **Data stores** at `/projects/{name}/stores` to create independent resources,
+request component bindings, review incoming requests, and manage explicit human
+grants. The server supplies enabled providers and management permissions. Resource
+and grant changes use their current versions. Retirement revokes access and
+retains data; purge is a separate UUID-confirmed action that waits for verified
+off-host backup intent.
 
-The named human sees their own database name, SQL username, SSH account, and
-key fingerprint. They can replace their SSH public key or rotate their SQL
-password. A new password is displayed once in a dialog and discarded when the
-dialog closes; save it in a protected password manager. Password rotation
-affects new connections, not existing sessions. The tunnel host, port, and
-verified SSH host key come from the operator, not the portal. See the
-[database access guide](database-access.md) for connection instructions.
+Open **My store access** at `/store-access` to issue a 24-hour credential for your
+own grant, inspect lease history, reveal connection values, or open an available
+console. Inspect pending issuance using its existing credential ID. After an
+uncertain response, inspect lease history before issuing another lease. Active
+credentials can be revealed again until their original deadline; early renewal
+creates an independent generation. Register an Ed25519 key before issuing an SSH
+lease; replacing your key ends existing leases. Console-only access needs no key.
 
-Unauthorized administrator controls are hidden on API `403`; no personal grant
-is shown as a separate `404` empty state. Other API failures remain visible.
-All authorization and audit decisions remain server-side. These controls have
-local UI tests but no deployed role, tunnel, or revocation acceptance yet;
-those checks belong to Phase 10.
+PostgreSQL uses pgAdmin SSO and the host `store-access` inside that console.
+The separately labelled `PGHOST` is for private native clients. RustFS, Qdrant,
+OpenSearch Dashboards and Neo4j Browser use lease-scoped launch sessions plus
+native credentials. Neo4j Community grants full instance access and has
+no read-only mode. Expiry, revocation and permission changes fence connections.
+Credential values remain in dialog memory and are discarded on close or expiry.
+See [human store access](database-access.md) and the
+[operator store guide](../operators/data-stores.md) for provider-specific steps
+and acceptance limits. The old implicit-project database grant and password
+issuance endpoints return HTTP 410; their former workspace panel is not mounted.
+
+## Use AI assistance
+
+Open `/projects/{name}/ai` for explanations, incident investigations and curated
+development guidance. Human viewers may run assistance for Public/Internal
+projects when the external provider is configured and eligible. A human platform
+administrator sets AI classification; Confidential, Restricted and unclassified
+projects cannot start model runs.
+
+Review observations, source references, hypotheses, gaps and usage completeness.
+A completed sourced incident investigation bound to the current failed revision
+can support a rollback proposal to a retained successful revision. An authorized
+human reviews the exact diff, approves it and executes it as separate actions.
+Approval expires after 15 minutes; changed authority or revision invalidates
+execution. Follow the resulting deployment operation and readiness separately.
+
+Runs and proposals have durable history. After an uncertain mutation, refresh
+history before acting again. Navigation does not cancel a synchronous model run;
+an interrupted server process can leave a running record. Automatic polling stops
+after five minutes and can be resumed with **Refresh AI**. Model output requires
+review, and incomplete usage is not reported as a complete cost estimate.
 
 ## Define and approve application access
 

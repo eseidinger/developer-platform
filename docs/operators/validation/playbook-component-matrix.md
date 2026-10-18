@@ -1,7 +1,10 @@
 # Playbook component matrix
 
-Status: current inventory and dependency classification. Last reviewed October 11,
-2026.
+Status: current inventory and dependency classification. Last reviewed October 18, 2026.
+
+The October 18 documentation review syntax-checked all 33 current playbooks with
+Ansible 2.21.5 and ran 23 offline Ansible tests. This includes the two human-access
+playbooks added to the table below. These checks executed no remote platform tasks.
 
 This page classifies the deployment, administration, acceptance, recovery, and
 failure-drill playbooks by the minimum components they need. It distinguishes a
@@ -49,6 +52,8 @@ These playbooks require only **P** for their executable assertions.
 | General acceptance | [`test-platform.yml`](../../../ansible/test-platform.yml) | Exercise the core authorized platform lifecycle with short-lived personas |
 | Application contract | [`test-platform-components.yml`](../../../ansible/test-platform-components.yml) | Exercise multi-service, scheduled-component, migration, status, update, rollback, and retirement behavior |
 | Hosted application access | [`test-platform-hosted-access.yml`](../../../ansible/test-platform-hosted-access.yml) | Plan or run the neutral identity/HTTPS/isolation/persistence suite; no platform deployment, explicit live confirmation, and a private target-host human administrator session |
+| Human store access installation | [`install-human-database-access.yml`](../../../ansible/install-human-database-access.yml) | Install the separately configured restricted SSH bastion for private store leases |
+| Human store acceptance | [`test-platform-human-database-access.yml`](../../../ansible/test-platform-human-database-access.yml) | Offline plan or opt-in human named-resource tunnel/SQL checks; current named-resource and historical implicit-database evidence are distinct |
 | CI credentials | [`test-platform-ci-credential.yml`](../../../ansible/test-platform-ci-credential.yml) | Exercise project-scoped machine deployment, denial, revocation, and cleanup |
 | CI credentials | [`verify-platform-test-runner-expiry.yml`](../../../ansible/verify-platform-test-runner-expiry.yml) | Verify the dedicated runner before or after its configured expiry |
 | Capacity | [`test-platform-capacity-admission.yml`](../../../ansible/test-platform-capacity-admission.yml) | Temporarily enable and exercise request-based reserved-capacity admission |
@@ -56,7 +61,7 @@ These playbooks require only **P** for their executable assertions.
 | Failure signals | [`test-platform-failure-signals.yml`](../../../ansible/test-platform-failure-signals.yml) | Exercise application, ingress, proxy, and Prometheus failure/recovery state |
 | Identity failure | [`test-platform-identity-provider-outage.yml`](../../../ansible/test-platform-identity-provider-outage.yml) | Prove local revocation fails closed during a controlled Keycloak outage |
 | Database failure | [`test-platform-postgres-outage.yml`](../../../ansible/test-platform-postgres-outage.yml) | Exercise managed PostgreSQL failure, recovery requests, and restored readiness |
-| Data-aware rollback | [`test-platform-rollback-data.yml`](../../../ansible/test-platform-rollback-data.yml) | Prove rollback retains database data and the current secret version |
+| Data-aware rollback | [`test-platform-rollback-data.yml`](../../../ansible/test-platform-rollback-data.yml) | Historical implicit-database helper; adapt resource/binding setup before current execution |
 
 `deploy.yml` refuses to overlap active backup or availability drills. That is a
 safety interlock, not a requirement to install **B**, **H**, or **W**.
@@ -158,8 +163,10 @@ cross-host acceptance.
 4. Deploy heartbeat and run the Docker-boundary drill: **P + H + W**.
 5. Configure repository access with `setup-backup.yml`: **P + B**.
 6. Deploy scheduled backup reporting and drills: **P + B + W**.
-7. Prepare a source backup on **P + B**, then restore it into a fresh **P + B**
-   recovery environment.
+7. For an explicitly selected recovery, prepare a source backup on **P + B**,
+   then restore into a fresh **P + B** recovery environment. Generic marker/project
+   checks retain legacy assumptions; use the current store quarantine and fresh
+   binding procedure rather than claiming automatic store-backed application recovery.
 
 Run destructive or availability-affecting drills only with their explicit
 acknowledgement variables, in the documented protected window, and after checking

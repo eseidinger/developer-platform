@@ -7,16 +7,34 @@ Status: operational draft based on [ADR-005](../architecture/decisions/ADR-005-o
 The [platform runbook](runbooks/platform.md#inspect-the-current-installation) contains dependency and workload checks; [heartbeat diagnostics](runbooks/platform.md#external-heartbeat-missing) covers the systemd sender and external scheduler. Installation commands live in the [watchdog guide](../../operations/watchdog/README.md) and [deployment playbooks guide](../../operations/watchdog/ansible/README.md).
 
 Prometheus scrapes itself, node-exporter, kube-state-metrics, blackbox-exporter,
-Alertmanager, Alloy and catalog-discovered applications. Alloy collects Docker
+Alertmanager, Alloy, PostgreSQL exporter, private kubelet cAdvisor endpoints,
+and catalog-discovered public/application-metrics targets. Bounded native-store
+collectors publish additional metrics through node-exporter. Alloy collects Docker
 logs and minimized project pod operational envelopes through a dedicated
 read-only Kubernetes credential. Central storage is configured for seven days;
-workload usage scrapes and elapsed-retention evidence remain absent.
+workload CPU/memory scrapes are implemented; elapsed-retention evidence remains open.
 
 Alertmanager defaults to a `local-only` receiver. The [SMTP deployment playbook](../../operations/alertmanager/README.md) configures authenticated email from an inventory with a private password prompt; selected synthetic and scrape-failure FIRING/RESOLVED receipt has operator-reported evidence; application-rule acceptance remains open; notification-delivery-failure injection is an accepted limitation under ADR-011.
 
-The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project telemetry endpoints, maintenance windows, and a separate local notification service are not implemented. The optional backup watchdog channel checks backup age/failure independently of heartbeat. Backup deployment and selected DOWN/UP receipt have operator-reported evidence; remaining scenarios are tracked in the backlog.
+The external watchdog can send state-change mail through PHP mail or authenticated TLS SMTP. Its host sender checks API dependency readiness and Prometheus readiness. Project-scoped HTTP metric and trace reads are implemented. Maintenance windows
+and a separate local notification service remain unimplemented. The optional backup watchdog channel checks backup age/failure independently of heartbeat. Backup deployment and selected DOWN/UP receipt have operator-reported evidence; remaining scenarios are tracked in the backlog.
 
 The [backlog evidence](../maintainers/delivery/backlog.md#evidence-conventions) records passing local watchdog freshness and SMTP fixture tests. The operator confirmed heartbeat outage/recovery mail and recovery after correcting the HTTPS probe from HEAD to GET. The recorded recovery checks passed Prometheus/Grafana health and the three scrape targets configured at that time. Broader cluster/host failure exercises, application-rule delivery, notification failures and remaining backup scenarios stay open; see [current monitoring progress](../maintainers/delivery/backlog.md#current-monitoring-progress). Commands in the runbook were reviewed against source, not executed as live acceptance for this update.
+
+## Dashboards and telemetry
+
+Grafana provisions source-controlled platform health, workload/capacity,
+PostgreSQL, application HTTP, Micrometer JVM, telemetry security, AI, named-store
+and eight store performance dashboards. Shared Grafana/Prometheus/Loki/Tempo
+remain operator-only; a dashboard selector is not project authorization.
+Project users read fixed API metric/trace views. Application metrics require
+opt-in instrumentation; tracing uses an authenticated Pod-local forwarder.
+See [trace setup](../../infrastructure/monitoring/TRACING.md),
+[AI telemetry](../../infrastructure/monitoring/AI.md), and
+[store performance](../../infrastructure/monitoring/README.md#phase-7-store-performance).
+Missing data requires checking collection health and freshness before interpreting
+it as zero activity. The known Tempo filesystem metric permission issue and
+unexecuted retention/outage/capacity checks are recorded in the AI evidence.
 
 ## Target coverage and alert contract
 

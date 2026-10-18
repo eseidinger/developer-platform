@@ -3,6 +3,16 @@
 Created: September 25, 2026. Status: **Proposed**.
 Source inspection confirms [database/login provisioning and credential derivation](../../../platform/app/src/app/main.py) and [Kubernetes Secret bindings](../../../platform/app/src/app/manifests.py). The runtime login currently owns its database; distinct migration/owner identity remains proposed. A separate read-only human identity and restricted tunnel are implemented in source, but live isolation, rotation, and restore acceptance remain outstanding. See the [backlog evidence](../../maintainers/delivery/backlog.md#evidence-conventions). This partial source evidence does not accept the full proposed decision.
 
+## Implementation status note — October 18, 2026
+
+The implementation observations immediately below describe the earlier implicit
+project-database baseline. Current named resources have operator-controlled
+database ownership, separate resource writer/reader roles, explicit human and
+component grants, and expiring credential generations. See
+[current store operations](../../operators/data-stores.md) and EV-67–72 for
+scoped evidence and remaining recovery/timing limits. This note does not accept
+or rewrite the original proposed decision.
+
 ## Context
 
 Projects need simple relational persistence. A dedicated database server for each application increases resource use and operational effort. Developers also need interactive access without sharing the workload identity.

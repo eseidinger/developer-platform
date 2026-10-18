@@ -194,21 +194,21 @@ The second invocation passes only when the client-credentials exchange returns
 
 This drill stops Keycloak on the deployed host. Run it only in an approved
 maintenance window, from a controller that can SSH to the `platform` host in the
-normal inventory. Provide a disposable existing project and its protected human
-project-administrator token outside the repository:
+normal inventory. Provide the protected test-runner JSON from step 3; the playbook creates its
+own disposable project, administrator persona and deployment credential:
 
 ```bash
 ansible-playbook -i ansible/inventory.yml \
   ansible/test-platform-identity-provider-outage.yml \
   -e platform_api_url=https://platform.eseidinger.de \
-  -e platform_test_project=disposable-outage-drill \
   -e platform_identity_drill_host=platform \
-  -e @/path/to/protected-project-admin-vars.yml \
+  -e @/path/to/protected-test-runner.json \
   -e platform_allow_identity_outage_drill=true \
   -e platform_identity_outage_acknowledgement=I_ACCEPT_IDENTITY_OUTAGE
 ```
 
-The playbook creates a disposable credential, proves it works, stops Keycloak,
+The playbook creates a disposable project, persona and credential, proves the
+credential works, stops Keycloak,
 requires `revocation_pending` and immediate denial of the issued token, then
 restores Keycloak in an `always` block and requires final `revoked` cleanup. It
 does not print client secrets or bearer tokens. If a failed controller connection

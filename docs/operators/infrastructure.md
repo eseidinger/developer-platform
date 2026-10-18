@@ -17,7 +17,8 @@ flowchart TB
   K8s --> Server[k3s server]
   Server --> Agent1[k3s agent 1]
   Server --> Agent2[k3s agent 2]
-  Project --> PG[PostgreSQL / Docker]
+  Project --> Relay[Component-scoped private lease relay]
+  Relay --> PG[Named stores / Docker]
 ```
 
 `scripts/up.sh` renders the k3d configuration, creates or starts cluster `workloads`, writes `.runtime/admin.kubeconfig`, applies the controller and metrics manifests, and refreshes the load balancer after Compose networking is ready. The server enables secrets encryption and has a TLS SAN for its Docker-network name.
@@ -41,7 +42,9 @@ a control-plane PodCIDR change.
 | k3d load balancer | `127.0.0.1:8081` behind Caddy | Routes workload HTTP to Traefik and project Services |
 | Prometheus | `127.0.0.1:9090` | Metrics, rules, and generated discovery targets |
 | Grafana | `127.0.0.1:3000` | Dashboards; administrator password comes from `.env` |
-| Alloy and Loki | Internal Compose endpoints | Docker log collection and query storage |
+| Alloy and Loki | Internal Compose endpoints | Docker and minimized workload-envelope collection and retained log storage |
+| Tempo and telemetry gateway | Internal Compose endpoints | Authenticated opt-in traces, bounded storage and project-filtered reads |
+| Store relay and consoles | Internal isolated networks | Scoped native access and human browser consoles; optional providers require selection and budgets |
 | Alertmanager | Internal Compose endpoint | Alert grouping and configured receivers |
 
 The private `.env` is the installation's secret/configuration input and must be
@@ -52,21 +55,22 @@ heartbeat, and watchdog state is documented under
 
 ## Project resources
 
-Each project receives `project-<name>`. The Platform API reconciles Namespace, ResourceQuota, LimitRange, NetworkPolicy, database Secret, workload Deployment(s), Service(s), and public Ingress where applicable. Component applications create one Deployment per long-running service and one CronJob per scheduled component. CronJobs use `Forbid` concurrency and bounded job history.
+Each project receives `project-<name>`. The Platform API reconciles Namespace, ResourceQuota, LimitRange, NetworkPolicy, approved binding Secrets, workload Deployment(s), Service(s), and public Ingress where applicable. Component applications create one Deployment per long-running service and one CronJob per scheduled component. CronJobs use `Forbid` concurrency and bounded job history.
 
 ```mermaid
 flowchart LR
   Revision[desired revision] --> Namespace[project-name namespace]
   Namespace --> Budget[Quota and LimitRange]
   Namespace --> Policy[NetworkPolicy]
-  Namespace --> Secrets[database and app Secrets]
+  Namespace --> Secrets[component store and project app Secrets]
   Namespace --> Deployments[service Deployments]
   Namespace --> CronJobs[scheduled CronJobs]
   Deployments --> Services[ClusterIP Services]
   Services --> Ingress[Traefik Ingress]
 ```
 
-Workload pods run non-root as UID/GID 10001, have read-only root filesystems, drop capabilities, use RuntimeDefault seccomp, mount writable `/tmp`, and do not mount Kubernetes API tokens. These controls reduce accidental privilege; they do not provide hostile-tenant isolation on the shared host.
+Workload pods run non-root as UID/GID 10001, have read-only root filesystems, drop capabilities, use RuntimeDefault seccomp, mount writable `/tmp`, and do not automatically mount Kubernetes API tokens. Tracing opt-in adds only
+a short-lived Pod-bound telemetry-audience token, not the provisioner credential. These controls reduce accidental privilege; they do not provide hostile-tenant isolation on the shared host.
 
 ## Provisioner authority
 
@@ -86,7 +90,12 @@ The ServiceAccount token is a sensitive, long-lived infrastructure credential. R
 
 ## Networking
 
-Ingress reaches pods only through Traefik. NetworkPolicies allow same-namespace traffic, DNS, and PostgreSQL at the configured fixed Docker-network IP; other egress is denied after policy convergence. New pods can briefly have egress before kube-router rules apply. Compose DNS does not resolve from pods, so PostgreSQL uses a fixed private IP. PostgreSQL TLS is not configured. [ADR-020](../architecture/decisions/ADR-020-generic-hosted-application-integration.md) accepts that transport as outside the first-release cross-project encrypted-channel requirement; operators must not describe the profile as encrypting all application traffic.
+Public ingress reaches the hosted-access authorizer through Traefik; protected
+backends accept only authorizer traffic. Private services retain same-namespace
+connectivity. NetworkPolicies allow DNS and explicitly bound component access to
+private relay lease ports; unbound components receive no project-wide PostgreSQL
+exception. Other egress requires an approved declaration and is denied after
+policy convergence. New pods can briefly have egress before kube-router rules apply. Compose DNS does not resolve from pods, so PostgreSQL uses a fixed private IP. PostgreSQL TLS is not configured. [ADR-020](../architecture/decisions/ADR-020-generic-hosted-application-integration.md) accepts that transport as outside the first-release cross-project encrypted-channel requirement; operators must not describe the profile as encrypting all application traffic.
 
 ## Metrics and capacity
 

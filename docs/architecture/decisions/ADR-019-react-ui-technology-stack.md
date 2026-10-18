@@ -2,6 +2,14 @@
 
 Created: October 6, 2026. Status: **Accepted; application implementation is planned**.
 
+## Implementation status note — October 18, 2026
+
+The scaffold observations below describe the October 6 baseline. The selected
+stack now implements OIDC login, project lifecycle, access administration, named
+stores and AI assistance, and is built into the API image. See the
+[current UI guide](../../developers/ui.md) and [source reference](../../../platform/ui/README.md).
+The original stack decision and acceptance requirements are preserved.
+
 ## Context
 
 Phase 3 needs a maintainable browser portal over the versioned Platform API. The

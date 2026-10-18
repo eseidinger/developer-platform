@@ -1,6 +1,6 @@
 # Platform maintainer guide
 
-Status: current. Last reviewed October 9, 2026.
+Status: current. Last reviewed October 18, 2026.
 
 Use this section when changing platform code, contracts, operational automation,
 or delivery plans. Application users should start in the
@@ -19,6 +19,7 @@ pages explain cross-component ownership and validation expectations.
 
 - [Testing requirements (draft)](testing-requirements.md)
 - [Time-dependent test requirements (draft)](time-dependent-test-requirements.md)
+- [Documentation review, October 18, 2026](documentation-review.md)
 
 ## Delivery
 

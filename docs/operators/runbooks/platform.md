@@ -23,12 +23,13 @@ kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 ## Controlled PostgreSQL outage and recovery
 
 `ansible/test-platform-postgres-outage.yml` is a self-contained protected-lab drill. It creates a disposable project,
-developer persona, and database-bound `http-echo` workload; stops only the Compose PostgreSQL service; requires the
+developer persona, and legacy unbound `http-echo` workload; stops only the Compose PostgreSQL service; requires the
 safe authenticated outage response (`503` while authorization cannot reach PostgreSQL, or `DatabaseUnavailable` when
 the endpoint can report it) and a failed Platform API readiness check; restores PostgreSQL in an `always` block; then
 requires recovered readiness and a redacted resolved recovery request. Its outer cleanup retires
 the disposable project and revokes the persona. It does not prove application-specific writes because `http-echo`
-does not use its database.
+does not issue SQL. Its `data-services` assertions use the legacy implicit-database
+view; passing them does not establish named-resource or application data recovery.
 
 ```bash
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-postgres-outage.yml \
@@ -54,11 +55,15 @@ the edge certificate; do not treat it as a readiness signal.
 ## Approve component outbound connectivity
 
 Outbound traffic is deny-by-default. Set `ALLOWED_EGRESS_CIDRS` (comma-separated CIDRs) and
-`ALLOWED_EGRESS_PORTS` (comma-separated TCP ports) in the platform host's `.env`, then restart the Platform API.
+`ALLOWED_EGRESS_PORTS` (comma-separated TCP ports) in the platform host's `.env`,
+then recreate the API with `docker compose up -d --no-deps --force-recreate platform-api`.
+A plain container restart does not reload Compose environment values.
 Both values must be syntactically valid; an invalid value fails closed. A service component may
 request only a CIDR wholly contained in that allow-list and a listed port; the platform rejects all other requests
-before deployment and emits a component-scoped NetworkPolicy for approved traffic. Do not use domain names here:
-Kubernetes NetworkPolicy enforces IP ranges, not stable DNS identities.
+before deployment and emits a component-scoped NetworkPolicy for approved traffic.
+Components may also declare DNS destinations; all resolved addresses must be in
+the CIDR allow-list and are pinned at apply time. Reapply when DNS addresses change.
+The operator allow-list itself contains CIDRs, not domain names.
 
 After changing an allow-list, use a disposable workload and a non-production endpoint to prove one approved
 connection succeeds and a neighbouring denied IP/port fails. Record the target CIDR, port, policy revision, and
@@ -71,7 +76,8 @@ environment.
 
 ## Configure a project quota
 
-Set `PROJECT_QUOTAS_JSON` in the platform host's `.env` and restart the Platform API. It is a JSON object
+Set `PROJECT_QUOTAS_JSON` in the platform host's `.env` and recreate the Platform
+API container to reload its environment. It is a JSON object
 whose optional `default` entry applies to every project and whose project-name entries override that default.
 Only `pods`, `requests.cpu`, `requests.memory`, `limits.cpu`, and `limits.memory` may be changed; service and
 storage restrictions remain managed hardening controls. For example:
@@ -153,9 +159,10 @@ memory and restored byte-for-byte before cleanup continues.
 
 ## Run the remaining automated Phase 2C drills
 
-The data-aware rollback drill creates its own project and managed database, inserts a
-unique SQL marker, rotates and confirms a write-only secret, rolls the application back,
-and verifies the marker and current secret metadata remain. It never reads a secret value:
+The historical data-aware rollback drill assumes an automatically provisioned
+`project_<name>` database. It has not been adapted to named resources and fails
+its marker step on a fresh current project. The following identifies the existing
+helper for maintenance; it is not current executable named-store acceptance:
 
 ```bash
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.yml \
@@ -237,7 +244,8 @@ sudo journalctl -u platform-heartbeat.service -n 50 --no-pager
 
 The oneshot service can be inactive between successful runs; inspect its last result and timer schedule. It sends only when API dependency readiness and Prometheus readiness pass. Check those endpoints first, then sender connectivity, endpoint/token configuration, and TLS without printing secrets.
 
-On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../../operations/watchdog/README.md). A stale cron makes the status page unavailable, but has no independent notifier. Under [ADR-011](../../architecture/decisions/ADR-011-watchdog-monitoring-boundary.md), silent watchdog failure is an accepted lab limitation; no additional external observer is required. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
+On the external watchdog host, inspect the hosting scheduler or `crontab -l`, PHP CLI extensions, and cron diagnostics using the [watchdog guide](../../../operations/watchdog/README.md). A stale cron stops scheduled freshness evaluation and mail; the HTTP status page
+can remain reachable with stale records. There is no independent notifier. Under [ADR-011](../../architecture/decisions/ADR-011-watchdog-monitoring-boundary.md), silent watchdog failure is an accepted lab limitation; no additional external observer is required. Manually running cron can send real email; use the documented alert exercise with intended recipients. Verify both the down and recovery notifications. A heartbeat alone does not verify application data or Alertmanager delivery.
 
 ## Docker or k3d unavailable
 
@@ -245,8 +253,15 @@ Inspect host disk/memory, Docker logs, and node status before changing resources
 
 ## PostgreSQL unreachable or slow
 
-Developers can inspect the managed service at `GET /projects/{name}/data-services`
-and submit one of the bounded recovery reasons to `POST .../data-services/recovery-requests`.
+Inspect current resources with `devplat stores list --project NAME` and
+`devplat stores get RESOURCE_UUID`, including observed state, usage freshness and
+provider error codes. Inspect the component's explicit binding and active
+credential generation before checking its relay connection. The older
+`GET /projects/{name}/data-services` view still reports the implicit
+`project_<name>` database and can report `DatabaseUnavailable` for a healthy
+named resource; it is not authoritative for current store health.
+The bounded `POST .../data-services/recovery-requests` remains an operator-assistance
+request rather than an automatic named-resource restore.
 Platform administrators review requests through `GET /operator/data-service-recovery-requests`
 and acknowledge or resolve them with its request-specific `PATCH` endpoint. These calls report
 control-plane database presence, not application transaction integrity; use the controlled
@@ -276,7 +291,9 @@ Attribute growth before removing anything. Never remove unidentified volumes. Fo
 
 Record affected resources, commands, results, actual recovery duration, and remaining uncertainty. Verify an application request, database write/read, and relevant recovery notifications.
 
-Per-user audit investigation and the richer portal and CLI workflows remain target procedures in the [software architecture](../../architecture/application-lifecycle.md). They cannot be used as current incident prerequisites.
+Restricted audit export, the React portal and CLI administration are implemented.
+Use authorized API/CLI reads and the [UI guide](../../developers/ui.md) where useful;
+full deployed journey acceptance and operational limits remain separately recorded.
 
 
 ## Scheduled backup failed or interrupted

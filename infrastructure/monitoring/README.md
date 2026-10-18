@@ -60,8 +60,8 @@ Provisioning writes the catalog and publishes discovery before applying workload
 resources. A failed or interrupted deployment retains its target. Publishing is
 atomic, serialized with provisioning/retirement by the existing PostgreSQL
 advisory lock, and repeated every 30 seconds by an API background thread. This
-thread reconciles monitoring files only; it does not repair workloads or provide
-a durable provisioning worker.
+thread reconciles monitoring files only; the separate durable deployment worker
+handles accepted operations without turning discovery into workload repair.
 
 A failed catalog query or publication retains the previous target file. The last
 successful publication timestamp is exported through node-exporter's textfile
@@ -172,7 +172,8 @@ silent failure remains accepted under [ADR-011](../../docs/architecture/decision
 ## Retirement
 
 Preferred: preview, then confirm with the returned `scope_token`; the platform deletes
-the namespace itself and keeps the database, role and catalog.
+the namespace itself, revokes affected store access and retains independent
+named-store data and the catalog.
 
 ```bash
 curl -sS -H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN" http://127.0.0.1:8000/projects/hello/retirement-preview
@@ -212,8 +213,9 @@ request completes publication. PUT explicitly reactivates a retired application.
 
 Removing a target may resolve its existing alert; that means monitoring ended,
 not that the application recovered. Record deliberate retirement separately from
-outage/recovery evidence. This acknowledgement endpoint does not implement the
-planned deletion preview, audit history, durable cleanup jobs, or database purge.
+outage/recovery evidence. Retirement previews, audit and provider cleanup are implemented separately from
+this monitoring acknowledgement. Named-store purge is an independent confirmed
+action gated by verified off-host backup intent.
 
 ## Local preparation and validation
 

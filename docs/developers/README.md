@@ -1,6 +1,6 @@
 # Application developer guide
 
-Status: current. Last reviewed October 9, 2026.
+Status: current. Last reviewed October 18, 2026.
 
 Use this section when you are deploying an application to an existing Developer
 Platform installation. Platform installation and shared-service administration
@@ -12,7 +12,7 @@ belong in the [operator guide](../operators/README.md).
    project-scoped deployment credential.
 2. Package the application as a public OCI image that satisfies the runtime
    restrictions.
-3. Describe its services, scheduled components, PostgreSQL requirement, routes,
+3. Describe its services, scheduled components, approved store bindings, routes,
    resources, probes, and approved egress in an application declaration.
 4. Apply the declaration with the CLI or API and wait for both operation success
    and workload readiness.

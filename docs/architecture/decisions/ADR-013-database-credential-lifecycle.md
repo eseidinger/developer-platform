@@ -2,6 +2,15 @@
 
 Recorded: September 27, 2026. Status: **Implemented baseline; owner acceptance of this record not recorded**. ADR-003's proposed runtime/owner separation remains outstanding; separate read-only human identity is implemented in source but not deployed-accepted.
 
+## Implementation status note — October 18, 2026
+
+The deterministic project-wide database/Secret model below is a historical
+baseline. Current named resources and explicit bindings use independent credential
+generations: application rotation every 30 days with at most one-hour overlap,
+and 24-hour human leases. Resource retirement retains data; confirmed purge waits
+for verified off-host intent. See [current store operations](../../operators/data-stores.md).
+This implementation update does not approve or rewrite the original record.
+
 ## Context
 
 Repeat PUT and cluster recreation must reconnect workloads to an existing database without deleting data. The current catalog stores specs/status, not independently versioned credential objects.

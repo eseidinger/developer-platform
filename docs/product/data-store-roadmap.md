@@ -28,6 +28,23 @@ rebuild and reconnection checks join other anytime leftovers in
 [Phase 10](../maintainers/delivery/plans/phase-10-anytime-leftovers.md); they
 also do not gate provider selection or Phase 7/8 exit.
 
+## Implementation checkpoint — October 18, 2026
+
+The current implementation has independent named PostgreSQL resources with
+AGE/pgvector selection, optional RustFS S3, OpenSearch, Qdrant and dedicated
+Neo4j Community, explicit component bindings, expiring human access and native
+consoles. Deterministic deployed PostgreSQL checks and selected native/shared-store
+and browser journeys are recorded in EV-67–72. The synthetic artifact/outbox/search
+flow has deployed evidence; external ODIP/VEF integration and domain comparisons
+are separate. Seven most recent fixture resource purges remain waiting for a
+verified scheduled backup in EV-71/72. No data deletion is inferred while that
+gate is pending. Deployed restore/rebuild, natural timers and operator reviews
+remain Phase 10 work; measurements/domain comparisons remain Phase 9.
+See the [current operations](../operators/data-stores.md) and
+[evidence register](../maintainers/delivery/backlog.md#verification-register).
+The imported sequence below remains proposal context, including superseded
+adoption restrictions; it is not an inventory of missing provider code.
+
 ## 1. Goal and Guiding Principles
 
 PostgreSQL remains the shared reference technology. Specialized data stores are introduced through concrete experiments across projects. Each introduction should support a functional use case, enable a traceable architecture comparison, and provide insights into development and operations.

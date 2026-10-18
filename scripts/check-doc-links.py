@@ -15,6 +15,8 @@ SEARCH_ROOTS = [
     ROOT / "operations",
     ROOT / "infrastructure",
     ROOT / "ansible",
+    ROOT / "examples",
+    ROOT / "persistence",
 ]
 IGNORED_PARTS = {"node_modules", ".git", ".pytest_cache", ".venv", "venv"}
 LINK = re.compile(r"!?\[[^\]]*\]\((?P<destination><[^>]+>|[^)\s]+)(?:\s+['\"][^)]*['\"])?\)")

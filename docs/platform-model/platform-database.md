@@ -3,8 +3,9 @@
 The PostgreSQL database named `platform` is the platform's durable record of
 project identity, desired application state, authorization decisions, and work
 to be reconciled. It is not the database that an application uses for its own
-business data. Each provisioned project has a separate `project_<name>`
-PostgreSQL database and role for that purpose.
+business data. Application data lives in independently created named resources. PostgreSQL
+resources use `resource_<uuid-without-hyphens>` databases; unbound applications
+receive no automatic database.
 
 The diagram groups records by meaning. It shows conceptual relationships;
 not every line represents a database foreign-key constraint.
@@ -31,6 +32,8 @@ erDiagram
 | `deployment_credentials` | Automation-client identity and lifecycle metadata: provider client identifiers, project and kind, expiry, rotation lineage, use, and revocation state. It does not contain the client secret. |
 | `hosted_access_resources`, `hosted_access_principals` | Versioned groups, policies and policy revisions, governance, human requests, memberships, service requests, and stable hosted principal mappings. Service records hold credential identifiers and states, not credential values. |
 | `hosted_access_operations`, `hosted_access_idempotency`, `hosted_access_metadata`, `hosted_access_replicas` | Pending access reconciliation, replay protection, policy generation, and authorizer replica acknowledgements. |
+| `store_resources`, `store_grants`, `store_credentials`, store identity/recovery metadata | Independent resource lifecycle, explicit human and component authority, expiring credential generations, quarantine and verified purge intent. |
+| `ai_project_policies`, `ai_runs`, `ai_change_proposals` | AI classification, durable sourced run results and usage, exact rollback diffs, approvals and resulting operations. |
 | `platform_audit.events` | Append-only, restricted audit records identifying actor, action, scope, result, revision or operation, and redacted detail. |
 
 This separation matters during partial failure. A project's desired revision can
@@ -41,13 +44,12 @@ the downstream resource already exists.
 
 ## State held elsewhere
 
-The platform database does **not** hold application rows. Those live in each
-project's separate PostgreSQL database. It does not hold write-only application
+The platform database does **not** hold application rows. Those live in the selected named PostgreSQL or native provider resources. It does not hold write-only application
 secret values, service client secrets, or database passwords. Application and
 managed service credentials are placed in Kubernetes Secrets in the relevant
 namespace; Keycloak holds its client identities, and the platform derives some
-provider secrets from a protected runtime key. The project database password
-is likewise derived from a runtime key rather than stored as a platform row.
+provider secrets from a protected runtime key. Store credential values are derived from protected operator keys and generation
+identities rather than stored as plaintext catalog rows.
 
 Keycloak stores realm accounts, client configuration, and projected client
 roles, but the platform DB remains authoritative for platform grants and

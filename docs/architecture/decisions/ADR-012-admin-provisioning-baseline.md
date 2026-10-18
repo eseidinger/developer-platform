@@ -2,6 +2,15 @@
 
 Recorded: September 27, 2026. Status: **Implemented baseline; owner acceptance of this record not recorded**. This documents existing code, not approval to replace the target contract in ADR-001.
 
+## Implementation status note — October 18, 2026
+
+This record preserves the September 27 synchronous/shared-token baseline.
+Current requests use OIDC and platform grants, persist revisions and durable
+operations, return 202, and execute through an in-process worker. Named stores
+are independent; a deployment creates no implicit database. See the
+[current application lifecycle](../application-lifecycle.md). The decision
+history below is unchanged and is not a current operating contract.
+
 ## Context
 
 The current lab has one FastAPI process outside k3d. Projects need a repeatable path to SQL and Kubernetes resources without installing infrastructure on each request. The richer project/environment/application model and durable worker have not been implemented.

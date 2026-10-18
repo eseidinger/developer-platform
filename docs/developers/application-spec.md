@@ -1,6 +1,6 @@
 # Application declaration reference
 
-Status: current. Last reviewed October 11, 2026.
+Status: current. Last reviewed October 18, 2026.
 
 This is the developer reference for the JSON body accepted by `PUT
 /projects/{name}` and by:
@@ -142,7 +142,7 @@ approved it.
 | `health.readiness` | No | Exactly one of `profile` or `path`. `profile` is `status` or `hello-world` and retains the TCP readiness probe on the first declared port. `path` configures an HTTP GET readiness probe; it must begin with `/` and uses the first declared port unless `port` matches another declared port number. |
 | `outbound` | No | Up to five `{ "cidr": "…", "port": N }` or `{ "dns": "api.example.com", "port": N }` destinations. CIDRs, and every IP address currently resolved for DNS destinations, must be in the operator allow-list. DNS rules are resolved to fixed NetworkPolicy IP rules when the deployment is applied; reapply when the destination address changes. |
 | `telemetry.metrics` | No | `{ "port": "http", "path": "/metrics" }`, where `port` names a declared HTTP service port and `path` is at most 128 characters with no query string. Collection uses a private Kubernetes service proxy and keeps supported HTTP series and reviewed Micrometer JVM/process metrics. |
-| `telemetry.tracing.enabled` | No | Boolean, default `false`. `true` projects a short-lived Pod-bound token and supplies the private OTLP endpoint. |
+| `telemetry.tracing.enabled` | No | Boolean, default `false`. `true` supplies a localhost OTLP endpoint and forwarder; only the forwarder mounts the short-lived Pod-bound token. |
 
 For Spring Boot, add Actuator and the Prometheus Micrometer registry, expose
 `/actuator/prometheus` on a declared service port, and use that path in the

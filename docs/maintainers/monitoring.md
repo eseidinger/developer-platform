@@ -3,15 +3,25 @@
 Status: current implementation guide.
 
 Monitoring configuration spans Prometheus, Alertmanager, blackbox exporter,
-Alloy, Grafana, generated application targets, security-event metrics, and the
-external heartbeat/watchdog boundary.
+Alloy, Tempo, the authenticated workload gateway/forwarder, Grafana, generated
+application targets, private application metrics, PostgreSQL/native-store
+collectors, AI telemetry, security-event metrics, and the external
+heartbeat/watchdog boundary.
 
 Run the local configuration and generator checks from the repository root:
 
 ```bash
 python3 scripts/check-monitoring.py
 python3 scripts/check-workload-logs.py
+python3 scripts/check-application-metrics.py
+python3 scripts/check-postgres-monitoring.py
+python3 scripts/generate-dashboards.py --check
 ```
+
+The `check-*` scripts above use disposable Docker dependencies; they are fixture
+checks, not read-only inspection of an installed platform. Dashboard generation
+with `--check` is a source-only reproducibility check. Store/AI pipeline fixtures
+and their exact dependencies are linked in the source-adjacent monitoring guide.
 
 The source-adjacent [application monitoring README](../../infrastructure/monitoring/README.md)
 documents target generation, rule files, fixtures, and implementation tests. The

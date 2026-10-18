@@ -6,13 +6,13 @@ canonical deployment sequence and post-install handoff.
 
 Deploy the local checkout to an existing Ubuntu 22.04+ host (amd64 or arm64)
 with SSH access, Python 3, systemd, and sudo privileges. Use a Linux controller
-with Python, tar, and `ansible-core >= 2.16`; no extra Ansible collections are needed.
+with Python, tar, and `ansible-core >= 2.16, < 2.22` (the CI range); no extra Ansible collections are needed.
 The target needs internet access to download packages, binaries, and container images.
 
 From the repository root:
 
 ```bash
-python3 -m pip install 'ansible-core>=2.16'
+python3 -m pip install 'ansible-core>=2.16,<2.22'
 cp ansible/inventory.example.yml ansible/inventory.yml
 # Edit the host, SSH user, domains, email, and bind address in inventory.yml.
 ansible-playbook -i ansible/inventory.yml ansible/deploy.yml --ask-become-pass
@@ -53,7 +53,7 @@ Back up `.env`, especially `DATABASE_KEY`, as described in [operations](../docs/
 
 Human PostgreSQL access is a separate opt-in installation. After the API and
 generated `DATABASE_BASTION_TOKEN` are deployed, run
-`ansible-playbook -i inventory.yml ansible/install-human-database-access.yml`.
+`ansible-playbook -i ansible/inventory.yml ansible/install-human-database-access.yml`.
 The dedicated SSH daemon binds to loopback by default. Set
 `platform_database_bastion_bind_ip` to a protected management-interface IPv4
 address and firewall port `platform_database_bastion_port` only when remote
@@ -266,7 +266,7 @@ They consume the protected test-runner file; no reusable human or project token 
 accepted:
 
 ```bash
-# Application rollback retains PostgreSQL contents and the current secret version.
+# Historical helper: requires adaptation to explicit named-store bindings.
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_rollback_drill_host=platform
@@ -327,8 +327,13 @@ that endpoint is not reachable from workload pods. Never retain or broaden a nor
 production allow-list merely to pass the drill.
 
 The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally disrupt shared services and
-must not run in routine CI. The rollback drill is safe for a protected acceptance
-environment. Egress alters only a disposable workload but depends on operator policy
+must not run in routine CI. The rollback-data helper still derives an implicit `project_<name>` database
+and must be adapted before it can test fresh named-store projects. The legacy
+`scripts/isolation.py`, `data_preservation.py`, and `interrupted_provisioning.py`
+also require the old `database` Secret/model. Their historical passes do not
+validate the current binding contract. The human-access harness now uses named
+resources and expiring credentials; its full live rerun remains separate from the
+older implicit-database evidence. Egress alters only a disposable workload but depends on operator policy
 and an external listener. Keep these drills in an explicitly approved protected pipeline
 rather than pull-request CI.
 

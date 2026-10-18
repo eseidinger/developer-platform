@@ -44,7 +44,9 @@ field must not silently acquire a different meaning.
 10. Provider portability is a contract constraint, not a requirement to operate a
     second provider.
 
-## Application metrics declaration (Phase 4 implementation in progress)
+<a id="application-metrics-declaration-phase-4-implementation-in-progress"></a>
+
+## Application metrics declaration
 
 A service component may opt in to platform collection of Prometheus-format
 application metrics with `telemetry.metrics: {port: "http", path: "/metrics"}`,
@@ -63,7 +65,9 @@ Operators may use the shared Prometheus/Grafana backends; project readers receiv
 only fixed project-scoped views through the Platform API. Missing or failed
 scrapes are explicit, not healthy zeros. See [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023).
 
-## Application tracing declaration (Phase 4 implementation in progress)
+<a id="application-tracing-declaration-phase-4-implementation-in-progress"></a>
+
+## Application tracing declaration
 
 Service and scheduled components may opt in to a private OpenTelemetry trace
 export path with the additive `v1alpha2` field
@@ -134,8 +138,12 @@ decisions that cannot be represented by the route policy. Display name is
 released only by explicit policy opt-in; email additionally requires classified
 personal-data handling. Neither is an authorization key.
 
-PostgreSQL remains a per-project retained resource, but its traffic is outside
-the initial encrypted-channel requirement and is not TLS-protected. Application
+Stores are independent named resources with explicit component bindings.
+No declaration form provisions an implicit project database. Binding credentials
+and relay egress reach only the named consuming component. PostgreSQL traffic
+inside the private relay boundary is outside the initial encrypted-channel
+requirement and is not TLS-protected. Human remote native access uses SSH.
+See the [store lifecycle and recovery contract](../operators/data-stores.md). Application
 secrets are project-scoped and may be visible to every component in the project.
 These are explicit first-release limits, not application-specific behavior.
 

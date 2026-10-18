@@ -1,6 +1,6 @@
 # Named data-store resources
 
-Phase 7 implementation is in progress. PostgreSQL named resources, the API/CLI,
+Phase 7 acceptance is in progress; the named provider implementations are present. PostgreSQL named resources, the API/CLI,
 portal and private lease relay are implemented in source and disposable tests.
 The pinned AGE/pgvector image and pgAdmin SSO configuration are in source.
 Disposable console SSO/connection and encrypted empty-server restore fixtures pass;
@@ -11,6 +11,17 @@ and expiry/revocation fixtures. Deployed interactive browser checks now pass
 for all four providers with disposable human personas, including active-session
 revocation; see [EV-72](../maintainers/delivery/backlog.md#verification-register).
 No existing installation has been reset.
+
+Current evidence checkpoint (October 18): EV-67 completes the scoped deterministic
+PostgreSQL 7.1 exit, including active pgAdmin Query Tool fencing. EV-68/69 record
+native shared-store, extension, binding, quota and verified-backup-gated purge
+checks. EV-71 adds a synthetic deployed Parquet/SQL outbox/search update/delete
+flow; EV-72 adds real portal OIDC/native browser use and session revocation for
+RustFS, Qdrant, OpenSearch and Neo4j. The seven EV-71/72 resource purges remain
+`PurgeAwaitingVerifiedBackup`; zero active grants/credentials is not proof of data
+deletion. Natural timers, operator reviews and deployed off-host restore/rebuild
+remain Phase 10 work; domain measurements/comparisons remain Phase 9. The dated
+notes below preserve what each earlier run established and did not establish.
 
 An October 18 node-01 manual check passed private SSH/Bolt access, invalid-password
 denial and HTTPS console launch/session boundaries for one existing Neo4j human
@@ -448,8 +459,8 @@ native tenants disabled. Keep native and UI multitenancy enabled with only the
 named resource tenant available; disabling UI multitenancy produces incorrect
 saved-object mappings in this pinned release. The local browser fixture verifies
 Discover, both data-access modes, cross-resource denial, workspace renewal,
-expiry/revocation and isolated purge. Deployed OIDC, DNS, trusted TLS, off-host
-recovery and upgrade acceptance remain open. See the
+expiry/revocation and isolated purge. EV-72 later records deployed OIDC/HTTPS console and active-session revocation
+checks. Off-host recovery, natural timers and operator upgrade acceptance remain open. See the
 [compatibility record](../../persistence/compatibility/opensearch-2026-10-17.md).
 
 ## PostgreSQL browser console

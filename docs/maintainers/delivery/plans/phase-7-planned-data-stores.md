@@ -15,6 +15,15 @@ deployed store restore and rebuild acceptance are
 Elapsed-time behavior and operator/browser review remain open under their
 recorded package scopes.
 
+**Current evidence note, October 18:** EV-72 subsequently records deployed portal
+OIDC, official console/native data use and active-session revocation for RustFS,
+Qdrant, OpenSearch and Neo4j with disposable humans. This qualifies the earlier
+browser deferrals below; it does not establish natural timers, operator upgrade
+review, off-host restore or domain comparison. EV-71/72 last record seven confirmed
+resource purges still awaiting verified scheduled backup, with access revoked.
+See the [verification register](../backlog.md#verification-register); this source
+documentation review did not recheck the live installation or close the phase.
+
 The owner requested continued implementation as far as possible with regular
 commits. Source/local provider work continues alongside remaining deployed and
 provider acceptance; passing the PostgreSQL gate does not enable another service.

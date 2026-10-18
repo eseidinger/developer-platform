@@ -12,14 +12,15 @@ Status: implemented lab signals plus target coverage. Source configuration is no
 | Signal | Implemented source/path | Limit |
 |---|---|---|
 | Host | node-exporter → Prometheus | No measured project/shared-service capacity breakdown |
-| Kubernetes object state | kube-state-metrics via private NodePort 30090 → Prometheus | No pod/container CPU or memory usage scrape |
+| Kubernetes state and usage | kube-state-metrics via private NodePort 30090 plus TLS-verified kubelet cAdvisor → Prometheus | Bounded project-container CPU/memory series; request accounting and measured usage remain distinct |
 | Application availability | Component-aware catalog → blackbox → Prometheus; Kubernetes readiness → kube-state-metrics | Protected public probes check the access boundary, not backend health; no independent external vantage point |
 | Monitoring components | Prometheus and blackbox-exporter self-scrapes | Does not prove email delivery |
 | Logs | Alloy reads Docker files and project pod logs through a dedicated read-only Kubernetes credential → Loki | Workload centralization keeps only minimized operational envelopes; shared backends are operator-only |
-| Views | Grafana Prometheus/Loki data sources; Phase 4 dashboard provisioning source | Six source dashboards await deployed panel and selector proof; project views use scoped Platform API reads |
-| Traces | Phase 4 source for bounded platform spans, private Alloy/Tempo and authenticated hosted OTLP | No deployed trace/readback evidence; backend and raw search remain operator-only |
-| Hosted metrics | Phase 4 source for opt-in private scrape and fixed project reads | Framework fixtures and live series/cardinality evidence remain open |
+| Views | Provisioned Grafana Prometheus/Loki/Tempo sources and operator dashboards | Owner-verified selected deployed views; project users use authorized fixed API reads |
+| Traces | Bounded platform spans, private Alloy/Tempo and authenticated hosted OTLP through a Pod-local forwarder | Selected deployed trace/AI readback exists; full framework, outage, elapsed-retention and capacity acceptance remains open |
+| Hosted metrics | Opt-in private scrape and fixed project HTTP reads, plus reviewed JVM/store workload families | Instrumentation is application-owned; complete framework/deployed coverage remains open |
 | Alerts | Scrape failure, low disk, unavailable replicas, application failure/missing result/stale discovery → Alertmanager | Default receiver sends nothing; SMTP requires separate configuration |
+| PostgreSQL and stores | Restricted PostgreSQL exporter and bounded native-store collectors → Prometheus | Aggregate operator statistics; provider health, last-good values and freshness are separate |
 | Host health | systemd sender checks API SQL/Kubernetes access and Prometheus readiness → external watchdog | Does not directly inspect Docker, all nodes/workloads, Grafana, Loki or Alertmanager |
 | Backup freshness | Optional scheduled runner → separately authenticated external backup channel | Independent of heartbeat; shares watchdog hosting/mail |
 
@@ -50,12 +51,14 @@ Central storage and alerting are outside k3d but share its host failure domain. 
 
 ## Target coverage and project views
 
-PostgreSQL exporter metrics and workload resource usage scrapes remain future
-work. Attributed centralized operational logs are implemented.
+PostgreSQL exporter metrics, native-store collection and workload CPU/memory
+scrapes are implemented. Attributed centralized operational logs are implemented.
 [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md)
 has source for bounded platform and opt-in hosted-application tracing, private
-Tempo collection, operator dashboards, and opt-in private hosted metrics. Their
-deployed acceptance remains open. Application spans require verified workload
+Tempo collection, operator dashboards, and opt-in private hosted metrics. Phase 4
+was accepted for lab sequencing under its recorded exception; remaining checks
+are in Phase 10. Selected live AI trace/metric readback and owner-verified
+dashboards are recorded in the [AI evidence](../../infrastructure/monitoring/AI.md#deployed-smoke-check-october-17-2026). Application spans require verified workload
 provenance; raw trace search remains operator-only.
 The [Phase 4 tracing decision](decisions/ADR-021-phase-4-tracing-boundary.md)
 fixes Tempo/Alloy placement, workload authentication, retention and resource
@@ -76,7 +79,7 @@ payloads, customer details or credentials. See the
 
 ## Status and operational evidence
 
-The current catalog stores `provisioning`, `applied`, `failed` or `retired`; it does not transition with ongoing workload health. Authorized operation reads now provide a live readiness snapshot, separate from the apply outcome, including desired/ready counts, deployment/active images and diagnostic reason. This is an on-demand observation, not a persisted catalog health transition or continuous observer; Kubernetes/API errors are reported as unknown rather than healthy.
+The current catalog stores `empty`, `provisioning`, `applied`, `failed` or `retired`; it does not transition with ongoing workload health. Authorized operation reads now provide a live readiness snapshot, separate from the apply outcome, including desired/ready counts, deployment/active images and diagnostic reason. This is an on-demand observation, not a persisted catalog health transition or continuous observer; Kubernetes/API errors are reported as unknown rather than healthy.
 
 Selected heartbeat, SMTP, scrape-rule and backup DOWN/UP notifications have operator-reported receipt in the backlog. Application probe fixtures do not establish live application-rule delivery or complete host/cluster failure acceptance. Continue controlled checks on the existing lab under [ADR-010](decisions/ADR-010-single-environment-lab.md); no duplicate installation is required.
 

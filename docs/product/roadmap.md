@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Status: current/next/later roadmap as of October 17, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
+Status: current/next/later roadmap as of October 18, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
 
 | Phase | State | User outcome | Acceptance gate |
 |---|---|---|---|
@@ -17,7 +17,13 @@ Status: current/next/later roadmap as of October 17, 2026. No calendar deadlines
 
 The [amended delivery gates](../maintainers/delivery/README.md#backlog-delivery-commitments) order Phase 1 as operational protection, accountable access/security alerts, then durable lifecycle. Phase 2A implements the prioritized multi-service/scheduled-component vertical slice. Phase 2B adds revocable CI deployment credentials. Phase 2C completes diagnostics, policies, recovery, and project retirement on the existing Kubernetes infrastructure and single Python API. Phase 4 adds tracing and dashboards, Phase 5 adds AI operations, and optional Phase 6 contains the former service-split and second-provider work. All 20 [backlog stories](../maintainers/delivery/backlog.md) remain traceable.
 
-Current implementation includes the Kubernetes/k3d provider, one Python/FastAPI API, PostgreSQL provisioning, the CLI and React portal, and bounded telemetry with operator dashboards. Phase 4 is complete under its recorded exception. Phase 5 implements project-scoped explanations/investigations, curated development assistance and human-approved rollback; its portal is owner-accepted, while PLAN-010–015 remain open for broader criteria. Phase 7 includes source/local evidence for named PostgreSQL resources and opt-in RustFS, OpenSearch, Qdrant and dedicated Neo4j Community providers; RustFS, Qdrant and OpenSearch Dashboards browser access has local login, mode/isolation and expiry/revocation evidence; Neo4j Browser/private Bolt has local full-access, independent credential-fencing and cold-recovery evidence. All eight store performance dashboards and native metrics pipelines are implemented in source; workload instrumentation examples and version-pinned Parquet/DuckDB comparisons pass locally. Their remaining deployed measurement and domain comparison acceptance is Phase 9 work. Phase 8 providers remain deferred. These statuses reflect inspected source and the recorded [backlog evidence](../maintainers/delivery/backlog.md).
+Current implementation includes the Kubernetes/k3d provider, one Python/FastAPI API, PostgreSQL provisioning, the CLI and React portal, and bounded telemetry with operator dashboards. Phase 4 is complete under its recorded exception. Phase 5 implements project-scoped explanations/investigations, curated development assistance and human-approved rollback; its portal is owner-accepted, while PLAN-010–015 remain open for broader criteria. Phase 7 includes source/local evidence for named PostgreSQL resources and opt-in RustFS, OpenSearch, Qdrant and dedicated Neo4j Community providers; RustFS, Qdrant and OpenSearch Dashboards browser access has local login, mode/isolation and expiry/revocation evidence; Neo4j Browser/private Bolt has local full-access, independent credential-fencing and cold-recovery evidence. All eight store performance dashboards and native metrics pipelines are implemented in source; workload instrumentation examples and version-pinned Parquet/DuckDB comparisons pass locally. Their remaining deployed measurement and domain comparison acceptance is Phase 9 work.
+October 18 evidence adds PostgreSQL's scoped deterministic exit (EV-67), native
+provider/extension checks (EV-68/69), synthetic artifact/outbox/search integration
+(EV-71), and deployed human console/session checks (EV-72). Seven EV-71/72
+resource purges remain awaiting verified scheduled backup; zero active leases
+is not evidence of completed deletion. Deployed restore/rebuild and natural
+expiry/operator reviews remain Phase 10 work. Phase 8 providers remain deferred. These statuses reflect inspected source and the recorded [backlog evidence](../maintainers/delivery/backlog.md).
 
 Phase 1 is the MVP (minimum viable product), comprising all three gates 1A–1C. MVP is not a separate delivery stage.
 

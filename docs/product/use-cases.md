@@ -9,9 +9,13 @@ As a developer, I want to declare a web application with PostgreSQL for a projec
 Prerequisites: an authorized user, an existing environment, an accessible registry, available capacity, and a supported image.
 
 1. Select a project and environment, or create them within the authorized scope.
-2. Validate and submit an [ApplicationSpec](../architecture/application-contract.md).
+2. Create or select an independent named PostgreSQL resource, obtain an approved
+   binding for the consuming component, then submit its UUID in the
+   [ApplicationSpec](../architecture/application-contract.md).
 3. Receive an operation ID and track progress.
-4. The platform provisions the database/role, secret binding, workload, and route.
+4. The store worker provisions the independent resource and credentials; the
+   deployment worker attaches the approved component Secret/relay egress and
+   applies the workload and route.
 5. Check the URL, observed revision, and health status; write and read data through the application.
 
 Acceptance: resubmitting the same revision does not create additional resources. A failed workload does not delete an already provisioned database. Missing capabilities are reported clearly before any changes.
@@ -26,7 +30,10 @@ The platform displays desired and observed revisions, operations, logs, and metr
 
 As an authorized developer, I want to inspect project data with a database client. The platform authorizes access to the specific database, uses a separate human identity, and provides a controlled tunnel. Application credentials are not exposed by default.
 
-Acceptance: a user from another project receives neither connection details nor access. Revoking a grant terminates access according to the defined session policy. Short-lived credentials are a later extension. See [ADR-003](../architecture/decisions/ADR-003-postgresql-provisioning.md).
+Acceptance: a user from another project receives neither connection details nor access. Revoking a grant terminates access according to the defined session policy. Current human leases last 24 hours and remote native access uses restricted
+SSH. Renewals keep each generation's original deadline. See the
+[current access guide](../developers/database-access.md); ADR-003 records the
+earlier database model.
 
 ## UC-04 – Remove resources
 
@@ -49,7 +56,8 @@ A proposed change includes a concrete diff. Only after approval and renewed auth
 As a developer, I want to deploy one application containing multiple services and a scheduled component so that the services can work together internally and recurring work runs without an external scheduler.
 
 1. Declare at least two named long-running services and one named scheduled component in one application revision.
-2. Give each component its own image, command, and resource settings; apply the application's existing managed configuration, secrets, and database binding consistently.
+2. Give each component its own image, command, and resource settings; apply project configuration/secrets and declare approved store bindings only on
+the components that consume them.
 3. Declare internal ports for the long-running services and a cron schedule for the scheduled component.
 4. Submit the application and track component-specific deployment and run status.
 5. Verify that services communicate through stable internal names and that the scheduled component runs at the declared time, reaches the required internal service, and exits.

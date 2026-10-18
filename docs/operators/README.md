@@ -1,6 +1,6 @@
 # Platform operator guide
 
-Status: current. Last reviewed October 9, 2026.
+Status: current. Last reviewed October 18, 2026.
 
 Use this section to install and administer the shared Developer Platform. It
 covers the host, Docker services, k3d/Kubernetes, PostgreSQL, identity, edge,
@@ -12,6 +12,7 @@ observability, backups, and independent watchdog components.
 - [Local installation](install-local.md)
 - [Remote installation](install-remote.md)
 - [Identity and access](identity-and-access.md)
+- [Named data-store resources](data-stores.md)
 - [Lifecycle and upgrades](lifecycle.md)
 - [Monitoring and alerting](monitoring.md)
 - [Backup and recovery](backup-and-recovery.md)
