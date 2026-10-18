@@ -82,6 +82,18 @@ try {
         if ((await uploadResponse).status() !== 200) throw Error()
         const uploaded = await signedS3(page, provider.origin, session, 'GET', own + '/fixture-upload.txt')
         if (uploaded.status !== 200 || uploaded.text !== 'console upload fixture') throw Error()
+        const versioning = await signedS3(page, provider.origin, session, 'GET', own + '?versioning')
+        if (versioning.status !== 200) throw Error('RustFS console cannot read bucket versioning: ' + versioning.status)
+        await page.goto(provider.origin + '/rustfs/console/browser/?bucket=' + encodeURIComponent(provider.connection.S3_BUCKET))
+        await page.getByText('fixture-upload.txt', { exact: true }).first().waitFor()
+        stage = 's3-console-delete'
+        await page.getByRole('button', { name: 'Actions: fixture-upload.txt' }).click()
+        await page.getByRole('menuitem', { name: 'Delete', exact: true }).click()
+        const deleteResponse = page.waitForResponse(response => response.request().method() === 'DELETE' && new URL(response.url()).pathname.endsWith('/fixture-upload.txt'), { timeout: 15000 })
+        await page.getByRole('button', { name: 'Confirm', exact: true }).click()
+        if ((await deleteResponse).status() !== 204) throw Error('RustFS console delete failed')
+        const deleted = await signedS3(page, provider.origin, session, 'GET', own + '/fixture-upload.txt')
+        if (deleted.status !== 404) throw Error('RustFS console deleted object remains visible')
       }
       const read = await signedS3(page, provider.origin, session, 'GET', own + '/fixture.txt')
       if (read.status !== 200 || read.text !== 'console fixture' || Number.isNaN(Date.parse(read.date))) throw Error()

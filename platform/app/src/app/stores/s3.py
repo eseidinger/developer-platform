@@ -53,7 +53,7 @@ def client(endpoint, key, secret):
 def policy(resource, mode):
     name = bucket(resource)
     objects = ['s3:GetObject', 's3:GetObjectVersion']
-    listing = ['s3:GetBucketLocation', 's3:ListBucket', 's3:ListBucketVersions']
+    listing = ['s3:GetBucketLocation', 's3:GetBucketVersioning', 's3:ListBucket', 's3:ListBucketVersions']
     if mode == 'read-write':
         objects += ['s3:PutObject', 's3:DeleteObject', 's3:DeleteObjectVersion',
                     's3:AbortMultipartUpload', 's3:ListMultipartUploadParts']
