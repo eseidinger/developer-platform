@@ -157,21 +157,59 @@ try {
   const denied = await anonymous.request.get(consoleBase + `/browser/server/obj/1/${sid}`, { maxRedirects: 0 })
   if (![302, 401, 403].includes(denied.status())) throw Error()
   await anonymous.close()
-  stage = 'grant-revocation'
+  const transition = config.transition || 'revoke'
+  if (!['revoke', 'downgrade', 'retire'].includes(transition)) throw Error()
+  stage = 'active-query-start'
+  const held = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
+    { sql: 'SELECT pg_sleep(30)', explain_plan: null })
+  if (held.status !== 200 || held.body.success !== 1) throw Error()
+  stage = 'active-query-busy'
+  const busy = await call('GET', `/sqleditor/poll/${transaction}`)
+  if (busy.body.data?.status !== 'Busy') throw Error()
+  stage = 'grant-transition'
   const grant = await requestJson(context, `/v1/resources/${config.resourceId}/grants`, config.runnerToken)
   const row = grant.body.grants?.find(item => item.grant_id === config.grantId)
   if (!row) throw Error()
-  const revoked = await requestJson(context, `/v1/resource-grants/${config.grantId}/revocation`,
-    config.runnerToken, 'POST', { version: row.version })
-  if (revoked.status !== 202) throw Error()
-  await new Promise(resolve => setTimeout(resolve, 1200))
-  stage = 'revoked-reconnect-denial'
+  let changed
+  if (transition === 'retire') {
+    const resource = await requestJson(context, `/v1/resources/${config.resourceId}`, config.runnerToken)
+    if (resource.status !== 200) throw Error()
+    changed = await requestJson(context, `/v1/resources/${config.resourceId}/retirement`,
+      config.runnerToken, 'POST', { version: resource.body.version })
+  } else if (transition === 'downgrade') {
+    changed = await requestJson(context, `/v1/resource-grants/${config.grantId}/mode`,
+      config.runnerToken, 'PUT', { version: row.version, mode: 'read-only' })
+  } else {
+    changed = await requestJson(context, `/v1/resource-grants/${config.grantId}/revocation`,
+      config.runnerToken, 'POST', { version: row.version })
+  }
+  if (changed.status !== 202) throw Error()
+  stage = 'active-query-terminated'
+  let terminated = false
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const polled = await call('GET', `/sqleditor/poll/${transaction}`)
+    if (polled.body.data?.status === 'Success') throw Error()
+    if (polled.status >= 400 || polled.body.success === 0 ||
+        (polled.body.data?.status && polled.body.data.status !== 'Busy')) {
+      terminated = true
+      break
+    }
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  if (!terminated) throw Error()
+  stage = 'transitioned-reconnect-denial'
   await call('DELETE', connectionPath)
   const reconnect = await call('POST', connectionPath, { password: c.PGPASSWORD })
   if (reconnect.body.data?.connected === true || (reconnect.status === 200 && reconnect.body.success === 1)) throw Error()
+  if (transition === 'downgrade') {
+    stage = 'downgraded-grant-cleanup'
+    const revoked = await requestJson(context, `/v1/resource-grants/${config.grantId}/revocation`,
+      config.runnerToken, 'POST', { version: changed.body.version })
+    if (revoked.status !== 202) throw Error()
+  }
   console.log('PASS deployed pgAdmin: interactive portal and console SSO; scoped Query Tool ' +
     (config.mode === 'read-write' ? 'DDL/write/read' : 'read and read-only DDL denial') +
-    '; password save denied; anonymous isolation; revoked reconnect denied' +
+    '; password save denied; anonymous isolation; active query terminated and reconnect denied after ' + transition +
     (config.other ? '; other-human isolation' : ''))
 } catch {
   if (activePage) lastPath = new URL(activePage.url()).pathname

@@ -75,10 +75,28 @@ try {
     break
   }
   if (!ddlDenied) throw Error()
+  stage = 'active-query-start'
+  const held = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
+    { sql: 'SELECT pg_sleep(30)', explain_plan: null })
+  if (held.status !== 200 || held.body.success !== 1) throw Error()
+  const busy = await call('GET', `/sqleditor/poll/${transaction}`)
+  if (busy.body.data?.status !== 'Busy') throw Error()
   stage = 'lease-expiry'
   await context.request.post(config.expireUrl)
-  // The real relay guard closes the existing pgAdmin backend connection.
-  await new Promise(resolve => setTimeout(resolve, 600))
+  stage = 'active-query-terminated'
+  let terminated = false
+  for (let attempt = 0; attempt < 100; attempt++) {
+    const polled = await call('GET', `/sqleditor/poll/${transaction}`)
+    if (polled.body.data?.status === 'Success') throw Error()
+    if (polled.status >= 400 || polled.body.success === 0 ||
+        (polled.body.data?.status && polled.body.data.status !== 'Busy')) {
+      terminated = true
+      break
+    }
+    await new Promise(resolve => setTimeout(resolve, 200))
+  }
+  if (!terminated) throw Error()
+  stage = 'expired-reconnect-denial'
   await call('DELETE', path)
   const expired = await call('POST', path, { password: c.PGPASSWORD })
   if (expired.body.data?.connected === true || (expired.status === 200 && expired.body.success === 1)) throw Error()
@@ -101,7 +119,7 @@ try {
   const denied = await anonymous.request.get(config.base + `/browser/server/obj/1/${sid}`, { maxRedirects: 0 })
   if (![302, 401, 403].includes(denied.status())) throw Error()
   await anonymous.close()
-  console.log('PASS console: real Keycloak SSO; scoped pgAdmin Query Tool read and read-only DDL denial; password saving denied; expired reconnect denied; other-human/anonymous isolation')
+  console.log('PASS console: real Keycloak SSO; scoped pgAdmin Query Tool read and read-only DDL denial; password saving denied; active query terminated and expired reconnect denied; other-human/anonymous isolation')
 } catch {
   console.log(stage)
   process.exitCode = 1
