@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import json
 import os
+import time
 from datetime import datetime
 from urllib.error import HTTPError
 from urllib.parse import urlencode
@@ -156,6 +157,28 @@ class S3:
         console = console_user(credential['credential_id'])
         if self.admin('GET', 'user-info', missing=True, accessKey=console) is not None:
             self.admin('DELETE', 'remove-user', accessKey=console)
+        # Admin deletion can precede the restored server's IAM cache refresh.
+        # Recovery must not release quarantine while the old native key works.
+        try:
+            self.root.head_bucket(Bucket=bucket(resource))
+        except ClientError as error:
+            if error.response['ResponseMetadata']['HTTPStatusCode'] == 404:
+                return  # Already purged; there is no retained resource to read.
+            raise StoreError('Revoked credential could not be verified') from None
+        scoped = client(self.endpoint, key, catalog.secret_for(credential['credential_id']))
+        for attempt in range(20):
+            try:
+                scoped.list_objects_v2(Bucket=bucket(resource), MaxKeys=1)
+            except ClientError as error:
+                status = error.response['ResponseMetadata']['HTTPStatusCode']
+                code = error.response['Error']['Code']
+                if status in {401, 403} or (status == 400 and code in
+                        {'InvalidRequest', 'InvalidAccessKeyId', 'ExpiredToken'}):
+                    return
+                raise StoreError('Revoked credential could not be verified') from None
+            if attempt < 19:
+                time.sleep(.25)
+        raise StoreError('Revoked credential remains active')
 
     def credentials(self, resource, credential):
         return {'AWS_ACCESS_KEY_ID': access_key(credential['credential_id']),

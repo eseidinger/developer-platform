@@ -7,8 +7,9 @@ This plan collects the remaining work in
 `PLAN-016`, `PLAN-009`, `PLAN-017`, `PLAN-018`, `PLAN-019`, `PLAN-006`,
 `PLAN-007`, and `PLAN-008`, plus the deferred deployed portal acceptance for
 owner-accepted `PLAN-020`, and all deferred acceptance/fixes from owner-completed
-Phase 4 (`PLAN-021`–`PLAN-024`, package 9.9), and deferred second AI model
-provider evaluation (`PLAN-012` follow-up, package 9.10). It does not replace their acceptance criteria or
+Phase 4 (`PLAN-021`–`PLAN-024`, package 9.9), deferred second AI model
+provider evaluation (`PLAN-012` follow-up, package 9.10), and deployed named
+PostgreSQL restore acceptance (`PLAN-026` follow-up, package 9.11). It does not replace their acceptance criteria or
 create a new task ID. The
 [delivery backlog](../backlog.md) remains the authoritative task and evidence
 register.
@@ -32,7 +33,8 @@ are accepted.
 Exit: every acceptance criterion for `PLAN-016`, `PLAN-009`, `PLAN-017`,
 `PLAN-018`, `PLAN-019`, `PLAN-006`, `PLAN-007`, and `PLAN-008`, and the
 deferred deployed portal journeys in `PLAN-020`, Phase 4 follow-ups in package 9.9,
-and second AI model-provider evaluation in package 9.10, has dated source, local, and
+second AI model-provider evaluation in package 9.10, and the deployed named
+PostgreSQL restore check in package 9.11 have dated source, local, and
 deployed evidence (or a new explicit owner-directed exception). The generic and
 externally owned versioned results are recorded together. Only then may Phase 9
 be closed; incomplete work here remains visible without blocking the other
@@ -268,9 +270,28 @@ budget and safety contracts, with dated reproducible evidence and documented
 limits, or a new explicit owner-directed exception. Schedule independently when
 capacity and a provider setup are available, before the final reviews in 9.8.
 
+### 9.11 — Verify deployed named PostgreSQL restore (`PLAN-026` follow-up)
+
+**Owner deferral (October 18, 2026):** This is the off-host restore check moved
+from Phase 7 package 7.1. Preserve the local encrypted restore fixture as source
+evidence; it is not a deployed recovery result.
+
+1. Capture a verified backup containing a named resource, its binding/grant
+   catalog and a known application-written SQL marker. Record snapshot, versions
+   and pre-backup receipt.
+2. Restore into an empty isolated host using the documented operator workflow.
+   Verify retained data, quarantine and fresh approval, scoped access and
+   revocation, application reconnection, and the measured RPO/RTO against the
+   selected recovery targets.
+3. Record the result under PLAN-026 and distinguish this resource recovery from
+   the generic application recovery checks in package 9.5.
+
+**Exit evidence:** dated off-host restore and readback with versioned fixture,
+snapshot and recovery timings, or an explicit owner-directed exception.
+
 ### 9.8 — Complete the lowest-priority human database leftovers (`PLAN-008`)
 
-Schedule this **last**, after all other Phase 9 work packages, including 9.9 and 9.10. EV-47's
+Schedule this **last**, after all other Phase 9 work packages, including 9.9–9.11. EV-47's
 automated and manual core tests are accepted as passed and need no repeat solely
 for the later clean deployment. The following reviews remain unverified:
 
@@ -306,11 +327,13 @@ not turn an unperformed check into a passing result.
 `PLAN-016` → `PLAN-009` → `PLAN-017` → `PLAN-018` → `PLAN-019`, with portal
 acceptance package 9.6 run after the identity/access API is available. Package
 9.7 runs after the Phase 3 source capabilities are ready. Run 9.8 last,
-after 9.1–9.7, 9.9 and 9.10; its reviews or an explicit owner-directed exception remain
+after 9.1–9.7 and 9.9–9.11; its reviews or an explicit owner-directed exception remain
 required before Phase 9 exit. Package 9.9 can run independently once the
 implemented Phase 4 telemetry is available and does not gate Phase 5.
 Package 9.10 runs once a second model-provider setup is available and also does
 not gate Phase 5; primary-provider acceptance does not depend on its completion.
+Package 9.11 runs when an isolated restore host and verified backup are available;
+it does not gate package 7.1 acceptance.
 
 `PLAN-018` requires the implemented and accepted identity, contract, and
 monitoring outcomes. `PLAN-019` requires the completed deployed integration

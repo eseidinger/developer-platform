@@ -64,6 +64,24 @@ test('credential issuance is explicit and pending provisioning never retries the
   await user.click(screen.getByRole('button', { name: 'Close and discard credential' }))
   expect(screen.queryByDisplayValue('seed-private-password')).not.toBeInTheDocument()
 })
+test('pgAdmin shows its reachable host separately from the private native PGHOST', async () => {
+  vi.mocked(api.getMine).mockResolvedValue([{ grant, resource: { ...resource, console_url: '/store-console/postgresql/' } }])
+  vi.mocked(api.leases).mockResolvedValue([{ ...pending, state: 'active' }])
+  vi.mocked(api.reveal).mockResolvedValue({ ...pending, state: 'active', connection: {
+    PGHOST: '172.30.80.15', PGPORT: '20002', PGDATABASE: 'resource_fixture', PGUSER: 'credential_fixture',
+    PGPASSWORD: 'seed-private-password', PGSSLMODE: 'disable',
+  } })
+  const { user } = setup()
+  await user.click(await screen.findByRole('button', { name: 'Inspect this lease' }))
+  const pgAdmin = screen.getByRole('heading', { name: 'pgAdmin connection' }).parentElement!
+  expect(within(pgAdmin).getByLabelText('Host name/address (pgAdmin)')).toHaveValue('store-access')
+  expect(within(pgAdmin).getByLabelText('Port (pgAdmin)')).toHaveValue('20002')
+  expect(within(pgAdmin).getByLabelText('Maintenance database (pgAdmin)')).toHaveValue('resource_fixture')
+  expect(within(pgAdmin).getByLabelText('Username (pgAdmin)')).toHaveValue('credential_fixture')
+  expect(within(pgAdmin).getByLabelText('SSL mode (pgAdmin)')).toHaveValue('Disable')
+  expect(screen.getByLabelText('PGHOST (private client only)')).toHaveValue('172.30.80.15')
+  expect(screen.getByDisplayValue('seed-private-password')).toHaveAttribute('type', 'password')
+})
 test.each([['s3', 'RustFS', 'RUSTFS_CONSOLE_SECRET_KEY'], ['qdrant', 'Qdrant', 'QDRANT_API_KEY'],
   ['opensearch', 'OpenSearch', 'OPENSEARCH_PASSWORD'], ['neo4j', 'Neo4j', 'NEO4J_PASSWORD']] as const)(
   '%s console launch sends an ephemeral POST assertion without caching it or placing it in a URL', async (provider, label, key) => {

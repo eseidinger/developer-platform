@@ -9,6 +9,51 @@ with local isolation/recovery evidence. RustFS, Qdrant and OpenSearch Dashboards
 browser access, plus Neo4j Browser, pass local native-login, supported-mode/isolation
 and expiry/revocation fixtures; deployed acceptance remains incomplete. No existing installation has been reset.
 
+An October 18 node-01 manual check passed private SSH/Bolt access, invalid-password
+denial and HTTPS console launch/session boundaries for one existing Neo4j human
+lease after the restricted bastion was updated.
+See [EV-51](../maintainers/delivery/backlog.md#verification-register) for the
+exact repair and limits; this does not close deployed provider acceptance.
+
+A subsequent October 18 node-01 PostgreSQL check created two active named
+resources in `data-store-test`. Private bastion access passed writer DDL/data,
+read-only denial, wrong-password and cross-resource denial. Downgrading a writer
+closed its held session; a new read-only lease read retained data but could not
+write. The pgAdmin entry returned its login page; authenticated console use,
+application binding and deployed recovery remain open. The resources and marker
+were retained for follow-up. See [EV-52](../maintainers/delivery/backlog.md#verification-register).
+
+The same lab then deployed bound `web` and unbound `probe` test components.
+Only `web` received a scoped PostgreSQL Secret and relay egress. Its credential
+read and wrote the assigned resource through an operator tunnel. Revoking the
+binding closed its SQL session and removed the Secret and egress rule while both
+components remained ready. The test workload does not issue SQL itself; see
+[EV-53](../maintainers/delivery/backlog.md#verification-register).
+
+Short-lived service-account test personas then checked cross-project PostgreSQL
+binding approval on node-01. Separate owner and consumer project administrators
+exercised pending request, denied consumer approval, owner approval, scoped
+read-only native access, and consumer revocation; a viewer was denied resource
+management. All personas were revoked and the disposable consumer project was
+retired. These personas cannot exercise personal human leases or pgAdmin SSO.
+See [EV-54](../maintainers/delivery/backlog.md#verification-register).
+
+The October 18 follow-up exercised SQL inside a disposable pod using the bound
+component's managed Secret and relay-only egress. A controlled 30-day rotation
+closed a held SQL session, delivered a fresh credential and allowed a new pod
+to reconnect and read/write retained data. Revocation removed the Secret and
+egress rule; the retained test application was restored to an unbound spec.
+A Kubernetes field-manager conflict exposed by the first rollout was corrected
+and a second bind/rotation/reapply/revocation cycle passed without deleting the
+Deployment. See [EV-58 and EV-59](../maintainers/delivery/backlog.md#verification-register).
+
+Deployed pgAdmin browser automation then passed real portal/console OIDC sign-in,
+read-only scoped connection and query, password-save denial, other-human and
+anonymous isolation, and denied reconnect after grant revocation. The disposable
+Keycloak users and grant were removed/revoked. Natural 24-hour lease expiry and
+a separate read-write console user remain untested; see
+[EV-60](../maintainers/delivery/backlog.md#verification-register).
+
 ## Selecting shared services
 
 For remote deployments, configure the optional `platform_stores` group in the
@@ -401,6 +446,12 @@ In pgAdmin, register **Host name/address** `store-access`, **Port** the credenti
 `PGPORT`, **Maintenance database** `PGDATABASE`, **Username** `PGUSER`, and **SSL mode**
 `Disable`. Supply your own `PGPASSWORD`. The lease relay verifies the exact
 user/database and closes the backend connection at expiry, revoke or downgrade.
+Do not copy `PGHOST` into pgAdmin: that private relay IP is unreachable from
+the isolated console network. An October 18 node-01 user-confirmed connection
+using `store-access` is recorded in [EV-55](../maintainers/delivery/backlog.md#verification-register).
+The portal now displays the pgAdmin host and the private native-client `PGHOST`
+in separate labelled sections; the [live UI correction](../maintainers/delivery/backlog.md#verification-register)
+is recorded as EV-56.
 Renew and register/update the new lease port/user to reconnect. Password saving,
 PSQL shell and shared administrator server registrations are disabled. SQL query history is bounded to 20 entries per user/database in the console
 volume; it is not a platform telemetry export. User registrations/settings live in the console volume;

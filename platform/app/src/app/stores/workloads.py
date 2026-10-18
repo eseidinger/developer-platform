@@ -161,7 +161,8 @@ def reconcile_runtime(conn, control):
                 patch = {"spec": {"template": desired_pod}} if kind == "Deployment" else {
                     "spec": {"jobTemplate": {"spec": {"template": desired_pod}}}}
                 resource.patch(name=manifest["metadata"]["name"], namespace="project-" + project,
-                    body=patch, content_type="application/strategic-merge-patch+json", _request_timeout=(3, 5))
+                    body=patch, content_type="application/strategic-merge-patch+json",
+                    field_manager="developer-platform", _request_timeout=(3, 5))
                 continue
             if kind == "Deployment":
                 observed = live.get("status", {}).get("observedGeneration", 0)

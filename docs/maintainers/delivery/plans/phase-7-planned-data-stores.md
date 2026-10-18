@@ -2,7 +2,7 @@
 
 Status: implementation in progress as of October 17, 2026. PostgreSQL named
 resources/private access/console are implemented in source with disposable local
-evidence; deployed integration/recovery acceptance remains open in package 7.1.
+evidence; deployed PostgreSQL access and lifecycle acceptance remains open in package 7.1.
 Additional shared-store providers have no operational acceptance recorded here.
 
 The owner requested continued implementation as far as possible with regular
@@ -262,20 +262,23 @@ capabilities and agreed external integration contract.
   declarations against the new contract. Legacy implicit database provisioning,
   automatic access for every component and compatibility/migration paths are not
   requirements. Record reset steps and impacts before performing recreation.
-- Complete ODIP → VEF deployment acceptance for Energy, linking the generic
-  platform evidence and external domain assertions in the
-  [energy-system integration plan](energy-system-integration.md).
-- Exercise PostgreSQL provisioning and recovery; document JSONB, full-text search,
+- Exercise PostgreSQL provisioning; document JSONB, full-text search,
   recursive CTEs, materialized views, partitioning, and transactional-outbox baselines.
-- Reuse existing Phase 9 evidence and record newly performed integration/recovery
+- Reuse existing Phase 9 evidence and record newly performed integration
   checks against their original tasks; do not close unrelated leftovers.
 
 **Exit:** the independent resource/binding contract passes PostgreSQL lifecycle,
 isolation, named-resource human read-only/read-write access through both private
-and browser-console paths, and recovery
-acceptance; a versioned cross-project acceptance record
+and browser-console paths; a versioned cross-project resource-binding acceptance record
 and reproducible PostgreSQL reference establish the gate for additional stores. Local-only
 integration or the imported roadmap's starting-point claims do not satisfy it.
+
+**Owner scope change (October 18, 2026):** Deployed off-host PostgreSQL restore
+acceptance is a [Phase 9 leftover](phase-9-anytime-leftovers.md#911--verify-deployed-named-postgresql-restore-plan-026-follow-up),
+not a package 7.1 exit gate. The local encrypted restore fixture remains evidence,
+not a deployed restore result. The ODIP → VEF integration check is omitted from
+package 7.1; externally owned energy-system acceptance remains tracked by its
+own integration plan and Phase 9 generic integration work.
 
 **Extension compatibility evidence (October 17, 2026):** PostgreSQL 18.6 with
 pgvector 0.8.7, AGE 1.8.0 and deferred TimescaleDB 2.30.2 passed the 16-case local
