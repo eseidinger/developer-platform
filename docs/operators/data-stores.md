@@ -54,6 +54,13 @@ Keycloak users and grant were removed/revoked. Natural 24-hour lease expiry and
 a separate read-write console user remain untested; see
 [EV-60](../maintainers/delivery/backlog.md#verification-register).
 
+An October 18 read-only node-01 monitoring check found both named PostgreSQL
+resource databases in deployed size series. All 27 PostgreSQL dashboard queries
+parsed against live Prometheus, with 26 returning data; the unlimited database
+connection-limit panel was empty as expected. The exporter reported `pg_up=1`
+and no scrape error, and Grafana's provisioned dashboard files matched source.
+See [EV-62](../maintainers/delivery/backlog.md#verification-register).
+
 ## Selecting shared services
 
 For remote deployments, configure the optional `platform_stores` group in the
