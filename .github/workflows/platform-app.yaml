@@ -45,9 +45,11 @@ jobs:
             if curl -fsS http://127.0.0.1:18080/realms/master/.well-known/openid-configuration >/dev/null; then
               exit 0
             fi
+            if [ "$attempt" -eq 30 ]; then
+              exit 1
+            fi
             sleep 2
           done
-          exit 1
       - name: Verify real hosted identities and proxy configuration
         env:
           ACCESS_TEST_KEYCLOAK_URL: http://127.0.0.1:18080

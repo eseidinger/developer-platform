@@ -146,17 +146,19 @@ def main():
                                     ({"smoke": "ok", "provider": "health/ready"}.get(group["labels"]["project"], "error"))]
             atomic_write(temp / "discovery/applications.json", json.dumps(groups))
             configuration = (temp / "prometheus.yml").read_text()
-            configuration = configuration.replace("global:\n  scrape_interval: 30s",
-                                                  "global:\n  scrape_interval: 1s\n  scrape_timeout: 1s")
             configuration = configuration.replace("refresh_interval: 15s", "refresh_interval: 1s")
-            configuration = configuration.replace("scrape_timeout: 10s", "scrape_timeout: 1s")
+            applications_scrape = "  - job_name: applications\n    metrics_path: /probe\n    scrape_timeout: 10s"
+            if applications_scrape not in configuration:
+                raise AssertionError("The applications scrape configuration changed")
+            configuration = configuration.replace(applications_scrape,
+                "  - job_name: applications\n    scrape_interval: 1s\n    metrics_path: /probe\n    scrape_timeout: 1s")
             configuration = configuration.replace("blackbox-exporter:9115", f"127.0.0.1:{port}")
             configuration = configuration.replace("alertmanager:9093", "127.0.0.1:9")
             (temp / "prometheus.yml").write_text(configuration)
             with socket.socket() as sock:
                 sock.bind(("127.0.0.1", 0))
                 prom_port = sock.getsockname()[1]
-            run("docker", "run", "--rm", "-d", "--name", prometheus_name, "--network", "host",
+            run("docker", "run", "-d", "--name", prometheus_name, "--network", "host",
                 "-v", f"{temp}:/etc/prometheus:ro", PROMETHEUS,
                 "--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/tmp/data",
                 f"--web.listen-address=127.0.0.1:{prom_port}")
