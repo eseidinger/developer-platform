@@ -190,12 +190,16 @@ class ConsoleBoundaryTests(TestCase):
 
 
 class DashboardsStreamingTests(IsolatedAsyncioTestCase):
-    async def check_fence(self, expire, stall=False):
+    async def check_fence(self, expire, stall=False, asset=False):
+        finish = asyncio.Event()
         class Held(httpx.AsyncByteStream):
             async def __aiter__(self):
                 yield b'first'
-                await asyncio.Event().wait()
-        cid = str(uuid4())
+                await finish.wait()
+                if asset:
+                    yield b'second'
+        # Production rows carry a UUID object; the stream guard must accept it.
+        cid = uuid4()
         row = {'credential_id': cid, 'resource_id': str(uuid4()), 'relay_port': 20000, 'provider': 'opensearch',
             'issuer': 'https://identity.fixture.invalid', 'subject': 'human',
             'expires_at': datetime.now(timezone.utc) + timedelta(hours=24)}
@@ -207,8 +211,9 @@ class DashboardsStreamingTests(IsolatedAsyncioTestCase):
         with patch.dict(os.environ, {'DATABASE_KEY': 's' * 32, 'APPS_DOMAIN': 'apps.fixture.invalid',
                 'OPENSEARCH_DASHBOARDS_IP': '127.0.0.4'}):
             app = console.create_gateway(load)
-            request = Request({'type': 'http', 'method': 'GET', 'scheme': 'https', 'path': '/held',
-                'raw_path': b'/held', 'query_string': b'', 'path_params': {'port': 20000},
+            path = '9054/bundles/plugin/test/test.plugin.js' if asset else 'held'
+            request = Request({'type': 'http', 'method': 'GET', 'scheme': 'https', 'path': '/' + path,
+                'raw_path': ('/' + path).encode(), 'query_string': b'', 'path_params': {'port': 20000},
                 'headers': [(b'host', b'console-20000.apps.fixture.invalid'),
                     (b'cookie', (console.COOKIE + '=' + console.assertion(row, 'session', 86400)).encode())],
                 'client': ('127.0.0.1', 12345)})
@@ -218,7 +223,7 @@ class DashboardsStreamingTests(IsolatedAsyncioTestCase):
                 endpoint = next(route.endpoint for route in app.routes if getattr(route, 'path', None) == '/{path:path}' and getattr(route, 'methods', None))
                 if stall:
                     current[0]['expires_at'] = datetime.now(timezone.utc) + timedelta(seconds=1)
-                response = await endpoint(request, 'held')
+                response = await endpoint(request, path)
                 blocked[0] = stall
                 iterator = response.body_iterator
                 self.assertEqual(await asyncio.wait_for(anext(iterator), 1), b'first')
@@ -229,6 +234,10 @@ class DashboardsStreamingTests(IsolatedAsyncioTestCase):
                 else:
                     current[0] = None
                 try:
+                    if asset:
+                        await asyncio.sleep(.6)
+                        finish.set()
+                        self.assertEqual(await asyncio.wait_for(anext(iterator), 1), b'second')
                     with self.assertRaises(StopAsyncIteration):
                         await asyncio.wait_for(anext(iterator), 1.5)
                 finally:
@@ -242,3 +251,6 @@ class DashboardsStreamingTests(IsolatedAsyncioTestCase):
 
     async def test_catalog_stall_cannot_keep_a_frontend_stream_open_past_its_deadline(self):
         await self.check_fence(False, stall=True)
+
+    async def test_authorized_frontend_asset_finishes_after_revocation(self):
+        await self.check_fence(False, asset=True)

@@ -369,7 +369,7 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
         # Preserve native signed paths/headers and stream bytes without buffering.
         # The relay enforces native identity, connection limits and hard deadlines.
         try:
-            await asyncio.wait_for(slots.acquire(), .1)
+            await asyncio.wait_for(slots.acquire(), 5)
         except TimeoutError:
             raise HTTPException(503, 'Console capacity is occupied') from None
         transport = httpx.AsyncClient(trust_env=False, follow_redirects=False, timeout=httpx.Timeout(60, connect=3))
@@ -414,14 +414,18 @@ def create_gateway(load, destination=backend, register=None, acknowledge=acknowl
                     remaining = (row['expires_at'] - datetime.now(timezone.utc)).total_seconds()
                     if remaining <= 0: return
                     try:
-                        current = await asyncio.wait_for(asyncio.to_thread(load, UUID(row['credential_id'])), min(.5, remaining))
+                        current = await asyncio.wait_for(asyncio.to_thread(load, UUID(str(row['credential_id']))), min(.5, remaining))
                     except Exception:
                         return
                     deadline = min(current['expires_at'], row['expires_at']) if current else datetime.now(timezone.utc)
                     if deadline <= datetime.now(timezone.utc):
                         return
                     await asyncio.sleep(min(.5, max(0, (deadline - datetime.now(timezone.utc)).total_seconds())))
-            guard = asyncio.create_task(alive()) if frontend else None
+            # Dashboards loads dozens of immutable frontend bundles at once.
+            # They contain no tenant data and are authorized when requested;
+            # repeated catalog probes can truncate a bundle under burst load.
+            asset = (path.startswith(('9054/bundles/', 'ui/')) or path in {'startup.js', 'bootstrap.js'})
+            guard = asyncio.create_task(alive()) if frontend and not asset else None
             pending = None
             try:
                 iterator = upstream.aiter_raw().__aiter__()

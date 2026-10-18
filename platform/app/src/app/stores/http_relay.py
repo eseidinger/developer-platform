@@ -86,7 +86,7 @@ def identity(request, lease):
         if len(pieces) != 3:
             raise ValueError('JWT required')
         payload = json.loads(base64.urlsafe_b64decode(pieces[1] + '=' * (-len(pieces[1]) % 4)))
-        if payload.get('jti') != lease['credential_id']:
+        if payload.get('jti') != str(lease['credential_id']):
             raise ValueError('Lease identity mismatch')
         # This untrusted inspection never grants authentication. The native
         # Qdrant service must verify the JWT signature and collection permissions.

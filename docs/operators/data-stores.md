@@ -7,7 +7,10 @@ Disposable console SSO/connection and encrypted empty-server restore fixtures pa
 RustFS, OpenSearch, Qdrant and dedicated Neo4j Community have native providers and opt-in service selection
 with local isolation/recovery evidence. RustFS, Qdrant and OpenSearch Dashboards
 browser access, plus Neo4j Browser, pass local native-login, supported-mode/isolation
-and expiry/revocation fixtures; deployed acceptance remains incomplete. No existing installation has been reset.
+and expiry/revocation fixtures. Deployed interactive browser checks now pass
+for all four providers with disposable human personas, including active-session
+revocation; see [EV-72](../maintainers/delivery/backlog.md#verification-register).
+No existing installation has been reset.
 
 An October 18 node-01 manual check passed private SSH/Bolt access, invalid-password
 denial and HTTPS console launch/session boundaries for one existing Neo4j human

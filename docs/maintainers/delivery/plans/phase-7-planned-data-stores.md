@@ -293,8 +293,10 @@ timings and transfer/checksum cost are separate observations without adoption
 thresholds. DuckDB is confined to applications and the optional fixture group.
 The 180-row synthetic fixture is not ODIP domain/large-volume acceptance. A
 deployed bound-component fixture now verifies atomic PostgreSQL metadata/outbox
-publication with an exact-version RustFS artifact (EV-71); domain application
-integration remains externally owned. Deployed recovery is Phase 10 work.
+publication with an exact-version RustFS artifact (EV-71). Deployed RustFS
+browser upload/delete, scoped reader denial and active-session revocation pass
+with disposable human personas (EV-72); domain application integration remains
+externally owned. Deployed recovery is Phase 10 work.
 
 - Implement owner-selected [RustFS](data-store-expansion.md#object-storage-selection-priority)
   as a shared, continuously running Docker Compose service with its official
@@ -327,7 +329,8 @@ fixtures pass empty-volume restoration with fresh scoped approval and isolated
 workspace/data purge. A deployed synthetic bound-component fixture verifies
 PostgreSQL-authoritative create, update and delete projection behavior (EV-71);
 domain application integration remains externally owned.
-Deployed rebuild and recovery acceptance are Phase 10 package 10.13; judged
+Deployed Dashboards writer/reader login, scoped data operations and active-session
+revocation pass in EV-72. Deployed rebuild and recovery acceptance are Phase 10 package 10.13; judged
 domain comparisons are Phase 9 work.
 See the [compatibility evidence](../../../../persistence/compatibility/opensearch-2026-10-17.md).
 
@@ -363,8 +366,10 @@ capture and verified-backup-gated purge. Verify native full-access capabilities
 cannot bypass platform identity or lease controls. No Docker socket in the API
 or commercial edition is selected. The provider is now opt-in in source with native/Browser/isolation, real catalog,
 instance-replacement networking, JVM, expiry and cold-volume recovery fixtures.
-Source explicitly reports full-instance access; public/deployed acceptance remains
-open. See the [local evidence](../../../../persistence/compatibility/neo4j-2026-10-17.md). See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
+Source explicitly reports full-instance access. Deployed Neo4j Browser login,
+native graph writes, active-session revocation and independent access for a
+second full-access persona pass in EV-72. See the
+[local evidence](../../../../persistence/compatibility/neo4j-2026-10-17.md). See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
 
 - Protect authoritative sources, graph definitions and loaders under the
   [rebuildable-projection policy](data-store-expansion.md#apache-age-rebuild-policy).
@@ -392,6 +397,9 @@ require this package.
 **Exit:** any adopted provider has scoped collection access, deletion and common
 lifecycle evidence. Rebuild/recovery is Phase 10 package 10.13; retrieval-quality
 and performance comparison are Phase 9 work.
+
+Deployed Qdrant official-console writer/reader login, collection-scoped point
+operations and active-session revocation pass in EV-72.
 
 ## Phase exit
 

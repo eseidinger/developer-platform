@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 import json
 import time
 from unittest import IsolatedAsyncioTestCase
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import h11
 from app.stores import catalog
@@ -93,6 +93,8 @@ class HTTPRelayTests(IsolatedAsyncioTestCase):
         payload = base64.urlsafe_b64encode(json.dumps({'jti': self.lease['credential_id']}).encode()).decode().rstrip('=')
         # Signature verification belongs to Qdrant; the relay cannot mint a token.
         request = h11.Request(method='GET', target='/collections', headers=[('host', 'fixture'), ('api-key', 'header.' + payload + '.signature')])
+        identity(request, self.lease)
+        self.lease['credential_id'] = UUID(self.lease['credential_id'])
         identity(request, self.lease)
         self.lease['credential_id'] = str(uuid4())
         with self.assertRaises(ValueError):
