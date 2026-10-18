@@ -6,22 +6,23 @@ the inspected platform source. No new deployment or benchmark was performed for
 this documentation update.
 
 The [data store roadmap](../../../product/data-store-roadmap.md) is organized into
-two platform phases:
+provider phases 7 and 8 plus a separate measurement phase 9:
 
 | Phase | Scope | Tasks |
 |---|---|---|
 | [7 — Planned Data Stores](phase-7-planned-data-stores.md) | PostgreSQL baseline/integration, DuckDB/Parquet/S3, OpenSearch, AGE/Neo4j, pgvector/Qdrant | PLAN-026–030, PLAN-036 |
 | [8 — Deferred Data Stores](phase-8-deferred-data-stores.md) | TimescaleDB, ClickHouse, Valkey, MongoDB/CouchDB | PLAN-031–033 |
+| [9 — Data Store Measurement and Comparison](phase-9-store-measurement-and-comparison.md) | Eight performance dashboards and reproducible comparisons across selected stores | PLAN-037, with source evidence from PLAN-026–033 |
 
-Data-store phases precede leftovers in delivery order: Phase 7 planned stores,
-Phase 8 deferred stores, then Phase 9 anytime leftovers. This renumbers the
-former Phases 8, 9 and 7 respectively and replaces the initial eight-phase breakdown. Existing task IDs and acceptance
-criteria are retained as packages within the two phases. Phase 7 incorporates
-source roadmap phases 0–4; Phase 8 incorporates source phases 5–7. Optional Phase 6
-compute/service expansion is independent. [Phase 9 leftovers](phase-9-anytime-leftovers.md)
-remains last, anytime and lowest priority. Only the integration/recovery checks
-specifically needed for a store gate that package; completing all of Phase 9 is
-not a prerequisite.
+Phase 7 incorporates source roadmap phases 0–4; Phase 8 incorporates source
+phases 5–7. Their provider acceptance covers functional integration, backup
+safeguards and ordinary lifecycle checks. Deployed restore, rebuild and
+application reconnection acceptance belongs to Phase 10 packages 10.11 and 10.13.
+Quantitative measurements, comparisons and eight performance dashboards belong
+to Phase 9 and do not gate provider selection or Phase 7/8 exit. Optional Phase 6
+compute/service expansion is independent. [Phase 10 leftovers](phase-10-anytime-leftovers.md)
+remains last, anytime and lowest priority. Phase 10 recovery work does not gate
+provider selection or Phase 7/8 exit.
 
 ## Provisioning decision
 
@@ -526,8 +527,8 @@ Two AGE limitations were reproduced:
   described in [upstream issue #2503](https://github.com/apache/age/issues/2503)
   restored graph queries and the two-node count. This is a tested diagnostic
   workaround, not an approved general-purpose production recovery procedure.
-  Phase 7 must provide validated AGE recovery or rebuild before claiming its
-  operational recovery acceptance. A separate server would not by itself fix
+  Phase 10 package 10.13 must provide validated AGE recovery or rebuild before
+  claiming operational recovery acceptance. A separate server would not by itself fix
   this AGE-only logical-restore defect.
 
 ### Apache AGE restore diagnosis
@@ -732,7 +733,8 @@ copies off-host, a 24-hour RPO and a four-hour RTO. Reuse the existing external
 backup repository and credential-management approach where technically suitable;
 the new single-host object store cannot be the only backup destination for data
 on that host. Validate consistency, version/checksum preservation, independent
-backup access and provider-supported backup/recovery methods before acceptance.
+backup access before Phase 7/8 acceptance. Validate provider-supported restore
+and rebuild methods in Phase 10 packages 10.11 and 10.13.
 
 For derived search, graph and vector indexes, retain protected configuration,
 source dataset/version references and reproducible rebuild procedures. An index
@@ -817,7 +819,8 @@ preference are sufficient reasons to choose a store. Phase 8 remains deferred
 for scheduling purposes and can be activated whenever the owner chooses.
 
 Comparisons and realistic workload measurements remain useful learning and
-operational documentation; their results do not approve or reject a technology.
+operational documentation under [Phase 9](phase-9-store-measurement-and-comparison.md);
+their results do not approve or reject a technology.
 Record the chosen store and any observations without requiring it to outperform
 the baseline. The already selected shared-service provisioning, explicit bindings,
 isolation, backup/recovery and capacity policies still govern implementation and
@@ -845,22 +848,22 @@ decoupling, or event volume.
 Every activated provider must demonstrate provisioning/reconciliation, retry and
 restart behavior, scoped access and revocation, managed secret rotation/redaction,
 network isolation, bounded capacity, health/alerts, upgrade/rollback, and retirement
-with explicit retention/deletion policy. Record backup and measured recovery for
-authoritative data; demonstrate rebuild and reconcile retained configuration for
-derived indexes. Document supported versions, license, maturity, operating model,
+with explicit retention/deletion policy. Record working backups in Phase 7/8;
+measure authoritative-data recovery and demonstrate derived-index rebuild and
+retained-configuration reconciliation in Phase 10. Document supported versions,
+license, maturity, operating model,
 and recovery ownership before selection. Use the existing lab under its recorded
 validation policy, with bounded impact and recovery steps; do not provision another
 test environment. Keep selected shared stores running with bounded resource
 allocations and measure their combined capacity before adding services. Recheck host capacity;
 the source roadmap's VM figures are not verified sizing evidence.
 
-Each comparison records versioned data, reproducible workload and environment,
-equivalent results, p50/p95 latency, throughput, scaling, CPU/RAM/disk/index size,
-import/update/delete/rebuild, consistency and coupling, deployment/recovery/upgrade,
-and infrastructure, maintenance and license costs. Isolated performance comparisons
-may use the local workstation. Record observations and the owner's selection;
-no comparison result or success threshold gates adoption or permanent use.
+The [Phase 9 measurement plan](phase-9-store-measurement-and-comparison.md)
+records versioned data, reproducible workloads and environments, equivalent
+results, quantitative performance, resource use and operating cost. Isolated
+performance comparisons may use the local workstation. No result or success
+threshold gates adoption or permanent use.
 
-Execution and evidence: [PLAN-026–033 and PLAN-036](../backlog.md#data-store-expansion-tasks).
+Execution and evidence: [PLAN-026–033, PLAN-036 and PLAN-037](../backlog.md#data-store-expansion-tasks).
 Assign named platform and external experiment owners before each phase starts.
 

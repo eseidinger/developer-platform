@@ -13,7 +13,8 @@ Only unfinished, owned implementation plans belong here:
 - [UI implementation](ui.md)
 - [Phase 7 planned data stores](phase-7-planned-data-stores.md) — baseline/integration, analytics/object storage, search, graphs and vectors
 - [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) — owner-scheduled time series/OLAP, caching and documents
-- [Phase 9 anytime leftovers — lowest priority](phase-9-anytime-leftovers.md)
+- [Phase 9 data store measurement and comparison](phase-9-store-measurement-and-comparison.md) — performance dashboards and reproducible comparisons
+- [Phase 10 anytime leftovers and store recovery — lowest priority](phase-10-anytime-leftovers.md)
 
 **PLAN-020** [UI increment 4a](ui.md#4a-deliver-hosted-application-access-plan-020)
 is owner-accepted for lab sequencing under the exception recorded in the

@@ -54,4 +54,4 @@ The helper provides instrumentation, not automatic coverage of external
 applications. Register each consuming application's metrics endpoint and verify
 its workload panels after integration. See the
 [store monitoring workflow](../../infrastructure/monitoring/README.md#phase-7-store-performance)
-and the [Phase 7 plan](../../docs/maintainers/delivery/plans/phase-7-planned-data-stores.md#native-performance-dashboards).
+and the [Phase 9 measurement plan](../../docs/maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md#eight-performance-dashboards).

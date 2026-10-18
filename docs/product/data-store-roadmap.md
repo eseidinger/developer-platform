@@ -17,6 +17,17 @@ operating model below. Measure combined capacity and resize before adding anothe
 store when necessary. See the
 [current delivery decision](../maintainers/delivery/plans/data-store-expansion.md#store-selection-decision).
 
+**Delivery phase amendment (18 October 2026):** The imported experiment sequence
+below remains source context. Current delivery places functional planned-store
+acceptance in [Phase 7](../maintainers/delivery/plans/phase-7-planned-data-stores.md),
+optional deferred-store acceptance in [Phase 8](../maintainers/delivery/plans/phase-8-deferred-data-stores.md),
+and all quantitative measurements, comparisons and eight performance dashboards
+in [Phase 9](../maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md).
+Phase 9 does not gate provider selection or Phase 7/8 exit. Deployed restore,
+rebuild and reconnection checks join other anytime leftovers in
+[Phase 10](../maintainers/delivery/plans/phase-10-anytime-leftovers.md); they
+also do not gate provider selection or Phase 7/8 exit.
+
 ## 1. Goal and Guiding Principles
 
 PostgreSQL remains the shared reference technology. Specialized data stores are introduced through concrete experiments across projects. Each introduction should support a functional use case, enable a traceable architecture comparison, and provide insights into development and operations.

@@ -3,15 +3,15 @@
 Status: **complete by owner direction, October 16, 2026**, at deployed/source
 baseline `4681e56`. The owner accepted the implemented telemetry and verified
 operator dashboards and directed all remaining acceptance work into the final,
-lowest-priority [Phase 9 leftovers](phase-9-anytime-leftovers.md#99-complete-deferred-phase-4-acceptance).
+lowest-priority [Phase 10 leftovers](phase-10-anytime-leftovers.md#109-complete-deferred-phase-4-acceptance).
 This closes the Phase 4 delivery gate and PLAN-021 through PLAN-024 under an
 explicit acceptance exception; deferred checks remain unverified, not passed.
 
 The phase follows the usable Phase 3 source capabilities and precedes AI operations
 in [Phase 5](phase-5-ai-operations.md). It extends existing Prometheus, Loki,
 Alloy, and operator-only Grafana. Full PLAN-017 monitoring acceptance remains
-in the independent [Phase 9 leftovers](phase-9-anytime-leftovers.md); any
-remaining Phase 4 acceptance is now tracked in package 9.9 and does not gate Phase 5.
+in the independent [Phase 10 leftovers](phase-10-anytime-leftovers.md); any
+remaining Phase 4 acceptance is now tracked in package 10.9 and does not gate Phase 5.
 
 Execution tracking: [PLAN-021 through PLAN-024](../backlog.md#additional-phase-tasks).
 The [backlog](../backlog.md) remains the evidence and task-status register.
@@ -49,7 +49,7 @@ authenticated workload OTLP gateway, an operator-configurable root sample rate
 defaulting to 100% as of the October 17 owner request, 24-hour trace retention,
 and a hard 4 GiB trace-volume budget. It also fixes the workload identity, app declaration, and project-read
 boundaries. These decisions now have implementation and partial deployed evidence in the
-backlog; remaining limit/retention verification belongs to Phase 9 package 9.9.
+backlog; remaining limit/retention verification belongs to Phase 10 package 10.9.
 
 ## Ordered work packages
 
@@ -203,7 +203,7 @@ the app continues to work when trace collection fails.
 ## Phase exit and handoff
 
 **Completion record (October 16, 2026):** The owner directed closure of Phase 4
-and transfer of its remaining checks to Phase 9 package 9.9. PLAN-021 through
+and transfer of its remaining checks to Phase 10 package 10.9. PLAN-021 through
 PLAN-024 are complete for delivery sequencing under this explicit exception.
 Existing source/local results and node-01 readback remain evidence; VEF/ODIP,
 PostgreSQL and host storage dashboard checks remain owner-accepted passed.
@@ -211,10 +211,10 @@ PostgreSQL and host storage dashboard checks remain owner-accepted passed.
 The exception covers the unperformed end-to-end tracing/retry/scheduled flows,
 project/forged-origin/redaction checks, 0/10/100% sampling, telemetry failure and
 recovery, retirement, FastAPI runtime coverage, restart/reprovisioning, trace/log
-links, and retention/storage/resource-cost checks listed in package 9.9. It also
+links, and retention/storage/resource-cost checks listed in package 10.9. It also
 covers any implementation corrections needed when those checks are eventually
 run. None is claimed to have passed. The original work packages above preserve
-the intended criteria; their outstanding execution now belongs to Phase 9.
+the intended criteria; their outstanding execution now belongs to Phase 10.
 
 Phase 5 AI investigation may consume only the authorized,
 redacted Platform API views established here, never an unrestricted Grafana or
@@ -224,4 +224,4 @@ does not gate tracing, dashboards, or AI operations.
 Foundations: [observability architecture](../../../architecture/observability.md),
 [ADR-021 tracing decision](../../../architecture/decisions/ADR-021-phase-4-tracing-boundary.md),
 [operator monitoring](../../../operators/monitoring.md), and
-[Phase 9 monitoring acceptance](phase-9-anytime-leftovers.md).
+[Phase 10 monitoring acceptance](phase-10-anytime-leftovers.md).

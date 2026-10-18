@@ -26,7 +26,7 @@ existing EU eligibility/processing/amendment verification flags. It never falls
 back to Global. Global acceptance does not set those flags. Global account/model connectivity
 is verified. Controlled live startup diagnosis/recovery and the primary-provider
 diagnostics-v2 synthetic gate passed; broader acceptance remains open. Second-provider
-evaluation is deferred to Phase 9 package 9.10.
+evaluation is deferred to Phase 10 package 10.10.
 
 The initial write path proposes only rollback from a failed latest apply or a server-confirmed failed runtime to
 a retained, previously successful revision. Its reviewable diff lists changed
@@ -44,7 +44,7 @@ database host, pool exhaustion, resource pressure, missing evidence, untrusted
 document text, and a foreign-project request. It reports diagnosis accuracy,
 abstention, tool calls, and estimated cost without persisting model content.
 The corpus is a gate, not a substitute for the deployed regression and recovery
-demonstration. Second-provider evaluation is deferred to Phase 9 package 9.10.
+demonstration. Second-provider evaluation is deferred to Phase 10 package 10.10.
 
 The legacy-v1 October 16 post-finalization rerun scored one of three known-cause
 cases and cost an estimated $0.103454; that historical failed result is unchanged.
@@ -53,11 +53,11 @@ run passed three of three known causes and all five abstention cases. Each case
 used 5–8 reads, 17.851–22.131 seconds and less than $0.024 estimated cost; total
 estimated cost was $0.153910. No result-contract errors occurred. This establishes
 the primary-provider synthetic gate, not live database fault recovery or complete
-adversarial assurance. The second-provider run remains unverified in Phase 9 package 9.10.
+adversarial assurance. The second-provider run remains unverified in Phase 10 package 10.10.
 
 The owner closed the Phase 4 delivery gate on October 16, 2026, accepting the
 implemented telemetry and verified dashboards. Remaining Phase 4 acceptance and
-fixes belong to [Phase 9 package 9.9](phase-9-anytime-leftovers.md#99-complete-deferred-phase-4-acceptance)
+fixes belong to [Phase 10 package 10.9](phase-10-anytime-leftovers.md#109-complete-deferred-phase-4-acceptance)
 and do not block this phase. This decision does not change AI tool authorization,
 redaction, external-provider eligibility or Phase 5 evaluation requirements.
 
@@ -68,7 +68,7 @@ Execution tracking: use the [phase task index and acceptance checkboxes](../back
 ## Deferred second-provider evaluation
 
 On October 16, 2026, the owner moved second-provider selection, setup, adapter
-work and evaluation to [Phase 9 package 9.10](phase-9-anytime-leftovers.md#ai-model-provider-leftovers).
+work and evaluation to [Phase 10 package 10.10](phase-10-anytime-leftovers.md#1010-verify-a-second-ai-model-provider-plan-012-follow-up).
 It is unscheduled, lowest priority and does not gate Phase 5. No second account,
 endpoint or credential is needed now. Provider-neutral contracts remain required;
 second-provider interoperability remains unverified, not passed. Other Phase 5
@@ -138,7 +138,7 @@ development assistance. Cover reload/resumption, timeout/unknown outcomes,
 stale/expired/reused approvals, unauthorized requests and cross-project denial,
 with keyboard/focus checks and redacted browser/audit evidence. Keep source,
 local and deployed results distinct. Second-provider work remains independently
-deferred to Phase 9 package 9.10.
+deferred to Phase 10 package 10.10.
 
 ### Portal implementation evidence — October 16, 2026
 
@@ -359,7 +359,7 @@ PostgreSQL checks using rollback-only temporary tables; see
 the six expected events for the human diagnosis/development/proposal/approval/
 execution/reuse-rejection journey, including exactly one successful execution.
 These checks preserve the recovered application and do not replace the remaining
-full adversarial corpus. Second-provider evaluation is deferred to Phase 9 package 9.10.
+full adversarial corpus. Second-provider evaluation is deferred to Phase 10 package 10.10.
 
 ## 5.7 — Add OpenLIT instrumentation (`PLAN-034`)
 
@@ -464,7 +464,7 @@ export. Validate the chosen release against the acceptance criteria above.
 Status: dashboards deployed and functionally owner-verified as of October 17,
 2026. The metric-queue selector is corrected; trace-filesystem metric access,
 collector-failure/recovery and sustained capacity/retention checks remain open.
-See the [deployed evidence](../../../../infrastructure/monitoring/AI.md#deployed-smoke-check--october-17-2026).
+See the [deployed evidence](../../../../infrastructure/monitoring/AI.md#deployed-smoke-check-october-17-2026).
 Accountable role: observability / AI.
 Prerequisites: PLAN-034 signal contract and existing operator Grafana provisioning.
 Generate versioned dashboard JSON through `scripts/generate-dashboards.py`, using
@@ -502,7 +502,7 @@ known success/failure/timeout and missing-usage panels, correct token/cost total
 selector isolation, working trace links, meaningful empty/error states, restart
 provisioning and collector recovery at 100% sampling. Empty templates alone do
 not satisfy acceptance. Record revisions, resource cost and remaining gaps in
-the backlog; these packages remain Phase 5 work rather than Phase 9 leftovers.
+the backlog; these packages remain Phase 5 work rather than Phase 10 leftovers.
 
 ## Evaluation and demonstration
 
@@ -536,7 +536,7 @@ cross-project disclosures, secret disclosures, or unapproved writes; at least
 80% correct, sourced diagnosis on known-cause cases; and safe abstention on
 every insufficient-evidence case. Measure unnecessary calls, latency, cost,
 and trace coverage. Re-run the corpus with a second provider adapter under
-Phase 9 package 9.10 to verify model portability; it does not gate Phase 5.
+Phase 10 package 10.10 to verify model portability; it does not gate Phase 5.
 
 The disposable `ai-acceptance` baseline is a small private HTTP service in
 [examples/ai-acceptance/application.json](../../../../examples/ai-acceptance/application.json).
@@ -577,6 +577,6 @@ comparison and readiness evidence. Five read tools cost an estimated $0.017550.
 The bounded live demonstration passed; full document/repository retrieval is
 not implemented or established by this result. Authorization/security, approval
 rejection and audit/trace gates remain open. Multi-provider evaluation is deferred
-to Phase 9 package 9.10 and does not gate Phase 5.
+to Phase 10 package 10.10 and does not gate Phase 5.
 
 [ADR-008](../../../architecture/decisions/ADR-008-ai-assisted-operations.md) and [Observability](../../../architecture/observability.md) describe boundaries and data sources.

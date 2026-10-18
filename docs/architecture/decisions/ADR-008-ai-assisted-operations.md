@@ -37,7 +37,7 @@ Expand the incident corpus beyond the initial four scenarios with known-cause an
 
 
 **Owner-directed scheduling update, October 16, 2026:** Second-provider setup,
-adapter work and evaluation are deferred to [Phase 9 package 9.10](../../maintainers/delivery/plans/phase-9-anytime-leftovers.md#ai-model-provider-leftovers),
+adapter work and evaluation are deferred to [Phase 10 package 10.10](../../maintainers/delivery/plans/phase-10-anytime-leftovers.md#1010-verify-a-second-ai-model-provider-plan-012-follow-up),
 unscheduled and non-gating for Phase 5. The provider-neutral contract remains;
 this deferral does not claim second-provider interoperability passed.
 

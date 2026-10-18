@@ -5,12 +5,16 @@ PostgreSQL acceptance gate has local and deployed evidence, including active
 pgAdmin Query Tool session fencing and verified-backup-gated purge (EV-52–67).
 The four shared-store providers have combined deterministic deployed acceptance
 through test personas (EV-68). Deployed AGE/pgvector selection and scoped queries
-have a separate disposable check (EV-69). Domain comparisons, deployed restore,
-elapsed-time behavior and operator/browser review remain open.
+have a separate disposable check (EV-69). Domain comparisons and quantitative
+performance verification are now [Phase 9](phase-9-store-measurement-and-comparison.md);
+deployed store restore and rebuild acceptance are
+[Phase 10 package 10.13](phase-10-anytime-leftovers.md#1013-verify-deployed-data-store-recovery-plan-027plan-033-follow-up).
+Elapsed-time behavior and operator/browser review remain open under their
+recorded package scopes.
 
 The owner requested continued implementation as far as possible with regular
 commits. Source/local provider work continues alongside remaining deployed and
-domain acceptance; passing the PostgreSQL gate does not enable another service.
+provider acceptance; passing the PostgreSQL gate does not enable another service.
 Native RustFS, OpenSearch, Qdrant and dedicated Neo4j Community adapters now pass
 real isolation, credential, query and empty-volume recovery fixtures. Opt-in pinned Compose services,
 configuration/capacity-gated provider registration and non-demo OpenSearch TLS
@@ -52,12 +56,14 @@ then reached `purged/purged` with their native databases absent. Their project
 catalog, two personas and runner were cleaned up.
 
 The RustFS console Date-header repair and API resource-detail quota-mode repair
-were deployed and verified by the relevant fixture and live API checks. A fresh
-interactive browser upload against the deployed console remains unverified. The
+were deployed and verified by the relevant fixture and live API checks. The
+owner subsequently confirmed deployed interactive RustFS upload, download and
+delete; the disposable real-browser fixture now exercises upload and deletion
+through the official console. The
 local empty-volume recovery fixtures and synthetic analytics comparisons do not
 establish deployed off-host restore or domain-quality results. The previously
-deferred PostgreSQL time handling and restore checks remain in Phase 9 packages
-9.11/9.12; the ODIP-to-VEF check remains omitted from 7.1.
+deferred PostgreSQL time handling and restore checks remain in Phase 10 packages
+10.11/10.12; the ODIP-to-VEF check remains omitted from 7.1.
 
 ## Implementation checkpoint — October 17, 2026
 
@@ -95,24 +101,26 @@ release checks, verified pre-upgrade backups, extension upgrades and recovery li
 AGE authoritative rebuild is implemented and passes a real logical-restore
 fixture with two graphs, five labels, a cycle, source-defined indexes and preserved
 SQL/pgvector data. See the [dated evidence](../../../../persistence/compatibility/projection-rebuild-2026-10-17.md).
-Deployed rebuild/reconnection and recovery timing remain open.
+Deployed rebuild/reconnection and recovery timing remain open in Phase 10
+package 10.13.
 Retirement previews include named resource/grant versions; access fencing commits before namespace deletion. The PostgreSQL reference covers JSONB, full-text search, recursive CTEs, partitions, materialized views and transactional outbox rollback in the real database fixture.
 PLAN-026/036 and Phase 7 acceptance remain open.
 
 ## Goal and scope
 
 Provide the planned analytical, object-storage, search, graph and vector
-capabilities through measured comparisons and optional generic resource providers.
+capabilities through optional generic resource providers and functional integration.
 DuckDB/Parquet and one S3-compatible store form the analytical foundation;
 OpenSearch, Apache AGE/Neo4j and pgvector/Qdrant follow as targeted experiments.
 Stores may be selected at will under the [selection decision](data-store-expansion.md#store-selection-decision).
-Comparisons are for learning and do not impose adoption success criteria.
+Measurements and comparisons are separate [Phase 9](phase-9-store-measurement-and-comparison.md)
+learning work and do not impose adoption success criteria.
 
 **Entry:** existing PostgreSQL platform capabilities and agreed cross-project
 integration contract. Complete package 7.1 before introducing additional stores;
 then follow analytics/object storage → search → graph → vector package order,
 subject to each package's fixtures. Phase 5 AI operations does not depend on
-vector retrieval. Optional Phase 6 and unrelated Phase 9 leftovers do not gate
+vector retrieval. Optional Phase 6 and unrelated Phase 10 leftovers do not gate
 this work.
 
 **Service placement:** Shared stores run persistently in Docker Compose outside
@@ -124,97 +132,18 @@ activate the optional Docker compute adapter. See the
 
 **Ownership and evidence:** [common acceptance and responsibilities](data-store-expansion.md#ownership-and-common-acceptance)
 apply to every package. Track PLAN-026–030 and PLAN-036 in the
-[backlog](../backlog.md#data-store-expansion-tasks); external projects retain
-benchmarks, adapters and domain assertions.
+[backlog](../backlog.md#data-store-expansion-tasks); Phase 9 tracks cross-store
+measurement and comparison separately.
 
-## Native performance dashboards
+## Measurement and comparison scope
 
-**Owner-requested scope (October 17, 2026):** Deliver all eight dashboards below
-within Phase 7, alongside the provider/workload packages indicated. Extend the
-existing PostgreSQL dashboard and link every performance dashboard from the
-existing named-resource overview. The overview's quota, lifecycle, credential
-cleanup and quarantine panels remain the common operational entry point.
-All eight performance dashboards now have generated definitions. Native
-PostgreSQL/OpenSearch/Qdrant statistics, RustFS OTLP, container measurements and
-Community JVM/relay metrics have source/local evidence. The application collector
-and real DuckDB profiling example provide workload histograms/numeric fields;
-external application instrumentation and deployed collection remain open.
-Private collector roles, missing/stale-data handling, alerts and real Prometheus
-query validation are implemented. See the [monitoring guide](../../../../infrastructure/monitoring/README.md#phase-7-store-performance).
-
-| Dashboard / package | Required panels | Metrics source and implementation constraints |
-|---|---|---|
-| **PostgreSQL performance — 7.1 / PLAN-026** | Transactions/sec and rollbacks; connection usage; blocked sessions and oldest transactions; cache hits and disk I/O; WAL/checkpoints; temporary spills; vacuum activity and dead tuples. | Extend the existing PostgreSQL exporter using native statistics. Optionally add aggregated execution statistics through `pg_stat_statements`, after reviewing preload changes, collection permissions and overhead. Do not export SQL text or unbounded query identifiers. |
-| **DuckDB / Parquet analytics — 7.2 / PLAN-027** | Query duration and CPU time; peak buffer memory; temporary spill usage; rows scanned/returned; artifact transfer/checksum time; bytes downloaded; successful/failed runs. | Instrument application/job operations and extract selected DuckDB profiling fields. DuckDB is embedded: show workload/job observations rather than inventing a shared server. Keep query-engine time separate from storage transfer and integrity verification. |
-| **RustFS S3 performance — 7.2 / PLAN-027** | GET/PUT throughput and latency; transferred bytes; errors/timeouts; backpressure; storage growth; scanner/healing activity; disk pressure. | Verify the pinned release's OTLP metrics and route them through Alloy where compatible, with a bounded metrics pipeline into Prometheus. Current operations documentation describes OTLP export; do not assume a native Prometheus scrape endpoint. Validate availability and scope of each operation/bucket metric before adding panels. |
-| **OpenSearch performance — 7.3 / PLAN-028** | Search/indexing throughput and mean operation time; active searches; thread-pool queues/rejections; JVM heap/GC; circuit breakers; shard health; segment merges; cache efficiency; disk watermarks. | Use a restricted exporter polling cluster/node/index statistics over verified private TLS. Add application histograms for end-to-end search percentiles; accumulated native operation counts/times provide means, not p95/p99. Include single-node topology expectations when interpreting shard health. |
-| **Apache AGE performance and projection health — 7.4 / PLAN-029** | Graph-query throughput/latency/errors; SQL lock waits and spills; projection freshness and pending source updates; rebuild duration/failures; last successful validation. | Reuse PostgreSQL statistics for database behavior, instrument graph operations in applications, and expose projection-worker freshness/rebuild metrics. Identify each signal's source; do not attribute shared PostgreSQL CPU/I/O exclusively to AGE. |
-| **Neo4j Community instance performance — 7.4 / PLAN-029** | Per-resource instance availability/restarts; CPU/memory; JVM heap/GC; disk growth; Bolt connections; instrumented query latency/errors; backup interruption and duration. | Combine container metrics, a standard JVM exporter and client instrumentation, verified against the selected Community image. Validate connection counters against an available source. Native database-internal counters are conditional: the documented built-in metrics exporter is an Enterprise feature. Do not introduce a commercial edition to fill panels. Discover each dedicated instance from its stable resource identity. |
-| **pgvector performance — 7.5 / PLAN-030** | Vector-query throughput/latency; index size and usage; HNSW/IVFFlat build progress; vacuum activity; resource consumption during indexing. | Combine PostgreSQL statistics/index-build progress and application vector-query histograms. Clearly distinguish shared-server usage from attributable workload usage. Recall measurements come only from explicit, versioned comparison runs, not an inferred live operational metric. |
-| **Qdrant performance — 7.5 / PLAN-030** | Search/upsert throughput; latency percentiles and errors; point/vector counts; indexed versus unindexed points; optimizer activity; memory/page faults; file descriptors; snapshots. | Privately scrape native `/metrics`, with bounded per-collection dimensions and selected telemetry fields where required. Verify histogram and collection coverage in the pinned release; do not assume cloud-only `/sys_metrics` is available. |
-
-### Common collection and dashboard requirements
-
-- Keep dashboards, collectors, recording rules and alerts in versioned source and
-  provision through the existing Grafana/Prometheus/Alloy and Compose/Ansible
-  workflow. Extend the dashboard generator rather than hand-editing generated
-  JSON. Start with PostgreSQL enhancements and RustFS/OpenSearch/Qdrant native
-  collection, then AGE/pgvector workload views and DuckDB analytics; deliver
-  Neo4j coverage with its dedicated-instance provider. All eight remain in scope.
-- Filter by provider, project, stable resource ID and instance where reliable
-  attribution exists. Clearly label shared-service signals. Use catalog mappings
-  for generated database/bucket/index/collection names; dashboard filters are not
-  an authorization boundary. Apply the platform's monitoring access policy.
-- Show native performance alongside container CPU, memory limits, restarts and
-  disk pressure. Add missing Docker-container collection where needed; existing
-  Kubernetes workload metrics do not cover these Compose stores. Measure
-  collector overhead and account for it in single-host capacity admission.
-- Use bounded operation labels and histograms where percentiles are needed.
-  Exclude raw queries, object keys, document contents, credentials and arbitrary
-  client labels. Collect only reviewed numeric DuckDB/profile fields; do not
-  ship complete query plans or profiling payloads into telemetry. Bound scrape
-  frequency/timeouts, sample counts, label cardinality and payload sizes.
-- Keep metrics/admin endpoints private. Use restricted monitoring identities
-  where supported, store collector secrets privately and verify TLS. Document
-  edition/API limitations and exact required permissions; monitoring must not
-  widen human/application grants or expose administrator keys to browsers.
-- Show collector health, collection errors, last successful collection and stale
-  or missing data explicitly. Distinguish unavailable, disabled/unselected,
-  idle and scheduled maintenance; missing series must not imply healthy or zero.
-- Add actionable alerts for unavailability, sustained errors/rejections, resource
-  exhaustion and stalled maintenance. Tune thresholds using observed workloads;
-  dashboard thresholds do not impose store-adoption or benchmark success criteria.
-  Link relevant backup status, resource lifecycle and operator runbooks.
-
-### Verification and evidence
-
-For each pinned image/extension and dashboard, record which panels use native,
-container, collector or application signals. Verify actual metric names, types,
-units, permissions and dimensions in disposable fixtures before generating
-queries. Unsupported internal signals require a documented alternative or
-visible capability limitation; do not supply fabricated values or permanently
-empty panels. Use histogram buckets for quantiles and counter rates for means;
-do not reinterpret averages as percentiles.
-
-Exercise representative queries/writes and indexing/rebuild/analytics work;
-verify throughput, error and latency signals change as expected. Test missing
-collectors, provider outages, counter resets, stale data and collection-denied
-credentials, plus alert firing/resolution and bounded labels. Verify dashboard
-provisioning, queries and drill-down links locally, then record deployed
-collection/visualization separately. Neo4j fixtures must cover per-instance
-identity/discovery and scheduled offline backup visibility. External applications
-own their required workload instrumentation; local synthetic evidence does not
-claim external instrumentation or deployed acceptance.
-
-Reference interfaces: [PostgreSQL statistics](https://www.postgresql.org/docs/18/monitoring-stats.html),
-[pgvector monitoring](https://github.com/pgvector/pgvector#monitoring),
-[DuckDB profiling metrics](https://duckdb.org/docs/current/dev/metrics),
-[RustFS observability](https://docs.rustfs.com/en/operations/observability),
-[OpenSearch node statistics](https://docs.opensearch.org/latest/api-reference/nodes-apis/nodes-stats/),
-[Qdrant monitoring](https://qdrant.tech/documentation/ops-monitoring/monitoring/) and
-[Neo4j metrics export](https://neo4j.com/docs/operations-manual/current/monitoring/metrics/expose/).
-These references guide release-specific verification rather than guaranteeing
-that every current-documentation metric exists in the pinned images.
+Performance dashboards, quantitative measurements and cross-store/domain
+comparisons are in [Phase 9](phase-9-store-measurement-and-comparison.md).
+Existing metric pipelines and synthetic comparison fixtures remain available;
+their implementation evidence does not make measurements a Phase 7 exit gate.
+Phase 7 retains provider health, quota/capacity admission, backup capture and
+verified-backup-gated purge. Deployed restore, rebuild and reconnection checks
+belong to Phase 10 package 10.13.
 
 ## Ordered work packages
 
@@ -222,9 +151,6 @@ that every current-documentation metric exists in the pinned images.
 
 **Tasks:** PLAN-026 and PLAN-036 (human access paths). **Source:** phase 0. **Entry:** existing PostgreSQL platform
 capabilities and agreed external integration contract.
-
-- Extend PostgreSQL native performance monitoring and establish the common collector/dashboard verification workflow; apply the
-  [native performance dashboard requirements](#native-performance-dashboards).
 
 - Enforce the [resource administration policy](data-store-expansion.md#resource-administration-decision):
   project admins manage their own resources, grants and bindings; platform admins
@@ -251,7 +177,7 @@ capabilities and agreed external integration contract.
   application/binding removal revokes only its consumer access; resource/project
   retirement revokes all affected access and retains data; separate confirmed
   purge requires retirement and completed cleanup. Verify retries, partial cleanup,
-  stale confirmation, unaffected consumers and backup-retention/recovery semantics.
+  stale confirmation, unaffected consumers and backup-retention/purge semantics.
 - Implement [automatic application credential rotation](data-store-expansion.md#application-credential-rotation-decision)
   every 30 days, with managed-secret updates and controlled restarts of bound
   components.
@@ -289,10 +215,11 @@ capabilities and agreed external integration contract.
   store ports remain private and consoles never receive shared admin credentials.
 - Establish [operator-triggered shared-store upgrades](data-store-expansion.md#shared-store-upgrade-decision)
   with pinned images/extensions/consoles, a verified recoverable backup,
-  release-specific compatibility checks and a fixture-validated recovery procedure.
+  release-specific compatibility checks and an available recovery procedure.
   Applications must tolerate maintenance interruption and reconnect/restart.
   Verify data, scoped access and platform integrations afterward; do not assume
-  an older image can read migrated data. Keep automatic credential rotation
+  an older image can read migrated data. Deployed recovery validation is Phase 10
+  package 10.13. Keep automatic credential rotation
   independent while preserving its overlap deadline during maintenance.
 - Use the owner-accepted clean setup: update and recreate application/resource
   declarations against the new contract. Legacy implicit database provisioning,
@@ -300,7 +227,7 @@ capabilities and agreed external integration contract.
   requirements. Record reset steps and impacts before performing recreation.
 - Exercise PostgreSQL provisioning; document JSONB, full-text search,
   recursive CTEs, materialized views, partitioning, and transactional-outbox baselines.
-- Reuse existing Phase 9 evidence and record newly performed integration
+- Reuse existing Phase 10 evidence and record newly performed integration
   checks against their original tasks; do not close unrelated leftovers.
 
 **Exit:** the independent resource/binding contract passes PostgreSQL lifecycle,
@@ -315,21 +242,21 @@ browser read-only/read-write access, active pgAdmin Query Tool termination on
 grant revocation/downgrade and resource retirement, application binding and
 rotation, versioned cross-project approval/rejection and ownership, quota
 admission, monitoring failure/recovery, plus the reproducible PostgreSQL
-reference and focused API/CLI/portal fixtures. Phase 9 packages 9.11/9.12 retain
+reference and focused API/CLI/portal fixtures. Phase 10 packages 10.11/10.12 retain
 their explicit restore, elapsed-time and operator-reviewed work. This accepts
 the 7.1 entry gate for 7.2, not Phase 7 as a whole.
 
 **Owner scope change (October 18, 2026):** Deployed off-host PostgreSQL restore
-acceptance is a [Phase 9 leftover](phase-9-anytime-leftovers.md#911--verify-deployed-named-postgresql-restore-plan-026-follow-up),
+acceptance is a [Phase 10 leftover](phase-10-anytime-leftovers.md#1011-verify-deployed-named-postgresql-restore-plan-026-follow-up),
 not a package 7.1 exit gate. The local encrypted restore fixture remains evidence,
 not a deployed restore result. The ODIP → VEF integration check is omitted from
 package 7.1; externally owned energy-system acceptance remains tracked by its
-own integration plan and Phase 9 generic integration work.
+own integration plan and Phase 10 generic integration work.
 
 **Further owner scope change (October 18, 2026):** Run deterministic automated
 PostgreSQL acceptance now. Real 24-hour/30-day/one-hour elapsed-time observations,
 operator-reviewed live upgrade and human presentation/security reviews are
-[Phase 9 package 9.12](phase-9-anytime-leftovers.md#912--complete-time-dependent-and-operator-reviewed-postgresql-acceptance-plan-026plan-036-follow-up),
+[Phase 10 package 10.12](phase-10-anytime-leftovers.md#1012-complete-time-dependent-and-operator-reviewed-postgresql-acceptance-plan-026plan-036-follow-up),
 not package 7.1 exit gates. Existing controlled-clock fixture results remain
 evidence only for their simulated conditions. Any newly discovered deterministic
 gap remains Phase 7 work. The deployed pgAdmin Query Tool write,
@@ -344,7 +271,8 @@ coexistence/query matrix and restart checks. See the
 AGE-only and combined logical restores reproduced stale graph OIDs; the tested
 fixture-only repair is not full recovery acceptance. Implement explicit per-resource
 extension selection, safe AGE session/preload configuration and verified AGE
-recovery/rebuild as part of PLAN-026/029. Live services remain unchanged.
+recovery/rebuild as the PLAN-029 follow-up in Phase 10 package 10.13. Live
+services remain unchanged.
 
 ### 7.2 — Analytics and S3-Compatible Object Storage
 
@@ -361,33 +289,26 @@ daily/monthly aggregation, weather joins, windows and scenario costs. Engine
 timings and transfer/checksum cost are separate observations without adoption
 thresholds. DuckDB is confined to applications and the optional fixture group.
 The 180-row synthetic fixture is not ODIP domain/large-volume acceptance; application
-metadata/outbox integration and deployed recovery remain open.
+metadata/outbox integration remains open. Deployed recovery is Phase 10 work.
 
-- Deliver the RustFS S3 and DuckDB/Parquet analytics performance dashboards, including native OTLP and application/job collection; apply the
-  [native performance dashboard requirements](#native-performance-dashboards).
-
-- ODIP compares PostgreSQL and DuckDB on the same versioned energy data:
-  daily/monthly aggregation, generation/weather joins, windows, scenario costs,
-  and increasing data volumes. Separate query-engine and physical-storage effects.
-- Compare PostgreSQL raw artifacts with immutable, versioned S3/Parquet artifacts:
-  large-object streaming, checksums, versioning, backup/recovery, and cost.
 - Implement owner-selected [RustFS](data-store-expansion.md#object-storage-selection-priority)
   as a shared, continuously running Docker Compose service with its official
   browser console and private native S3 access. Pin verified compatible releases;
   verify scoped console login, 24-hour human credential/session expiry and
   automatic application rotation every 30 days with at most one-hour overlap.
   Preserve the priority of straightforward single-host operation: reproducible
-  setup, required S3 behavior, isolation/bindings, measured resource use, upgrades
-  and encrypted off-host backup/recovery. Future distributed deployment is not
+  setup, required S3 behavior, isolation/bindings, bounded resource use, upgrades
+  and encrypted off-host backup capture. Future distributed deployment is not
   an initial requirement. Add a generic S3-compatible resource provider backed by
   RustFS with named project buckets, explicit component bindings, scoped
-  credentials/policies, limits and lifecycle/recovery coverage under the common
+  credentials/policies, limits and lifecycle coverage under the common
   acceptance. Product selection is resolved; deployment and acceptance are open.
   DuckDB is an application analytical engine, not necessarily a shared service.
 
-**Exit:** ODIP publishes and consumes versioned datasets independently of physical
-storage, the analytical comparison is reproducible, and the selected object-store
-provider passes provisioning and recovery acceptance.
+**Exit:** An application publishes and consumes versioned datasets independently
+of physical storage, and the selected object-store provider passes provisioning,
+scoped access, backup capture and lifecycle acceptance. Restore acceptance is
+Phase 10 package 10.13; comparative analytics are Phase 9 work.
 
 ### 7.3 — Full-Text Search
 
@@ -398,25 +319,19 @@ foreign-resource denial, workspace isolation and renewal, and already-open
 session expiry/revocation. Resource-scoped saved views are editable in both
 modes; read-only document/schema access remains enforced natively. Native
 fixtures pass empty-volume restoration with fresh scoped approval and isolated
-workspace/data purge. These are synthetic local checks; judged domain search
-comparisons, application rebuild semantics and deployed acceptance remain open.
+workspace/data purge. Application source-of-truth/update semantics remain open.
+Deployed rebuild and recovery acceptance are Phase 10 package 10.13; judged
+domain comparisons are Phase 9 work.
 See the [compatibility evidence](../../../../persistence/compatibility/opensearch-2026-10-17.md).
 
 **Task:** PLAN-028. **Source:** phase 2. **Entry:** package 7.2 analytical foundation.
 
-- Deliver the OpenSearch native performance dashboard and restricted statistics collection; apply the
-  [native performance dashboard requirements](#native-performance-dashboards).
-
-- ODIP compares PostgreSQL FTS and OpenSearch using shared dataset descriptions,
-  metadata and documentation; Bot Social posts can follow when available.
-- Evaluate ranking, filters, facets, typo handling, incremental updates and latency
-  against manually judged queries. Keep hybrid retrieval as a later extension.
-- When selected, expose an optional OpenSearch provider; verify index rebuilds and
+- When selected, expose an optional OpenSearch provider; verify
   source-of-truth/update semantics while PostgreSQL remains authoritative.
 
-**Exit:** document any judged search-quality observations and the selected
-provider; any introduced provider meets common lifecycle acceptance. Search
-quality or benchmark results do not gate selection.
+**Exit:** any introduced provider meets common lifecycle, isolation and
+source-of-truth/update acceptance. Index rebuild and restore acceptance are
+Phase 10 package 10.13; search quality and latency comparison are Phase 9 work.
 
 ### 7.4 — Graph Data
 
@@ -437,67 +352,50 @@ access only and reject unsupported read-only grants; this is an explicit
 Neo4j-specific placement/access exception. Implement private native access and
 Neo4j Browser, separate human/application identities, existing expiry/rotation
 and active-session fencing, per-instance capacity/monitoring, offline backup
-interruptions and verified recovery/purge. Verify native full-access capabilities
+capture and verified-backup-gated purge. Verify native full-access capabilities
 cannot bypass platform identity or lease controls. No Docker socket in the API
 or commercial edition is selected. The provider is now opt-in in source with native/Browser/isolation, real catalog,
 instance-replacement networking, JVM, expiry and cold-volume recovery fixtures.
 Source explicitly reports full-instance access; public/deployed acceptance remains
 open. See the [local evidence](../../../../persistence/compatibility/neo4j-2026-10-17.md). See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
 
-- Deliver AGE graph/projection monitoring and the Neo4j Community per-instance performance dashboard with the dedicated-instance provider; apply the
-  [native performance dashboard requirements](#native-performance-dashboards).
-
-- Compare relational PostgreSQL/recursive CTEs, Apache AGE, and Neo4j Community
-  Edition for transitive dependencies, cycles, and change-impact analysis in VEF.
-- Extend to Energy compatibility, ODIP lineage, and Bot Social two-to-four-hop
-  relationships, mutual contacts and recommendations as external fixtures permit.
-- Resolve the recorded [AGE logical-restore limitation](data-store-expansion.md#apache-age-restore-diagnosis)
-  through the owner-selected [rebuildable-projection policy](data-store-expansion.md#apache-age-rebuild-policy):
-  protect authoritative sources, graph definitions and loaders, and recreate AGE
-  graphs from those sources within the selected recovery targets. AGE must not
-  hold the sole copy of unique domain data; durable human/application graph edits
-  must be represented in protected sources/definitions. Check Cypher behavior and data,
-  multiple graphs/labels, ownership/permissions and application reconnection;
-  successful `pg_restore` alone is insufficient. Preserve non-superuser
-  application roles with explicit AGE session/preload configuration.
-- Check extension/version compatibility and feature coverage. Provide optional
+- Protect authoritative sources, graph definitions and loaders under the
+  [rebuildable-projection policy](data-store-expansion.md#apache-age-rebuild-policy).
+  AGE must not hold the sole copy of unique domain data. Preserve non-superuser
+  application roles with explicit AGE session/preload configuration. The
+  source-backed rebuild and reconnection check is Phase 10 package 10.13.
+- Check extension/version compatibility needed for operation. Provide optional
   AGE or Neo4j support when selected, with common operational acceptance.
 
-**Exit:** equivalent graph semantics and measured operational tradeoffs are
-recorded, with rebuild/recovery evidence for introduced providers. VEF retains
-constraint evaluation and optimization responsibility.
+**Exit:** introduced providers have scoped graph behavior, retained data and
+backup capture. Rebuild/recovery evidence is Phase 10 package 10.13;
+cross-engine semantic and operational comparison is Phase 9 work;
+VEF retains constraint evaluation and optimization responsibility.
 
 ### 7.5 — Vector Retrieval and AI Memory
 
-**Task:** PLAN-030. **Source:** phase 4. **Entry:** versioned retrieval fixtures,
-selected AI/RAG experiment and the available platform foundation. Phase 5 operations assistance
-does not require this package.
+**Task:** PLAN-030. **Source:** phase 4. **Entry:** selected vector resource and
+the available platform foundation. Phase 5 operations assistance does not
+require this package.
 
-- Deliver pgvector and Qdrant performance dashboards, including bounded collection metrics and instrumented vector-query latency; apply the
-  [native performance dashboard requirements](#native-performance-dashboards).
+- Add optional extension/provider support when selected. Verify scoped collection
+  access, deletion and common lifecycle behavior. Rebuild/restore verification is
+  Phase 10 package 10.13.
 
-- Compare pgvector and Qdrant; include OpenSearch if already introduced. Use ODIP
-  dataset discovery, Bot Social topic similarity, Energy documentation, or platform
-  knowledge collections with explicit relevance judgments.
-- Measure Recall@k, MRR or nDCG, p95 latency, filtering, indexing time, memory,
-  and update/deletion behavior. Record embedding model and dataset versions.
-- Separate semantic memory, durable agent state, and conversation history. Add
-  optional extension/provider support when selected; retrieval results do not gate adoption.
-
-**Exit:** reproducible retrieval-quality results and a provider decision, with
-scoped collection access, deletion, rebuild/recovery and common lifecycle evidence
-for any adopted provider. There is no required retrieval-quality threshold for selection.
+**Exit:** any adopted provider has scoped collection access, deletion and common
+lifecycle evidence. Rebuild/recovery is Phase 10 package 10.13; retrieval-quality
+and performance comparison are Phase 9 work.
 
 ## Phase exit
 
-All five packages record their disposition and dated operational evidence;
-record comparison results when performed, without benchmark success thresholds. PostgreSQL and
+All five packages record their disposition and dated operational evidence. PostgreSQL and
 the chosen S3 provider are operationally covered; any adopted search, graph or
-vector provider passes common lifecycle, isolation, capacity and rebuild/recovery
-acceptance. All eight performance dashboards have versioned collection,
-release-specific capability/evidence records and the verification above, with
-external workload dependencies and deployed checks explicitly recorded. Retaining
-a baseline is a valid documented experimental decision.
-Unrelated Phase 9 work remains open. The separate
+vector provider passes common lifecycle, isolation, capacity and backup/purge
+acceptance. Deployed restore, rebuild and reconnection checks are
+[Phase 10 package 10.13](phase-10-anytime-leftovers.md#1013-verify-deployed-data-store-recovery-plan-027plan-033-follow-up).
+Quantitative measurements, domain comparisons and the eight
+performance dashboards are [Phase 9](phase-9-store-measurement-and-comparison.md)
+exit work. Retaining a baseline is a valid documented provider decision.
+Unrelated Phase 10 work remains open. The separate
 [Phase 8 deferred stores](phase-8-deferred-data-stores.md) activates only for its
 owner-selected schedule.
