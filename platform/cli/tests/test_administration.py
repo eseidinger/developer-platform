@@ -243,24 +243,77 @@ def test_ai_approval_and_execution_require_project_confirmation(monkeypatch, tmp
     assert not requests
 
 
-def test_human_database_grant_and_one_time_credential(monkeypatch, tmp_path):
-    grant_file = tmp_path / "grant.json"
-    grant_file.write_text(json.dumps({"issuer": "https://identity.example", "subject": "human",
-                                      "public_key": "ssh-ed25519 key"}))
+def test_obsolete_database_issuance_commands_are_excluded():
+    commands = {item.command for item in COMMANDS}
+    assert "database-access grants create" not in commands
+    assert "database-access credential issue" not in commands
+    assert ("POST", "/projects/{name}/database-access/grants") in EXCLUSIONS
+    assert ("POST", "/projects/{name}/database-access/me/credential") in EXCLUSIONS
+
+
+def test_postgresql_tunnel_uses_verified_host_and_does_not_print_credential(monkeypatch, tmp_path):
+    from uuid import uuid4
+
+    credential_id = str(uuid4())
+    key = tmp_path / "id_ed25519"
+    key.write_text("private key")
+    key.chmod(0o600)
+    hosts = tmp_path / "known_hosts"
+    hosts.write_text("bastion.example ssh-ed25519 verified-key\n")
+    commands = []
 
     def handler(request):
-        assert request.url.path in {"/projects/orders/database-access/grants",
-                                    "/projects/orders/database-access/me/credential"}
-        if request.method == "POST" and request.url.path.endswith("/grants"):
-            assert json.loads(request.content)["subject"] == "human"
-            return httpx.Response(201, json={"username": "human_123", "active": True})
-        return httpx.Response(200, json={"username": "human_123", "password": "one-time-secret"})
+        assert request.url.path == "/v1/store-access/credentials/" + credential_id
+        return httpx.Response(200, json={"state": "active", "provider": "postgresql",
+            "connection": {"PGPASSWORD": "never-print-me"},
+            "ssh": {"user": "platform-db", "host": "bastion.example", "port": 2222,
+                    "destination": "172.30.80.15", "destination_port": 20001}})
 
     runner = _cli(monkeypatch, tmp_path, handler)
-    created = runner.invoke(app, ["database-access", "grants", "create", "--project", "orders",
-                                  "--file", str(grant_file), "--output", "json"])
-    assert created.exit_code == 0, created.output
-    issued = runner.invoke(app, ["database-access", "credential", "issue", "--project", "orders",
-                                 "--output", "json"])
-    assert issued.exit_code == 0, issued.output
-    assert json.loads(issued.stdout)["password"] == "one-time-secret"
+    monkeypatch.setattr("platform_cli.tunnel.subprocess.run", lambda command, check: commands.append(command) or type("Result", (), {"returncode": 0})())
+    result = runner.invoke(app, ["stores", "access", "tunnel", credential_id,
+        "--identity-file", str(key), "--known-hosts", str(hosts), "--local-port", "15432"])
+    assert result.exit_code == 0, result.output
+    assert commands[0][-3:] == ["-L", "127.0.0.1:15432:172.30.80.15:20001", "platform-db@bastion.example"]
+    assert "StrictHostKeyChecking=yes" in commands[0]
+    assert "never-print-me" not in result.output
+    assert "never-print-me" not in repr(commands[0])
+
+
+@pytest.mark.parametrize("credential", [
+    {"state": "issuing", "provider": "postgresql"},
+    {"state": "active", "provider": "postgresql"},
+    {"state": "active", "provider": "neo4j", "ssh": {"user": "platform-db"}},
+])
+def test_tunnel_rejects_unusable_lease_before_ssh(monkeypatch, tmp_path, credential):
+    from uuid import uuid4
+
+    credential_id = str(uuid4())
+    runner = _cli(monkeypatch, tmp_path, lambda request: httpx.Response(200, json=credential))
+    monkeypatch.setattr("platform_cli.tunnel.subprocess.run", lambda *args, **kwargs: pytest.fail("SSH must not run"))
+    result = runner.invoke(app, ["stores", "access", "tunnel", credential_id,
+        "--identity-file", str(tmp_path / "key"), "--known-hosts", str(tmp_path / "hosts"),
+        "--local-port", "15432"])
+    assert result.exit_code == 2, result.output
+
+
+def test_tunnel_rejects_untrusted_endpoint_and_exposed_key(monkeypatch, tmp_path):
+    from uuid import uuid4
+
+    credential_id = str(uuid4())
+    key = tmp_path / "id_ed25519"
+    key.write_text("private key")
+    key.chmod(0o600)
+    hosts = tmp_path / "known_hosts"
+    hosts.write_text("bastion.example ssh-ed25519 verified-key\n")
+    credential = {"state": "active", "provider": "postgresql",
+        "ssh": {"user": "platform-db", "host": "-oProxyCommand=sh", "port": 2222,
+                "destination": "172.30.80.15", "destination_port": 20001}}
+    runner = _cli(monkeypatch, tmp_path, lambda request: httpx.Response(200, json=credential))
+    monkeypatch.setattr("platform_cli.tunnel.subprocess.run", lambda *args, **kwargs: pytest.fail("SSH must not run"))
+    args = ["stores", "access", "tunnel", credential_id, "--identity-file", str(key),
+            "--known-hosts", str(hosts), "--local-port", "15432"]
+    assert runner.invoke(app, args).exit_code == 2
+    credential["ssh"]["host"] = "bastion.example"
+    key.chmod(0o644)
+    assert runner.invoke(app, args).exit_code == 2

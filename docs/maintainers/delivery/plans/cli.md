@@ -1,11 +1,14 @@
 # Platform CLI implementation plan
 
-Status: source implemented October 13, 2026; deployed acceptance remains open.
+Status: source implemented; deployed acceptance remains open.
 The Python package under `platform/cli` now has profiles, human device login,
 environment authentication, deployment and operation commands, hosted access,
-and explicit commands for all 81 non-health public API operations. Local tests,
-contract parity, and wheel packaging pass. Live identity-provider login,
-project/role denial, and deployment acceptance remain to be recorded.
+and explicit commands for 119 public API operations, plus a named-store PostgreSQL
+SSH tunnel. The registry excludes two health probes, two legacy operations that
+always return HTTP 410, and browser-only console launch. Local tests,
+contract parity, and wheel packaging pass. Human login and an authorized project
+list were observed from WSL on October 18, 2026; project/role denial, deployment,
+and tunnel acceptance remain to be recorded.
 
 This plan delivers the CLI portion of PLAN-006 over the same versioned Python
 Platform API used by the portal. It follows the identity boundary in
@@ -35,15 +38,15 @@ Docker, or Keycloak administration APIs; duplicate authorization policy; accept 
 legacy shared platform token; or expose credentials that the Platform API does not
 return. Hosted application access administration consumes the existing generic
 access API; it does not implement a new identity provider or application token
-client. Human database tunnels and the application template remain separate
-Phase 3 work packages.
+client. The CLI opens PostgreSQL tunnels for active named-store credentials;
+bastion deployment and the application template remain separate work packages.
 
 Full project administration means coverage of every current public
 project-scoped API operation and its shared operation endpoints, subject to the
 caller's server-side permissions. Operations requiring platform authority have
 explicit `operator` commands. Unsupported actions, such as identity-provider
-account creation, ownership transfer without an API contract, component-specific
-secret isolation, and human database tunnels, are recorded as API/product gaps;
+account creation, ownership transfer without an API contract, and
+component-specific secret isolation, are recorded as API/product gaps;
 the CLI must not bypass the API to approximate them.
 
 ## Project administration coverage

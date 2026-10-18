@@ -37,9 +37,24 @@ For private SSH access, register an Ed25519 key using
 `devplat stores access key --file key.json`, with `{"public_key":"ssh-ed25519 ..."}`.
 Replacing a key ends your current leases. Register the key before issuing the
 lease you want to use. The operator must configure a reachable private bastion;
-the default installer listens on loopback. Follow the returned SSH instructions
-and independently verify the SSH host key. The key may forward only to your
-credential's private relay ports, with no shell, agent, remote forwarding or PTY.
+the default installer listens on loopback. Independently verify the bastion's SSH
+host key and place it in a `known_hosts` file. Then open a local PostgreSQL tunnel
+with the active credential UUID:
+
+```bash
+devplat stores access tunnel CREDENTIAL_UUID \
+  --identity-file ~/.ssh/id_ed25519 \
+  --known-hosts ~/.ssh/known_hosts \
+  --local-port 15432
+```
+
+The command runs in the foreground; Ctrl-C closes the local tunnel. It requires
+an owner-only private key file, verifies the bastion against the supplied
+`known_hosts` file, and forwards only to `127.0.0.1` on your machine. The key
+may forward only to your credential's private relay ports, with no shell, agent,
+remote forwarding or PTY. If the credential is still issuing, inspect it again
+before opening the tunnel. If the bastion is not configured, the command reports
+that no reachable SSH bastion is available.
 
 After starting the tunnel, connect the native PostgreSQL client to its **local**
 forwarded address/port, using `PGUSER`/`PGDATABASE` from your lease. Let the client

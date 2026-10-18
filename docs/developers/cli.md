@@ -63,7 +63,9 @@ lifecycle. `grants` and `credentials` manage project roles and CI identities.
 `governance` and `access` manage hosted application identity. Commands under
 `operator` require their corresponding privileged API role.
 `stores` manages named resources, explicit component bindings, human grants,
-SSH keys and expiring credential leases; see the [human database access guide](database-access.md).
+SSH keys and expiring credential leases. `stores access tunnel` opens a verified
+local PostgreSQL forward for an active lease; see the
+[human database access guide](database-access.md).
 `operator audit export --start TIMESTAMP --end TIMESTAMP --format csv` writes the
 bounded CSV response to stdout; the default JSON format uses normal output modes.
 

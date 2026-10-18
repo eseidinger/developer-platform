@@ -1297,6 +1297,16 @@
       "ResourceCreate": {
         "additionalProperties": false,
         "properties": {
+          "configuration": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VectorConfiguration"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "extensions": {
             "items": {
               "enum": [
@@ -1959,6 +1969,31 @@
           "type"
         ],
         "title": "ValidationError",
+        "type": "object"
+      },
+      "VectorConfiguration": {
+        "additionalProperties": false,
+        "properties": {
+          "distance": {
+            "default": "Cosine",
+            "enum": [
+              "Cosine",
+              "Dot",
+              "Euclid",
+              "Manhattan"
+            ],
+            "title": "Distance",
+            "type": "string"
+          },
+          "vector_size": {
+            "default": 384,
+            "maximum": 65536.0,
+            "minimum": 1.0,
+            "title": "Vector Size",
+            "type": "integer"
+          }
+        },
+        "title": "VectorConfiguration",
         "type": "object"
       },
       "Version": {
@@ -8062,6 +8097,49 @@
           }
         ],
         "summary": "Get Credential"
+      }
+    },
+    "/v1/store-access/credentials/{credential_id}/console": {
+      "post": {
+        "operationId": "launch_console_v1_store_access_credentials__credential_id__console_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Launch Console"
       }
     },
     "/v1/store-access/me": {

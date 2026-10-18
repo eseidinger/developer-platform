@@ -80,11 +80,9 @@ add("credentials create", "POST", P + "/deployment-credentials", "Create a CI cr
 add("credentials rotate", "POST", P + "/deployment-credentials/{credential_id}/rotate", "Rotate a CI credential with bounded overlap.", body="credential", fields=("expires_in_days", "overlap_hours"), credential=True)
 add("credentials revoke", "DELETE", P + "/deployment-credentials/{credential_id}", "Revoke a CI credential.", destructive=True)
 add("database-access grants list", "GET", P + "/database-access/grants", "List named human database grants.")
-add("database-access grants create", "POST", P + "/database-access/grants", "Grant a human read-only database access using a JSON file.", body="file")
 add("database-access grants revoke", "DELETE", P + "/database-access/grants", "Revoke a human database grant and terminate its sessions.", body="grant", fields=("issuer", "subject"), destructive=True)
 add("database-access me", "GET", P + "/database-access/me", "Inspect your database tunnel identity.")
 add("database-access key replace", "PUT", P + "/database-access/me/key", "Replace your SSH public key using a JSON file.", body="file")
-add("database-access credential issue", "POST", P + "/database-access/me/credential", "Rotate and reveal your database password once.", credential=True)
 
 for command, suffix, description, query, resource in (
     ("access context", "application-access-context", "Inspect access eligibility and permissions.", (), False),
@@ -150,7 +148,13 @@ for family, collection, fields in (
     add("operator " + family + " revoke", "DELETE", collection + "/{credential_id}", "Revoke a test automation identity.", destructive=True)
 add("operator test-runner-credentials rotate", "POST", "/platform/test-runner-credentials/{credential_id}/rotate", "Rotate a test runner credential.", body="credential", fields=("expires_in_days", "overlap_hours"), credential=True, destructive=True)
 
-EXCLUSIONS = {("GET", "/healthz"): "Service liveness probe", ("GET", "/readyz"): "Service readiness probe"}
+EXCLUSIONS = {
+    ("GET", "/healthz"): "Service liveness probe",
+    ("GET", "/readyz"): "Service readiness probe",
+    ("POST", P + "/database-access/grants"): "Obsolete endpoint always returns HTTP 410",
+    ("POST", P + "/database-access/me/credential"): "Obsolete endpoint always returns HTTP 410",
+    ("POST", "/v1/store-access/credentials/{credential_id}/console"): "Browser-only console launch assertion",
+}
 
 
 # Named store resources use body versions and explicit UUID scope confirmations.
