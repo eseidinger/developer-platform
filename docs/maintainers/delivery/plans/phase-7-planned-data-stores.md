@@ -280,6 +280,15 @@ not a deployed restore result. The ODIP → VEF integration check is omitted fro
 package 7.1; externally owned energy-system acceptance remains tracked by its
 own integration plan and Phase 9 generic integration work.
 
+**Further owner scope change (October 18, 2026):** Run deterministic automated
+PostgreSQL acceptance now. Real 24-hour/30-day/one-hour elapsed-time observations,
+operator-reviewed live upgrade and human presentation/security reviews are
+[Phase 9 package 9.12](phase-9-anytime-leftovers.md#912--complete-time-dependent-and-operator-reviewed-postgresql-acceptance-plan-026plan-036-follow-up),
+not package 7.1 exit gates. Existing controlled-clock fixture results remain
+evidence only for their simulated conditions. Unrun deterministic checks,
+including deployed pgAdmin Query Tool writes, resource lifecycle, approvals,
+quota/admission and collector failure behavior, remain Phase 7 work.
+
 **Extension compatibility evidence (October 17, 2026):** PostgreSQL 18.6 with
 pgvector 0.8.7, AGE 1.8.0 and deferred TimescaleDB 2.30.2 passed the 16-case local
 coexistence/query matrix and restart checks. See the

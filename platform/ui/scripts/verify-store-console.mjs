@@ -41,6 +41,40 @@ try {
   stage = 'scoped-query'
   const stats = await call('GET', `/browser/server/stats/1/${sid}`)
   if (stats.status !== 200 || stats.body.success === 0) throw Error()
+  stage = 'query-tool-initialize'
+  const transaction = Date.now()
+  const initialized = await call('POST', `/sqleditor/initialize/sqleditor/${transaction}/1/${sid}/0`,
+    { dbname: c.PGDATABASE, password: c.PGPASSWORD })
+  if (initialized.status !== 200 || initialized.body.success !== 1) throw Error()
+  const query = async sql => {
+    const started = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
+      { sql, explain_plan: null })
+    if (started.status !== 200 || started.body.success !== 1) throw Error()
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const polled = await call('GET', `/sqleditor/poll/${transaction}`)
+      if (polled.body.data?.status === 'Success') return polled.body.data
+      if (polled.body.data?.status !== 'Busy') throw Error()
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    throw Error()
+  }
+  stage = 'query-tool-read'
+  if (!JSON.stringify((await query('SELECT 1 AS fixture_value')).result).includes('1')) throw Error()
+  stage = 'query-tool-read-only-denial'
+  const deniedWrite = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
+    { sql: 'CREATE TABLE public.phase7_forbidden(id integer)', explain_plan: null })
+  if (deniedWrite.status !== 200 || deniedWrite.body.success !== 1) throw Error()
+  let ddlDenied = false
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const polled = await call('GET', `/sqleditor/poll/${transaction}`)
+    if (polled.body.data?.status === 'Busy') {
+      await new Promise(resolve => setTimeout(resolve, 100))
+      continue
+    }
+    ddlDenied = polled.status >= 400 || polled.body.success === 0
+    break
+  }
+  if (!ddlDenied) throw Error()
   stage = 'lease-expiry'
   await context.request.post(config.expireUrl)
   // The real relay guard closes the existing pgAdmin backend connection.
@@ -67,7 +101,7 @@ try {
   const denied = await anonymous.request.get(config.base + `/browser/server/obj/1/${sid}`, { maxRedirects: 0 })
   if (![302, 401, 403].includes(denied.status())) throw Error()
   await anonymous.close()
-  console.log('PASS console: real Keycloak SSO; scoped pgAdmin connection/query; password saving denied; expired reconnect denied; other-human/anonymous isolation')
+  console.log('PASS console: real Keycloak SSO; scoped pgAdmin Query Tool read and read-only DDL denial; password saving denied; expired reconnect denied; other-human/anonymous isolation')
 } catch {
   console.log(stage)
   process.exitCode = 1

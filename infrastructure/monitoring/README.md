@@ -378,6 +378,7 @@ blocks. Filesystems without inode capacity have no inode ratio.
 and Prometheus containers. It verifies repeatable role setup, denied application
 reads/writes, aggregate privacy, database selection, absent/unlimited values and
 dashboard query readback using production collectors, SQL and metric filters.
+It pauses the exporter to verify `up=0`, then resumes it and verifies `pg_up=1`.
 
 
 ## Phase 7 store performance

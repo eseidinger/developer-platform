@@ -8,8 +8,10 @@ This plan collects the remaining work in
 `PLAN-007`, and `PLAN-008`, plus the deferred deployed portal acceptance for
 owner-accepted `PLAN-020`, and all deferred acceptance/fixes from owner-completed
 Phase 4 (`PLAN-021`–`PLAN-024`, package 9.9), deferred second AI model
-provider evaluation (`PLAN-012` follow-up, package 9.10), and deployed named
-PostgreSQL restore acceptance (`PLAN-026` follow-up, package 9.11). It does not replace their acceptance criteria or
+provider evaluation (`PLAN-012` follow-up, package 9.10), deployed named
+PostgreSQL restore acceptance (`PLAN-026` follow-up, package 9.11), and
+time-dependent/operator-reviewed PostgreSQL checks (`PLAN-026`/`PLAN-036`
+follow-up, package 9.12). It does not replace their acceptance criteria or
 create a new task ID. The
 [delivery backlog](../backlog.md) remains the authoritative task and evidence
 register.
@@ -33,8 +35,9 @@ are accepted.
 Exit: every acceptance criterion for `PLAN-016`, `PLAN-009`, `PLAN-017`,
 `PLAN-018`, `PLAN-019`, `PLAN-006`, `PLAN-007`, and `PLAN-008`, and the
 deferred deployed portal journeys in `PLAN-020`, Phase 4 follow-ups in package 9.9,
-second AI model-provider evaluation in package 9.10, and the deployed named
-PostgreSQL restore check in package 9.11 have dated source, local, and
+second AI model-provider evaluation in package 9.10, the deployed named
+PostgreSQL restore check in package 9.11, and deferred PostgreSQL checks in
+package 9.12 have dated source, local, and
 deployed evidence (or a new explicit owner-directed exception). The generic and
 externally owned versioned results are recorded together. Only then may Phase 9
 be closed; incomplete work here remains visible without blocking the other
@@ -289,9 +292,37 @@ evidence; it is not a deployed recovery result.
 **Exit evidence:** dated off-host restore and readback with versioned fixture,
 snapshot and recovery timings, or an explicit owner-directed exception.
 
+### 9.12 — Complete time-dependent and operator-reviewed PostgreSQL acceptance (`PLAN-026`/`PLAN-036` follow-up)
+
+**Owner deferral (October 18, 2026):** Phase 7 runs deterministic automated
+checks without elapsed-time handling. The following checks remain explicit
+follow-ups, not passing evidence or package 7.1 exit gates:
+
+1. Observe a real 24-hour human lease expiry and early renewal across independent
+   generations, including active native and pgAdmin Query Tool connection closure
+   at each original deadline. Controlled-clock fixture results remain source
+   evidence, not an elapsed-day result.
+2. Observe automatic application rotation after a real 30-day interval and the
+   one-hour maximum overlap under interruption/controller restart. Controlled
+   issuance-age and deadline fixtures remain source evidence, not elapsed-time
+   observations.
+3. Review an operator-triggered pinned PostgreSQL/extension/console upgrade
+   against a verified recoverable backup and release-specific compatibility
+   record. Schedule live maintenance only after operator impact review; verify
+   scoped access, applications, console, telemetry and backup afterward. This
+   is separate from the off-host restore acceptance in package 9.11.
+4. Review Grafana panel presentation, remote firewall boundary and retained
+   browser/client evidence for credential exposure where automated assertions
+   cannot establish the human-facing result. Preserve the separate PLAN-008
+   reviews in package 9.8.
+
+**Exit evidence:** dated elapsed-time observations and operator-reviewed upgrade
+and presentation records, or a new explicit owner-directed exception. Failure
+in a deterministic Phase 7 test remains Phase 7 work and is not moved here.
+
 ### 9.8 — Complete the lowest-priority human database leftovers (`PLAN-008`)
 
-Schedule this **last**, after all other Phase 9 work packages, including 9.9–9.11. EV-47's
+Schedule this **last**, after all other Phase 9 work packages, including 9.9–9.12. EV-47's
 automated and manual core tests are accepted as passed and need no repeat solely
 for the later clean deployment. The following reviews remain unverified:
 
@@ -327,13 +358,15 @@ not turn an unperformed check into a passing result.
 `PLAN-016` → `PLAN-009` → `PLAN-017` → `PLAN-018` → `PLAN-019`, with portal
 acceptance package 9.6 run after the identity/access API is available. Package
 9.7 runs after the Phase 3 source capabilities are ready. Run 9.8 last,
-after 9.1–9.7 and 9.9–9.11; its reviews or an explicit owner-directed exception remain
+after 9.1–9.7 and 9.9–9.12; its reviews or an explicit owner-directed exception remain
 required before Phase 9 exit. Package 9.9 can run independently once the
 implemented Phase 4 telemetry is available and does not gate Phase 5.
 Package 9.10 runs once a second model-provider setup is available and also does
 not gate Phase 5; primary-provider acceptance does not depend on its completion.
 Package 9.11 runs when an isolated restore host and verified backup are available;
 it does not gate package 7.1 acceptance.
+Package 9.12 follows the independent elapsed-time clocks and an operator-reviewed
+maintenance window; it does not gate deterministic package 7.1 acceptance.
 
 `PLAN-018` requires the implemented and accepted identity, contract, and
 monitoring outcomes. `PLAN-019` requires the completed deployed integration

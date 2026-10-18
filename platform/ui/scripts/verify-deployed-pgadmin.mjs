@@ -98,14 +98,60 @@ try {
   stage = 'pgadmin-scoped-query'
   const stats = await call('GET', `/browser/server/stats/1/${sid}`)
   if (stats.status !== 200 || stats.body.success === 0) throw Error()
-  stage = 'other-human-isolation'
-  const otherContext = await browser.newContext()
-  await loginPortal(otherContext, config.other)
-  const foreign = await otherContext.request.get(consoleBase + `/browser/server/obj/1/${sid}`)
-  const foreignBody = await foreign.json()
-  if ((!([400, 403, 404, 410].includes(foreign.status())) && foreignBody.success !== 0)
-      || JSON.stringify(foreignBody).includes(c.PGUSER)) throw Error()
-  await otherContext.close()
+  stage = 'pgadmin-query-tool-initialize'
+  const transaction = Date.now()
+  const initialized = await call('POST', `/sqleditor/initialize/sqleditor/${transaction}/1/${sid}/0`,
+    { dbname: c.PGDATABASE, password: c.PGPASSWORD })
+  if (initialized.status !== 200 || initialized.body.success !== 1) throw Error()
+  const query = async sql => {
+    const started = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
+      { sql, explain_plan: null })
+    if (started.status !== 200 || started.body.success !== 1) throw Error()
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const polled = await call('GET', `/sqleditor/poll/${transaction}`)
+      if (polled.body.data?.status === 'Success') return polled.body.data
+      if (polled.body.data?.status !== 'Busy') throw Error()
+      await new Promise(resolve => setTimeout(resolve, 100))
+    }
+    throw Error()
+  }
+  if (config.mode === 'read-write') {
+    stage = 'pgadmin-query-tool-write'
+    const marker = config.marker
+    if (!/^phase7_[a-z0-9_]{1,50}$/.test(marker)) throw Error()
+    await query(`CREATE TABLE public.${marker}(value text PRIMARY KEY)`)
+    await query(`INSERT INTO public.${marker} VALUES ('query-tool-write')`)
+    if (!JSON.stringify((await query(`SELECT value FROM public.${marker}`)).result).includes('query-tool-write')) throw Error()
+    await query(`DROP TABLE public.${marker}`)
+  } else {
+    stage = 'pgadmin-query-tool-read'
+    if (!JSON.stringify((await query('SELECT 1 AS fixture_value')).result).includes('1')) throw Error()
+    stage = 'pgadmin-query-tool-read-only-denial'
+    const attempted = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
+      { sql: 'CREATE TABLE public.phase7_forbidden(id integer)', explain_plan: null })
+    if (attempted.status !== 200 || attempted.body.success !== 1) throw Error()
+    let deniedWrite = false
+    for (let attempt = 0; attempt < 50; attempt++) {
+      const polled = await call('GET', `/sqleditor/poll/${transaction}`)
+      if (polled.body.data?.status === 'Busy') {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        continue
+      }
+      deniedWrite = polled.status >= 400 || polled.body.success === 0
+      break
+    }
+    if (!deniedWrite) throw Error()
+  }
+  if (config.other) {
+    stage = 'other-human-isolation'
+    const otherContext = await browser.newContext()
+    await loginPortal(otherContext, config.other)
+    const foreign = await otherContext.request.get(consoleBase + `/browser/server/obj/1/${sid}`)
+    const foreignBody = await foreign.json()
+    if ((!([400, 403, 404, 410].includes(foreign.status())) && foreignBody.success !== 0)
+        || JSON.stringify(foreignBody).includes(c.PGUSER)) throw Error()
+    await otherContext.close()
+  }
   stage = 'anonymous-denial'
   const anonymous = await browser.newContext()
   const denied = await anonymous.request.get(consoleBase + `/browser/server/obj/1/${sid}`, { maxRedirects: 0 })
@@ -123,7 +169,10 @@ try {
   await call('DELETE', connectionPath)
   const reconnect = await call('POST', connectionPath, { password: c.PGPASSWORD })
   if (reconnect.body.data?.connected === true || (reconnect.status === 200 && reconnect.body.success === 1)) throw Error()
-  console.log('PASS deployed pgAdmin: interactive portal and console SSO; scoped connection/query; password save denied; other-human/anonymous isolation; revoked reconnect denied')
+  console.log('PASS deployed pgAdmin: interactive portal and console SSO; scoped Query Tool ' +
+    (config.mode === 'read-write' ? 'DDL/write/read' : 'read and read-only DDL denial') +
+    '; password save denied; anonymous isolation; revoked reconnect denied' +
+    (config.other ? '; other-human isolation' : ''))
 } catch {
   if (activePage) lastPath = new URL(activePage.url()).pathname
   console.log('FAIL deployed pgAdmin stage=' + stage + (lastPath ? ' path=' + lastPath : ''))

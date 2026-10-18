@@ -117,7 +117,14 @@ def main():
             raw = urllib.request.urlopen(f"http://127.0.0.1:{export_port}/metrics").read().decode()
             assert "pg_stat_statements" not in raw and "private_fixture" not in raw and "fixture-private-payload" not in raw
             assert "usename=" not in raw and "application_name=" not in raw
-            print("PASS PostgreSQL 18 monitoring permissions, idempotent setup, aggregate privacy, database selection and dashboard queries")
+            # A stopped collector must become unavailable and recover after restart.
+            run("docker", "pause", exporter)
+            try:
+                wait_for(lambda: bool(query('up{job="postgres"} == 0')))
+            finally:
+                run("docker", "unpause", exporter)
+            wait_for(lambda: bool(query('pg_up{job="postgres"} == 1')))
+            print("PASS PostgreSQL 18 monitoring permissions, idempotent setup, aggregate privacy, database selection, dashboard queries and collector outage/recovery")
     finally:
         for container in (prometheus, exporter, name):
             subprocess.run(["docker", "rm", "-f", "-v", container], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
