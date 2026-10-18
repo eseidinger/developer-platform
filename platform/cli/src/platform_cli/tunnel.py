@@ -1,4 +1,4 @@
-"""Open a local PostgreSQL forward for an active named-store credential."""
+"""Open a local TCP forward for an active named-store credential."""
 
 from __future__ import annotations
 
@@ -34,8 +34,8 @@ def ssh_command(credential: dict, identity_file: str, known_hosts: str, local_po
     """Build an SSH command using only validated server connection details."""
     if credential.get("state") != "active":
         raise ConfigurationError("The credential is not active; inspect it again after issuance completes.")
-    if credential.get("provider") != "postgresql":
-        raise ConfigurationError("Database tunnels require a PostgreSQL credential.")
+    if credential.get("provider") not in {"postgresql", "s3", "qdrant", "opensearch", "neo4j"}:
+        raise ConfigurationError("The credential has an unsupported store provider.")
     ssh = credential.get("ssh")
     if not isinstance(ssh, dict):
         raise ConfigurationError("No reachable SSH bastion is configured for this credential.")
@@ -75,4 +75,4 @@ def run_tunnel(command: list[str]) -> int:
     try:
         return subprocess.run(command, check=False).returncode
     except FileNotFoundError:
-        raise ConfigurationError("OpenSSH 'ssh' is required to open a database tunnel.") from None
+        raise ConfigurationError("OpenSSH 'ssh' is required to open a store tunnel.") from None

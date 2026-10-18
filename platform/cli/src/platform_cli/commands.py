@@ -308,9 +308,14 @@ def execute(spec: CommandSpec, state, values: dict):
         path = _path(spec, values)
         if spec.command.startswith("secrets ") and values.get("secret", "").startswith("ACCESS_"):
             raise ConfigurationError("Managed service credentials must be changed with access services commands.")
-        if spec.destructive and not values.get("confirm_project"):
+        store_target = ("resource_id" if spec.command in {"stores retire", "stores purge"}
+                        else "grant_id" if spec.command == "stores grants revoke" else None)
+        if store_target and values.get("confirm_" + store_target) != values[store_target]:
+            raise ConfigurationError("Confirm the exact " + store_target.replace("_", " ") +
+                                     " with --confirm-" + store_target.replace("_", "-") + ".")
+        if spec.destructive and not store_target and not values.get("confirm_project"):
             raise ConfigurationError("Confirm the exact project/scope with --confirm-project NAME.")
-        if spec.destructive and values["confirm_project"] != (values.get("project") or "platform"):
+        if spec.destructive and not store_target and values["confirm_project"] != (values.get("project") or "platform"):
             raise ConfigurationError("The confirmation scope does not match this request.")
         body = _body(spec, values)
         headers = {}
@@ -434,7 +439,8 @@ def register(app: typer.Typer, spec: CommandSpec):
     if spec.command == "logs":
         options.extend(("follow", "poll_interval"))
     if spec.destructive:
-        options.append("confirm_project")
+        options.append("confirm_resource_id" if spec.command in {"stores retire", "stores purge"}
+                       else "confirm_grant_id" if spec.command == "stores grants revoke" else "confirm_project")
     if spec.family and spec.method != "GET":
         options.extend(("wait", "timeout", "poll_interval"))
     options.append("output")

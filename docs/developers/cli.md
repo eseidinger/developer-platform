@@ -64,8 +64,11 @@ lifecycle. `grants` and `credentials` manage project roles and CI identities.
 `operator` require their corresponding privileged API role.
 `stores` manages named resources, explicit component bindings, human grants,
 SSH keys and expiring credential leases. `stores access tunnel` opens a verified
-local PostgreSQL forward for an active lease; see the
+local TCP forward for an active store lease; see the
 [human database access guide](database-access.md).
+`stores retire` and `stores purge` require `--confirm-resource-id UUID` matching
+the target resource. `stores grants revoke` requires `--confirm-grant-id UUID`
+matching the target grant.
 `operator audit export --start TIMESTAMP --end TIMESTAMP --format csv` writes the
 bounded CSV response to stdout; the default JSON format uses normal output modes.
 

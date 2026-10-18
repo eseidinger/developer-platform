@@ -300,7 +300,7 @@ def stores_access_tunnel(ctx: typer.Context, credential_id: str,
                          identity_file: Annotated[str, typer.Option("--identity-file", help="Private Ed25519 key registered with the platform.")],
                          known_hosts: Annotated[str, typer.Option("--known-hosts", help="Verified SSH host key file.")],
                          local_port: Annotated[int, typer.Option("--local-port", min=1, max=65535)]):
-    """Forward an active PostgreSQL lease to a local TCP port until interrupted."""
+    """Forward an active store lease to a local TCP port until interrupted."""
     try:
         from uuid import UUID
         credential_id = str(UUID(credential_id))
@@ -310,7 +310,7 @@ def stores_access_tunnel(ctx: typer.Context, credential_id: str,
         finally:
             client.close()
         command = ssh_command(credential, identity_file, known_hosts, local_port)
-        typer.echo(f"PostgreSQL tunnel on 127.0.0.1:{local_port}; press Ctrl-C to close.", err=True)
+        typer.echo(f"{credential['provider']} tunnel on 127.0.0.1:{local_port}; press Ctrl-C to close.", err=True)
         result = run_tunnel(command)
         if result:
             raise typer.Exit(result)

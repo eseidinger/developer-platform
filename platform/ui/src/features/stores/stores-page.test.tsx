@@ -38,6 +38,12 @@ test('viewers see only personal grants and never load administration lists', asy
   expect(api.getBindings).not.toHaveBeenCalled()
   expect(api.issue).not.toHaveBeenCalled()
 })
+test('project page points to all store access when grants belong to another project', async () => {
+  vi.mocked(api.getMine).mockResolvedValue([{ grant, resource: { ...resource, owner_project: 'other' } }])
+  setup()
+  expect(await screen.findByText('No named-resource human grants for this project.', { exact: false })).toBeInTheDocument()
+  expect(screen.getByRole('link', { name: 'View all your store access' })).toHaveAttribute('href', '/store-access')
+})
 test('creating a resource does not implicitly bind an application', async () => {
   vi.mocked(api.getContext).mockResolvedValue({ manage: true, platform_admin: false, providers: [{ id: 'postgresql', enabled: true }] })
   vi.mocked(api.createResource).mockResolvedValue(resource)
@@ -120,4 +126,28 @@ test('Neo4j human grants expose full access and never offer a read-only downgrad
   await user.click(button)
   await waitFor(() => expect(api.createHuman).toHaveBeenCalledWith(resource.resource_id, { issuer: 'https://fixture.invalid', subject: 'native-writer', mode: 'read-write' }))
   expect(screen.queryByRole('button', { name: 'Change permissions' })).not.toBeInTheDocument()
+})
+test('Neo4j binding requests offer only full instance access', async () => {
+  vi.mocked(api.getContext).mockResolvedValue({ manage: true, platform_admin: false, providers: [{ id: 'postgresql', enabled: true }, { id: 'neo4j', enabled: true }] })
+  vi.mocked(api.requestBinding).mockResolvedValue(grant)
+  const { user } = setup()
+  const form = (await screen.findByRole('button', { name: 'Request binding' })).closest('form')!
+  await user.type(within(form).getByLabelText('Resource UUID'), resource.resource_id)
+  await user.selectOptions(within(form).getByLabelText('Resource provider'), 'neo4j')
+  expect(within(form).queryByRole('option', { name: 'Read-only' })).not.toBeInTheDocument()
+  await user.type(within(form).getByLabelText('Component'), 'worker')
+  await user.click(within(form).getByRole('button', { name: 'Request binding' }))
+  await waitFor(() => expect(api.requestBinding).toHaveBeenCalledWith('alpha', {
+    resource_id: resource.resource_id, component: 'worker', mode: 'read-write',
+  }))
+})
+test('known Neo4j resources lock the binding mode to full access', async () => {
+  vi.mocked(api.getContext).mockResolvedValue({ manage: true, platform_admin: false, providers: [{ id: 'postgresql', enabled: true }, { id: 'neo4j', enabled: true }] })
+  vi.mocked(api.getResources).mockResolvedValue([{ ...resource, provider: 'neo4j' }])
+  const { user } = setup()
+  const form = (await screen.findByRole('button', { name: 'Request binding' })).closest('form')!
+  await user.type(within(form).getByLabelText('Resource UUID'), resource.resource_id)
+  expect(within(form).getByLabelText('Resource provider')).toHaveValue('neo4j')
+  expect(within(form).getByLabelText('Resource provider')).toBeDisabled()
+  expect(within(form).queryByRole('option', { name: 'Read-only' })).not.toBeInTheDocument()
 })

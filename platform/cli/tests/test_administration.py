@@ -251,7 +251,8 @@ def test_obsolete_database_issuance_commands_are_excluded():
     assert ("POST", "/projects/{name}/database-access/me/credential") in EXCLUSIONS
 
 
-def test_postgresql_tunnel_uses_verified_host_and_does_not_print_credential(monkeypatch, tmp_path):
+@pytest.mark.parametrize("provider", ["postgresql", "s3", "qdrant", "opensearch", "neo4j"])
+def test_store_tunnel_uses_verified_host_and_does_not_print_credential(monkeypatch, tmp_path, provider):
     from uuid import uuid4
 
     credential_id = str(uuid4())
@@ -264,7 +265,7 @@ def test_postgresql_tunnel_uses_verified_host_and_does_not_print_credential(monk
 
     def handler(request):
         assert request.url.path == "/v1/store-access/credentials/" + credential_id
-        return httpx.Response(200, json={"state": "active", "provider": "postgresql",
+        return httpx.Response(200, json={"state": "active", "provider": provider,
             "connection": {"PGPASSWORD": "never-print-me"},
             "ssh": {"user": "platform-db", "host": "bastion.example", "port": 2222,
                     "destination": "172.30.80.15", "destination_port": 20001}})
@@ -278,6 +279,28 @@ def test_postgresql_tunnel_uses_verified_host_and_does_not_print_credential(monk
     assert "StrictHostKeyChecking=yes" in commands[0]
     assert "never-print-me" not in result.output
     assert "never-print-me" not in repr(commands[0])
+
+
+@pytest.mark.parametrize(("command", "target", "confirmation"), [
+    (["retire", "resource-1"], "resource-1", "--confirm-resource-id"),
+    (["purge", "resource-1"], "resource-1", "--confirm-resource-id"),
+    (["grants", "revoke", "grant-1"], "grant-1", "--confirm-grant-id"),
+])
+def test_destructive_store_commands_require_exact_target_confirmation(monkeypatch, tmp_path, command, target, confirmation):
+    requests = []
+    runner = _cli(monkeypatch, tmp_path, lambda request: requests.append(request) or httpx.Response(202, json={"state": "retired"}))
+    body = tmp_path / "version.json"
+    body.write_text('{"version": 1}')
+    args = ["stores", *command, "--file", str(body)]
+    missing = runner.invoke(app, args)
+    assert missing.exit_code == 2, missing.output
+    assert confirmation in missing.output
+    wrong = runner.invoke(app, [*args, confirmation, "other-id"])
+    assert wrong.exit_code == 2, wrong.output
+    assert requests == []
+    confirmed = runner.invoke(app, [*args, confirmation, target])
+    assert confirmed.exit_code == 0, confirmed.output
+    assert len(requests) == 1
 
 
 @pytest.mark.parametrize("credential", [
