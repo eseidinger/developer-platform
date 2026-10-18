@@ -61,6 +61,14 @@ connection-limit panel was empty as expected. The exporter reported `pg_up=1`
 and no scrape error, and Grafana's provisioned dashboard files matched source.
 See [EV-62](../maintainers/delivery/backlog.md#verification-register).
 
+A separate read-write human test signed into the deployed portal and pgAdmin,
+connected the browser console with a scoped lease, then used the same lease via
+the private relay to create and read a marker table. The role had no server-admin
+capabilities; grant revocation denied a fresh connection. The disposable user
+and local credential files were removed. SQL was not run inside pgAdmin Query
+Tool, so that browser write path remains open. See
+[EV-63](../maintainers/delivery/backlog.md#verification-register).
+
 ## Selecting shared services
 
 For remote deployments, configure the optional `platform_stores` group in the
