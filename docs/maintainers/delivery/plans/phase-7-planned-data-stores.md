@@ -5,7 +5,8 @@ PostgreSQL acceptance gate has local and deployed evidence, including active
 pgAdmin Query Tool session fencing and verified-backup-gated purge (EV-52–67).
 The four shared-store providers have combined deterministic deployed acceptance
 through test personas (EV-68). Deployed AGE/pgvector selection and scoped queries
-have a separate disposable check (EV-69). Domain comparisons and quantitative
+have a separate disposable check (EV-69). An October 18 local rerun of native,
+analytics and official browser fixtures passed (EV-70). Domain comparisons and quantitative
 performance verification are now [Phase 9](phase-9-store-measurement-and-comparison.md);
 deployed store restore and rebuild acceptance are
 [Phase 10 package 10.13](phase-10-anytime-leftovers.md#1013-verify-deployed-data-store-recovery-plan-027plan-033-follow-up).
