@@ -17,6 +17,9 @@ or delivery plans. Application users should start in the
 Source-adjacent READMEs describe repository layout and commands. These maintainer
 pages explain cross-component ownership and validation expectations.
 
+- [Testing requirements (draft)](testing-requirements.md)
+- [Time-dependent test requirements (draft)](time-dependent-test-requirements.md)
+
 ## Delivery
 
 - [Current delivery status and sequence](delivery/README.md)

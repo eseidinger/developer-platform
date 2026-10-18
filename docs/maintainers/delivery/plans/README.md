@@ -4,6 +4,7 @@ Status: planned work index.
 
 Only unfinished, owned implementation plans belong here:
 
+- [Deployed Platform API acceptance suite](deployed-api-acceptance.md) — proposed first installed-platform test stage
 - [Energy-system use-case enablement priority](energy-system-integration.md)
 - [Generic use-case enablement increment](use-case-enablement-increment.md)
 - [Phase 4 tracing and Grafana dashboards](phase-4-tracing-and-dashboards.md)
