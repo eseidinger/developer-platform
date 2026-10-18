@@ -79,6 +79,20 @@ class BackupTests(unittest.TestCase):
         self.assertIn([self.job.docker, 'start', 'grafana'], calls)
         self.assertFalse((self.job.state / 'resume.json').exists())
 
+    def test_running_container_without_image_metadata_remains_in_backup_inventory(self):
+        def command(args, **kwargs):
+            if args[1] == 'inspect':
+                return json.dumps([{'Name': '/postgres', 'Config': {'Image': 'postgres:test'},
+                                    'Image': 'sha256:missing'}]).encode()
+            if args[1:3] == ['image', 'inspect']:
+                raise backup.BackupError('command failed')
+            raise AssertionError(args)
+        with patch.object(self.job, 'compose', return_value=b'container-1'), \
+                patch.object(self.job, 'command', side_effect=command):
+            self.assertEqual(self.job.image_records(), [{
+                'name': '/postgres', 'reference': 'postgres:test', 'id': 'sha256:missing',
+                'digests': [], 'image_metadata_available': False}])
+
     def test_retained_shared_store_volumes_are_required_and_unknown_providers_fail_closed(self):
         bundle = self.root / 'bundle'; bundle.mkdir()
         path = bundle / 'store-recovery.json'

@@ -1,8 +1,9 @@
 # Phase 7 — Planned Data Stores
 
-Status: implementation in progress as of October 17, 2026. PostgreSQL named
-resources/private access/console are implemented in source with disposable local
-evidence; deployed PostgreSQL access and lifecycle acceptance remains open in package 7.1.
+Status: implementation in progress as of October 18, 2026. PostgreSQL named
+resources/private access/console have disposable local and partial deployed
+evidence. The deployed lifecycle purge completed after a verified backup;
+package 7.1 remains open for the other providers and remaining integration work.
 Additional shared-store providers have no operational acceptance recorded here.
 
 The owner requested continued implementation as far as possible with regular
@@ -286,8 +287,10 @@ operator-reviewed live upgrade and human presentation/security reviews are
 [Phase 9 package 9.12](phase-9-anytime-leftovers.md#912--complete-time-dependent-and-operator-reviewed-postgresql-acceptance-plan-026plan-036-follow-up),
 not package 7.1 exit gates. Existing controlled-clock fixture results remain
 evidence only for their simulated conditions. Unrun deterministic checks,
-including deployed pgAdmin Query Tool writes, resource lifecycle, approvals,
-quota/admission and collector failure behavior, remain Phase 7 work.
+remain Phase 7 work until executed. The deployed pgAdmin Query Tool write,
+lifecycle and verified-backup-gated purge, quota/admission requests,
+cross-project scope-change/rejection, and exporter outage/recovery checks have
+dated evidence in EV-65/66; PostgreSQL byte quota enforcement remains advisory.
 
 **Extension compatibility evidence (October 17, 2026):** PostgreSQL 18.6 with
 pgvector 0.8.7, AGE 1.8.0 and deferred TimescaleDB 2.30.2 passed the 16-case local

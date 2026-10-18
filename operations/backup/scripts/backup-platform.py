@@ -139,6 +139,24 @@ class Job:
     def service_state(self, bundle):
         self.volume_state(bundle, [('proxy', ['/data', '/config']), ('grafana', ['/var/lib/grafana'])])
 
+    def image_records(self):
+        records = []
+        for container in self.compose('ps', '-q').decode().split():
+            info = json.loads(self.command([self.docker, 'inspect', container]))[0]
+            record = {'name': info['Name'], 'reference': info['Config']['Image'],
+                      'id': info['Image'], 'digests': [], 'image_metadata_available': False}
+            try:
+                image = json.loads(self.command([self.docker, 'image', 'inspect', info['Image']]))[0]
+            except BackupError:
+                # A running container can outlive its local image metadata after pruning.
+                # Preserve its immutable image ID and configured reference in the bundle.
+                pass
+            else:
+                record['digests'] = image.get('RepoDigests', [])
+                record['image_metadata_available'] = True
+            records.append(record)
+        return records
+
     def data_store_state(self, bundle):
         manifest = json.loads((bundle / 'store-recovery.json').read_text())
         providers = {row['provider'] for row in manifest['resources'] if row['state'] != 'purged'} - {'postgresql'}
@@ -388,12 +406,7 @@ END $$;
             shutil.copy2(Path('/usr/local/sbin') / name, bundle / name)
         self.stage = 'service state capture'
         self.service_state(bundle)
-        image_records = []
-        for container in self.compose('ps', '-q').decode().split():
-            info = json.loads(self.command([self.docker, 'inspect', container]))[0]
-            image = json.loads(self.command([self.docker, 'image', 'inspect', info['Image']]))[0]
-            image_records.append({'name': info['Name'], 'reference': info['Config']['Image'],
-                                  'id': info['Image'], 'digests': image.get('RepoDigests', [])})
+        image_records = self.image_records()
         metadata = {
             'images': image_records,
             'containers': self.compose('ps', '--format', 'json').decode(),
