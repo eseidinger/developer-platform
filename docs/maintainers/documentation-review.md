@@ -112,3 +112,10 @@ It requires a digest-pinned `examples/web-postgres` image and protected operator
 session, and retires its project while retaining the independent database. Its
 offline contract checks pass; a live run remains outstanding. The other four
 legacy helpers in the finding above still need adaptation or replacement.
+
+The legacy isolation helper has also been replaced with a two-project named-store
+drill. It validates each project's own service and checks denied cross-project
+database and service connections, platform-database access and public egress from
+a bound workload. Offline contract checks pass; deployed isolation evidence is
+still required. The interrupted-provisioning, rollback-data and generic recovery
+helpers remain on the old implicit-database model.

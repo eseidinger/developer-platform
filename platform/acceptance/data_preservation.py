@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import stat
 import subprocess
 from uuid import UUID
@@ -20,8 +21,9 @@ def project_name(run_id):
     return "dp-" + run_id
 
 
-def declaration(project, image, run_id, binding_id, cpu_limit):
-    require(project == project_name(run_id) and bool(IMAGE.fullmatch(image)), "invalid_fixture_declaration")
+def web_postgres_declaration(project, image, run_id, binding_id, cpu_limit):
+    require(bool(re.fullmatch(r"[a-z][a-z0-9-]{0,30}[a-z0-9]", project))
+            and bool(RUN_ID.fullmatch(run_id)) and bool(IMAGE.fullmatch(image)), "invalid_fixture_declaration")
     require(cpu_limit in ("500m", "600m"), "invalid_fixture_cpu_limit")
     try:
         UUID(binding_id)
@@ -36,6 +38,11 @@ def declaration(project, image, run_id, binding_id, cpu_limit):
                 "resources": {"requests": {"cpu": "100m", "memory": "128Mi"},
                               "limits": {"cpu": cpu_limit, "memory": "256Mi"}}}],
             "configuration": {"values": {"DEMO_FAIL_READY": "false", "ACCEPTANCE_RUN_ID": run_id}}}}
+
+
+def declaration(project, image, run_id, binding_id, cpu_limit):
+    require(project == project_name(run_id), "invalid_fixture_project")
+    return web_postgres_declaration(project, image, run_id, binding_id, cpu_limit)
 
 
 def parser():

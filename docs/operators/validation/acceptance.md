@@ -33,6 +33,27 @@ coverage before an explicit purge. If cleanup is incomplete, inspect the report
 and project state before retrying retirement. This check has not yet been run
 against an installed environment.
 
+For named-store and network isolation, use a different fresh run ID with the
+same fixture image and protected operator session:
+
+```bash
+python3 scripts/isolation.py plan --run-id fedcba987654 \
+  --fixture-image REGISTRY/web-postgres@sha256:DIGEST
+python3 scripts/isolation.py run --run-id fedcba987654 \
+  --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
+  --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
+  --operator-token-file /path/to/protected-operator-session.json
+```
+
+It creates two `iso-<run-id>` projects with separate named PostgreSQL resources,
+proves the peer service works from its own namespace, then checks the bound
+workload's own SQL access, denial of the peer and platform databases, DNS
+resolution of the peer service, and denial of peer-service and public-endpoint
+connections. The private report is `.runtime/isolation/<run-id>/report.json`.
+Both projects are retired after the run; both databases remain retained pending
+verified backup coverage and an explicit purge. This new drill also awaits a
+live run.
+
 ## 1. Deploy the platform
 
 Prepare DNS, an Ubuntu 22.04+ host, SSH access, Python 3, systemd, and the capacity described in the repository README. From a trusted controller:
