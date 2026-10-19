@@ -170,8 +170,8 @@ the [CLI README](cli/README.md), [UI README](ui/README.md) and CI workflows.
 Rebuild through `bash scripts/up.sh` only when updating the intended lab.
 Live smoke creates or updates a retained project; follow
 [acceptance](../docs/operators/validation/acceptance.md) and record the revision,
-scope and cleanup outcome. The legacy isolation/data-preservation helpers still
-expect implicit database Secrets and need adaptation for named stores; see the
-[review findings](../docs/maintainers/documentation-review.md#remaining-implementation-gaps-and-uncertainty).
+scope and cleanup outcome. Named PostgreSQL isolation and data-preservation
+drills have source-level checks but still need live runs; see the
+[current review disposition](../docs/maintainers/documentation-review.md#current-disposition-october-19-2026).
 The backlog distinguishes source tests from deployed
 acceptance; a local pass does not close outstanding operational criteria.

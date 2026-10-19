@@ -83,6 +83,10 @@ journey. Earlier fixture results in compatibility/backlog records were not rerun
 
 ## Remaining implementation gaps and uncertainty
 
+The following table records the October 18 review baseline. It is retained as
+dated evidence; the [current disposition](#current-disposition-october-19-2026)
+below accounts for subsequent source changes.
+
 | Finding | Evidence and practical consequence |
 | --- | --- |
 | Legacy database diagnostics | [`main.py`](../../platform/app/src/app/main.py) still reports the implicit `project_<name>` database through `data-services`; use named-resource and binding/lease observations for current stores. |
@@ -131,3 +135,18 @@ Subsequent source update: a fixture-backed Playwright journey now covers portal
 project creation, deployment, rollback, retirement, and an API-denied create.
 This closes that narrow browser CI gap; it does not replace the proposed
 installed API/CLI/UI runner or resolve its ADR-010 environment decision.
+
+## Current disposition — October 19, 2026
+
+This is a source-status reconciliation through `1a66838`, not a new live
+acceptance result. The original findings above remain the dated review record.
+
+| Baseline finding | Current source status | Still needed |
+| --- | --- | --- |
+| Legacy database diagnostics | Named resources and binding credentials are reported by `data-services`. | Deployed readback and native application write/read. |
+| Legacy live helpers | The isolation, data-preservation, interrupted-provisioning and rollback-data drills use named PostgreSQL. The recovery helper can seed and check one named SQL marker while quarantine stays active. | Run the drills live. The automated recovery playbook still uses the implicit-database check, and the named marker check does not prove application reconnection. |
+| Automatic application recovery | Restore keeps recovered access quarantined; no automatic binding replay was added. | Reconstruct reviewed public declarations, issue fresh grants and bindings, then verify an application transaction after restore. |
+| Interrupted AI runs | History/detail reads mark runs still `running` after ten minutes as failed. | Process-kill and deployed readback; resumption is not implemented. |
+| Deployed telemetry guarantees | No new host evidence in this source review. | Resolve the recorded Tempo filesystem metric issue and observe collector recovery, elapsed retention and sustained combined capacity. |
+| Latest fixture cleanup | The last cited EV-71/72 state remains seven resources awaiting verified scheduled-backup purge intent, with access revoked. | Observe the timer, verified backup acknowledgement and final data deletion before claiming cleanup. |
+| Full installed acceptance | A fixture-backed portal lifecycle browser journey now runs in CI. | Implement and run the installed API/CLI/UI acceptance stages; settle the disposable-environment approach against [ADR-010](../architecture/decisions/ADR-010-single-environment-lab.md). |
