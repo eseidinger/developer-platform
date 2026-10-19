@@ -105,6 +105,18 @@ attributes, baggage, bodies, SQL text/parameters, tokens, personal data, and
 raw URLs. Use route templates only when they are platform-derived and bounded;
 otherwise omit paths. The gateway and Alloy both enforce the allowlist.
 
+Workload AI spans retain the bounded metadata defined in the
+[AI trace contract](../../../infrastructure/monitoring/README.md#workload-ai-traces).
+Normalize operation names to `application.ai.<operation>` and LangChain4j service
+wrappers to `application.ai.service`; do not retain arbitrary original method or
+span names. Library identifiers and versions are workload-reported metadata, not
+verified identity. Normalize legacy GenAI provider/token fields and typed numeric
+settings; retain only allowlisted finish reasons and bounded error types. Project
+trace reads revalidate the same metadata after filtering verified provenance.
+Prompts, responses, tool arguments/results, provider response IDs, arbitrary events,
+exception messages/stacks, and application-reported monetary estimates remain
+excluded. Existing span, attribute, ingest, retention and storage limits apply.
+
 Retain traces for **24 hours**. Use a dedicated host-mounted trace filesystem
 with a **4 GiB hard size limit**, outside the source tree and backup capture.
 Alert at **2 GiB** and stop trace ingestion at **3 GiB** until compaction returns

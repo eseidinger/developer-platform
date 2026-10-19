@@ -28,6 +28,26 @@ LOKI = "grafana/loki:3.7.8"
 CORRELATION = "a" * 32
 OPERATION = "12345678-1234-1234-1234-123456789abc"
 
+# Exercise real framework schemas, escaping, MDC correlation and input rejection.
+FRAMEWORK_LOGS = [
+    {"timestamp": "ignored-app-clock", "level": "WARNING", "loggerName": "org.acme.Service",
+     "message": 'Ready "now"\nGrüße', "mdc": {"traceId": "A" * 32, "spanId": "B" * 16},
+     "password": "MUST-NOT-STORE", "stackTrace": "MUST-NOT-STORE"},
+    {"@timestamp": "ignored-app-clock", "level": "INFO", "logger_name": "com.example.Web",
+     "message": "token=MUST-NOT-STORE Authorization: Bearer MUST-NOT-STORE", "trace_id": "c" * 32,
+     "span_id": "d" * 16, "headers": {"cookie": "MUST-NOT-STORE"}},
+    {"level": "ERROR", "message": "invalid optional IDs are discarded", "traceId": "0" * 32,
+     "spanId": "invalid", "loggerName": {"secret": "MUST-NOT-STORE"}},
+]
+INVALID_LOGS = [
+    {"level": "INFO", "message": "token=x " * 200},
+    {"level": "INFO", "message": {"secret": "MUST-NOT-STORE"}},
+    {"level": ["INFO"], "message": "MUST-NOT-STORE"},
+    {"level": "INFO", "message": "MUST-NOT-STORE" + "x" * 2000},
+    {"level": "unknown", "message": "MUST-NOT-STORE"},
+    {"level": "INFO", "message": "MUST-NOT-STORE", "event": "invalid"},
+]
+
 
 def run(*args):
     return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
@@ -109,8 +129,10 @@ class Kubernetes(http.server.BaseHTTPRequestHandler):
                 timestamp = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
                 lines = [json.dumps({"event": "request.completed", "level": "info", "correlationId": CORRELATION,
                                      "token": "MUST-NOT-STORE", "customer": "MUST-NOT-STORE"}),
-                         'raw token=MUST-NOT-STORE', 'not-json',
+                         'raw token=MUST-NOT-STORE', 'not-json', 'null', 'true', '42',
+                         '["MUST-NOT-STORE"]', '"MUST-NOT-STORE"',
                          '{"event":"request.failed","level":"error","correlationId":"MUST-NOT-STORE"}']
+                lines += [json.dumps(record) for record in FRAMEWORK_LOGS + INVALID_LOGS]
                 self.wfile.write("".join(timestamp + " " + line + "\n" for line in lines).encode())
             elif query.get("watch") == ["true"]:
                 for item in self.pods:
@@ -203,7 +225,7 @@ def main():
             while time.monotonic() < deadline:
                 try:
                     streams = query()
-                    if len(streams) == 2:
+                    if len(streams) >= 4 and sum(len(item["values"]) for item in streams) >= 8:
                         break
                 except (OSError, KeyError):
                     pass
@@ -221,12 +243,33 @@ def main():
             with urllib.request.urlopen(loki_url + "/loki/api/v1/series?" + params, timeout=3) as response:
                 indexed = json.load(response)["data"]
             assert indexed and all("operation_id" not in item and "revision" not in item for item in indexed)
+            import sys
+            sys.path.insert(0, str(ROOT / "platform" / "app" / "src"))
             for item in streams:
                 for entry in item["values"]:
-                    assert json.loads(entry[1]) == {"event": "request.completed", "level": "info", "correlationId": CORRELATION}
+                    record = json.loads(entry[1])
+                    from app.retained_logs import safe_log_record
+                    assert safe_log_record(entry[1]) == record
+                    if "event" in record:
+                        assert record == {"event": "request.completed", "level": "info", "correlationId": CORRELATION}
+                    elif record["message"].startswith('Ready "now"'):
+                        assert record == {"format": "application-json-v1", "level": "warning",
+                                          "message": 'Ready "now"\nGrüße', "logger": "org.acme.Service",
+                                          "traceId": "a" * 32, "spanId": "b" * 16}
+                    elif record["message"].startswith("token="):
+                        assert record["message"] == "token=[REDACTED] Authorization=[REDACTED] [REDACTED]"
+                        assert record["logger"] == "com.example.Web" and record["traceId"] == "c" * 32
+                    else:
+                        assert record == {"format": "application-json-v1", "level": "error",
+                                          "message": "invalid optional IDs are discarded"}
                     metadata = entry[2] if len(entry) > 2 else item["stream"]
                     assert metadata["operation_id"] == OPERATION and metadata["revision"] == "1"
-            print("PASS production Kubernetes discovery/source, component labels, safe envelope, correlation and non-indexed operation metadata")
+            for component in ("api", "worker"):
+                records = [json.loads(entry[1]) for item in streams if item["stream"]["component"] == component
+                           for entry in item["values"]]
+                assert {record.get("logger", record.get("event", record.get("message"))) for record in records} == {
+                    "org.acme.Service", "com.example.Web", "request.completed", "invalid optional IDs are discarded"}
+            print("PASS production Kubernetes discovery/source, component labels, framework JSON, safe envelopes, redaction, trace IDs and non-indexed operation metadata")
             import sys
             sys.path.insert(0, str(ROOT / "platform" / "app" / "src"))
             from app.retained_logs import observe_retained_logs

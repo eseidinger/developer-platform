@@ -320,7 +320,11 @@ operators remain a trusted boundary.
 Domain identifiers default to Confidential unless an application owner records
 a lower classification. Metrics contain only Public or Internal data. Logs may
 contain Internal operational data and explicitly approved Confidential
-correlation values, but no customer payloads or Restricted values.
+correlation values, but no customer payloads or Restricted values. Normal structured
+Quarkus/Spring message retention was enabled at the owner’s request on October 19,
+2026; messages remain subject to those classification limits. The collector drops
+unknown JSON fields and applies best-effort credential-pattern redaction. This
+does not authorize arbitrary customer payloads or make redaction exhaustive.
 
 Classification is project governance metadata, separate from the deployment
 declaration so a deployment cannot lower its own handling requirements. Project

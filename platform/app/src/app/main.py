@@ -581,7 +581,8 @@ def capabilities(principal: Principal = Depends(current_principal)):
         "componentAwarePublicProbes": True, "hostedProbeSemantics": "access-boundary",
         "semanticReadiness": "kubernetes", "retainedLogs": {
             "endpoint": "/projects/{name}/retained-logs", "requiresPermission": "view",
-            "format": "operational-envelope-v1", "retentionSeconds": 604800,
+            "format": "application-json-v1", "retentionSeconds": 604800,
+            "structuredMessages": True,
             "retentionEvidence": "configured", "arbitraryText": False}}}
 
 

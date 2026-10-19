@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 import httpx2 as httpx
 
 from .manifests import validate_name
+from .audit import redact
 
 RETENTION_SECONDS = 7 * 86400
 MAX_RESPONSE_BYTES = 2 * 1024 * 1024
@@ -24,6 +25,36 @@ def safe_event(message):
             or not CORRELATION.fullmatch(event.get("correlationId", ""))):
         raise ValueError("Invalid operational envelope")
     return {"event": event["event"], "level": event["level"], "correlationId": event.get("correlationId", "")}
+
+
+def safe_log_record(message):
+    """Revalidate the collector's bounded JSON schema at the project read boundary."""
+    record = json.loads(message)
+    if not isinstance(record, dict):
+        raise ValueError("Invalid application log")
+    if "event" in record:
+        return safe_event(message)
+    if (record.get("format") != "application-json-v1"
+            or record.get("level") not in ("trace", "debug", "info", "warning", "error", "fatal")
+            or not isinstance(record.get("message"), str)
+            or not 0 < len(record["message"].encode("utf-8")) <= 2000):
+        raise ValueError("Invalid application log")
+    safe_message = redact(record["message"])
+    if len(safe_message.encode("utf-8")) > 2000:
+        raise ValueError("Application log message limit exceeded")
+    result = {"format": "application-json-v1", "level": record["level"],
+              "message": safe_message}
+    for key, pattern in (("logger", r"[A-Za-z0-9_.$/:-]{1,128}"),
+                         ("traceId", r"[a-f0-9]{32}"), ("spanId", r"[a-f0-9]{16}"),
+                         ("correlationId", CORRELATION.pattern)):
+        value = record.get(key)
+        if value is not None:
+            if not isinstance(value, str) or not re.fullmatch(pattern, value):
+                raise ValueError("Invalid application log metadata")
+            if key in ("traceId", "spanId") and not value.strip("0"):
+                raise ValueError("Invalid application trace identifier")
+            result[key] = value
+    return result
 
 
 def _time(value, default):
@@ -64,7 +95,7 @@ def observe_retained_logs(project, log, tail=200, since_seconds=RETENTION_SECOND
     result = {"state": "no_output", "reason": "NoLogLines", "lines": [], "truncated": False,
               "observed_at": now.isoformat(), "next_cursor": None,
               "retention": {"source": "loki", "state": "configured", "seconds": RETENTION_SECONDS,
-                            "format": "operational-envelope-v1"}}
+                            "format": "application-json-v1"}}
     try:
         with client_factory(timeout=5, follow_redirects=False, trust_env=False) as client:
             with client.stream("GET", os.environ.get("LOKI_URL", "http://loki:3100") + "/loki/api/v1/query_range",
@@ -88,7 +119,7 @@ def observe_retained_logs(project, log, tail=200, since_seconds=RETENTION_SECOND
                 timestamp = int(entry[0])
                 if not start <= timestamp <= end:
                     raise ValueError("Unexpected log timestamp")
-                event = safe_event(entry[1])
+                event = safe_log_record(entry[1])
                 # Loki's default query encoding flattens structured metadata into
                 # the returned stream map. It is not necessarily an index label.
                 metadata = entry[2] if len(entry) > 2 else stream["stream"]

@@ -15,7 +15,7 @@ Status: implemented lab signals plus target coverage. Source configuration is no
 | Kubernetes state and usage | kube-state-metrics via private NodePort 30090 plus TLS-verified kubelet cAdvisor → Prometheus | Bounded project-container CPU/memory series; request accounting and measured usage remain distinct |
 | Application availability | Component-aware catalog → blackbox → Prometheus; Kubernetes readiness → kube-state-metrics | Protected public probes check the access boundary, not backend health; no independent external vantage point |
 | Monitoring components | Prometheus and blackbox-exporter self-scrapes | Does not prove email delivery |
-| Logs | Alloy reads Docker files and project pod logs through a dedicated read-only Kubernetes credential → Loki | Workload centralization keeps only minimized operational envelopes; shared backends are operator-only |
+| Logs | Alloy reads Docker files and project pod logs through a dedicated read-only Kubernetes credential → Loki | Workload centralization keeps bounded JSON messages and operational envelopes; shared backends are operator-only |
 | Views | Provisioned Grafana Prometheus/Loki/Tempo sources and operator dashboards | Owner-verified selected deployed views; project users use authorized fixed API reads |
 | Traces | Bounded platform spans, private Alloy/Tempo and authenticated hosted OTLP through a Pod-local forwarder | Selected deployed trace/AI readback exists; full framework, outage, elapsed-retention and capacity acceptance remains open |
 | Hosted metrics | Opt-in private scrape and fixed project HTTP reads, plus reviewed JVM/store workload families | Instrumentation is application-owned; complete framework/deployed coverage remains open |
@@ -71,11 +71,12 @@ Operators should see host, Docker, cluster, database, certificates, storage, job
 Probe labels use project/application names, default environment, component,
 namespace and URL. Platform-derived revision/operation pod annotations become
 non-indexed log metadata. Application-supplied opaque correlation keys live only
-in the minimized operational JSON envelope, not metric or stream-index labels.
-Unknown fields/free text are not centrally retained; arbitrary log content remains
-kubelet-only. Owners supply and classify correlation, without exposing domain
-payloads, customer details or credentials. See the
-[implemented envelope and limits](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation).
+in JSON record bodies, not metric or stream-index labels. Bounded Quarkus/Spring
+JSON messages and operational envelopes are centrally retained; unknown JSON
+fields are discarded and plain-text logs remain kubelet-only. Known credential
+patterns receive best-effort redaction. Applications must keep secrets out of
+messages and supply appropriately classified opaque correlation identifiers.
+See the [implemented formats and limits](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation).
 
 ## Status and operational evidence
 

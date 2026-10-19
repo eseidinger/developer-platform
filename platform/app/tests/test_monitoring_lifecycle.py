@@ -314,6 +314,8 @@ class LifecycleTests(unittest.TestCase):
         self.assertTrue(capability["componentAwarePublicProbes"])
         self.assertEqual(capability["retainedLogs"]["retentionSeconds"], 604800)
         self.assertFalse(capability["retainedLogs"]["arbitraryText"])
+        self.assertTrue(capability["retainedLogs"]["structuredMessages"])
+        self.assertEqual(capability["retainedLogs"]["format"], "application-json-v1")
         self.deploy()
         self.complete_operations()
         logs = {"state": "no_output", "lines": []}

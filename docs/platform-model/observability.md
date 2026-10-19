@@ -44,7 +44,7 @@ questions:
 | Readiness and components | Kubernetes Deployment and pod readiness for services; CronJob and Job status for scheduled components. A provider error is reported as unknown rather than ready. |
 | Drift | Comparison of a desired revision with live Deployment or CronJob fields. A difference is reported, not repaired by the read. An observation failure can make the result unknown. |
 | Resources and usage | Namespace topology and declared resource allocations from Kubernetes; current pod CPU and memory from the Kubernetes metrics API. Usage distinguishes fresh, stale, missing, and unavailable samples. |
-| Logs | Bounded recent pod-log reads or minimized retained operational events, both scoped to the authorized project. |
+| Logs | Bounded recent pod-log reads or bounded retained JSON messages and operational events, both scoped to the authorized project. |
 
 These views are snapshots, with timestamps or explicit state where appropriate.
 An inventory route is a declared endpoint, for example, but does not prove
@@ -101,13 +101,14 @@ effort, especially after an instance disappears. A pod-log response can state
 that no pods or no output were found, or that the log API is unavailable.
 
 Alloy also collects project pod logs through a dedicated read-only Kubernetes
-credential. Before forwarding them to Loki, it keeps only a small structured
-operational envelope: an allowed event name, level, and optional correlation
-ID. Unrecognized fields and ordinary free-text workload logs do not enter
-this retained project stream. Alloy separately forwards platform Docker
+credential. Before forwarding them to Loki, it keeps bounded JSON messages,
+severity, logger names, valid trace/span IDs, and existing operational envelopes.
+Unknown fields are discarded; known credential patterns receive best-effort
+redaction. Applications must exclude secrets from message text. Plain-text logs
+remain kubelet-only. Alloy separately forwards platform Docker
 container logs to Loki. Loki is configured for seven-day retention. The
 Platform API's retained-log view constructs a fixed project selector, checks
-returned stream labels and event format again, and bounds the query. It does
+returned stream labels and record format again, and bounds the query. It does
 not accept caller-supplied LogQL or expose central storage as a project-wide
 query interface. Retention is a configured window, not a promise that every
 event was ingested.

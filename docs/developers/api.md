@@ -62,11 +62,14 @@ Arbitrary LogQL, backend URLs and raw payload search are not supported.
 
 Responses distinguish `ok`, `no_output`, and `unavailable`; unavailable storage
 never becomes empty success. Entries contain timestamp, pod/container/component,
-validated revision/operation metadata and event/level/opaque correlation.
+validated revision/operation metadata and a JSON `message` containing either an
+operational event or a bounded application message with severity and optional
+logger/trace/span/correlation identifiers.
 `retention.source=loki`, `seconds=604800` and `state=configured` describe
-configuration, not a certified retention drill. Only the
+configuration, not a certified retention drill. Supported JSON log formats and the
 [operational envelope](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
-is centralized; ordinary application text remains kubelet best effort.
+are centralized; plain-text logs remain kubelet best effort. `retention.format` is
+`application-json-v1`; legacy operational event records keep their original shape.
 `GET /v1/capabilities` advertises these supported contracts in `observability`;
 it does not attest collector health or elapsed retention in the current environment.
 

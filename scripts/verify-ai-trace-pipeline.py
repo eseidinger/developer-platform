@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from unittest.mock import patch
 from uuid import uuid4
@@ -20,8 +21,11 @@ from langchain_openai import ChatOpenAI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace.export import SpanExporter
+from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import ExportTraceServiceRequest
 
 from app import ai_observability as obs, main, tracing
+from app.telemetry_gateway import sanitize
+from app.trace_read import read as read_project_trace
 
 ROOT = Path(__file__).resolve().parents[1]
 MARKER = 'synthetic-private-prompt-password-provider-response'
@@ -46,6 +50,95 @@ def wait(callback, seconds=45):
             pass
         time.sleep(.25)
     raise AssertionError('Disposable trace readiness/readback timed out')
+
+
+def verify_workload_trace(endpoint, query_port, opener):
+    """Actual gateway sanitizer -> production Alloy -> Tempo -> scoped API read."""
+    request = ExportTraceServiceRequest()
+    resource = request.resource_spans.add()
+    attribute = resource.resource.attributes.add()
+    attribute.key = 'platform.project'
+    attribute.value.string_value = MARKER
+    scope = resource.scope_spans.add()
+    scope.scope.name = 'io.quarkus.opentelemetry'
+    scope.scope.version = '3.27.0'
+    scope.scope.attributes.add().value.string_value = MARKER
+    trace_id, now = uuid4().bytes, time.time_ns()
+    operations = ('chat','text_completion','generate_content','embeddings','execute_tool',
+                  'invoke_agent','create_agent','retrieval')
+    for index, operation in enumerate(('service', *operations)):
+        span = scope.spans.add()
+        span.trace_id, span.span_id = trace_id, (index+1).to_bytes(8,'big')
+        if index: span.parent_span_id = (1).to_bytes(8,'big')
+        span.flags = 1
+        span.name = 'langchain4j.aiservices.PrivateAssistant.privateMethod' if not index else 'completion fixture-model'
+        span.start_time_unix_nano, span.end_time_unix_nano = now-1000000, now
+        span.status.code = 2 if operation == 'execute_tool' else 1
+        span.status.message = MARKER
+        fields = {'gen_ai.prompt':MARKER,'gen_ai.completion':MARKER,'gen_ai.output.messages':MARKER,
+                  'gen_ai.tool.call.arguments':MARKER,'gen_ai.tool.call.result':MARKER,
+                  'gen_ai.response.id':MARKER,'gen_ai.client.estimated_cost':MARKER}
+        if index:
+            fields.update({'gen_ai.operation.name':operation,'gen_ai.system':'OPEN_AI',
+                'gen_ai.request.model':'fixture-model','gen_ai.response.model':'fixture-model-v2',
+                'gen_ai.usage.prompt_tokens':12,'gen_ai.usage.completion_tokens':3,
+                'gen_ai.response.finish_reasons':'STOP','gen_ai.request.temperature':0.5,
+                'gen_ai.request.top_p':0.9,'gen_ai.request.max_tokens':128})
+        if operation == 'execute_tool':
+            fields['gen_ai.tool.name'] = 'lookup_weather'
+            fields['error.type'] = 'fixture.ProviderError'
+        for key,value in fields.items():
+            attr = span.attributes.add(); attr.key = key
+            if isinstance(value,str): attr.value.string_value = value
+            elif type(value) is int: attr.value.int_value = value
+            else: attr.value.double_value = value
+        span.events.add().name = MARKER
+    payload = sanitize(request.SerializeToString(),'fixture-ai','web',now)
+    with opener.open(urllib.request.Request(endpoint,data=payload,
+            headers={'Content-Type':'application/x-protobuf'}),timeout=5) as response:
+        assert response.status == 200
+
+    def stored():
+        request = urllib.request.Request(f'http://127.0.0.1:{query_port}/api/v2/traces/{trace_id.hex()}',
+                                        headers={'Accept':'application/json'})
+        with opener.open(request,timeout=3) as response:
+            data = json.load(response)
+        spans = [span for r in data.get('trace',{}).get('resourceSpans',[])
+                 for s in r.get('scopeSpans',[]) for span in s.get('spans',[])]
+        return data if len(spans) == 9 else None
+    data = wait(stored)
+    assert MARKER not in json.dumps(data)
+    spans = [span for r in data['trace']['resourceSpans'] for s in r['scopeSpans'] for span in s['spans']]
+    assert {s['name'] for s in spans} == {'application.ai.'+op for op in ('service',*operations)}
+    root = next(s for s in spans if s['name']=='application.ai.service')
+    assert all(s['parentSpanId']==root['spanId'] for s in spans if s is not root)
+    chat = next(s for s in spans if s['name']=='application.ai.chat')
+    fields = {a['key']:a['value'] for a in chat['attributes']}
+    assert fields['gen_ai.request.model']['stringValue']=='fixture-model'
+    assert fields['gen_ai.provider.name']['stringValue']=='openai'
+    assert int(fields['gen_ai.usage.input_tokens']['intValue'])==12
+    assert fields['gen_ai.response.finish_reasons']['arrayValue']['values'][0]['stringValue']=='stop'
+    assert not any(s.get('events') or s.get('status',{}).get('message') for s in spans)
+
+    class Tempo:
+        def open(self, request, timeout):
+            return opener.open(urllib.request.Request(request.full_url.replace('http://tempo:3200',
+                f'http://127.0.0.1:{query_port}'),headers={'Accept':'application/json'}),timeout=timeout)
+    project = read_project_trace('fixture-ai',trace_id.hex(),Tempo())
+    assert len(project['spans']) == 9
+    assert {s['name'] for s in project['spans']} == {s['name'] for s in spans}
+    assert any(s.get('attributes',{}).get('platform.ai.framework')=='langchain4j' for s in project['spans'])
+    assert read_project_trace('foreign',trace_id.hex(),Tempo()) is None
+    assert MARKER not in json.dumps(project)
+    for expression in ('{ resource.service.name = "fixture-ai.web" && span.gen_ai.request.model = "fixture-model" }',
+                       '{ resource.service.name = "fixture-ai.web" && span.platform.ai.framework = "langchain4j" }'):
+        def searchable():
+            params = urllib.parse.urlencode({'q':expression,'start':int(now/1e9)-60,'end':int(time.time())+1})
+            with opener.open(f'http://127.0.0.1:{query_port}/api/search?'+params,timeout=5) as response:
+                found=json.load(response)
+            return any(t['traceID']==trace_id.hex() for t in found.get('traces',[]))
+        wait(searchable)
+    print('PASS Quarkus/LangChain4j service and all AI operation spans through gateway sanitizer -> Alloy -> Tempo: model/framework searches, legacy aliases, token counts, scoped API reads, parentage and private-content removal verified.')
 
 
 def run():
@@ -99,6 +192,7 @@ def run():
             wait(lambda: subprocess.run(['docker', 'exec', alloy, '/usr/bin/bash', '-c',
                 'exec 3<>/dev/tcp/127.0.0.1/4318'], capture_output=True, timeout=3).returncode == 0)
             endpoint = f'http://127.0.0.1:{otlp_port}/v1/traces'
+            verify_workload_trace(endpoint,query_port,opener)
             with patch.dict(os.environ, {'PLATFORM_OTLP_ENDPOINT': 'http://alloy:4318/v1/traces',
                     'PLATFORM_TRACE_SAMPLE_RATE': '1.0', 'PLATFORM_TRACE_SERVICE_NAME': 'platform-api'}), \
                     patch.object(tracing, 'OTLPSpanExporter', side_effect=lambda **kwargs: Capture(endpoint)), \

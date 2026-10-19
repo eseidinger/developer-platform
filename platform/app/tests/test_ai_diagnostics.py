@@ -87,6 +87,14 @@ class DiagnosticSignatureTests(unittest.TestCase):
         self.assertEqual(result["retained_state"], "no_output")
         self.assertEqual(ai_tools.logs_view(retained, {"state": "no_match", "failure_codes": []})["state"], "no_output")
 
+    def test_normal_json_does_not_break_event_counts_or_enter_model_context(self):
+        retained = {"state": "ok", "observed_at": "synthetic", "truncated": False, "lines": [
+            {"message": json.dumps({"format": "application-json-v1", "message": "private customer text", "level": "info"})},
+            {"message": json.dumps({"event": "request.completed", "level": "info"})}]}
+        result = ai_tools.logs_view(retained, {"state": "no_match", "failure_codes": []})
+        self.assertEqual(result["event_counts"], {"request.completed": 1})
+        self.assertNotIn("private customer text", json.dumps(result))
+
     def test_log_tool_uses_trusted_current_service_and_revision(self):
         retained = {"state": "no_output", "lines": [], "observed_at": "synthetic", "truncated": False}
         current = lambda _: (3, {"components": [{"name": "web", "type": "service"}]}, "applied")

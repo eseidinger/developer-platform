@@ -7,6 +7,8 @@ import time
 import urllib.error
 import urllib.request
 
+from . import workload_trace
+
 
 class TraceUnavailable(Exception):
     pass
@@ -51,13 +53,33 @@ def read(project: str, trace_id: str, opener=None, now=None) -> dict | None:
                               "parent_span_id": base64.b64decode(span.get("parentSpanId", "")).hex(),
                               "start_time_unix_nano": start, "end_time_unix_nano": end,
                               "name": "application.span"}
-                    fields = {a["key"]: a["value"] for a in span.get("attributes", [])}
-                    method = fields.get("http.request.method", {}).get("stringValue")
-                    status = fields.get("http.response.status_code", {}).get("intValue")
-                    if method in {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}:
+                    fields = {a["key"]: workload_trace.json_value(a["value"])
+                              for a in span.get("attributes", []) if a["key"] in workload_trace.INPUT_KEYS}
+                    instrument = scope.get("scope", {})
+                    scope_name, version = workload_trace.instrumentation(instrument.get("name"), instrument.get("version"))
+                    fields = workload_trace.attributes(fields, scope_name)
+                    result["name"] = workload_trace.span_name(fields, span.get("name"))
+                    if fields:
+                        result["attributes"] = fields
+                    if scope_name != "platform-verified-workload":
+                        result["instrumentation"] = {"name": scope_name, **({"version": version} if version else {})}
+                    status_code = span.get("status", {}).get("code")
+                    if isinstance(status_code, str):
+                        status_code = {"STATUS_CODE_UNSET":0, "STATUS_CODE_OK":1, "STATUS_CODE_ERROR":2}.get(status_code)
+                    if type(status_code) is int and status_code in {0, 1, 2}:
+                        result["status"] = status_code
+                    kind = span.get("kind")
+                    if isinstance(kind, str):
+                        kind = {"SPAN_KIND_UNSPECIFIED":0, "SPAN_KIND_INTERNAL":1, "SPAN_KIND_SERVER":2,
+                                "SPAN_KIND_CLIENT":3, "SPAN_KIND_PRODUCER":4, "SPAN_KIND_CONSUMER":5}.get(kind)
+                    if type(kind) is int and 0 <= kind <= 5:
+                        result["kind"] = kind
+                    method = fields.get("http.request.method")
+                    status = fields.get("http.response.status_code")
+                    if method:
                         result["method"] = method
-                    if status is not None and 100 <= int(status) <= 599:
-                        result["status_code"] = int(status)
+                    if status is not None:
+                        result["status_code"] = status
                     spans.append(result)
                     if len(spans) > 200:
                         raise TraceUnavailable()

@@ -209,7 +209,12 @@ def component_resources(name, components, database_ip, password, configuration=N
             if component["type"] == "scheduled":
                 # A regular sidecar keeps Jobs active after the application exits.
                 # Native sidecars stop automatically when all main containers finish.
-                spec["initContainers"] = [{**forwarder, "restartPolicy": "Always"}]
+                # Native sidecars are considered started before their Python listener
+                # is ready unless a startup probe gates the application container.
+                spec["initContainers"] = [{**forwarder, "restartPolicy": "Always",
+                    "startupProbe": {"exec": {"command": ["python", "-c",
+                        "import socket; socket.create_connection(('127.0.0.1', 4318), timeout=1).close()"]},
+                        "periodSeconds": 2, "timeoutSeconds": 5, "failureThreshold": 30}}]
             else:
                 spec["containers"].append(forwarder)
         if restart_policy:

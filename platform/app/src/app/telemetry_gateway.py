@@ -18,10 +18,10 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from google.protobuf.message import DecodeError
 
 from .manifests import validate_name
+from . import workload_trace
 
 MAX_BODY = 262144
 MAX_SPANS = 200
-_METHODS = {"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"}
 _held = threading.Lock()
 _tokens = 131072.0
 _last = time.monotonic()
@@ -95,16 +95,21 @@ def sanitize(payload: bytes, project: str, component: str, now_ns=None) -> bytes
         attribute = output.resource.attributes.add()
         attribute.key = key
         attribute.value.string_value = value
-    scope = output.scope_spans.add()
-    scope.scope.name = "platform-verified-workload"
     now_ns = now_ns or time.time_ns()
     count = 0
     for resource_spans in incoming.resource_spans:
         for scope_spans in resource_spans.scope_spans:
+            if not scope_spans.spans:
+                continue
+            scope = output.scope_spans.add()
+            scope.scope.name, scope.scope.version = workload_trace.instrumentation(
+                scope_spans.scope.name, scope_spans.scope.version)
             for span in scope_spans.spans:
                 count += 1
+                # Python OTLP encoders may emit only remote-context flags (or zero).
+                # Exported batches cannot be required to repeat the W3C sampled bit.
                 if count > MAX_SPANS or len(span.trace_id) != 16 or len(span.span_id) != 8 \
-                        or not any(span.trace_id) or not any(span.span_id) or not span.flags & 1:
+                        or not any(span.trace_id) or not any(span.span_id):
                     raise ValueError("Invalid or excessive spans")
                 if (span.start_time_unix_nano <= 0 or span.end_time_unix_nano < span.start_time_unix_nano
                         or span.start_time_unix_nano < now_ns - 24 * 3600 * 10 ** 9
@@ -116,22 +121,30 @@ def sanitize(payload: bytes, project: str, component: str, now_ns=None) -> bytes
                 clean.span_id = span.span_id
                 if len(span.parent_span_id) == 8:
                     clean.parent_span_id = span.parent_span_id
-                clean.name = "application.span"
-                clean.kind = span.kind
+                clean.kind = span.kind if 0 <= span.kind <= 5 else 0
                 clean.start_time_unix_nano = span.start_time_unix_nano
                 clean.end_time_unix_nano = span.end_time_unix_nano
                 clean.flags = 1
-                if span.status.code == 2:
-                    clean.status.code = 2
-                for attribute in span.attributes:
-                    if attribute.key == "http.request.method" and attribute.value.string_value in _METHODS:
-                        item = clean.attributes.add()
-                        item.key = attribute.key
-                        item.value.string_value = attribute.value.string_value
-                    elif attribute.key == "http.response.status_code" and 100 <= attribute.value.int_value <= 599:
-                        item = clean.attributes.add()
-                        item.key = attribute.key
-                        item.value.int_value = attribute.value.int_value
+                clean.status.code = span.status.code if 0 <= span.status.code <= 2 else 0
+                source = {a.key: workload_trace.protobuf_value(a.value) for a in span.attributes
+                          if a.key in workload_trace.INPUT_KEYS}
+                exception_type = next((workload_trace.protobuf_value(a.value)
+                    for event in span.events if event.name == "exception"
+                    for a in event.attributes if a.key == "exception.type"), None)
+                fields = workload_trace.attributes(source, scope.scope.name, span.name, exception_type)
+                clean.name = workload_trace.span_name(fields, span.name)
+                for key, value in fields.items():
+                    item = clean.attributes.add()
+                    item.key = key
+                    if isinstance(value, str):
+                        item.value.string_value = value
+                    elif type(value) is int:
+                        item.value.int_value = value
+                    elif type(value) is float:
+                        item.value.double_value = value
+                    elif isinstance(value, list):
+                        for reason in value:
+                            item.value.array_value.values.add().string_value = reason
     if count == 0:
         raise ValueError("Empty trace batch")
     result = safe.SerializeToString()

@@ -49,7 +49,8 @@ def component_change_summary(current, previous):
 
 
 def logs_view(retained, diagnostics):
-    counts = Counter(json.loads(line["message"])["event"] for line in retained["lines"])
+    counts = Counter(record["event"] for line in retained["lines"]
+                     if "event" in (record := json.loads(line["message"])))
     return {"source": "project-logs", "state": "ok" if diagnostics.get("failure_codes") else retained["state"],
             "retained_state": retained["state"], "window_seconds": 3600,
             "observed_at": retained["observed_at"], "event_counts": dict(counts),

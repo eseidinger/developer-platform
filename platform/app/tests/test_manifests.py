@@ -165,6 +165,13 @@ class WorkloadContract(unittest.TestCase):
         forwarder, = pod["initContainers"]
         self.assertEqual(forwarder["name"], "telemetry-forwarder")
         self.assertEqual(forwarder["restartPolicy"], "Always")
+        # A running native sidecar is not proof that its loopback listener exists.
+        probe = forwarder["startupProbe"]
+        self.assertEqual(probe["exec"]["command"][:2], ["python", "-c"])
+        self.assertIn("127.0.0.1", probe["exec"]["command"][2])
+        self.assertIn("4318", probe["exec"]["command"][2])
+        self.assertGreater(probe["timeoutSeconds"], 1)
+        self.assertGreaterEqual(probe["failureThreshold"] * probe["periodSeconds"], 30)
         self.assertEqual(pod["restartPolicy"], "Never")
         self.assertEqual(forwarder["resources"]["requests"]["memory"], "64Mi")
         self.assertIn("telemetry-token", [mount["name"] for mount in forwarder["volumeMounts"]])

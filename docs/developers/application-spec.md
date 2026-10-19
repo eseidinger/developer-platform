@@ -181,6 +181,15 @@ provide another, framework-neutral naming convention that FastAPI instrumentatio
 can use. Its metric names need an explicit mapping to this platform's supported
 Prometheus series. The injected OTLP endpoint currently accepts traces only.
 
+For LangChain4j and other AI instrumentation, the platform preserves a bounded
+[AI trace metadata contract](../../infrastructure/monitoring/README.md#workload-ai-traces):
+operation, provider/model, token usage, numeric generation settings, finish reason,
+tool/error type and instrumentation identity. AI span names are normalized to
+`application.ai.<operation>`, with `application.ai.service` for recognized
+LangChain4j service wrappers. Prompts, responses, tool payloads, exception text and
+arbitrary method names are excluded. The existing project trace API exposes the
+same sanitized metadata; no additional application declaration is required.
+
 A public service gets an ingress at
 `https://<component>-<project>.<apps-domain>`. Private services get in-project
 DNS and can be reached by other project workloads through their component name.
@@ -215,7 +224,7 @@ hosted protection.
 | `retryLimit` | No | Integer 0–10; default `6`. Kubernetes retries a failed Job with exponential backoff. This does not establish dependency ordering. |
 | `maxRunSeconds` | No | Integer 60–86400. Stops a Job that exceeds this duration. |
 | `outbound` | No | Same CIDR or DNS TCP egress declaration supported by service components. |
-| `telemetry.tracing.enabled` | No | Boolean, default `false`; scheduled jobs start independently sampled traces. |
+| `telemetry.tracing.enabled` | No | Boolean, default `false`; scheduled jobs start independently sampled traces and wait for the local forwarder listener before the application starts. |
 
 Scheduled components do not accept `ports`, `replicas`, `exposure`, or `health`.
 
@@ -224,10 +233,13 @@ target for private-only applications. For protected `v1alpha2` services it check
 the authentication boundary's expected denial/login response, not backend content;
 Kubernetes readiness is the independent semantic health signal. It never creates
 an anonymous health route or implicitly authorizes a monitoring identity.
-Applications may emit the domain-neutral
+Applications may emit normal Quarkus/Spring JSON logs or the domain-neutral
 [operational log envelope](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
 for seven-day configured central retention and authorized retained-log reads.
-This does not add a declaration field; normal free-text logs stay kubelet-only.
+No declaration field is required. JSON `message` and `level` are retained with
+optional logger/trace metadata; unknown fields are discarded and known credential
+patterns receive best-effort redaction. Keep secrets out of messages. Plain-text
+logs stay kubelet-only.
 
 For an application such as Spring Boot that becomes reachable before its database
 migrations and initialization are complete, use its application readiness endpoint:

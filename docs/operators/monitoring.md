@@ -10,7 +10,7 @@ Prometheus scrapes itself, node-exporter, kube-state-metrics, blackbox-exporter,
 Alertmanager, Alloy, PostgreSQL exporter, private kubelet cAdvisor endpoints,
 and catalog-discovered public/application-metrics targets. Bounded native-store
 collectors publish additional metrics through node-exporter. Alloy collects Docker
-logs and minimized project pod operational envelopes through a dedicated
+logs, bounded project JSON messages and operational envelopes through a dedicated
 read-only Kubernetes credential. Central storage is configured for seven days;
 workload CPU/memory scrapes are implemented; elapsed-retention evidence remains open.
 

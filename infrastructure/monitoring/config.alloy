@@ -86,29 +86,75 @@ loki.source.kubernetes "workloads" {
   client { kubeconfig_file = "/run/alloy/log-reader.kubeconfig" }
   forward_to = [loki.process.workloads.receiver]
 }
-// Only a minimized operational envelope enters central storage. Ordinary
-// free-text/debug/customer payload logs remain kubelet-only. Unknown JSON keys
-// (tokens, headers, payloads, names, etc.) are discarded, not regex-redacted.
+// Structured framework messages and the existing operational envelope. Discard
+// arbitrary attributes; keep message/trace identifiers in the body, never labels.
 loki.process "workloads" {
   stage.drop {
     longer_than = "4KB"
     drop_counter_reason = "oversized_workload_envelope"
   }
   stage.json {
-    expressions = {event = "event", level = "level", correlation_id = "correlationId"}
+    expressions = {record = "@"}
     drop_malformed = true
   }
   stage.template {
     source = "safe_line"
-    template = "{\"event\":\"{{ .event }}\",\"level\":\"{{ .level }}\",\"correlationId\":\"{{ if .correlation_id }}{{ .correlation_id }}{{ end }}\"}"
+    template = `{{- $r := dict -}}
+{{- if kindIs "string" .record -}}{{- $r = fromJson .record -}}{{- end -}}
+{{- if kindIs "map" $r -}}
+  {{- $level := get $r "level" -}}
+  {{- $cid := get $r "correlationId" -}}
+  {{- if not (hasKey $r "correlationId") -}}{{- $cid = "" -}}{{- end -}}
+  {{- if hasKey $r "event" -}}
+    {{- $event := get $r "event" -}}
+    {{- if and (kindIs "string" $event) (kindIs "string" $level) (kindIs "string" $cid) -}}
+      {{- if and (regexMatch "^(application|request|job)[.](started|ready|completed|failed)$" $event) (has $level (list "debug" "info" "warning" "error")) (regexMatch "^([a-f0-9]{32}|[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12})?$" $cid) -}}
+        {{- dict "event" $event "level" $level "correlationId" $cid | toJson -}}
+      {{- end -}}
+    {{- end -}}
+  {{- else -}}
+    {{- $message := get $r "message" -}}
+    {{- if and (kindIs "string" $level) (kindIs "string" $message) -}}
+      {{- $level = lower $level -}}
+      {{- if eq $level "warn" -}}{{- $level = "warning" -}}{{- end -}}
+      {{- if eq $level "severe" -}}{{- $level = "error" -}}{{- end -}}
+      {{- if and (has $level (list "trace" "debug" "info" "warning" "error" "fatal")) (gt (len $message) 0) (le (len $message) 2000) -}}
+        {{- $message = regexReplaceAll "(?i)\\b(bearer|basic)\\s+[^\\s,;]+" $message "${1} [REDACTED]" -}}
+        {{- $message = regexReplaceAll "(?i)\\b(password|secret|token|authorization|credential|cookie|api[_-]?key)\\s*[:=]\\s*[^,\\s]+" $message "${1}=[REDACTED]" -}}
+        {{- if le (len $message) 2000 -}}
+        {{- $out := dict "format" "application-json-v1" "level" $level "message" $message -}}
+        {{- $logger := coalesce (get $r "loggerName") (get $r "logger_name") (get $r "logger") -}}
+        {{- if kindIs "string" $logger -}}
+          {{- if regexMatch "^[A-Za-z0-9_.$/:-]{1,128}$" $logger -}}{{- $_ := set $out "logger" $logger -}}{{- end -}}
+        {{- end -}}
+        {{- $mdc := get $r "mdc" -}}
+        {{- if not (kindIs "map" $mdc) -}}{{- $mdc = dict -}}{{- end -}}
+        {{- range $key, $size := dict "traceId" 32 "spanId" 16 -}}
+          {{- $snake := "trace_id" -}}{{- if eq $key "spanId" -}}{{- $snake = "span_id" -}}{{- end -}}
+          {{- $id := coalesce (get $r $key) (get $r $snake) (get $mdc $key) (get $mdc $snake) -}}
+          {{- if kindIs "string" $id -}}
+            {{- $id = lower $id -}}
+            {{- if and (regexMatch (printf "^[a-f0-9]{%v}$" $size) $id) (regexMatch "[1-9a-f]" $id) -}}{{- $_ := set $out $key $id -}}{{- end -}}
+          {{- end -}}
+        {{- end -}}
+        {{- if kindIs "string" $cid -}}
+          {{- if regexMatch "^([a-f0-9]{32}|[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12})$" $cid -}}{{- $_ := set $out "correlationId" $cid -}}{{- end -}}
+        {{- end -}}
+        {{- $out | toJson -}}
+        {{- end -}}
+      {{- end -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}`
   }
-  stage.output { source = "safe_line" }
-  stage.match {
-    selector = "{job=\"kubernetes-workloads\"} !~ \"^\\\\{\\\\x22event\\\\x22:\\\\x22(application|request|job)\\\\.(started|ready|completed|failed)\\\\x22,\\\\x22level\\\\x22:\\\\x22(debug|info|warning|error)\\\\x22,\\\\x22correlationId\\\\x22:\\\\x22([a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})?\\\\x22\\\\}$\""
-    action = "drop"
+  stage.drop {
+    source = "safe_line"
+    expression = "^$"
     drop_counter_reason = "unsafe_workload_envelope"
   }
-  // High-cardinality revision/operation identifiers stay out of stream indexes.
+  stage.output { source = "safe_line" }
+  stage.json { expressions = {log_format = "format"} }
+  stage.labels { values = {log_format = ""} }
   stage.structured_metadata {
     values = {revision = "", operation_id = ""}
   }
@@ -149,9 +195,9 @@ otelcol.processor.transform "platform_safe" {
   trace_statements {
     context = "span"
     statements = [
-      `keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type", "platform.ai.run_id", "platform.ai.kind", "platform.ai.model", "platform.ai.tool", "platform.ai.input_tokens", "platform.ai.output_tokens", "platform.ai.outcome", "platform.ai.tool_error_count", "platform.project", "gen_ai.operation.name", "gen_ai.provider.name", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens"])`,
+      `keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type", "platform.ai.run_id", "platform.ai.kind", "platform.ai.model", "platform.ai.tool", "platform.ai.input_tokens", "platform.ai.output_tokens", "platform.ai.outcome", "platform.ai.tool_error_count", "platform.project", "gen_ai.operation.name", "gen_ai.provider.name", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens", "gen_ai.request.max_tokens", "gen_ai.request.temperature", "gen_ai.request.top_p", "gen_ai.response.finish_reasons", "gen_ai.tool.name", "error.type", "platform.instrumentation.name", "platform.ai.framework"])`,
       `truncate_all(attributes, 128)`,
-      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step" and name != "platform.ai.run" and name != "platform.ai.model" and name != "platform.ai.tool" and name != "application.span"`,
+      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step" and name != "platform.ai.run" and name != "platform.ai.model" and name != "platform.ai.tool" and name != "application.span" and name != "application.ai.chat" and name != "application.ai.text_completion" and name != "application.ai.generate_content" and name != "application.ai.embeddings" and name != "application.ai.execute_tool" and name != "application.ai.invoke_agent" and name != "application.ai.create_agent" and name != "application.ai.retrieval" and name != "application.ai.service"`,
       `set(status.message, "")`,
     ]
   }

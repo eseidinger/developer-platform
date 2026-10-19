@@ -70,7 +70,7 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/project
 | --- | --- | --- |
 | Inspect state | `GET $P/drift`, `GET $P/revisions` | `in_sync`, current revision |
 | Diagnose | `GET $P/logs?tail=100`, `GET $P/resource-usage` | Lines per pod/container; usage `state` is `ok` |
-| Retained operations | `GET $P/retained-logs?component=api&tail=100` | Minimized central events, including retired pod instances; view grant required; storage failure is `unavailable` |
+| Retained operations | `GET $P/retained-logs?component=api&tail=100` | Bounded JSON messages and operational events, including retired pod instances; view grant required; storage failure is `unavailable` |
 | Change configuration | `PUT $P/configuration` body `{"values": {"MODE": "a"}}` (replaces the set; optional `If-Match: <revision>`) | `GET $P/configuration` shows `activation: active` |
 | Set or rotate a secret | `PUT $P/secrets/NAME` body `{"value": "..."}` | `GET $P/secrets` shows `version` and `state: rotating` once the pods are `active` |
 | Finish a rotation | `POST $P/secrets/NAME/confirm` after the application works with the new value | 200, previous value revoked |
