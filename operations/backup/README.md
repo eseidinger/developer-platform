@@ -19,11 +19,13 @@ pause managed leases for at most 35 minutes and stop retained native instances
 for capture; applications must tolerate interruption and reconnect. Caddy and
 Grafana are also briefly stopped. See the [capture contract](../../docs/operators/data-stores.md#retention-and-capacity).
 
-The marker-seeding and generic `test-recovery.py` examples below preserve the
-legacy `project_<name>`/`database` Secret assumptions. They are not current
-acceptance for newly created named stores. The restore script handles store
-volumes and quarantine but refuses replay of recovered component bindings and
-still submits internal stored specs for selected-project reapply. Use reviewed
+The automated playbook and `check`/`seed-marker` examples below preserve the
+legacy `project_<name>`/`database` Secret assumptions. For named PostgreSQL,
+the helper also has an explicit [quarantined SQL marker check](#verify-a-named-postgresql-marker).
+Neither path establishes full named-store application recovery. The restore
+script handles store volumes and quarantine but refuses replay of recovered
+component bindings and still submits internal stored specs for selected-project
+reapply. Use reviewed
 public declarations and fresh grants/bindings as described in the
 [current recovery workflow](../../docs/operators/backup-and-recovery.md#reapply-restored-projects).
 Deployed off-host application reconnection remains unverified.
@@ -778,6 +780,42 @@ end-to-end transaction behavior. Network denial to other namespaces/internet,
 public DNS/TLS, live alert delivery, and full recovery-time/data-loss targets
 remain separate checks. Test duration is **not** total RTO; record VM preparation,
 restoration start and simulated failure timestamps separately.
+
+### Verify a named PostgreSQL marker
+
+This manual check verifies one named resource's SQL data while restored access is
+still quarantined. It uses PostgreSQL operator access and validates the resource
+UUID, owning project, provider, restored catalog, bundle checksum, and marker
+timestamp. It does not exercise a fresh grant, component binding, application
+transaction, or reconnection. The automated recovery playbook does not invoke it.
+
+On the **source host**, choose an existing named PostgreSQL resource UUID from the
+store catalog and seed before taking a new verified backup. Keep the receipt
+outside the backup and copy it to the isolated recovery host:
+
+```bash
+sudo python3 /path/to/test-recovery.py seed-named-marker \
+  --project smoke --resource-id REPLACE_WITH_RESOURCE_UUID \
+  --marker /root/smoke-named-marker.json
+sudo systemctl start platform-backup.service
+```
+
+After restoring that snapshot, with the recovery quarantine still active,
+provide a fresh recovery administrator token in `PLATFORM_ACCESS_TOKEN` and run:
+
+```bash
+sudo --preserve-env=PLATFORM_ACCESS_TOKEN \
+  python3 /tmp/test-recovery.py check-named-store \
+  --project smoke --resource-id REPLACE_WITH_RESOURCE_UUID \
+  --bundle /root/platform-recovery/bundle \
+  --marker /root/smoke-named-marker.json
+```
+
+The private passing report identifies `mode: named-store-catalog-sql`,
+`quarantine_verified: true`, and `application_reconnected: false`. Require
+`result: passed` and `historical_data_verified: true` for this SQL marker drill.
+Continue with the [fresh approval and binding procedure](../../docs/operators/backup-and-recovery.md#named-data-store-recovery)
+and separately verify a bound application's data transaction.
 
 ### Local tests for the prepared scripts
 

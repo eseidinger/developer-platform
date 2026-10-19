@@ -153,23 +153,101 @@ with psycopg.connect(host=os.environ['POSTGRES_HOST'],dbname=db,user=db,password
     print('Marker committed. Keep receipt independently; take a new backup now.')
 
 
+def named_database(resource_id):
+    try:
+        parsed = uuid.UUID(resource_id)
+    except (ValueError, AttributeError):
+        raise RuntimeError('Invalid resource ID') from None
+    if str(parsed) != resource_id:
+        raise RuntimeError('Resource ID must be a canonical UUID')
+    return 'resource_' + parsed.hex
+
+
+def postgres_sql(root, database, sql):
+    return command(['docker', 'compose', 'exec', '-T', 'postgres', 'psql', '-X', '-A', '-t',
+                    '-v', 'ON_ERROR_STOP=1', '-U', 'postgres', '-d', database], root, sql)
+
+
+def check_named_catalog(root, project, resource_id):
+    named_database(resource_id)
+    if not re.fullmatch('[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?', project):
+        raise RuntimeError('Invalid project name')
+    # Both values are validated before interpolation. The catalog check prevents a
+    # receipt for another project or provider from passing against this database.
+    query = ("SELECT count(*) FROM store_resources WHERE resource_id='%s' "
+             "AND owner_project='%s' AND provider='postgresql' AND state<>'purged';") % (resource_id, project)
+    if postgres_sql(root, 'platform', query).strip() != '1':
+        raise RuntimeError('Named PostgreSQL resource is absent from this project catalog')
+
+
+def seed_named(root, project, resource_id, receipt):
+    database = named_database(resource_id)
+    check_named_catalog(root, project, resource_id)
+    marker = {'project': project, 'resource_id': resource_id,
+              'table': 'recovery_marker_' + uuid.uuid4().hex,
+              'value': uuid.uuid4().hex,
+              'created_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
+    with receipt.open('x') as output:
+        json.dump({**marker, 'seeded': False}, output, indent=2)
+    sql = ('BEGIN; CREATE TABLE public."%s" (value text NOT NULL); '
+           'INSERT INTO public."%s" VALUES (\'%s\'); COMMIT;') % (
+               marker['table'], marker['table'], marker['value'])
+    postgres_sql(root, database, sql)
+    receipt.write_text(json.dumps({**marker, 'seeded': True}, indent=2) + '\n')
+    print('Named-store marker committed. Keep receipt independently; take a new backup now.')
+
+
+def check_named_sql(root, project, resource_id, marker):
+    database = named_database(resource_id)
+    check_named_catalog(root, project, resource_id)
+    if postgres_sql(root, 'platform', 'SELECT recovery_required FROM store_control WHERE singleton=true;').strip() != 't':
+        raise RuntimeError('Named-store check requires active restore quarantine')
+    sql = """BEGIN;
+CREATE TEMP TABLE recovery_probe(value text);
+INSERT INTO recovery_probe VALUES ('recovery-ok');
+DO $$ BEGIN
+IF current_database() <> '%s' OR (SELECT value FROM recovery_probe) <> 'recovery-ok' THEN
+RAISE EXCEPTION 'named database readback failed'; END IF;
+END $$;
+%s
+ROLLBACK;
+""" % (database, marker_sql(marker) if marker else '')
+    postgres_sql(root, database, sql)
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('action', choices=['check', 'seed-marker'])
+    p.add_argument('action', choices=['check', 'seed-marker', 'check-named-store', 'seed-named-marker'])
     p.add_argument('--platform-dir', type=Path, default=Path('/opt/developer-platform'))
     p.add_argument('--project', default='smoke')
     p.add_argument('--bundle', type=Path, default=Path('/root/platform-recovery/bundle'))
     p.add_argument('--marker', type=Path, help='Independent marker receipt; required for seed-marker')
+    p.add_argument('--resource-id', help='Canonical UUID of an owned named PostgreSQL resource')
     p.add_argument('--report', type=Path)
     args = p.parse_args()
     if not re.fullmatch('[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?', args.project):
         p.error('Invalid project name')
     os.umask(0o077)
     root = args.platform_dir.resolve()
+    named = args.action in ('check-named-store', 'seed-named-marker')
+    if named:
+        if not args.resource_id:
+            p.error('--resource-id is required for named-store actions')
+        try:
+            named_database(args.resource_id)
+        except RuntimeError as error:
+            p.error(str(error))
+    elif args.resource_id:
+        p.error('--resource-id only applies to named-store actions')
     if args.action == 'seed-marker':
         if not args.marker:
             p.error('--marker is required')
         seed(root, args.project, args.marker)
+        return
+    if args.action == 'seed-named-marker':
+        if not args.marker:
+            p.error('--marker is required')
+        seed_named(root, args.project, args.resource_id, args.marker)
         return
     report_path = args.report or root / '.runtime/recovery' / ('checks-' + uuid.uuid4().hex + '.json')
     report_path.parent.mkdir(parents=True, exist_ok=True)
@@ -179,6 +257,11 @@ def main():
               'project': args.project, 'historical_data_verified': False,
               'limits': ['No full RTO measurement', 'No public DNS/TLS or live alert delivery test',
                          'No denied network destination test', 'No application-level database transaction test']}
+    if named:
+        report.update(mode='named-store-catalog-sql', resource_id=args.resource_id,
+                      quarantine_verified=False, application_reconnected=False)
+        report['limits'].append('No named-store grant, binding, or application access test')
+        report['limits'].append('No workload ingress or monitoring convergence test')
     started = time.monotonic()
     stage = 'recovery configuration guard'
     try:
@@ -202,33 +285,41 @@ def main():
         if not any(v['name'] == args.project for v in projects):
             raise RuntimeError('Project missing from restored catalog')
         report['checks'].append(stage)
-        stage = 'project rollout'
-        command([str(root / '.runtime/bin/kubectl'), '--kubeconfig', str(root / '.runtime/admin.kubeconfig'),
-                 '--request-timeout=10s', '-n', 'project-' + args.project, 'rollout', 'status',
-                 'deployment/' + args.project, '--timeout=120s'], root, timeout=135)
-        report['checks'].append(stage)
-        stage = 'HTTP ingress'
-        retry(lambda: request('http://127.0.0.1/', {'Host': args.project + '.apps.localhost'}))
-        report['checks'].append(stage)
-        stage = 'monitoring: Prometheus readiness'
-        retry(lambda: request('http://127.0.0.1:9090/-/ready'), seconds=180)
-        report['checks'].append(stage)
-        stage = 'monitoring: Grafana database health'
-        retry(check_grafana, seconds=180)
-        report['checks'].append(stage)
-        stage = 'monitoring: Prometheus scrape targets'
-        retry(check_targets, seconds=180)
-        report['checks'].append(stage)
-        stage = 'Kubernetes database authentication, write/read and catalog privilege'
+        if not named:
+            stage = 'project rollout'
+            command([str(root / '.runtime/bin/kubectl'), '--kubeconfig', str(root / '.runtime/admin.kubeconfig'),
+                     '--request-timeout=10s', '-n', 'project-' + args.project, 'rollout', 'status',
+                     'deployment/' + args.project, '--timeout=120s'], root, timeout=135)
+            report['checks'].append(stage)
+            stage = 'HTTP ingress'
+            retry(lambda: request('http://127.0.0.1/', {'Host': args.project + '.apps.localhost'}))
+            report['checks'].append(stage)
+            stage = 'monitoring: Prometheus readiness'
+            retry(lambda: request('http://127.0.0.1:9090/-/ready'), seconds=180)
+            report['checks'].append(stage)
+            stage = 'monitoring: Grafana database health'
+            retry(check_grafana, seconds=180)
+            report['checks'].append(stage)
+            stage = 'monitoring: Prometheus scrape targets'
+            retry(check_targets, seconds=180)
+            report['checks'].append(stage)
+        stage = ('named PostgreSQL catalog and SQL readback' if named else
+                 'Kubernetes database authentication, write/read and catalog privilege')
         marker = json.loads(args.marker.read_text()) if args.marker else None
         if marker and (marker.get('project') != args.project or marker.get('seeded') is not True):
             raise RuntimeError('Marker receipt does not match project or was not seeded')
+        if named and marker and marker.get('resource_id') != args.resource_id:
+            raise RuntimeError('Marker receipt does not match resource')
         if marker:
             marker_sql(marker)
             if datetime.datetime.fromisoformat(marker['created_at']).timestamp() > manifest['captured_at']:
                 raise RuntimeError('Marker was created after this backup')
-        compose = json.loads(command(['docker', 'compose', 'config', '--format', 'json'], root))
-        check_pod(root, args.project, compose['services']['postgres']['image'], marker)
+        if named:
+            check_named_sql(root, args.project, args.resource_id, marker)
+            report['quarantine_verified'] = True
+        else:
+            compose = json.loads(command(['docker', 'compose', 'config', '--format', 'json'], root))
+            check_pod(root, args.project, compose['services']['postgres']['image'], marker)
         report['checks'].append(stage)
         report['historical_data_verified'] = marker is not None
         report['result'] = 'passed'

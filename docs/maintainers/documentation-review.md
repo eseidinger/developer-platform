@@ -119,3 +119,10 @@ playbook now provisions a named PostgreSQL resource and binding, checks persiste
 through the bound web fixture after rollback, and checks the current secret.
 Its syntax and offline declaration checks pass; a live rerun remains open. The
 generic recovery helper remains on the old implicit-database model.
+
+Subsequent source update: the recovery helper now also supports explicit named
+PostgreSQL marker seeding and a quarantined SQL readback against a selected
+resource UUID. It checks ownership and backup timing, and records that no binding
+or application reconnection was tested. The automated recovery playbook and its
+legacy `check` path still use the implicit database, and live named-store restore
+and application acceptance remain open.

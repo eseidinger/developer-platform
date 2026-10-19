@@ -70,9 +70,11 @@ this guide explains execution and the scope of reported evidence.
 The following sections explain scope and manual fallback procedures. Use the
 current in-place playbooks for routine notification drills; isolated restore procedures require a later explicit decision or an actual recovery event under ADR-016.
 
-The marker-seeding and generic `test-recovery.py` checks above still assume the
+The automated playbooks and `test-recovery.py check` path above still assume the
 historical `project_<name>` database and project-wide `database` Secret.
-They are not runnable acceptance for newly created named stores. The current
+For a named PostgreSQL resource, use the helper's
+[quarantined SQL marker check](../../operations/backup/README.md#verify-a-named-postgresql-marker)
+to verify restored data without releasing access. The current
 restore script has named-store volume/quarantine support, but refuses automatic
 reapply of recovered bound components until fresh approval and declarations.
 Use the [named-store recovery procedure](#named-data-store-recovery); a complete
@@ -156,9 +158,9 @@ and credentials, replays purge tombstones and validates surviving data. Preserve
 all operator keys from the original encrypted configuration. Never clear recovery
 guards manually or use an old data snapshot to reactivate revoked access.
 
-The generic marker/test helper retains the earlier implicit-database assumptions
-described above. Review the selected project's declaration and the helper's scope
-before invoking it; its historical result is not current named-store acceptance.
+The automated marker/test path retains the earlier implicit-database assumptions
+described above. The separate named PostgreSQL marker path checks catalog and SQL
+data under quarantine; it is not application reconnection acceptance.
 Current local provider restore fixtures are documented in
 [data-store operations](data-stores.md) and the
 [upgrade runbook](runbooks/store-upgrades.md). A deployed full restore still needs

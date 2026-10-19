@@ -13,6 +13,42 @@ spec.loader.exec_module(checks)
 
 
 class RecoveryChecks(unittest.TestCase):
+    def test_named_store_requires_matching_catalog_and_quarantine(self):
+        resource_id = '12345678-1234-4234-8234-123456789abc'
+        calls = []
+        def sql(root, database, statement):
+            calls.append((database, statement))
+            return '1\n' if 'count(*)' in statement else 't\n'
+        with patch.object(checks, 'postgres_sql', side_effect=sql):
+            checks.check_named_sql(Path('/tmp'), 'smoke', resource_id, None)
+        self.assertEqual([db for db, _ in calls], ['platform', 'platform', 'resource_12345678123442348234123456789abc'])
+        self.assertIn("owner_project='smoke'", calls[0][1])
+        self.assertIn('recovery_required', calls[1][1])
+        with patch.object(checks, 'postgres_sql', return_value='0\n'):
+            with self.assertRaisesRegex(RuntimeError, 'absent'):
+                checks.check_named_sql(Path('/tmp'), 'smoke', resource_id, None)
+        with patch.object(checks, 'postgres_sql', side_effect=['1\n', 'f\n']):
+            with self.assertRaisesRegex(RuntimeError, 'quarantine'):
+                checks.check_named_sql(Path('/tmp'), 'smoke', resource_id, None)
+        with self.assertRaisesRegex(RuntimeError, 'Invalid resource ID'):
+            checks.named_database("x'; DROP TABLE store_resources; --")
+        with self.assertRaisesRegex(RuntimeError, 'Invalid project name'):
+            checks.check_named_catalog(Path('/tmp'), "smoke'; DROP TABLE projects; --", resource_id)
+
+    def test_named_seed_receipt_only_valid_after_committed_sql(self):
+        resource_id = '12345678-1234-4234-8234-123456789abc'
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            with patch.object(checks, 'postgres_sql', side_effect=['1\n', '']):
+                checks.seed_named(root, 'smoke', resource_id, root / 'receipt.json')
+            marker = json.loads((root / 'receipt.json').read_text())
+            self.assertTrue(marker['seeded'])
+            self.assertEqual(marker['resource_id'], resource_id)
+            with patch.object(checks, 'postgres_sql', side_effect=['1\n', RuntimeError('SQL failed')]):
+                with self.assertRaisesRegex(RuntimeError, 'SQL failed'):
+                    checks.seed_named(root, 'smoke', resource_id, root / 'failed.json')
+            self.assertFalse(json.loads((root / 'failed.json').read_text())['seeded'])
+
     def test_bundle_detects_corruption_and_traversal(self):
         with tempfile.TemporaryDirectory() as tmp:
             p = Path(tmp)
