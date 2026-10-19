@@ -16,8 +16,8 @@ services:
       interval: 10s
       timeout: 5s
       retries: 12
-    mem_limit: 6g
-    cpus: 3
+    mem_limit: 2g
+    cpus: 1
     shm_size: 256m
 
   postgres-console:

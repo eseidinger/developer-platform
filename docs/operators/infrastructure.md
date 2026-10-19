@@ -107,6 +107,14 @@ to a shared volume every 15 seconds. The API mounts that volume read-only and do
 not receive the Docker socket. Container environment values and credentials are
 excluded from the snapshot. Missing/stale snapshots block enabled admission.
 
+The light-load profile caps shared services at 10.875 GiB RAM and 7.5 CPU cores
+with all optional shared providers enabled and no dedicated Neo4j instances.
+Monitoring services without CPU caps additionally share the configured host CPU
+overhead allowance. Kubernetes defaults to a 2 GiB server and two 7 GiB workers
+(16 GiB total). These ceilings are sized for the observed small datasets and low
+traffic; re-measure before increasing concurrency, ingestion or database sizes.
+The host/runtime overhead allowances and minimum reserve are unchanged.
+
 ## Persistence and failure domain
 
 Kubernetes objects are disposable desired-state projections. Platform catalog, grants, audit records, named-resource databases, and identity data live in external PostgreSQL volumes. Recreating k3d requires catalog replay and is not a database restore.

@@ -128,11 +128,11 @@ otelcol.receiver.otlp "platform" {
   }
 }
 // Limiters observe the entire Alloy process heap, not a per-signal allocation.
-// All pipelines share this budget under the 512 MiB container limit.
+// All pipelines share this budget under the 256 MiB container limit.
 otelcol.processor.memory_limiter "platform" {
   check_interval = "1s"
-  limit = "384MiB"
-  spike_limit = "96MiB"
+  limit = "192MiB"
+  spike_limit = "48MiB"
   output {
     traces = [otelcol.processor.transform.platform_safe.input]
   }
@@ -187,8 +187,8 @@ otelcol.exporter.otlphttp "tempo" {
 // private; the authenticated workload gateway continues to forward traces only.
 otelcol.processor.memory_limiter "ai_metrics" {
   check_interval = "1s"
-  limit = "384MiB"
-  spike_limit = "96MiB"
+  limit = "192MiB"
+  spike_limit = "48MiB"
   output { metrics = [otelcol.processor.filter.ai_metrics.input] }
 }
 otelcol.processor.filter "ai_metrics" {
@@ -246,8 +246,8 @@ otelcol.receiver.otlp "rustfs_metrics" {
 }
 otelcol.processor.memory_limiter "rustfs_metrics" {
   check_interval = "1s"
-  limit = "384MiB"
-  spike_limit = "96MiB"
+  limit = "192MiB"
+  spike_limit = "48MiB"
   output { metrics = [otelcol.processor.filter.rustfs_metrics.input] }
 }
 otelcol.processor.filter "rustfs_metrics" {

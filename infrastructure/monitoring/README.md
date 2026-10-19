@@ -400,8 +400,8 @@ statistics, with document and identity administration denied. Qdrant uses the
 separate `STORE_MONITOR_PASSWORD` as a native read-only key for metrics; its
 edition does not provide a metrics-only key, so keep that operator credential
 private. Resource mappings come from the catalog, not arbitrary native labels.
-All OTLP memory limiters use a common 384 MiB hard / 288 MiB soft process-heap
-budget inside Alloy's existing 512 MiB container limit. The limiter observes the
+All OTLP memory limiters use a common 192 MiB hard / 144 MiB soft process-heap
+budget inside Alloy's 256 MiB light-load container limit. The limiter observes the
 whole collector heap, not just its named pipeline; smaller per-signal limits
 refused RustFS telemetry in the deployed multi-pipeline collector. Body limits,
 label allowlists, aggregation and batching still apply. See the

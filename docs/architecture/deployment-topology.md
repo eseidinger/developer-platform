@@ -58,7 +58,7 @@ This older 32 GiB illustration excludes the optional native stores and dedicated
 Neo4j instances and is not the current admission policy. Default Kubernetes
 request admission is disabled; its configured memory reserve is 8 GiB when enabled.
 Review the [combined store allocation](../operators/data-stores.md#retention-and-capacity),
-Tempo's 2 GiB container limit and actual available host memory before selecting
+Tempo's 1 GiB container limit and actual available host memory before selecting
 providers. The 3 GiB platform-service allocation is only a planning placeholder. Measure idle, peak, and failure/retry behavior for the Python API and Keycloak before accepting it or reduce workload capacity/reserve explicitly. Measure actual usable memory on the host: “32 GB” and “32 GiB” are not equivalent. Also constrain and measure CPU, I/O, connections, and log growth.
 
 All local components share one host failure domain. The host sender does not directly inspect the Docker daemon or deliver a local notification; failed API/Prometheus checks stop its heartbeat. The external watchdog detects expiry, including during host loss. Broader host checks remain target work. The operator has reported receipt for heartbeat, selected Alertmanager and backup scenarios; see [current monitoring evidence](../maintainers/delivery/backlog.md#current-monitoring-progress).

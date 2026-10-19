@@ -164,6 +164,36 @@ capacity promise. The private host record and original files are retained under
 records the base image, patch image, source hashes and application time. This was
 a scoped patch, not a full deployment of the current repository revision.
 
+The subsequent light-load profile reduces shared-service ceilings to 10.875 GiB
+RAM and 7.5 capped CPU cores, while leaving host/runtime overhead allowances and
+minimum reserves unchanged. The Kubernetes pool is 16 GiB: a 2 GiB server and two
+7 GiB workers. See [current infrastructure budgets](../infrastructure.md#metrics-and-capacity).
+These settings assume the observed small datasets and low traffic, rather than
+demonstrating performance under load.
+
+The October 19, 2026 live resize verified both workers Ready and schedulable with
+7 GiB allocatable memory, API/telemetry readiness, recovered application Pods,
+and all 19 monitoring scrape targets healthy. At 1,475m/1,708 MiB active Pod
+requests, the authenticated capacity report showed 5,025m CPU and 10,580 MiB
+memory available. Shared-service allocations were 7,500m/11,136 MiB. The private
+configuration, original limits and application record are retained under
+`/opt/developer-platform/.runtime/light-load-539339f7c2f3/`. All 12 deployments
+recovered, with no OOM kills in the resized infrastructure containers. Two
+scheduled ingestion jobs failed during application restart; the next scheduled
+run, `ingestion-worker-29873396`, completed successfully. Failed runs were not
+replayed manually.
+
+`scripts/cluster_config.py` sets memory limits when creating a cluster; changing
+its output alone does not resize existing nodes. For an existing k3d pool, save
+the original Docker limits and each worker's `/proc/meminfo` bind-mount source,
+increase the Docker memory limit, and update that source's `MemTotal` to the new
+limit in KiB. Preserve the bind-mounted file's inode. Cordon and, if necessary,
+restart one worker at a time so Kubernetes refreshes its memory inventory; verify
+the increased allocatable memory and node/workload readiness before uncordoning
+and proceeding. Existing Docker limits and the memory-information files survive
+container restarts. Do not recreate the cluster to resize its pool, or reduce
+limits beneath already admitted workloads as an automatic rollback.
+
 After that measurement, an operator may enable conservative request admission with
 `CAPACITY_ADMISSION_ENABLED=true`, `CAPACITY_RESERVE_CPU_MILLICORES`, and
 `CAPACITY_RESERVE_MEMORY_MIB` in `.env`, together with the host and node overhead

@@ -18,4 +18,4 @@ services:
           - ${IDENTITY_DOMAIN:-identity.localhost}
       platform:
         ipv4_address: ${PROXY_IP:-172.30.80.20}
-    mem_limit: 256m
+    mem_limit: 128m

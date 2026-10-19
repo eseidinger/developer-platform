@@ -21,8 +21,8 @@ services:
         ipv4_address: ${RUSTFS_IP:-172.30.80.16}
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    mem_limit: 1g
-    cpus: 1
+    mem_limit: 512m
+    cpus: 0.5
     healthcheck:
       test: [CMD, wget, -q, --spider, http://127.0.0.1:9000/health/ready]
       interval: 15s
@@ -47,8 +47,8 @@ services:
         ipv4_address: ${QDRANT_IP:-172.30.80.18}
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    mem_limit: 1g
-    cpus: 1
+    mem_limit: 512m
+    cpus: 0.5
     healthcheck:
       test: [CMD, bash, -ec, "exec 3<>/dev/tcp/127.0.0.1/6333; printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; read -r status <&3; [[ $$status == *'200 OK'* ]]"]
       interval: 15s
@@ -75,8 +75,8 @@ services:
         ipv4_address: ${OPENSEARCH_IP:-172.30.80.17}
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    mem_limit: 2g
-    cpus: 2
+    mem_limit: 1536m
+    cpus: 1
     healthcheck:
       test: [CMD, bash, -euc, "curl --fail --silent --cacert /usr/share/opensearch/config/ca.pem https://opensearch:9200/_plugins/_security/health | grep -Eq '\"status\"[[:space:]]*:[[:space:]]*\"UP\"'"]
       interval: 15s
@@ -126,8 +126,8 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     tmpfs: ["/tmp:size=64m"]
-    mem_limit: 1g
-    cpus: 1
+    mem_limit: 512m
+    cpus: 0.5
     healthcheck:
       test: [CMD, curl, --fail, --silent, http://127.0.0.1:5601/app/login]
       interval: 15s

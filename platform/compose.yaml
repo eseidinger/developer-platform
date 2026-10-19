@@ -181,8 +181,8 @@ services:
     tmpfs: ["/tmp"]
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
-    mem_limit: 256m
-    cpus: 0.5
+    mem_limit: 128m
+    cpus: 0.25
 
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:19999/healthz', timeout=2)"]

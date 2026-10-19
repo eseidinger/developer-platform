@@ -105,7 +105,7 @@ STORE_CAPACITY_BYTES={"postgresql":17179869184,"s3":8589934592,"qdrant":42949672
 ```
 
 These are example logical allocations, requiring review against physical capacity.
-Compose limits are 1 GiB/one CPU each for RustFS and Qdrant, and 2 GiB/two CPUs
+Light-load Compose limits are 512 MiB/half a CPU each for RustFS and Qdrant, and 1.5 GiB/one CPU
 for OpenSearch, plus a transient 512 MiB initializer. Existing services, workload
 requests, telemetry, backup and recovery also need headroom. Services remain
 running together; removing a selection does not remove or purge their volumes.

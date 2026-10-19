@@ -13,6 +13,6 @@ print(json.dumps({
         "k3s": {"extraArgs": [
             {"arg": "--tls-san=k3d-workloads-server-0", "nodeFilters": ["server:*"]},
             {"arg": "--secrets-encryption", "nodeFilters": ["server:*"]}]},
-        "runtime": {"serversMemory": "2g", "agentsMemory": "4g"}
+        "runtime": {"serversMemory": "2g", "agentsMemory": "7g"}
     }
 }, indent=2))
