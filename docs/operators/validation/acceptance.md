@@ -9,6 +9,30 @@ platform, Alertmanager, backup, heartbeat, and watchdog dependencies.
 
 This guide covers a clean platform installation, basic human identities, revocable CI deployment credentials, and core platform tests. Backup, external watchdog, heartbeat availability drills, and Alertmanager delivery are separate operational tracks; they are not prerequisites for this sequence.
 
+For a scoped named-PostgreSQL data-preservation check, build and publish the
+[`examples/web-postgres`](../../../examples/web-postgres) image, then use its
+immutable digest. On the platform host, with a protected `0600` JSON operator
+session (`access_token`, `refresh_token`, `client_id`), run:
+
+```bash
+python3 scripts/data_preservation.py plan --run-id 0123456789ab \
+  --fixture-image REGISTRY/web-postgres@sha256:DIGEST
+python3 scripts/data_preservation.py run --run-id 0123456789ab \
+  --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
+  --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
+  --operator-token-file /path/to/protected-operator-session.json
+```
+
+Use a fresh 12-character lowercase hex run ID each time and substitute a real
+64-character digest. The check creates one `dp-<run-id>` project and its own
+named `state` database, then reads the app's database-backed visit count after
+deploy, redeploy, restart and rollback. The private report is written under
+`.runtime/data-preservation/<run-id>/report.json`. The project is retired after
+the check; its database is retained and requires separately verified backup
+coverage before an explicit purge. If cleanup is incomplete, inspect the report
+and project state before retrying retirement. This check has not yet been run
+against an installed environment.
+
 ## 1. Deploy the platform
 
 Prepare DNS, an Ubuntu 22.04+ host, SSH access, Python 3, systemd, and the capacity described in the repository README. From a trusted controller:

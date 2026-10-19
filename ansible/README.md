@@ -329,10 +329,11 @@ production allow-list merely to pass the drill.
 The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally disrupt shared services and
 must not run in routine CI. The rollback-data helper still derives an implicit `project_<name>` database
 and must be adapted before it can test fresh named-store projects. The legacy
-`scripts/isolation.py`, `data_preservation.py`, and `interrupted_provisioning.py`
-also require the old `database` Secret/model. Their historical passes do not
-validate the current binding contract. The human-access harness now uses named
-resources and expiring credentials; its full live rerun remains separate from the
+`scripts/isolation.py` and `interrupted_provisioning.py` still require the old
+`database` Secret/model. `scripts/data_preservation.py` now uses a run-scoped
+named PostgreSQL resource and the web/PostgreSQL fixture, but awaits a live run.
+The historical passes do not validate the current binding contract. The
+human-access harness now uses named resources and expiring credentials; its full live rerun remains separate from the
 older implicit-database evidence. Egress alters only a disposable workload but depends on operator policy
 and an external listener. Keep these drills in an explicitly approved protected pipeline
 rather than pull-request CI.

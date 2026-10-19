@@ -105,3 +105,10 @@ records the state at the dated review baseline.
 AI history and detail reads now mark runs still `running` after ten minutes as
 failed, with a safe interruption result. Process-kill and deployed readback remain
 unverified; this source change does not resume model work.
+
+The legacy data-preservation helper has since been replaced with a run-scoped
+named-PostgreSQL fixture check covering a write, redeploy, restart, and rollback.
+It requires a digest-pinned `examples/web-postgres` image and protected operator
+session, and retires its project while retaining the independent database. Its
+offline contract checks pass; a live run remains outstanding. The other four
+legacy helpers in the finding above still need adaptation or replacement.
