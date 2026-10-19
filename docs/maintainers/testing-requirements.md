@@ -155,9 +155,12 @@ runs static checks, component tests, and Playwright against local Vite with API
 fixtures. Separate workflows exercise disposable named-store and telemetry
 dependencies. These are useful checks and should remain in CI.
 
-The immediate CI gaps are a fixture-backed UI browser journey for the core
-project lifecycle and broader CLI command-family behavior checks. The immediate
-deployed-test gap is an API acceptance runner with a documented minimal setup,
+The portal now has a fixture-backed browser journey for project creation, two
+deployments, rollback, retirement, and denied creation. It verifies UI request
+shape and state transitions, but cannot establish installed API, identity,
+Kubernetes, or routing behavior. The remaining immediate CI gap is broader CLI
+command-family behavior checks. The immediate deployed-test gap is an API
+acceptance runner with a documented minimal setup,
 followed by CLI and UI stages on the same installation. Existing live playbooks
 and harnesses provide parts of that runner, but CI currently syntax-checks
 rather than executes most platform acceptance playbooks. A passing CI run does

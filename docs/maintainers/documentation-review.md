@@ -126,3 +126,8 @@ resource UUID. It checks ownership and backup timing, and records that no bindin
 or application reconnection was tested. The automated recovery playbook and its
 legacy `check` path still use the implicit database, and live named-store restore
 and application acceptance remain open.
+
+Subsequent source update: a fixture-backed Playwright journey now covers portal
+project creation, deployment, rollback, retirement, and an API-denied create.
+This closes that narrow browser CI gap; it does not replace the proposed
+installed API/CLI/UI runner or resolve its ADR-010 environment decision.
