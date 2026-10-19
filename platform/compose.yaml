@@ -1,4 +1,26 @@
 services:
+  host-capacity:
+    build: .
+    restart: unless-stopped
+    user: "0:0"
+    command: ["python", "-m", "app.host_capacity"]
+    network_mode: none
+    environment:
+      CAPACITY_HOST_SNAPSHOT: /var/lib/platform-capacity/host.json
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - host_capacity:/var/lib/platform-capacity
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "python", "-c", "import json,time; assert time.time()-json.load(open('/var/lib/platform-capacity/host.json'))['captured_at']<60"]
+      interval: 15s
+      timeout: 3s
+      retries: 3
   telemetry-gateway:
     build: .
     restart: unless-stopped
@@ -98,17 +120,24 @@ services:
       CAPACITY_ADMISSION_ENABLED: ${CAPACITY_ADMISSION_ENABLED:-false}
       CAPACITY_RESERVE_CPU_MILLICORES: ${CAPACITY_RESERVE_CPU_MILLICORES:-2000}
       CAPACITY_RESERVE_MEMORY_MIB: ${CAPACITY_RESERVE_MEMORY_MIB:-8192}
+      CAPACITY_HOST_SNAPSHOT: /run/capacity/host.json
+      CAPACITY_HOST_OVERHEAD_CPU_MILLICORES: ${CAPACITY_HOST_OVERHEAD_CPU_MILLICORES:-2000}
+      CAPACITY_HOST_OVERHEAD_MEMORY_MIB: ${CAPACITY_HOST_OVERHEAD_MEMORY_MIB:-1024}
+      CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB: ${CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB:-4096}
       KUBECONFIG: /run/platform/kubeconfig
     volumes:
       - monitoring_discovery:/var/lib/platform-monitoring
       - ../.runtime/controller.kubeconfig:/run/platform/kubeconfig:ro
       - ../.runtime/stores/public:/run/stores:ro
+      - host_capacity:/run/capacity:ro
     networks:
       platform:
         ipv4_address: ${PLATFORM_API_IP:-172.30.80.11}
       search-consoles:
         ipv4_address: ${STORE_SEARCH_API_IP:-172.30.81.2}
     depends_on:
+      host-capacity:
+        condition: service_started
       postgres:
         condition: service_healthy
       keycloak-realm-init:

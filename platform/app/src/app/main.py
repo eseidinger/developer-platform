@@ -1205,7 +1205,7 @@ def provision(name: str, body: Union[ApplicationEnvelopeV1Alpha2, ApplicationEnv
     if capacity["state"] == "rejected":
         required_audit(actor, "project.provision", "project", name, "rejected", {"project": name},
                        {"reason": "insufficient_reserved_capacity"})
-        raise HTTPException(422, "Requested rollout exceeds remaining reserved cluster capacity")
+        raise HTTPException(422, "Requested rollout exceeds remaining host or Kubernetes capacity")
     try:
         with connect() as conn:
             operation_id, operation_state, revision = queue_deploy(

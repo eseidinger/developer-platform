@@ -112,13 +112,37 @@ interpreted as zero usage. The deployed `ansible/test-platform.yml` drill
 exercises this endpoint and requires at least one node with capacity,
 allocatable values, and a metrics sample.
 
-The platform-admin response also contains `admission`. When request admission is enabled,
-it reports aggregate `allocatable`, active-pod `requested`, configured `reserve`, and computed
-`available` values using explicit `cpu_millicores` and `memory_mib` units. This is the exact
-request accounting used for admission, not live utilization. Disabled, invalid-policy, and
-Kubernetes-query states are explicit and never imply free capacity.
+### Capacity accounting
 
-This endpoint is deliberately not a host-capacity or storage guarantee. Before
+The platform-admin response also contains `admission`. When enabled, `host` shows
+physical capacity, minimum infrastructure reserve, shared-container allocations,
+overhead allowances and remaining host budget. `kubernetes` shows raw reported
+allocatable values, allocatable values capped by the host and Docker node limits,
+runtime overhead, active Pod requests and remaining scheduler budget. CPU exposed
+by multiple k3d nodes on one host is counted only once. Units are explicit
+`cpu_millicores` and `memory_mib`.
+
+Host infrastructure allocation is the larger of the configured minimum reserve
+and the sum of shared-container limits, host overhead and node-runtime memory
+overhead. The minimum reserve is not subtracted again from the Kubernetes pool.
+Each resource's final `available` is the smaller host/Kubernetes remainder, and
+`limiting` identifies that constraint. Compatibility fields `allocatable`,
+`requested`, `reserve` and `available` retain their arithmetic relationship;
+`reserve` now means the effective deduction, rather than just the configured floor.
+
+The collector includes allocated shared services, retained/stopped Neo4j instances,
+and other running containers. Missing memory limits prevent a usable snapshot.
+Services without CPU caps are listed in `cpu_unbounded_services`; the configured
+host CPU overhead is their budget alongside OS, node-process and transient work.
+This is a budget, not an enforcement of CPU limits on those services.
+
+The 4 GiB initial node-runtime memory allowance covers the roughly 3.7 GiB observed
+outside Pods on the current lab; it is not peak-load evidence. The 1 GiB host-memory
+and 2 CPU overhead defaults also require calibration for the selected profile.
+The host snapshot refreshes every 15 seconds and expires after 60 seconds. Missing,
+failed, stale or topology-mismatched collection fails enabled admission closed.
+The snapshot and request guard do not reserve queued operations atomically, replace
+per-node Kubernetes scheduling, or establish a storage/peak-load guarantee. Before
 raising project quotas or making a capacity promise, perform a protected,
 recorded manual load exercise: collect host CPU/memory/disk, Docker shared
 service usage, `kubectl top nodes` and project usage during representative load;
@@ -127,11 +151,25 @@ requested resources exceed the agreed reserve. Confirm alert delivery for the
 chosen threshold at the same time. Do not run that exercise against production
 data without an approved load plan and rollback conditions.
 
+Lab verification on October 19, 2026 applied only the capacity modules, collector
+configuration and capacity rejection message to the installed API. The API and
+collector passed health checks, API readiness passed, and the authenticated
+operator endpoint reported admission `state: ok`. Physical CPU was capped at
+16,000m despite the three nodes reporting 48,000m in total. Existing node memory
+limits remained 2/4/4 GiB. At that sample, active requests were 1,475m/1,708 MiB;
+remaining admission budget was 275m CPU (host limited) and 4,436 MiB memory
+(Kubernetes limited). These are changing request budgets, not a load-tested
+capacity promise. The private host record and original files are retained under
+`/opt/developer-platform/.runtime/capacity-update-f5fd8282145b/`; `report.json`
+records the base image, patch image, source hashes and application time. This was
+a scoped patch, not a full deployment of the current repository revision.
+
 After that measurement, an operator may enable conservative request admission with
 `CAPACITY_ADMISSION_ENABLED=true`, `CAPACITY_RESERVE_CPU_MILLICORES`, and
-`CAPACITY_RESERVE_MEMORY_MIB` in `.env`. The API then lists Kubernetes Nodes and active Pods,
-subtracts the explicit reserve and current pod requests from allocatable capacity, and rejects a rollout whose
-requested resources do not fit. It fails closed with `503` if Kubernetes capacity cannot be read. Keep it disabled
+`CAPACITY_RESERVE_MEMORY_MIB` in `.env`, together with the host and node overhead
+budgets listed in the [inventory reference](../../../ansible/README.md). The API
+rejects a rollout whose requested resources do not fit both budgets. It fails
+closed with `503` if host or Kubernetes capacity cannot be read. Keep it disabled
 until the reserve is measured; it is a request-based admission guard, not a live-usage or storage guarantee. On a
 protected lab, verify one intentionally oversized disposable rollout is rejected with `422`, then confirm a
 within-reserve rollout proceeds and remove the disposable workload.

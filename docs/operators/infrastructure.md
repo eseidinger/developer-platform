@@ -99,7 +99,13 @@ policy convergence. New pods can briefly have egress before kube-router rules ap
 
 ## Metrics and capacity
 
-`kube-state-metrics` runs in `platform-system` with list/watch access to nodes, namespaces, pods, and workload controllers. Prometheus reaches it through NodePort 30090 on the k3d server. The Platform API reads core Node allocatable values and active Pod requests for aggregate admission, plus pod and node metrics for observed usage. The audited `/operator/capacity` view exposes both views with explicit unavailable states rather than treating missing provider data as zero. Admission is opt-in and its enablement and CPU/memory reserves are managed by the deployment inventory.
+`kube-state-metrics` runs in `platform-system` with list/watch access to nodes, namespaces, pods, and workload controllers. Prometheus reaches it through NodePort 30090 on the k3d server. The Platform API combines Node allocatable values and active Pod requests with a fresh host resource snapshot for admission. Physical host CPU is counted once; node memory is bounded by Docker container limits. The audited `/operator/capacity` view exposes host and Kubernetes budgets, limiting constraints, and observed node metrics, with explicit unavailable states. Admission is opt-in and its budgets are managed by the deployment inventory; see the [capacity accounting procedure](runbooks/platform.md#capacity-accounting).
+
+The `host-capacity` collector is trusted operator infrastructure with Docker socket
+authority. It has no network, uses only GET requests, and writes resource allocations
+to a shared volume every 15 seconds. The API mounts that volume read-only and does
+not receive the Docker socket. Container environment values and credentials are
+excluded from the snapshot. Missing/stale snapshots block enabled admission.
 
 ## Persistence and failure domain
 
@@ -112,5 +118,5 @@ All local components share one host failure domain: Docker, k3d, edge, PostgreSQ
 - No high availability or multi-host control plane.
 - No hostile-tenant isolation claim.
 - Kubernetes API, Docker socket, PostgreSQL, and monitoring backends are not public interfaces.
-- Aggregate admission accounts for Kubernetes requests, not host processes, shared Compose services, storage, or transient runtime usage; those measurements and capacity alerts remain operational work.
+- Aggregate admission combines Kubernetes requests, shared-container limits, and explicit host/runtime allowances. It does not guarantee per-node fit, storage capacity, or peak-load headroom; calibrating allowances and checking capacity alerts remain operational work.
 - Pod-log retention is kubelet best effort, not a platform retention guarantee.

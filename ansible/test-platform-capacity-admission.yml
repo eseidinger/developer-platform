@@ -272,7 +272,7 @@
           register: rejected_capacity
           failed_when: >-
             rejected_capacity.status != 422 or
-            rejected_capacity.json.detail != 'Requested rollout exceeds remaining reserved cluster capacity'
+            rejected_capacity.json.detail != 'Requested rollout exceeds remaining host or Kubernetes capacity'
           no_log: true
 
         - name: Remove the temporary capacity reservation

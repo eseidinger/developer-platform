@@ -76,9 +76,12 @@ Useful inventory overrides:
 | `platform_image_registries` | `docker.io,ghcr.io,quay.io` | Comma-separated registries the API may resolve image tags from |
 | `platform_drift_scan_interval_seconds` | `300` | Seconds between background drift scans |
 | `platform_revision_retention` | `25` | Revisions kept per project; older ones and their finished operations are pruned |
-| `platform_capacity_admission_enabled` | `false` | Enable fail-closed aggregate Kubernetes request admission after measuring the host and choosing reserves |
-| `platform_capacity_reserve_cpu_millicores` | `2000` | CPU excluded from workload admission accounting for the platform and operating margin |
-| `platform_capacity_reserve_memory_mib` | `8192` | Memory excluded from workload admission accounting for the platform and operating margin |
+| `platform_capacity_admission_enabled` | `false` | Enable fail-closed host and Kubernetes request admission after reviewing combined allocations |
+| `platform_capacity_reserve_cpu_millicores` | `2000` | Minimum host infrastructure CPU allocation; not an additional deduction from Kubernetes capacity |
+| `platform_capacity_reserve_memory_mib` | `8192` | Minimum host infrastructure memory allocation; charged once |
+| `platform_capacity_host_overhead_cpu_millicores` | `2000` | CPU allowance for OS, node processes, uncapped shared services and transient/recovery work, in addition to capped shared-service CPU allocations |
+| `platform_capacity_host_overhead_memory_mib` | `1024` | Host OS/transient memory allowance in addition to shared container limits and node runtime overhead; calibrate under representative load |
+| `platform_capacity_kubernetes_overhead_memory_mib` | `4096` | Memory allowance for k3s/containerd/node processes; system Pod requests are counted separately; calibrate under representative load |
 | `platform_allowed_egress_cidrs` | empty | Comma-separated external CIDRs that components may request; empty denies external component egress |
 | `platform_allowed_egress_ports` | empty | Comma-separated TCP ports that components may request; empty denies external component egress |
 
@@ -317,9 +320,10 @@ removes the reservation, and then proves the same-sized real workload is admitte
 It preserves the exact host `.env`, temporarily enables admission with a valid zero reserve,
 recreates only `platform-api`, and restores the original `.env` and API container in an
 `always` block. The reservation namespace is also always removed.
-Normal deployments manage the admission enablement and reserves through the three
+Normal deployments manage admission enablement and budgets through the
 `platform_capacity_*` inventory variables above. The drill deliberately overrides
-them only for its duration and restores the exact pre-drill environment afterward.
+the minimum reserve only for its duration; shared-service allocations and overhead
+allowances still apply. It restores the exact pre-drill environment afterward.
 The egress drill defaults to [Cloudflare's public DNS-over-TLS listener](https://developers.cloudflare.com/1.1.1.1/encryption/dns-over-tls/)
 at `1.1.1.1:853`. It replaces the two Platform API allow-list variables and temporarily
 disables capacity admission only for the drill, recreates only `platform-api`, and restores

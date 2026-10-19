@@ -21,6 +21,7 @@ networks:
       config:
         - subnet: ${PLATFORM_SUBNET:-172.30.80.0/24}
 volumes:
+  host_capacity:
   rustfs_data:
   qdrant_data:
   opensearch_data:
