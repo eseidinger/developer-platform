@@ -61,7 +61,7 @@ These playbooks require only **P** for their executable assertions.
 | Failure signals | [`test-platform-failure-signals.yml`](../../../ansible/test-platform-failure-signals.yml) | Exercise application, ingress, proxy, and Prometheus failure/recovery state |
 | Identity failure | [`test-platform-identity-provider-outage.yml`](../../../ansible/test-platform-identity-provider-outage.yml) | Prove local revocation fails closed during a controlled Keycloak outage |
 | Database failure | [`test-platform-postgres-outage.yml`](../../../ansible/test-platform-postgres-outage.yml) | Exercise managed PostgreSQL failure, recovery requests, and restored readiness |
-| Data-aware rollback | [`test-platform-rollback-data.yml`](../../../ansible/test-platform-rollback-data.yml) | Historical implicit-database helper; adapt resource/binding setup before current execution |
+| Data-aware rollback | [`test-platform-rollback-data.yml`](../../../ansible/test-platform-rollback-data.yml) | Named PostgreSQL resource/binding, bound-workload visit persistence, and current-secret checks; live rerun pending |
 
 `deploy.yml` refuses to overlap active backup or availability drills. That is a
 safety interlock, not a requirement to install **B**, **H**, or **W**.

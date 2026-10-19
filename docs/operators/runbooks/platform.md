@@ -160,15 +160,16 @@ memory and restored byte-for-byte before cleanup continues.
 
 ## Run the remaining automated Phase 2C drills
 
-The historical data-aware rollback drill assumes an automatically provisioned
-`project_<name>` database. It has not been adapted to named resources and fails
-its marker step on a fresh current project. The following identifies the existing
-helper for maintenance; it is not current executable named-store acceptance:
+The data-aware rollback drill now uses a named PostgreSQL resource and the
+digest-pinned `examples/web-postgres` workload. It verifies a database-backed
+visit survives application rollback and the current secret remains injected.
+Its source checks pass; a live run is still required:
 
 ```bash
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
-  -e platform_rollback_drill_host=platform
+  -e platform_rollback_drill_host=platform \
+  -e platform_rollback_drill_image=REGISTRY/web-postgres@sha256:DIGEST
 ```
 
 The egress drill supplies a temporary default target of

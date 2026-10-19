@@ -115,4 +115,7 @@ longer covers the historical implicit database creation step. That outage drill
 requires an otherwise idle k3d lab, disabled capacity admission and exact outage
 confirmation, and attempts host restoration in all normal error paths. All three
 have passing offline contract checks but still need live runs. The rollback-data
-playbook and generic recovery helper remain on the old implicit-database model.
+playbook now provisions a named PostgreSQL resource and binding, checks persistence
+through the bound web fixture after rollback, and checks the current secret.
+Its syntax and offline declaration checks pass; a live rerun remains open. The
+generic recovery helper remains on the old implicit-database model.

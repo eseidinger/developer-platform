@@ -266,10 +266,11 @@ They consume the protected test-runner file; no reusable human or project token 
 accepted:
 
 ```bash
-# Historical helper: requires adaptation to explicit named-store bindings.
+# Named-store rollback check; supply a published digest-pinned web/PostgreSQL image.
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
-  -e platform_rollback_drill_host=platform
+  -e platform_rollback_drill_host=platform \
+  -e platform_rollback_drill_image=REGISTRY/web-postgres@sha256:DIGEST
 
 # Temporarily enable and exercise reserved-capacity admission, then restore policy.
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-capacity-admission.yml \
@@ -327,8 +328,9 @@ that endpoint is not reachable from workload pods. Never retain or broaden a nor
 production allow-list merely to pass the drill.
 
 The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally disrupt shared services and
-must not run in routine CI. The rollback-data helper still derives an implicit `project_<name>` database
-and must be adapted before it can test fresh named-store projects.
+must not run in routine CI. The rollback-data helper now creates a named
+PostgreSQL resource and checks persistence through its bound workload; a live
+rerun is still required.
 `scripts/isolation.py`, `scripts/data_preservation.py`, and
 `scripts/interrupted_provisioning.py` now use run-scoped named PostgreSQL
 resources and the web/PostgreSQL fixture, but await live runs. The interruption

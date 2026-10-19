@@ -1,10 +1,9 @@
 ---
-- name: Prove application rollback retains database data and the current secret version
+- name: Prove application rollback retains named-store data and the current secret version
   hosts: localhost
   gather_facts: false
   vars:
     platform_rollback_drill_install_dir: /opt/developer-platform
-    platform_rollback_drill_image: hashicorp/http-echo:1.0.0
   tasks:
     - name: Require protected runner configuration and a platform inventory host
       ansible.builtin.assert:
@@ -16,27 +15,23 @@
           - platform_rollback_drill_host is defined
           - platform_rollback_drill_host in groups['all']
           - platform_rollback_drill_install_dir | length > 1
+          - platform_rollback_drill_image is defined
+          - platform_rollback_drill_image is match('^[A-Za-z0-9][A-Za-z0-9._:/-]+@sha256:[0-9a-f]{64}$')
         fail_msg: >-
-          Supply the protected runner configuration and platform_rollback_drill_host from the
-          normal platform inventory. The host is used only for a bounded SQL marker check.
+          Supply the protected runner configuration, a digest-pinned
+          examples/web-postgres image and platform_rollback_drill_host from the
+          normal platform inventory. The host runs bounded workload checks.
       no_log: true
 
     - name: Establish unique disposable rollback inputs
       ansible.builtin.set_fact:
         rollback_run_id: "{{ lookup('pipe', 'date +%s') }}-{{ 99999 | random }}"
-        rollback_project: "{{ platform_rollback_project | default('rollback-' + lookup('pipe', 'date +%s') + '-' + (9999 | random | string)) }}"
-
-    - name: Derive bounded database and marker names
-      ansible.builtin.set_fact:
-        rollback_database: "project_{{ rollback_project | replace('-', '_') }}"
-        rollback_marker: "marker-{{ rollback_run_id }}"
+        rollback_project: "rollback-{{ lookup('pipe', 'date +%s') }}-{{ 9999 | random }}"
 
     - name: Require safe generated rollback identifiers
       ansible.builtin.assert:
         that:
           - rollback_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
-          - rollback_database is match('^[a-z0-9_]+$')
-          - rollback_marker is match('^[a-z0-9-]+$')
 
     - name: Exchange the runner credential
       ansible.builtin.uri:
@@ -68,17 +63,89 @@
             status_code: 201
           no_log: true
 
+        - name: Record confirmed ownership of the disposable project
+          ansible.builtin.set_fact:
+            rollback_project_created: true
+
+        - name: Create a named PostgreSQL resource for the rollback project
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/v1/projects/{{ rollback_project }}/resources"
+            method: POST
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body: {name: state, provider: postgresql}
+            status_code: 202
+          register: rollback_resource_request
+          no_log: true
+
+        - name: Wait for the named PostgreSQL resource
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/v1/resources/{{ rollback_resource_request.json.resource_id }}"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_resource_ready
+          until: rollback_resource_ready.json.observed_state | default('') == 'active'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Bind the named resource to the web component
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/v1/projects/{{ rollback_project }}/resource-bindings"
+            method: POST
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            body_format: json
+            body:
+              resource_id: "{{ rollback_resource_request.json.resource_id }}"
+              component: web
+              mode: read-write
+            status_code: 202
+          register: rollback_binding_request
+          no_log: true
+
+        - name: Wait for the web component binding
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/v1/projects/{{ rollback_project }}/resource-bindings"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_binding_ready
+          until: >-
+            rollback_binding_ready.json.bindings |
+            selectattr('grant_id', 'equalto', rollback_binding_request.json.grant_id) |
+            selectattr('observed_state', 'equalto', 'active') | list | length == 1
+          retries: 60
+          delay: 5
+          no_log: true
+
         - name: Deploy the first application revision
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ rollback_project }}"
             method: PUT
-            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            headers:
+              Authorization: "Bearer {{ rollback_access_token }}"
+              If-Match: '"0"'
             body_format: json
             body:
-              name: "{{ rollback_project }}"
-              image: "{{ platform_rollback_drill_image }}"
-              port: 5678
-              probe_profile: hello-world
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata: {name: "{{ rollback_project }}", project: "{{ rollback_project }}"}
+              spec:
+                components:
+                  - name: web
+                    type: service
+                    runtime: {type: container, image: "{{ platform_rollback_drill_image }}"}
+                    ports: [{name: http, protocol: http, port: 8080}]
+                    replicas: 1
+                    exposure: private
+                    bindings:
+                      - bindingId: "{{ rollback_binding_request.json.grant_id }}"
+                        envPrefix: ''
+                    health: {readiness: {path: /health/ready}}
+                    resources:
+                      requests: {cpu: 100m, memory: 128Mi}
+                      limits: {cpu: 500m, memory: 256Mi}
+                configuration:
+                  values: {DEMO_FAIL_READY: 'false', ACCEPTANCE_RUN_ID: "{{ rollback_run_id }}"}
             status_code: 202
           register: rollback_first_deployment
           no_log: true
@@ -96,31 +163,29 @@
           delay: 5
           no_log: true
 
-        - name: Insert a unique marker into the managed project database
+        - name: Write the first database-backed visit through the bound workload
           ansible.builtin.command:
             argv:
-              - docker
-              - compose
+              - "{{ platform_rollback_drill_install_dir }}/.runtime/bin/kubectl"
+              - --kubeconfig
+              - "{{ platform_rollback_drill_install_dir }}/.runtime/admin.kubeconfig"
+              - -n
+              - "project-{{ rollback_project }}"
               - exec
-              - -T
-              - postgres
-              - psql
-              - -v
-              - ON_ERROR_STOP=1
-              - -U
-              - postgres
-              - -d
-              - "{{ rollback_database }}"
+              - deployment/web
+              - --
+              - python
               - -c
               - >-
-                CREATE TABLE IF NOT EXISTS platform_rollback_probe
-                (marker text PRIMARY KEY);
-                INSERT INTO platform_rollback_probe(marker)
-                VALUES ('{{ rollback_marker }}') ON CONFLICT DO NOTHING;
+                import json,urllib.request;
+                print(json.load(urllib.request.urlopen('http://127.0.0.1:8080/api/visits',timeout=10))['visits'])
             chdir: "{{ platform_rollback_drill_install_dir }}"
           delegate_to: "{{ platform_rollback_drill_host }}"
           become: true
-          changed_when: true
+          register: rollback_initial_visit
+          changed_when: false
+          failed_when: >-
+            rollback_initial_visit.rc != 0 or rollback_initial_visit.stdout | trim != '1'
           no_log: true
 
         - name: Create the first write-only secret version
@@ -204,21 +269,31 @@
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ rollback_project }}"
             method: PUT
-            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            headers:
+              Authorization: "Bearer {{ rollback_access_token }}"
+              If-Match: '"{{ rollback_first_deployment.json.revision }}"'
             body_format: json
             body:
               apiVersion: platform.example/v1alpha2
               kind: Application
-              metadata: {name: "{{ rollback_project }}"}
+              metadata: {name: "{{ rollback_project }}", project: "{{ rollback_project }}"}
               spec:
                 components:
-                  - name: api
+                  - name: web
                     type: service
-                    runtime:
-                      type: container
-                      image: "{{ platform_rollback_drill_image }}"
-                      args: ['-listen=:5678', '-text=rollback-second-revision']
-                    ports: [{name: http, protocol: http, port: 5678}]
+                    runtime: {type: container, image: "{{ platform_rollback_drill_image }}"}
+                    ports: [{name: http, protocol: http, port: 8080}]
+                    replicas: 1
+                    exposure: private
+                    bindings:
+                      - bindingId: "{{ rollback_binding_request.json.grant_id }}"
+                        envPrefix: ''
+                    health: {readiness: {path: /health/ready}}
+                    resources:
+                      requests: {cpu: 100m, memory: 128Mi}
+                      limits: {cpu: 600m, memory: 256Mi}
+                configuration:
+                  values: {DEMO_FAIL_READY: 'false', ACCEPTANCE_RUN_ID: "{{ rollback_run_id }}"}
             status_code: 202
           register: rollback_second_deployment
           no_log: true
@@ -240,9 +315,11 @@
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ rollback_project }}/rollback"
             method: POST
-            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            headers:
+              Authorization: "Bearer {{ rollback_access_token }}"
+              If-Match: '"{{ rollback_second_deployment.json.revision }}"'
             body_format: json
-            body: {revision: 1}
+            body: {revision: "{{ rollback_first_deployment.json.revision }}"}
             status_code: 202
           register: rollback_request
           no_log: true
@@ -260,27 +337,52 @@
           delay: 5
           no_log: true
 
-        - name: Require the database marker to survive application rollback
+        - name: Require the named database visit to survive application rollback
           ansible.builtin.command:
             argv:
-              - docker
-              - compose
+              - "{{ platform_rollback_drill_install_dir }}/.runtime/bin/kubectl"
+              - --kubeconfig
+              - "{{ platform_rollback_drill_install_dir }}/.runtime/admin.kubeconfig"
+              - -n
+              - "project-{{ rollback_project }}"
               - exec
-              - -T
-              - postgres
-              - psql
-              - -U
-              - postgres
-              - -d
-              - "{{ rollback_database }}"
-              - -Atc
-              - "SELECT count(*) FROM platform_rollback_probe WHERE marker='{{ rollback_marker }}';"
+              - deployment/web
+              - --
+              - python
+              - -c
+              - >-
+                import json,urllib.request;
+                print(json.load(urllib.request.urlopen('http://127.0.0.1:8080/api/visits',timeout=10))['visits'])
             chdir: "{{ platform_rollback_drill_install_dir }}"
           delegate_to: "{{ platform_rollback_drill_host }}"
           become: true
-          register: rollback_marker_check
+          register: rollback_visit_after
           changed_when: false
-          failed_when: rollback_marker_check.stdout | trim != '1'
+          failed_when: >-
+            rollback_visit_after.rc != 0 or rollback_visit_after.stdout | trim != '2'
+          no_log: true
+
+        - name: Verify the current secret is injected after rollback without disclosing it
+          ansible.builtin.command:
+            argv:
+              - "{{ platform_rollback_drill_install_dir }}/.runtime/bin/kubectl"
+              - --kubeconfig
+              - "{{ platform_rollback_drill_install_dir }}/.runtime/admin.kubeconfig"
+              - -n
+              - "project-{{ rollback_project }}"
+              - exec
+              - deployment/web
+              - --
+              - python
+              - -c
+              - >-
+                import os,sys;
+                sys.exit(0 if os.environ.get('ROLLBACK_PROBE') ==
+                'current-' + os.environ.get('ACCEPTANCE_RUN_ID','') else 1)
+            chdir: "{{ platform_rollback_drill_install_dir }}"
+          delegate_to: "{{ platform_rollback_drill_host }}"
+          become: true
+          changed_when: false
           no_log: true
 
         - name: Require rollback to retain the current secret metadata without disclosure
@@ -297,16 +399,36 @@
             rollback_secret_after.json | to_json is search('first-' + rollback_run_id + '|current-' + rollback_run_id)
           no_log: true
 
-        - name: Require revision metadata to disclose retained dependency semantics
+        - name: Require revision metadata to disclose current secret semantics
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ rollback_project }}/revisions"
             headers: {Authorization: "Bearer {{ rollback_access_token }}"}
             status_code: 200
           register: rollback_revisions
           failed_when: >-
-            rollback_revisions.json.current_revision | int != 3 or
-            rollback_revisions.json.revisions[0].dependencies.database.state != 'retained' or
+            rollback_revisions.json.current_revision | int != rollback_request.json.revision | int or
             rollback_revisions.json.revisions[0].dependencies.application_secrets.state != 'current_only'
+          no_log: true
+
+        - name: Require the named resource to remain active after rollback
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/v1/resources/{{ rollback_resource_request.json.resource_id }}"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_resource_after
+          failed_when: rollback_resource_after.json.observed_state | default('') != 'active'
+          no_log: true
+
+        - name: Require the same binding to remain active after rollback
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/v1/projects/{{ rollback_project }}/resource-bindings"
+            headers: {Authorization: "Bearer {{ rollback_access_token }}"}
+            status_code: 200
+          register: rollback_binding_after
+          failed_when: >-
+            rollback_binding_after.json.bindings |
+            selectattr('grant_id', 'equalto', rollback_binding_request.json.grant_id) |
+            selectattr('observed_state', 'equalto', 'active') | list | length != 1
           no_log: true
       always:
         - name: Refresh the runner token before rollback-project cleanup
@@ -335,7 +457,9 @@
             status_code: [200, 404]
           register: rollback_cleanup_preview
           failed_when: false
-          when: rollback_cleanup_token | length > 0
+          when:
+            - rollback_cleanup_token | length > 0
+            - rollback_project_created | default(false)
           no_log: true
 
         - name: Retire the disposable rollback project
@@ -355,6 +479,7 @@
           failed_when: false
           when:
             - rollback_cleanup_token | length > 0
+            - rollback_project_created | default(false)
             - rollback_cleanup_preview.status | default(0) | int == 200
           no_log: true
 
@@ -362,4 +487,4 @@
       ansible.builtin.debug:
         msg: >-
           PASS: {{ rollback_project }} restored application revision one while retaining the
-          database marker and active secret version 2 without disclosing either secret value.
+          named database visit count and active secret version 2 without disclosing its value.
