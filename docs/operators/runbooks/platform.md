@@ -24,12 +24,13 @@ kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 
 `ansible/test-platform-postgres-outage.yml` is a self-contained protected-lab drill. It creates a disposable project,
 developer persona, and legacy unbound `http-echo` workload; stops only the Compose PostgreSQL service; requires the
-safe authenticated outage response (`503` while authorization cannot reach PostgreSQL, or `DatabaseUnavailable` when
-the endpoint can report it) and a failed Platform API readiness check; restores PostgreSQL in an `always` block; then
+safe authenticated `503` response and a failed Platform API readiness check;
+restores PostgreSQL in an `always` block; then
 requires recovered readiness and a redacted resolved recovery request. Its outer cleanup retires
 the disposable project and revokes the persona. It does not prove application-specific writes because `http-echo`
-does not issue SQL. Its `data-services` assertions use the legacy implicit-database
-view; passing them does not establish named-resource or application data recovery.
+does not issue SQL. Its `data-services` assertions verify the recovery-request
+outcome and absence of an implicit database; passing them does not establish
+named-resource or application data recovery.
 
 ```bash
 ansible-playbook -i ansible/inventory.yml ansible/test-platform-postgres-outage.yml \
@@ -256,15 +257,16 @@ Inspect host disk/memory, Docker logs, and node status before changing resources
 Inspect current resources with `devplat stores list --project NAME` and
 `devplat stores get RESOURCE_UUID`, including observed state, usage freshness and
 provider error codes. Inspect the component's explicit binding and active
-credential generation before checking its relay connection. The older
-`GET /projects/{name}/data-services` view still reports the implicit
-`project_<name>` database and can report `DatabaseUnavailable` for a healthy
-named resource; it is not authoritative for current store health.
+credential generation before checking its relay connection.
+`GET /projects/{name}/data-services` summarizes visible named resources,
+component bindings and whether a current binding credential is active. An empty
+project has no reported data services. Check provider-specific native connectivity
+and an application write/read before declaring data recovery.
 The bounded `POST .../data-services/recovery-requests` remains an operator-assistance
 request rather than an automatic named-resource restore.
 Platform administrators review requests through `GET /operator/data-service-recovery-requests`
 and acknowledge or resolve them with its request-specific `PATCH` endpoint. These calls report
-control-plane database presence, not application transaction integrity; use the controlled
+control-plane state, not application transaction integrity; use the controlled
 database write/read procedure below before resolving an incident.
 
 Use the readiness and service-log commands above. Inspect host disk, connection limits, locks, database permissions, and connectivity from the affected workload. A read-only connection/activity summary is:

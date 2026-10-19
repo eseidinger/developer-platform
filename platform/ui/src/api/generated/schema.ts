@@ -579,7 +579,7 @@ export interface paths {
         };
         /**
          * Data Services
-         * @description Report managed-database availability and the latest recovery outcome.
+         * @description Report named resources, component bindings and the latest recovery request.
          */
         get: operations["data_services_projects__name__data_services_get"];
         put?: never;

@@ -4,6 +4,7 @@ from uuid import uuid4
 from psycopg.types.json import Jsonb
 
 CLASSES = {"public", "internal", "confidential", "restricted"}
+STALE_RUN_MINUTES = 10  # The synchronous model loop has a 90-second budget.
 
 
 def initialize(conn):
@@ -51,9 +52,21 @@ def create_run(conn, project, principal, kind, model, base_revision=None):
 
 
 def finish_run(conn, run_id, state, result, evidence, tool_calls, estimated_cost):
-    conn.execute("""UPDATE ai_runs SET state=%s,result=%s,evidence=%s,tool_calls=%s,
+    updated = conn.execute("""UPDATE ai_runs SET state=%s,result=%s,evidence=%s,tool_calls=%s,
         estimated_cost_usd=%s,completed_at=now() WHERE run_id=%s AND state='running'""",
         (state, Jsonb(result), Jsonb(evidence), tool_calls, estimated_cost, run_id))
+    return updated.rowcount == 1
+
+
+def fail_interrupted_runs(conn, project):
+    """Close runs too old to belong to a normally executing request."""
+    conn.execute("""UPDATE ai_runs SET state='failed',completed_at=now(),
+        result=%s,evidence='[]'::jsonb,tool_calls=0,estimated_cost_usd=NULL
+        WHERE project=%s AND state='running'
+        AND created_at < now() - (%s * interval '1 minute')""",
+        (Jsonb({"summary": "Investigation interrupted", "observations": [], "hypotheses": [],
+                "gaps": ["The run did not complete within its recovery window. Start a new run to retry."],
+                "insufficient_evidence": True, "usage_complete": False}), project, STALE_RUN_MINUTES))
 
 
 def get_run(conn, project, run_id):

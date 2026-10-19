@@ -9,6 +9,7 @@ from uuid import UUID
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from app import main
+from fastapi import HTTPException
 from app.identity import Principal
 
 
@@ -20,14 +21,62 @@ class DataServiceTests(unittest.TestCase):
     principal = Principal("https://issuer.example", "person", "Person")
     timestamp = datetime(2026, 10, 5, tzinfo=timezone.utc)
 
-    def test_reports_database_availability_without_credentials(self):
+    def test_reports_named_resources_and_bindings_without_credentials(self):
         conn = Mock()
-        conn.execute.side_effect = [result((1,)), result((1,)), result(None)]
+        conn.execute.side_effect = [result((1,)),
+            Mock(fetchall=Mock(return_value=[("resource-id", "smoke", "primary", "postgresql", "active", "active", None)])),
+            Mock(fetchall=Mock(return_value=[("binding-id", "resource-id", "web", "active", "active", None, True)])),
+            result(None)]
         with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
              patch.object(main, "connect", return_value=nullcontext(conn)):
             body = main.data_services("smoke", self.principal)
-        self.assertEqual(body["services"], [{"type": "postgresql", "name": "managed", "state": "available", "reason": None}])
+        self.assertEqual(body["services"], [{"resource_id": "resource-id", "owner_project": "smoke",
+            "type": "postgresql", "name": "primary", "state": "available", "observed_state": "active", "reason": None}])
+        self.assertEqual(body["bindings"], [{"binding_id": "binding-id", "resource_id": "resource-id",
+            "component": "web", "state": "active", "observed_state": "active", "reason": None,
+            "credential_active": True}])
         self.assertIsNone(body["latest_recovery_request"])
+        self.assertFalse(any("pg_database" in call.args[0] for call in conn.execute.call_args_list))
+
+    def test_empty_project_has_no_implicit_database_or_bindings(self):
+        conn = Mock()
+        conn.execute.side_effect = [result((1,)), Mock(fetchall=Mock(return_value=[])),
+                                    Mock(fetchall=Mock(return_value=[])), result(None)]
+        with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
+             patch.object(main, "connect", return_value=nullcontext(conn)):
+            body = main.data_services("smoke", self.principal)
+        self.assertEqual(body["services"], [])
+        self.assertEqual(body["bindings"], [])
+
+    def test_provider_error_is_visible_without_exposing_internal_details(self):
+        conn = Mock()
+        conn.execute.side_effect = [result((1,)),
+            Mock(fetchall=Mock(return_value=[("resource-id", "smoke", "primary", "postgresql",
+                                             "active", "pending", "ProviderUnavailable")])),
+            Mock(fetchall=Mock(return_value=[])), result(None)]
+        with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
+             patch.object(main, "connect", return_value=nullcontext(conn)):
+            body = main.data_services("smoke", self.principal)
+        self.assertEqual(body["services"][0]["state"], "unavailable")
+        self.assertEqual(body["services"][0]["reason"], "ProviderUnavailable")
+
+    def test_observation_failure_is_not_reported_as_a_missing_store(self):
+        conn = Mock()
+        conn.execute.side_effect = [result((1,)), RuntimeError("private database detail")]
+        with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
+             patch.object(main, "connect", return_value=nullcontext(conn)):
+            with self.assertRaises(HTTPException) as raised:
+                main.data_services("smoke", self.principal)
+        self.assertEqual(raised.exception.status_code, 503)
+        self.assertNotIn("private", raised.exception.detail)
+
+    def test_denied_view_cannot_query_named_resources(self):
+        with patch.object(main, "require_permission", side_effect=HTTPException(403, "Denied")), \
+             patch.object(main, "connect") as connect:
+            with self.assertRaises(HTTPException) as raised:
+                main.data_services("smoke", self.principal)
+        self.assertEqual(raised.exception.status_code, 403)
+        connect.assert_not_called()
 
     def test_creates_bounded_recovery_request(self):
         request_id = UUID(int=1)

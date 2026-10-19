@@ -93,9 +93,10 @@ assertions are browser-only; raw provider endpoints remain private. See
 [resource lifecycle](../operators/data-stores.md) and
 [human connection instructions](database-access.md) for request bodies and provider limits.
 
-The legacy `database-access` grant/password issuance POSTs return 410. The older
-`data-services` diagnostic still inspects the implicit `project_<name>` database;
-use named resource state and binding/lease observations for current stores.
+The legacy `database-access` grant/password issuance POSTs return 410.
+`data-services` summarizes visible named resources, component bindings and
+current binding credential state. An empty project has no implicit database.
+Use the named-resource and lease endpoints for detailed observations.
 
 ## AI assistance
 
@@ -109,8 +110,9 @@ project governance does not itself set the AI policy.
 
 Runs execute synchronously within a 90-second budget and save durable results,
 evidence, usage completeness and estimated cost. A disconnected request does not
-cancel server work, and a process interruption can leave a running record.
-Inspect history before retrying an uncertain POST. Automation can read authorized
+cancel server work. History and detail reads mark records still running after ten
+minutes as failed with a safe interruption explanation; they do not retry model
+work. Inspect history before retrying an uncertain POST. Automation can read authorized
 history but cannot start human assistance or approve writes.
 
 A completed sourced incident investigation bound to the current revision can

@@ -110,7 +110,7 @@
           register: postgres_workload_deployment
           no_log: true
 
-        - name: Wait for the disposable workload and managed database
+        - name: Wait for the disposable unbound workload
           ansible.builtin.uri:
             url: "{{ platform_api_url }}{{ postgres_workload_deployment.json.status_url }}"
             headers:
@@ -124,13 +124,15 @@
           delay: 5
           no_log: true
 
-        - name: Require database availability before the outage
+        - name: Require no implicit database before the outage
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ postgres_drill_project }}/data-services"
             headers: {Authorization: "Bearer {{ postgres_developer_token.json.access_token }}"}
             status_code: 200
           register: postgres_before_outage
-          failed_when: postgres_before_outage.json.services[0].state != 'available'
+          failed_when: >-
+            postgres_before_outage.json.services | length != 0 or
+            postgres_before_outage.json.bindings | length != 0
           no_log: true
 
         - name: Create a developer-visible recovery request before the controlled outage
@@ -154,16 +156,13 @@
               become: true
               changed_when: true
 
-            - name: Wait for a safe managed-database outage response
+            - name: Wait for a safe catalog outage response
               ansible.builtin.uri:
                 url: "{{ platform_api_url }}/projects/{{ postgres_drill_project }}/data-services"
                 headers: {Authorization: "Bearer {{ postgres_developer_token.json.access_token }}"}
-                status_code: [200, 503]
+                status_code: 503
               register: postgres_during_outage
-              until: >-
-                postgres_during_outage.status == 503 or
-                (((postgres_during_outage.json | default({})).get('services', [{}])[0].get('state', ''))
-                == 'unavailable')
+              until: postgres_during_outage.status == 503
               retries: 20
               delay: 2
               no_log: true
@@ -196,13 +195,16 @@
           retries: 30
           delay: 2
 
-        - name: Require database availability after recovery
+        - name: Require recovered catalog access without an implicit database
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects/{{ postgres_drill_project }}/data-services"
             headers: {Authorization: "Bearer {{ postgres_developer_token.json.access_token }}"}
             status_code: 200
           register: postgres_after_recovery
-          until: postgres_after_recovery.json.services[0].state == 'available'
+          until: >-
+            postgres_after_recovery.status == 200 and
+            postgres_after_recovery.json.services | length == 0 and
+            postgres_after_recovery.json.bindings | length == 0
           retries: 30
           delay: 2
           no_log: true
@@ -224,7 +226,8 @@
             status_code: 200
           register: postgres_recovery_outcome
           failed_when: >-
-            postgres_recovery_outcome.json.services[0].state != 'available' or
+            postgres_recovery_outcome.json.services | length != 0 or
+            postgres_recovery_outcome.json.bindings | length != 0 or
             postgres_recovery_outcome.json.latest_recovery_request.status != 'resolved' or
             postgres_recovery_outcome.json | to_json is search('password|PGPASSWORD')
           no_log: true

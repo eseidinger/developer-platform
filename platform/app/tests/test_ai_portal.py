@@ -47,6 +47,16 @@ class PortalTests(unittest.TestCase):
             self.assertIn('ORDER BY created_at DESC', sql)
             self.assertEqual(args, ('demo', cursor, 'demo', cursor, 21))
 
+    def test_stale_run_reconciliation_is_scoped_and_keeps_new_runs_running(self):
+        conn = Mock()
+        ai_store.fail_interrupted_runs(conn, 'demo')
+        statement, params = conn.execute.call_args.args
+        self.assertIn("project=%s AND state='running'", statement)
+        self.assertIn("created_at < now()", statement)
+        self.assertIn("state='failed'", statement)
+        self.assertEqual(params[1:], ('demo', ai_store.STALE_RUN_MINUTES))
+        self.assertTrue(params[0].obj['insufficient_evidence'])
+
     def test_context_distinguishes_policy_admin_project_manager_and_automation(self):
         for scope, manager, admin in [(None, False, False), (None, True, False),
                                        (None, True, True), ({'automation': True}, True, True)]:
@@ -81,8 +91,11 @@ class PortalTests(unittest.TestCase):
         ids = [uuid4() for _ in range(3)]
         rows = [(i, 'investigate_incident', 'completed', 'model', 4, .01, 'date', 'date', 2) for i in ids]
         with patch.object(main, 'require_permission'), patch.object(main, 'connect'), \
-             patch.object(ai_store, 'history', return_value=rows):
+             patch.object(ai_store, 'history', return_value=rows), \
+             patch.object(ai_store, 'fail_interrupted_runs') as reconcile:
             result = main.list_ai_runs('demo', 2, None, HUMAN)
+        reconcile.assert_called_once()
+        self.assertEqual(reconcile.call_args.args[1], 'demo')
         self.assertEqual(result['next_cursor'], str(ids[1]))
         self.assertEqual(len(result['items']), 2)
         self.assertNotIn('result', result['items'][0])

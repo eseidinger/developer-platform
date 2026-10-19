@@ -1327,6 +1327,7 @@ def list_ai_runs(name: str, limit: int = Query(20, ge=1, le=50), before: UUID | 
                  principal: Principal = Depends(current_principal)):
     require_permission(principal, "view", name)
     with connect() as conn:
+        ai_store.fail_interrupted_runs(conn, name)
         rows = ai_store.history(conn, name, limit, before)
     items = [{"run_id": str(r[0]), "project": name, "kind": r[1], "state": r[2],
               "model": r[3], "tool_calls": r[4], "estimated_cost_usd": float(r[5]) if r[5] is not None else None,
@@ -1373,8 +1374,14 @@ def create_ai_run(name: str, body: AIRunRequest,
                    "insufficient_evidence": True, "usage_complete": False}, "evidence": [], "tool_calls": 0,
                    "estimated_cost_usd": None}
     with connect() as conn:
-        ai_store.finish_run(conn, run_id, outcome["state"], outcome["result"],
-                            outcome["evidence"], outcome["tool_calls"], outcome["estimated_cost_usd"])
+        finished = ai_store.finish_run(conn, run_id, outcome["state"], outcome["result"],
+                                       outcome["evidence"], outcome["tool_calls"], outcome["estimated_cost_usd"])
+        if not finished:
+            row = ai_store.get_run(conn, name, run_id)
+            if row is None:
+                raise HTTPException(503, "AI run state is temporarily unavailable")
+            outcome = {"state": row[2], "result": row[4], "evidence": row[5],
+                       "tool_calls": row[6], "estimated_cost_usd": float(row[7]) if row[7] is not None else None}
     audit_result = "failed" if outcome["state"] == "failed" else "succeeded"
     required_audit(actor_for(principal), "ai.run", "ai-run", str(run_id), audit_result,
                    {"project": name}, {"kind": body.kind, "state": outcome["state"],
@@ -1386,6 +1393,7 @@ def create_ai_run(name: str, body: AIRunRequest,
 def get_ai_run(name: str, run_id: UUID, principal: Principal = Depends(current_principal)):
     require_permission(principal, "view", name)
     with connect() as conn:
+        ai_store.fail_interrupted_runs(conn, name)
         row = ai_store.get_run(conn, name, run_id)
     if row is None:
         raise HTTPException(404, "Unknown project AI run")
@@ -1985,14 +1993,26 @@ def lookup_human_database_key(fingerprint: str, x_database_bastion_token: str | 
 
 @app.get("/projects/{name}/data-services")
 def data_services(name: str, principal: Principal = Depends(current_principal)):
-    """Report managed-database availability and the latest recovery outcome."""
+    """Report named resources, component bindings and the latest recovery request."""
     require_permission(principal, "view", name)
-    database = "project_" + name.replace("-", "_")
     try:
         with connect() as conn:
             if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
                 raise HTTPException(404, "Unknown project")
-            available = bool(conn.execute("SELECT 1 FROM pg_database WHERE datname=%s", (database,)).fetchone())
+            resources = conn.execute("""SELECT resource_id::text,owner_project,name,provider,state,
+                    observed_state,error_code FROM store_resources r
+                WHERE state<>'purged' AND (owner_project=%s OR EXISTS (
+                    SELECT 1 FROM store_grants g WHERE g.resource_id=r.resource_id
+                    AND g.kind='binding' AND g.consumer_project=%s AND g.state IN ('pending','active')))
+                ORDER BY owner_project,name,resource_id LIMIT 256""", (name, name)).fetchall()
+            bindings = conn.execute("""SELECT g.grant_id::text,g.resource_id::text,g.component,g.state,
+                    g.observed_state,g.error_code,EXISTS (
+                    SELECT 1 FROM store_credentials c WHERE c.grant_id=g.grant_id
+                    AND c.grant_version=g.version AND c.state='active'
+                    AND c.observed_state='active' AND c.expires_at>now())
+                FROM store_grants g WHERE g.kind='binding' AND g.consumer_project=%s
+                    AND g.state IN ('pending','active')
+                ORDER BY g.component,g.grant_id LIMIT 256""", (name,)).fetchall()
             request = conn.execute("""SELECT request_id, reason, status, requested_at, reviewed_at
                 FROM data_service_recovery_requests WHERE project=%s ORDER BY requested_at DESC LIMIT 1""",
                                    (name,)).fetchone()
@@ -2000,12 +2020,19 @@ def data_services(name: str, principal: Principal = Depends(current_principal)):
         raise
     except Exception as exc:
         log.error("Data-service observation failed project=%s error_type=%s", name, type(exc).__name__)
-        available, request = None, None
-    state = "available" if available else "unavailable"
+        raise HTTPException(503, "Data-service observation is temporarily unavailable") from None
+    services = [{"resource_id": resource_id, "owner_project": owner, "name": resource_name,
+                 "type": provider, "state": "available" if state == observed == "active"
+                 else "unavailable" if error_code else "pending" if state == "active" else state,
+                 "observed_state": observed, "reason": error_code}
+                for resource_id, owner, resource_name, provider, state, observed, error_code in resources]
+    binding_status = [{"binding_id": grant_id, "resource_id": resource_id, "component": component,
+                       "state": state, "observed_state": observed, "reason": error_code,
+                       "credential_active": credential_active}
+                      for grant_id, resource_id, component, state, observed, error_code, credential_active in bindings]
     required_audit(actor_for(principal), "data-service.inspect", "project", name, "succeeded", {"project": name},
-                   {"state": state})
-    return {"project": name, "services": [{"type": "postgresql", "name": "managed", "state": state,
-                                              "reason": None if available else "DatabaseUnavailable"}],
+                   {"resource_count": len(services), "binding_count": len(binding_status)})
+    return {"project": name, "services": services, "bindings": binding_status,
             "latest_recovery_request": _recovery_record(request)}
 
 

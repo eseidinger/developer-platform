@@ -87,6 +87,32 @@ class AIRunAuditTests(unittest.TestCase):
                 finish.assert_called_once()
                 audit.assert_called_once()
 
+    def test_late_model_result_does_not_override_reconciled_failure(self):
+        run_id = uuid4()
+        persisted = (run_id, 'explain_application', 'failed', 'model',
+                     {'summary': 'Investigation interrupted'}, [], 0, None,
+                     'created', 'completed', 2)
+        with ExitStack() as stack:
+            stack.enter_context(patch.object(main, 'require_permission'))
+            stack.enter_context(patch.object(main, 'connect', return_value=Connection()))
+            stack.enter_context(patch.object(main, 'access_scope', return_value=None))
+            stack.enter_context(patch.object(main.ai_store, 'classification', return_value='internal'))
+            stack.enter_context(patch.object(main.ai_model, 'configured_model'))
+            stack.enter_context(patch.object(main, 'current_spec', return_value=(2, {}, 'applied')))
+            stack.enter_context(patch.object(main.ai_store, 'create_run', return_value=run_id))
+            stack.enter_context(patch.object(main.ai_store, 'finish_run', return_value=False))
+            stack.enter_context(patch.object(main.ai_store, 'get_run', return_value=persisted))
+            stack.enter_context(patch.object(main.ai_tools, 'make_tools', return_value=[]))
+            stack.enter_context(patch.object(main.ai_agent, 'run', return_value={
+                'state': 'completed', 'result': {'summary': 'Late answer'}, 'evidence': [],
+                'tool_calls': 1, 'estimated_cost_usd': .01}))
+            audit = stack.enter_context(patch.object(main, 'record_event', return_value=42))
+            response = main.create_ai_run('demo', main.AIRunRequest(kind='explain_application'),
+                                          Principal('https://issuer.example', 'human'))
+        self.assertEqual(response['state'], 'failed')
+        self.assertEqual(response['result'], persisted[4])
+        self.assertEqual(audit.call_args.args[4], 'failed')
+
     def test_required_audit_failure_still_returns_unavailable(self):
         with patch.object(main, 'record_event', side_effect=RuntimeError('unavailable')):
             with self.assertRaises(HTTPException) as error:

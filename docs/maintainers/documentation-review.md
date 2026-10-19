@@ -97,3 +97,11 @@ These findings are documented limitations rather than implementation changes in
 this review. Follow the current [store](../operators/data-stores.md),
 [recovery](../operators/backup-and-recovery.md) and [testing](testing-requirements.md)
 guides when planning their resolution.
+
+Subsequent source update: the legacy `data-services` diagnostic has been replaced
+with visible named-resource and binding-credential observations. Its deployed
+readback and native application write/read remain unverified. The finding above
+records the state at the dated review baseline.
+AI history and detail reads now mark runs still `running` after ten minutes as
+failed, with a safe interruption result. Process-kill and deployed readback remain
+unverified; this source change does not resume model work.
