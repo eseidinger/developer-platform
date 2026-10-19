@@ -38,6 +38,29 @@ def denied(operation):
         raise AssertionError('Scoped search credential exceeded its permissions')
 
 
+def wait_for_search(provider, container, resource=None, seconds=180):
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        try:
+            if resource is None:
+                provider.root.request('GET', '/_cluster/health')
+            else:
+                provider.validate_recovery(resource)
+            return
+        except Exception:
+            time.sleep(.4)
+    state = subprocess.run(['docker', 'inspect', '--format',
+        '{{.State.Running}} {{.State.OOMKilled}} {{.State.ExitCode}}', container],
+        capture_output=True, text=True, timeout=10)
+    if state.returncode:
+        raise AssertionError('Disposable OpenSearch readiness failed; container state unavailable')
+    running, oom_killed, exit_code = state.stdout.strip().split()
+    if running != 'true':
+        reason = 'OOM-killed' if oom_killed == 'true' else 'exited with code ' + exit_code
+        raise AssertionError('Disposable OpenSearch container ' + reason)
+    raise AssertionError('Disposable OpenSearch did not become ready while container was running')
+
+
 def main():
     name = 'named-search-' + uuid4().hex[:12]
     volume = name + '-data'
@@ -56,15 +79,8 @@ def main():
         port = int(command('docker', 'port', name, '9200/tcp').rsplit(':', 1)[1])
         endpoint = f'http://127.0.0.1:{port}'
         provider = OpenSearch(endpoint, password)
-        for _ in range(120):
-            try:
-                provider.root.request('GET', '/_cluster/health')
-                break
-            except Exception:
-                time.sleep(.4)
-        else:
-            # Fixed diagnostics only: container logs may include credentials.
-            raise AssertionError('Disposable OpenSearch did not become ready')
+        # Fixed diagnostics only: container logs may include credentials.
+        wait_for_search(provider, name)
         from app.stores.native_monitoring import opensearch as native_metrics
         provider.ensure_monitoring()
         empty_metrics = native_metrics(provider, [])
@@ -164,14 +180,7 @@ def main():
                 '-e', 'plugins.security.ssl.http.enabled=false', '-p', '127.0.0.1::9200'], env) as recovered_name:
             recovered_port = int(command('docker', 'port', recovered_name, '9200/tcp').rsplit(':', 1)[1])
             recovered = OpenSearch(f'http://127.0.0.1:{recovered_port}', password)
-            for _ in range(120):
-                try:
-                    recovered.validate_recovery(first)
-                    break
-                except Exception:
-                    time.sleep(.4)
-            else:
-                raise AssertionError('Restored OpenSearch did not become ready')
+            wait_for_search(recovered, recovered_name, first)
             for old in credentials:
                 recovered.revoke(first, old)
                 denied(lambda c=old: recovered.probe(first, c))
@@ -191,14 +200,7 @@ def main():
         port = int(command('docker', 'port', name, '9200/tcp').rsplit(':', 1)[1])
         endpoint = f'http://127.0.0.1:{port}'
         provider = OpenSearch(endpoint, password)
-        for _ in range(120):
-            try:
-                provider.validate_recovery(first)
-                break
-            except Exception:
-                time.sleep(.4)
-        else:
-            raise AssertionError('Original OpenSearch did not recover after capture')
+        wait_for_search(provider, name, first)
 
         async def relay_access():
             lease = {**reader, 'resource_id': first['resource_id'], 'provider': 'opensearch',

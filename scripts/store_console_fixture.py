@@ -31,7 +31,7 @@ def docker(*args):
     return result
 
 
-def ready(url, seconds=90):
+def ready(url, container, seconds=180):
     deadline = time.monotonic() + seconds
     while time.monotonic() < deadline:
         try:
@@ -41,7 +41,16 @@ def ready(url, seconds=90):
         except Exception:
             pass
         time.sleep(.5)
-    raise RuntimeError('Console fixture readiness failed')
+    state = subprocess.run(['docker', 'inspect', '--format',
+        '{{.State.Running}} {{.State.OOMKilled}} {{.State.ExitCode}}', container],
+        capture_output=True, text=True, timeout=10)
+    if state.returncode:
+        raise RuntimeError('Console fixture readiness failed; container state unavailable')
+    running, oom_killed, exit_code = state.stdout.strip().split()
+    if running != 'true':
+        reason = 'OOM-killed' if oom_killed == 'true' else 'exited with code ' + exit_code
+        raise RuntimeError('Console fixture container ' + reason)
+    raise RuntimeError('Console fixture readiness failed while container was running')
 
 
 def run(connection, expire_url):
@@ -78,11 +87,11 @@ def run(connection, expire_url):
         directory.chmod(0o755)  # Container identities must traverse; random fixture-only values.
         try:
             name = 'store-console-identity-' + uuid4().hex[:10]; containers.append(name)
-            docker('run', '-d', '--name', name, '--network', 'host', '--memory', '512m', '--cpus', '1',
+            docker('run', '-d', '--name', name, '--network', 'host', '--memory', '1g', '--cpus', '2',
                 '-v', f'{realm_path}:/opt/keycloak/data/import/platform.json:ro',
                 'quay.io/keycloak/keycloak:26.4.1', 'start-dev', '--import-realm',
                 '--http-host=127.0.0.1', f'--http-port={identity_port}', f'--hostname=http://127.0.0.1:{identity_port}')
-            ready(issuer + '/.well-known/openid-configuration')
+            ready(issuer + '/.well-known/openid-configuration', name)
             name = 'store-console-browser-' + uuid4().hex[:10]; containers.append(name)
             docker('run', '-d', '--name', name, '--network', 'host', '--memory', '512m', '--cpus', '1',
                 '--cap-drop=ALL', '--security-opt=no-new-privileges',
@@ -93,7 +102,7 @@ def run(connection, expire_url):
                 '-e', 'STORE_CONSOLE_OIDC_SECRET=' + secret, '-e', 'IDENTITY_DOMAIN=fixture.invalid',
                 '-e', 'SCRIPT_NAME=/store-console/postgresql',
                 '-v', f'{config_path}:/pgadmin4/config_local.py:ro', IMAGE)
-            ready(base + '/misc/ping')
+            ready(base + '/misc/ping', name)
             result = subprocess.run(['node', str(ROOT / 'platform/ui/scripts/verify-store-console.mjs')],
                 input=json.dumps({'base': base, 'username': 'fixture', 'password': password,
                     'connection': connection, 'expireUrl': expire_url, 'otherUsername': 'other', 'otherPassword': other_password}), text=True, capture_output=True, timeout=90)

@@ -381,7 +381,9 @@ def main():
                 async def console_check():
                     from store_console_fixture import run as console_run
                     lease = {"credential_id": reader["credential_id"], "resource_id": alpha["resource_id"],
-                        "provider": "postgresql", "expires_at": datetime.now(timezone.utc) + timedelta(minutes=5)}
+                        # Keep the lease valid through both bounded console startup
+                        # waits. The browser check expires it explicitly via control.
+                        "provider": "postgresql", "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)}
                     relay = Relay(backend=lambda value: ("127.0.0.1", port))
                     relay.leases = {20000: lease}; relay.last_success = time.monotonic()
                     server = await asyncio.start_server(lambda r,w: relay.handle(20000,r,w), "127.0.0.1", 0)
