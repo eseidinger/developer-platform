@@ -106,16 +106,13 @@ AI history and detail reads now mark runs still `running` after ten minutes as
 failed, with a safe interruption result. Process-kill and deployed readback remain
 unverified; this source change does not resume model work.
 
-The legacy data-preservation helper has since been replaced with a run-scoped
-named-PostgreSQL fixture check covering a write, redeploy, restart, and rollback.
-It requires a digest-pinned `examples/web-postgres` image and protected operator
-session, and retires its project while retaining the independent database. Its
-offline contract checks pass; a live run remains outstanding. The other four
-legacy helpers in the finding above still need adaptation or replacement.
-
-The legacy isolation helper has also been replaced with a two-project named-store
-drill. It validates each project's own service and checks denied cross-project
-database and service connections, platform-database access and public egress from
-a bound workload. Offline contract checks pass; deployed isolation evidence is
-still required. The interrupted-provisioning, rollback-data and generic recovery
-helpers remain on the old implicit-database model.
+Subsequent source updates replaced three legacy helpers with run-scoped named
+PostgreSQL drills. Data preservation checks an application write across redeploy,
+restart and rollback. Isolation checks own SQL access, cross-project and platform
+database denial, peer-service isolation and public egress. Interrupted provisioning
+checks recovery of a bound application's second revision and retained data; it no
+longer covers the historical implicit database creation step. That outage drill
+requires an otherwise idle k3d lab, disabled capacity admission and exact outage
+confirmation, and attempts host restoration in all normal error paths. All three
+have passing offline contract checks but still need live runs. The rollback-data
+playbook and generic recovery helper remain on the old implicit-database model.

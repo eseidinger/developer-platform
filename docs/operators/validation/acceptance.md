@@ -54,6 +54,32 @@ Both projects are retired after the run; both databases remain retained pending
 verified backup coverage and an explicit purge. This new drill also awaits a
 live run.
 
+The interrupted-provisioning drill is for an otherwise idle k3d lab only. It
+pauses `k3d-workloads-server-0` and kills `platform-api` during a bound
+application rollout. Ensure `CAPACITY_ADMISSION_ENABLED` is disabled in the
+running Platform API and the protected `.env`; otherwise the paused Kubernetes
+API can prevent the new revision from being queued. Check the offline plan first:
+
+```bash
+python3 scripts/interrupted_provisioning.py plan --run-id 123456abcdef \
+  --fixture-image REGISTRY/web-postgres@sha256:DIGEST
+python3 scripts/interrupted_provisioning.py run --run-id 123456abcdef \
+  --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
+  --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
+  --confirm-outage pause-k3d-workloads-server-0-and-kill-platform-api \
+  --operator-token-file /path/to/protected-operator-session.json
+```
+
+The drill refuses any active nonfixture project. It creates a named database
+and binding, writes a visit, pauses the cluster API while revision 2 is queued,
+kills and restarts the Platform API, then verifies the original operation and
+repeat request succeed on that one revision and the visit count advances using
+the same database. It retires its project but retains the database. The private
+report is `.runtime/interrupted-provisioning/<run-id>/report.json`. If the report
+says `restore-failed-manual-action-required`, restore the k3d server and Platform
+API before investigating or retrying cleanup. This revised drill has not been
+run live.
+
 ## 1. Deploy the platform
 
 Prepare DNS, an Ubuntu 22.04+ host, SSH access, Python 3, systemd, and the capacity described in the repository README. From a trusted controller:
