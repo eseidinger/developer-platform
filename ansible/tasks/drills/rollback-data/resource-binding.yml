@@ -1,0 +1,81 @@
+---
+- name: Create the disposable rollback project
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ rollback_access_token }}"
+    body_format: json
+    body:
+      name: "{{ rollback_project }}"
+    status_code: 201
+  no_log: true
+
+- name: Record confirmed ownership of the disposable project
+  ansible.builtin.set_fact:
+    rollback_project_created: true
+
+- name: >-
+    Create a named PostgreSQL resource for the rollback project
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ rollback_project }}/resources
+    method: POST
+    headers:
+      Authorization: "Bearer {{ rollback_access_token }}"
+    body_format: json
+    body:
+      name: state
+      provider: postgresql
+    status_code: 202
+  register: rollback_resource_request
+  no_log: true
+
+- name: Wait for the named PostgreSQL resource
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/v1/resources/{{
+      rollback_resource_request.json.resource_id }}
+    headers:
+      Authorization: "Bearer {{ rollback_access_token }}"
+    status_code: 200
+  register: rollback_resource_ready
+  until: >-
+    rollback_resource_ready.json.observed_state | default('') == 'active'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: Bind the named resource to the web component
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ rollback_project
+      }}/resource-bindings
+    method: POST
+    headers:
+      Authorization: "Bearer {{ rollback_access_token }}"
+    body_format: json
+    body:
+      resource_id: "{{ rollback_resource_request.json.resource_id }}"
+      component: web
+      mode: read-write
+    status_code: 202
+  register: rollback_binding_request
+  no_log: true
+
+- name: Wait for the web component binding
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ rollback_project
+      }}/resource-bindings
+    headers:
+      Authorization: "Bearer {{ rollback_access_token }}"
+    status_code: 200
+  register: rollback_binding_ready
+  until: >-
+    rollback_binding_ready.json.bindings | selectattr('grant_id', 'equalto',
+    rollback_binding_request.json.grant_id) | selectattr('observed_state',
+    'equalto', 'active') | list | length == 1
+  retries: 60
+  delay: 5
+  no_log: true

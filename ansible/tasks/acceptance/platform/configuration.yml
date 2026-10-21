@@ -1,0 +1,121 @@
+---
+- name: Verify developer can create a configuration revision
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/configuration
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ developer_token }}"
+    body_format: json
+    body:
+      values:
+        ACCEPTANCE_RUN: "{{ test_run_id }}"
+    status_code: 202
+  register: configuration_change
+  no_log: true
+
+- name: Wait for the configuration revision
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ configuration_change.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ developer_token }}"
+    status_code: 200
+  register: configuration_operation
+  until:
+    - configuration_operation.json.state == 'succeeded'
+    - configuration_operation.json.readiness.state == 'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: >-
+    Verify viewer can observe configuration but cannot change it
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/configuration
+    method: "{{ item.method }}"
+    headers:
+      Authorization: "Bearer {{ viewer_token }}"
+    body_format: json
+    body: "{{ item.body | default(omit) }}"
+    status_code: "{{ item.status }}"
+  loop:
+    - method: GET
+      status: 200
+    - method: PUT
+      status: 403
+      body:
+        values:
+          FORBIDDEN: value
+  no_log: true
+
+- name: Verify viewer cannot assign project grants
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/grants
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ viewer_token }}"
+    body_format: json
+    body:
+      issuer: https://invalid.example
+      subject: must-not-be-granted
+      role: viewer
+    status_code: 403
+  no_log: true
+
+- name: Restart the application as a developer persona
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/restart
+    method: POST
+    headers:
+      Authorization: "Bearer {{ developer_token }}"
+    status_code: 202
+  register: restart_operation_request
+  no_log: true
+
+- name: Wait for the restart operation
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ restart_operation_request.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ developer_token }}"
+    status_code: 200
+  register: restart_operation
+  until:
+    - restart_operation.json.state == 'succeeded'
+    - restart_operation.json.readiness.state == 'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: Roll back to the first revision as a developer persona
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/rollback
+    method: POST
+    headers:
+      Authorization: "Bearer {{ developer_token }}"
+    body_format: json
+    body:
+      revision: 1
+    status_code: 202
+  register: rollback_operation_request
+  no_log: true
+
+- name: Wait for the rollback operation
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ rollback_operation_request.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ developer_token }}"
+    status_code: 200
+  register: rollback_operation
+  until:
+    - rollback_operation.json.state == 'succeeded'
+    - rollback_operation.json.readiness.state == 'ready'
+  retries: 60
+  delay: 5
+  no_log: true

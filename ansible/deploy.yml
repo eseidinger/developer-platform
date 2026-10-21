@@ -4,7 +4,9 @@
   become: true
   gather_facts: true
   vars:
-    platform_arch: "{{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']] }}"
+    platform_arch: >-
+      {{ {'x86_64': 'amd64', 'aarch64': 'arm64'}[ansible_facts['architecture']]
+      }}
     platform_settings:
       PLATFORM_DOMAIN: "{{ platform_domain }}"
       APPS_DOMAIN: "{{ platform_apps_domain }}"
@@ -15,463 +17,53 @@
       DRIFT_SCAN_INTERVAL_SECONDS: "{{ platform_drift_scan_interval_seconds }}"
       REVISION_RETENTION: "{{ platform_revision_retention }}"
       PLATFORM_TRACE_SAMPLE_RATE: "{{ platform_tracing_settings.sample_rate }}"
-      CAPACITY_ADMISSION_ENABLED: "{{ (platform_capacity_admission_enabled | bool) | ternary('true', 'false') }}"
-      CAPACITY_RESERVE_CPU_MILLICORES: "{{ platform_capacity_reserve_cpu_millicores | int }}"
-      CAPACITY_RESERVE_MEMORY_MIB: "{{ platform_capacity_reserve_memory_mib | int }}"
-      CAPACITY_HOST_OVERHEAD_CPU_MILLICORES: "{{ platform_capacity_host_overhead_cpu_millicores | int }}"
-      CAPACITY_HOST_OVERHEAD_MEMORY_MIB: "{{ platform_capacity_host_overhead_memory_mib | int }}"
-      CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB: "{{ platform_capacity_kubernetes_overhead_memory_mib | int }}"
+      CAPACITY_ADMISSION_ENABLED: >-
+        {{ (platform_capacity_admission_enabled | bool) | ternary('true',
+        'false') }}
+      CAPACITY_RESERVE_CPU_MILLICORES: >-
+        {{ platform_capacity_reserve_cpu_millicores | int }}
+      CAPACITY_RESERVE_MEMORY_MIB: >-
+        {{ platform_capacity_reserve_memory_mib | int }}
+      CAPACITY_HOST_OVERHEAD_CPU_MILLICORES: >-
+        {{ platform_capacity_host_overhead_cpu_millicores | int }}
+      CAPACITY_HOST_OVERHEAD_MEMORY_MIB: >-
+        {{ platform_capacity_host_overhead_memory_mib | int }}
+      CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB: >-
+        {{ platform_capacity_kubernetes_overhead_memory_mib | int }}
       ALLOWED_EGRESS_CIDRS: "{{ platform_allowed_egress_cidrs }}"
       ALLOWED_EGRESS_PORTS: "{{ platform_allowed_egress_ports }}"
 
   pre_tasks:
-    - name: Apply defaults only when inventory has not configured them
-      ansible.builtin.set_fact:
-        platform_install_dir: "{{ platform_install_dir | default('/opt/developer-platform') }}"
-        platform_source_dir: "{{ platform_source_dir | default(playbook_dir ~ '/..') }}"
-        platform_domain: "{{ platform_domain | default('platform.localhost') }}"
-        platform_apps_domain: "{{ platform_apps_domain | default('apps.localhost') }}"
-        platform_identity_domain: "{{ platform_identity_domain | default('identity.localhost') }}"
-        platform_tls_email: "{{ platform_tls_email | default('admin@example.com') }}"
-        platform_edge_bind_ip: "{{ platform_edge_bind_ip | default('127.0.0.1') }}"
-        platform_image_registries: "{{ platform_image_registries | default('docker.io,ghcr.io,quay.io') }}"
-        platform_drift_scan_interval_seconds: "{{ platform_drift_scan_interval_seconds | default(300) }}"
-        platform_revision_retention: "{{ platform_revision_retention | default(25) }}"
-        platform_capacity_admission_enabled: "{{ platform_capacity_admission_enabled | default(false) }}"
-        platform_capacity_reserve_cpu_millicores: "{{ platform_capacity_reserve_cpu_millicores | default(2000) }}"
-        platform_capacity_reserve_memory_mib: "{{ platform_capacity_reserve_memory_mib | default(8192) }}"
-        platform_capacity_host_overhead_cpu_millicores: "{{ platform_capacity_host_overhead_cpu_millicores | default(2000) }}"
-        platform_capacity_host_overhead_memory_mib: "{{ platform_capacity_host_overhead_memory_mib | default(1024) }}"
-        platform_capacity_kubernetes_overhead_memory_mib: "{{ platform_capacity_kubernetes_overhead_memory_mib | default(4096) }}"
-        platform_allowed_egress_cidrs: "{{ platform_allowed_egress_cidrs | default('') }}"
-        platform_allowed_egress_ports: "{{ platform_allowed_egress_ports | default('') }}"
-        platform_install_docker: "{{ platform_install_docker | default(true) }}"
-        platform_kubectl_version: "{{ platform_kubectl_version | default('v1.36.4') }}"
 
-    - name: Check supported host and configuration
-      ansible.builtin.assert:
-        that:
-          - ansible_facts['distribution'] == 'Ubuntu'
-          - ansible_facts['distribution_version'] is version('22.04', '>=')
-          - ansible_facts['architecture'] in ['x86_64', 'aarch64']
-          - platform_install_dir.startswith('/')
-          - platform_install_dir != '/'
-          - platform_kubectl_version is match('^v1\.(35|36|37)\.[0-9]+$')
-          - (platform_capacity_admission_enabled | string | lower) in ['true', 'false']
-          - (platform_capacity_reserve_cpu_millicores | string) is match('^[0-9]+$')
-          - (platform_capacity_reserve_memory_mib | string) is match('^[0-9]+$')
-          - (platform_capacity_host_overhead_cpu_millicores | string) is match('^[0-9]+$')
-          - (platform_capacity_host_overhead_memory_mib | string) is match('^[0-9]+$')
-          - (platform_capacity_kubernetes_overhead_memory_mib | string) is match('^[0-9]+$')
-          - (platform_allowed_egress_cidrs | string) is match('^$|^[0-9A-Fa-f:.]+/[0-9]{1,3}(?:,[0-9A-Fa-f:.]+/[0-9]{1,3})*$')
-          - (platform_allowed_egress_ports | string) is match('^$|^[0-9]+(?:,[0-9]+)*$')
-        fail_msg: Use Ubuntu 22.04 or newer on amd64/arm64 and kubectl compatible with Kubernetes 1.36.
-
-    - name: Validate and render explicitly managed deployment options
-      ansible.builtin.set_fact:
-        platform_managed_settings: "{{ platform_inventory_options | platform_inventory_settings }}"
-      vars:
-        platform_inventory_options:
-          stores: "{{ platform_stores | default(none) }}"
-          network: "{{ platform_network | default(none) }}"
-          search_console_network: "{{ platform_search_console_network | default(none) }}"
-          k3s_image: "{{ platform_k3s_image | default(none) }}"
-          kubectl_version: "{{ platform_kubectl_version }}"
-          bootstrap_subject: "{{ platform_bootstrap_subject | default(none) }}"
-          store_ssh_host: "{{ platform_store_ssh_host | default(none) }}"
-          bastion_bind_ip: "{{ platform_database_bastion_bind_ip | default(none) }}"
-          bastion_port: "{{ platform_database_bastion_port | default(none) }}"
-          bootstrap_timeout_seconds: "{{ platform_bootstrap_timeout_seconds | default(3600) }}"
-          readiness_timeout_seconds: "{{ platform_readiness_timeout_seconds | default(300) }}"
-
-    - name: Validate tracing settings with the selected defaults
-      ansible.builtin.set_fact:
-        platform_tracing_settings: "{{ platform_trace_options | platform_trace_settings }}"
-      vars:
-        platform_trace_options:
-          sample_rate: "{{ platform_trace_sample_rate | default(1.0) }}"
-          retention: "{{ platform_trace_retention | default('24h') }}"
-
-    - name: Render Tempo configuration with inventory trace retention
-      ansible.builtin.set_fact:
-        platform_tempo_configuration: "{{ (lookup('ansible.builtin.file', platform_source_dir ~ '/infrastructure/monitoring/tempo.yaml') | from_yaml) | combine(platform_tempo_retention, recursive=true) }}"
-      vars:
-        platform_tempo_retention:
-          backend_worker:
-            compaction:
-              block_retention: "{{ platform_tracing_settings.retention }}"
-
-    - name: Validate environment values
-      ansible.builtin.assert:
-        that:
-          - item.key in ['ALLOWED_EGRESS_CIDRS', 'ALLOWED_EGRESS_PORTS'] or item.value | string is match('^[A-Za-z0-9.@:,_-]+$')
-        fail_msg: Platform settings must be nonempty single-line domain, email, or IP values.
-      loop: "{{ platform_settings | dict2items }}"
-
+    - name: Validate deployment configuration before host changes
+      ansible.builtin.import_tasks: tasks/deploy/preflight.yml
   tasks:
-    - name: Install host prerequisites
-      ansible.builtin.apt:
-        name: [ca-certificates, python3, python3-apt, bash, tar, e2fsprogs, acl]
-        state: present
-        update_cache: true
-        cache_valid_time: 3600
 
-    - name: Install Docker from its official Ubuntu repository
-      when: platform_install_docker | bool
-      block:
-        - name: Create APT key directory
-          ansible.builtin.file:
-            path: /etc/apt/keyrings
-            state: directory
-            mode: '0755'
+    - name: >-
+        Prepare the Docker host and private installation directory
+      ansible.builtin.import_tasks: tasks/deploy/host.yml
 
-        - name: Download Docker repository key
-          ansible.builtin.get_url:
-            url: https://download.docker.com/linux/ubuntu/gpg
-            dest: /etc/apt/keyrings/docker.asc
-            mode: '0644'
-
-        - name: Configure Docker repository
-          ansible.builtin.copy:
-            dest: /etc/apt/sources.list.d/docker.sources
-            owner: root
-            group: root
-            mode: '0644'
-            content: |
-              Types: deb
-              URIs: https://download.docker.com/linux/ubuntu
-              Suites: {{ ansible_facts['distribution_release'] }}
-              Components: stable
-              Architectures: {{ platform_arch }}
-              Signed-By: /etc/apt/keyrings/docker.asc
-
-        - name: Install Docker Engine and Compose
-          ansible.builtin.apt:
-            name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
-            state: present
-            update_cache: true
-
-    - name: Enable Docker
-      ansible.builtin.systemd_service:
-        name: docker
-        enabled: true
-        state: started
-
-    - name: Check Compose version
-      ansible.builtin.command: docker compose version --short
-      register: platform_compose_version
-      changed_when: false
-      when: not ansible_check_mode
-
-    - name: Require Compose include support
-      ansible.builtin.assert:
-        that: platform_compose_version.stdout | regex_replace('^v', '') is version('2.20.3', '>=')
-      when: not ansible_check_mode
-
-    - name: Create private installation directory
-      ansible.builtin.file:
-        path: "{{ platform_install_dir }}"
-        state: directory
-        owner: root
-        group: root
-        mode: '0700'
-
-    - name: Transfer deployment sources without local secrets or runtime data
-      when: not ansible_check_mode
-      block:
-        - name: Allocate local source archive
-          ansible.builtin.tempfile:
-            state: file
-            suffix: .tar.gz
-          delegate_to: localhost
-          become: false
-          register: platform_archive
-
-        - name: Package deployment files
-          ansible.builtin.command:
-            argv:
-              - tar
-              - --exclude=__pycache__
-              - --exclude=*.pyc
-              - --exclude=infrastructure/monitoring/private
-              - -czf
-              - "{{ platform_archive.path }}"
-              - -C
-              - "{{ platform_source_dir }}"
-              - compose.yaml
-              - .env.example
-              - infrastructure
-              - identity
-              - persistence
-              - platform
-              - scripts
-              - operations/backup/scripts
-          delegate_to: localhost
-          become: false
-          changed_when: true
-
-        - name: Extract deployment files on the host
-          ansible.builtin.unarchive:
-            src: "{{ platform_archive.path }}"
-            dest: "{{ platform_install_dir }}"
-            owner: root
-            group: root
-      always:
-        - name: Remove local source archive
-          ansible.builtin.file:
-            path: "{{ platform_archive.path }}"
-            state: absent
-          delegate_to: localhost
-          become: false
-          when: platform_archive.path is defined
+    - name: Transfer source with guaranteed local archive cleanup
+      ansible.builtin.import_tasks: tasks/deploy/source-transfer.yml
 
     - name: Configure and start the platform
       when: not ansible_check_mode
       block:
-        - name: Create missing generated secrets without replacing existing values
-          ansible.builtin.command:
-            argv: [python3, scripts/init.py]
-            chdir: "{{ platform_install_dir }}"
-          register: platform_environment_init
-          changed_when: >-
-            'Created .env.' in platform_environment_init.stdout or
-            'Added generated values for new required secrets:' in platform_environment_init.stdout
 
-        - name: Configure deployment endpoints while preserving secrets
-          ansible.builtin.lineinfile:
-            path: "{{ platform_install_dir }}/.env"
-            regexp: "^{{ item.key }}="
-            line: "{{ item.key }}={{ item.value }}"
-            owner: root
-            group: root
-            mode: '0600'
-          loop: "{{ (platform_settings | combine(platform_managed_settings)) | dict2items }}"
-          no_log: true
-          diff: false
+        - name: Prepare private runtime configuration
+          ansible.builtin.import_tasks: tasks/deploy/environment.yml
 
-        - name: Create private runtime directory
-          ansible.builtin.file:
-            path: "{{ platform_install_dir }}/.runtime"
-            state: directory
-            owner: root
-            group: root
-            mode: '0700'
+        - name: Install checksum-verified cluster tools
+          ansible.builtin.import_tasks: tasks/deploy/tools.yml
 
-        - name: Install checksum-verified k3d using the repository installer
-          ansible.builtin.command:
-            argv: [python3, scripts/setup/install-k3d.py]
-            chdir: "{{ platform_install_dir }}"
-          changed_when: true
+        - name: Prepare monitoring configuration and bounded storage
+          ansible.builtin.import_tasks: tasks/deploy/monitoring-storage.yml
 
-        - name: Install checksum-verified kubectl alongside k3d
-          ansible.builtin.get_url:
-            url: "https://dl.k8s.io/release/{{ platform_kubectl_version }}/bin/linux/{{ platform_arch }}/kubectl"
-            checksum: "sha256:https://dl.k8s.io/release/{{ platform_kubectl_version }}/bin/linux/{{ platform_arch }}/kubectl.sha256"
-            dest: "{{ platform_install_dir }}/.runtime/bin/kubectl"
-            mode: '0755'
+        - name: Check maintenance and store state before the outage
+          ansible.builtin.import_tasks: tasks/deploy/maintenance-preflight.yml
 
-        - name: Create system-wide local binary directory
-          ansible.builtin.file:
-            path: /usr/local/bin
-            state: directory
-            owner: root
-            group: root
-            mode: '0755'
+        - name: Reconcile services and wait for API readiness
+          ansible.builtin.import_tasks: tasks/deploy/startup.yml
 
-        - name: Install kubectl for host administration
-          ansible.builtin.copy:
-            src: "{{ platform_install_dir }}/.runtime/bin/kubectl"
-            dest: /usr/local/bin/kubectl
-            remote_src: true
-            owner: root
-            group: root
-            mode: '0755'
-
-        - name: Configure Tempo trace retention
-          ansible.builtin.copy:
-            dest: "{{ platform_install_dir }}/infrastructure/monitoring/tempo.yaml"
-            content: "{{ platform_tempo_configuration | to_nice_yaml(indent=2) }}"
-            owner: root
-            group: root
-            mode: '0644'
-
-        - name: Validate Compose configuration
-          ansible.builtin.command:
-            argv: [docker, compose, config, --quiet]
-            chdir: "{{ platform_install_dir }}"
-          changed_when: false
-
-        - name: Check bounded Tempo trace storage mount
-          ansible.builtin.command:
-            argv: [mountpoint, -q, /var/lib/developer-platform/tempo]
-          register: platform_tempo_mount
-          failed_when: false
-          changed_when: false
-
-        - name: Prepare bounded Tempo trace storage
-          ansible.builtin.command:
-            argv: [bash, scripts/setup/prepare-tempo-storage.sh]
-            chdir: "{{ platform_install_dir }}"
-          changed_when: platform_tempo_mount.rc != 0
-
-        - name: Check for maintenance jobs that must not overlap deployment
-          ansible.builtin.command:
-            argv:
-              - systemctl
-              - list-units
-              - --type=service
-              - --state=activating,active,running
-              - --no-legend
-              - platform-backup.service
-              - platform-backup-freshness-drill.service
-              - backup-drill-*
-              - platform-availability-*
-          register: platform_maintenance_units
-          changed_when: false
-
-        - name: Validate fixed Docker addresses before stopping services
-          ansible.builtin.command:
-            argv: [python3, scripts/checks/check-network-addresses.py, --validate-networks]
-            chdir: "{{ platform_install_dir }}"
-          changed_when: false
-
-        - name: Refuse deployment during backup or availability maintenance
-          ansible.builtin.assert:
-            that: platform_maintenance_units.stdout | trim == ''
-            fail_msg: >-
-              Deployment cannot overlap an active backup or availability drill:
-              {{ platform_maintenance_units.stdout | trim }}
-
-        - name: Inspect an existing backup runner
-          ansible.builtin.stat:
-            path: /usr/local/sbin/platform-backup
-          register: platform_installed_backup_runner
-
-        - name: Require the managed backup runner to be a regular file
-          ansible.builtin.assert:
-            that: not platform_installed_backup_runner.stat.exists or platform_installed_backup_runner.stat.isreg | default(false)
-            fail_msg: Inspect the non-regular platform-backup path before updating its recovery code.
-
-        - name: Refresh installed backup code before enabling named-store changes
-          ansible.builtin.copy:
-            src: "{{ platform_install_dir }}/operations/backup/scripts/backup-platform.py"
-            dest: /usr/local/sbin/platform-backup
-            remote_src: true
-            owner: root
-            group: root
-            mode: '0700'
-          when: platform_installed_backup_runner.stat.exists
-
-        - name: Prepare selected data-store configuration before the service outage
-          ansible.builtin.command:
-            argv: [python3, scripts/setup/prepare-stores.py]
-            chdir: "{{ platform_install_dir }}"
-          changed_when: false
-          no_log: true
-
-        - name: Stop existing Compose services cleanly
-          ansible.builtin.command:
-            argv: [docker, compose, stop, --timeout, '60']
-            chdir: "{{ platform_install_dir }}"
-          changed_when: true
-
-        - name: Remove stopped Compose containers while preserving data and the shared network
-          ansible.builtin.command:
-            argv: [docker, compose, rm, --force]
-            chdir: "{{ platform_install_dir }}"
-          changed_when: true
-
-        - name: Reconcile Compose services and Kubernetes cluster
-          ansible.builtin.command:
-            argv: [bash, scripts/up.sh]
-            chdir: "{{ platform_install_dir }}"
-          changed_when: true
-          async: "{{ platform_bootstrap_timeout_seconds | default(3600) }}"
-          poll: 10
-          # Bootstrap can emit Kubernetes token diagnostics on failure.
-          no_log: true
-
-        - name: Wait for the platform API
-          ansible.builtin.uri:
-            url: http://127.0.0.1:8000/readyz
-            timeout: 5
-            status_code: 200
-          register: platform_health
-          until: platform_health.status | default(0) == 200
-          retries: "{{ ((platform_readiness_timeout_seconds | default(300) | int) / 5) | round(0, 'ceil') | int }}"
-          delay: 5
-
-        - name: Resolve the source revision being installed
-          ansible.builtin.shell: |
-            set -e
-            rev=$(git -C "{{ platform_source_dir }}" rev-parse HEAD 2>/dev/null || echo unknown)
-            if [ -n "$(git -C "{{ platform_source_dir }}" status --porcelain 2>/dev/null)" ]; then rev="$rev+dirty"; fi
-            echo "$rev"
-          args:
-            executable: /bin/bash
-          delegate_to: localhost
-          become: false
-          register: platform_source_revision
-          changed_when: false
-
-        - name: Collect tool versions and running images
-          ansible.builtin.shell: |
-            set -eo pipefail
-            echo "docker=$(docker version --format '{{ '{{' }}.Server.Version{{ '}}' }}')"
-            echo "compose=$(docker compose version --short)"
-            echo "k3d=$(.runtime/bin/k3d version | head -1)"
-            echo "kubectl=$(.runtime/bin/kubectl version --client | head -1)"
-            docker compose images --format json | python3 -c '
-            import json, sys
-            raw = sys.stdin.read().strip()
-            try:
-                rows = json.loads(raw)
-            except ValueError:
-                rows = [json.loads(line) for line in raw.splitlines() if line.strip()]
-            if isinstance(rows, dict):
-                rows = [rows]
-            for r in sorted(rows, key=lambda r: r.get("ContainerName", "")):
-                name = r.get("ContainerName", "").replace("developer-platform-", "")
-                print("image.%s=%s:%s@%s" % (name, r.get("Repository"), r.get("Tag"), r.get("ID")))
-            '
-          args:
-            chdir: "{{ platform_install_dir }}"
-            executable: /bin/bash
-          register: platform_versions
-          changed_when: false
-
-        - name: Record the installation (versions and non-secret parameters only)
-          ansible.builtin.copy:
-            dest: "{{ platform_install_dir }}/.runtime/installation-record.json"
-            owner: root
-            group: root
-            mode: '0600'
-            content: "{{ record | to_nice_json }}\n"
-          vars:
-            record:
-              recorded_at: "{{ ansible_facts['date_time']['iso8601'] }}"
-              source_revision: "{{ platform_source_revision.stdout | trim }}"
-              host:
-                distribution: "{{ ansible_facts['distribution'] }} {{ ansible_facts['distribution_version'] }}"
-                architecture: "{{ ansible_facts['architecture'] }}"
-              parameters:
-                platform_domain: "{{ platform_domain }}"
-                platform_apps_domain: "{{ platform_apps_domain }}"
-                platform_identity_domain: "{{ platform_identity_domain }}"
-                platform_edge_bind_ip: "{{ platform_edge_bind_ip }}"
-                platform_image_registries: "{{ platform_image_registries }}"
-                platform_drift_scan_interval_seconds: "{{ platform_drift_scan_interval_seconds | int }}"
-                platform_revision_retention: "{{ platform_revision_retention | int }}"
-                platform_capacity_admission_enabled: "{{ platform_capacity_admission_enabled | bool }}"
-                platform_capacity_reserve_cpu_millicores: "{{ platform_capacity_reserve_cpu_millicores | int }}"
-                platform_capacity_reserve_memory_mib: "{{ platform_capacity_reserve_memory_mib | int }}"
-                platform_capacity_host_overhead_cpu_millicores: "{{ platform_capacity_host_overhead_cpu_millicores | int }}"
-                platform_capacity_host_overhead_memory_mib: "{{ platform_capacity_host_overhead_memory_mib | int }}"
-                platform_capacity_kubernetes_overhead_memory_mib: "{{ platform_capacity_kubernetes_overhead_memory_mib | int }}"
-                platform_install_docker: "{{ platform_install_docker | bool }}"
-                platform_kubectl_version: "{{ platform_kubectl_version }}"
-                managed_environment: "{{ platform_managed_settings }}"
-                tracing: "{{ platform_tracing_settings }}"
-                platform_bootstrap_timeout_seconds: "{{ platform_bootstrap_timeout_seconds | default(3600) | int }}"
-                platform_readiness_timeout_seconds: "{{ platform_readiness_timeout_seconds | default(300) | int }}"
-              versions: "{{ platform_versions.stdout_lines | select('match', '^[a-z0-9._-]+=') | map('regex_replace', '^([^=]+)=(.*)$', '\\1: \\2') | list }}"
+        - name: Record source and runtime versions after startup
+          ansible.builtin.import_tasks: tasks/deploy/installation-record.yml

@@ -1,0 +1,90 @@
+---
+- name: Remove the temporary capacity reservation
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ platform_capacity_drill_kubeconfig }}"
+      - delete
+      - namespace
+      - "{{ capacity_padding_namespace }}"
+      - --wait=true
+      - --timeout=120s
+  delegate_to: "{{ platform_capacity_drill_host }}"
+  become: true
+  changed_when: true
+
+- name: >-
+    Wait for admission capacity to recover after reservation removal
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/operator/capacity"
+    headers:
+      Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
+    status_code: 200
+  register: capacity_after_padding
+  until:
+    - >-
+      capacity_after_padding.json.admission.state | default('') == 'ok'
+    - >-
+        capacity_after_padding.json.admission.available.cpu_millicores | int >=
+        100
+    - >-
+      capacity_after_padding.json.admission.available.memory_mib | int >= 128
+  retries: 24
+  delay: 2
+  no_log: true
+
+- name: Deploy a within-reserve workload
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ capacity_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
+    body_format: json
+    body:
+      apiVersion: platform.example/v1alpha2
+      kind: Application
+      metadata:
+        name: "{{ capacity_project }}"
+      spec:
+        components:
+          - name: api
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_capacity_image }}"
+              args:
+                - '-listen=:5678'
+                - '-text=capacity-accepted'
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 500m
+                memory: 256Mi
+    status_code: 202
+  register: accepted_capacity
+  no_log: true
+
+- name: Wait for the within-reserve workload
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ accepted_capacity.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
+    status_code: 200
+  register: accepted_capacity_operation
+  until:
+    - >-
+      (accepted_capacity_operation.json.state | default('')) == 'succeeded'
+    - >-
+        (accepted_capacity_operation.json.readiness.state | default('')) ==
+        'ready'
+  retries: 60
+  delay: 5
+  no_log: true

@@ -1,0 +1,34 @@
+---
+- name: >-
+    Create missing generated secrets without replacing existing values
+  ansible.builtin.command:
+    argv:
+      - python3
+      - scripts/init.py
+    chdir: "{{ platform_install_dir }}"
+  register: platform_environment_init
+  changed_when: >-
+    'Created .env.' in platform_environment_init.stdout or
+    'Added generated values for new required secrets:' in
+    platform_environment_init.stdout
+
+- name: Configure deployment endpoints while preserving secrets
+  ansible.builtin.lineinfile:
+    path: "{{ platform_install_dir }}/.env"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop: >-
+    {{ (platform_settings | combine(platform_managed_settings)) | dict2items }}
+  no_log: true
+  diff: false
+
+- name: Create private runtime directory
+  ansible.builtin.file:
+    path: "{{ platform_install_dir }}/.runtime"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'

@@ -1,0 +1,85 @@
+---
+- name: >-
+    Create a project-scoped deployment credential as project administrator
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials
+    method: POST
+    headers:
+      Authorization: "Bearer {{ project_admin_token }}"
+    body_format: json
+    body:
+      name: "deployment-{{ test_run_id }}"
+      expires_in_days: 1
+    status_code: 201
+  register: deployment_credential
+  no_log: true
+
+- name: Exchange deployment credentials for a short-lived token
+  ansible.builtin.uri:
+    url: "{{ deployment_credential.json.token_endpoint }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: client_credentials
+      client_id: "{{ deployment_credential.json.client_id }}"
+      client_secret: "{{ deployment_credential.json.client_secret }}"
+    status_code: 200
+  register: deployment_token_response
+  no_log: true
+
+- name: >-
+    Perform the project's first deployment through CI credentials
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ test_project }}"
+    method: PUT
+    headers:
+      Authorization: >-
+        Bearer {{ deployment_token_response.json.access_token }}
+    body_format: json
+    body:
+      name: "{{ test_project }}"
+      image: "{{ platform_test_image }}"
+      port: 5678
+      probe_profile: hello-world
+    status_code: 202
+  register: first_deployment
+  no_log: true
+
+- name: Wait for the CI deployment operation and rollout
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ first_deployment.json.status_url }}
+    headers:
+      Authorization: >-
+        Bearer {{ deployment_token_response.json.access_token }}
+    status_code: 200
+  register: deployment_operation
+  until:
+    - deployment_operation.json.state == 'succeeded'
+    - deployment_operation.json.readiness.state == 'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: >-
+    Verify deployment identity cannot access another project
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ forbidden_project }}/logs
+    headers:
+      Authorization: >-
+        Bearer {{ deployment_token_response.json.access_token }}
+    status_code: 403
+  no_log: true
+
+- name: >-
+    Verify deployment identity cannot administer credentials
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials
+    headers:
+      Authorization: >-
+        Bearer {{ deployment_token_response.json.access_token }}
+    status_code: 403
+  no_log: true

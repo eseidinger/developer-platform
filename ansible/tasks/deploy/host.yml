@@ -1,0 +1,76 @@
+---
+- name: Install host prerequisites
+  ansible.builtin.apt:
+    name:
+      - ca-certificates
+      - python3
+      - python3-apt
+      - bash
+      - tar
+      - e2fsprogs
+      - acl
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install Docker from its official Ubuntu repository
+  when: platform_install_docker | bool
+  block:
+
+    - name: Create APT key directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+
+    - name: Download Docker repository key
+      ansible.builtin.get_url:
+        url: https://download.docker.com/linux/ubuntu/gpg
+        dest: /etc/apt/keyrings/docker.asc
+        mode: '0644'
+
+    - name: Configure Docker repository
+      ansible.builtin.template:
+        dest: /etc/apt/sources.list.d/docker.sources
+        owner: root
+        group: root
+        mode: '0644'
+        src: '{{ playbook_dir }}/templates/deploy/docker.sources.j2'
+
+    - name: Install Docker Engine and Compose
+      ansible.builtin.apt:
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
+        state: present
+        update_cache: true
+
+- name: Enable Docker
+  ansible.builtin.systemd_service:
+    name: docker
+    enabled: true
+    state: started
+
+- name: Check Compose version
+  ansible.builtin.command: docker compose version --short
+  register: platform_compose_version
+  changed_when: false
+  when: not ansible_check_mode
+
+- name: Require Compose include support
+  ansible.builtin.assert:
+    that: >-
+      platform_compose_version.stdout | regex_replace('^v', '') is
+      version('2.20.3', '>=')
+  when: not ansible_check_mode
+
+- name: Create private installation directory
+  ansible.builtin.file:
+    path: "{{ platform_install_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'

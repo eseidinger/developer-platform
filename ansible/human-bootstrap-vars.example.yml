@@ -1,3 +1,5 @@
+---
 platform_api_url: https://platform.example.com
 platform_human_admin_token: <short-lived-human-token>
-platform_test_runner_output: "<HOME>/.local/state/developer-platform/platform-test-runner.json"
+platform_test_runner_output: >-
+  <HOME>/.local/state/developer-platform/platform-test-runner.json

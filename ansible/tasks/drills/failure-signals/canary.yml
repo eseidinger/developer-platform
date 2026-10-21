@@ -1,0 +1,122 @@
+---
+- name: >-
+    Temporarily isolate failure signals from unrelated admission policy
+  ansible.builtin.lineinfile:
+    path: "{{ platform_failure_drill_install_dir }}/.env"
+    regexp: '^CAPACITY_ADMISSION_ENABLED='
+    line: 'CAPACITY_ADMISSION_ENABLED=false'
+    create: false
+    owner: root
+    group: root
+    mode: '0600'
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  no_log: true
+
+- name: >-
+    Recreate only the Platform API with temporary failure-drill policy
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+      - --force-recreate
+      - --wait
+      - --wait-timeout
+      - '120'
+      - platform-api
+    chdir: "{{ platform_failure_drill_install_dir }}"
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  changed_when: true
+
+- name: >-
+    Exchange the runner credential after temporary API recreation
+  ansible.builtin.uri:
+    url: "{{ platform_oidc_token_url }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: client_credentials
+      client_id: "{{ platform_test_runner_client_id }}"
+      client_secret: "{{ platform_test_runner_client_secret }}"
+    status_code: 200
+  register: failure_runner_token
+  no_log: true
+
+- name: Create the disposable failure-signal project
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ failure_runner_token.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ failure_project }}"
+    status_code: 201
+  no_log: true
+
+- name: Deploy the disposable public canary
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ failure_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ failure_runner_token.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ failure_project }}"
+      image: "{{ platform_failure_drill_image }}"
+      port: 5678
+      probe_profile: hello-world
+    status_code:
+      - 202
+      - 422
+      - 503
+    return_content: true
+  register: failure_deployment
+  failed_when: false
+  no_log: true
+
+- name: Require the disposable public canary to be accepted
+  ansible.builtin.assert:
+    that: failure_deployment.status | int == 202
+    fail_msg: >-
+      The disposable public canary was rejected before a workload was created
+      (HTTP {{ failure_deployment.status }}): {{ failure_deployment.get('json',
+      {}).get('detail', failure_deployment.get('json', {}).get('code',
+      'no safe API reason supplied')) }}
+
+- name: Wait for the disposable public canary
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ failure_deployment.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ failure_runner_token.json.access_token }}"
+    status_code: 200
+  register: failure_deployment_operation
+  until:
+    - >-
+      (failure_deployment_operation.json.state | default('')) == 'succeeded'
+    - >-
+        (failure_deployment_operation.json.readiness.state | default('')) ==
+        'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: Wait for a healthy project-attributed blackbox sample
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:9090/api/v1/query?query={{
+      ('probe_success{job="applications",project="' + failure_project +
+      '"} == 1') | urlencode }}
+    status_code: 200
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  register: failure_healthy_probe
+  until: >-
+    failure_healthy_probe.json.data.result | default([]) | length > 0
+  retries: 40
+  delay: 5
+  no_log: true

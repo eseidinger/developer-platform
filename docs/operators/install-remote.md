@@ -24,7 +24,7 @@ explicit defaults in a copied example take ownership of those settings.
 The inventory also supports initial administrator subject, Kubernetes image pin,
 build/start and readiness timeouts, and consistent advertised/bastion SSH settings.
 The bastion itself remains a separate opt-in installation. See the
-[option reference](../../ansible/README.md#additional-deployment-options) and the
+[option reference](../../ansible/docs/inventory-options.md#additional-deployment-options) and the
 [data-store workflow](data-stores.md#selecting-shared-services). Dashboards are
 provisioned automatically. `platform_trace_sample_rate: 1.0` and
 `platform_trace_retention: 24h` expose the chosen defaults; deployment applies them

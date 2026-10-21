@@ -91,7 +91,7 @@ For remote deployments, configure the optional `platform_stores` group in the
 The [deployment playbook](../../ansible/deploy.yml) validates and writes these
 settings before its outage, preserving generated secrets. Omit the group to retain
 existing remote settings; `profiles: []` explicitly selects PostgreSQL only.
-See the [inventory option reference](../../ansible/README.md#additional-deployment-options).
+See the [inventory option reference](../../ansible/docs/inventory-options.md#additional-deployment-options).
 
 Run `python3 scripts/init.py` to generate missing operator keys without replacing
 existing keys. After reviewing combined host capacity, set `COMPOSE_PROFILES` in

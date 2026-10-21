@@ -1,0 +1,89 @@
+---
+- name: >-
+    Reject an invalid scheduled-component specification before side effects
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    body_format: json
+    body:
+      apiVersion: platform.example/v1alpha2
+      kind: Application
+      metadata:
+        name: "{{ component_project }}"
+      spec:
+        components:
+          - name: invalid-schedule
+            type: scheduled
+            runtime:
+              type: container
+              image: "{{ platform_component_job_image }}"
+            schedule: every-minute
+    status_code: 422
+  no_log: true
+
+- name: >-
+    Reject a rollout that would exceed the namespace pod quota before side
+    effects
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    body_format: json
+    body:
+      apiVersion: platform.example/v1alpha2
+      kind: Application
+      metadata:
+        name: "{{ component_project }}"
+      spec:
+        components:
+          - name: api
+            type: service
+            replicas: 5
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+          - name: peer
+            type: service
+            replicas: 5
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+    status_code: 422
+    return_content: true
+  register: quota_rejection
+  failed_when: >-
+    quota_rejection.status != 422 or 'namespace pod quota' not in
+    (quota_rejection.content | string)
+  no_log: true
+
+- name: >-
+    Reject outbound egress that is not enabled by operator policy
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    body_format: json
+    body:
+      apiVersion: platform.example/v1alpha2
+      kind: Application
+      metadata:
+        name: "{{ component_project }}"
+      spec:
+        components:
+          - name: api
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+            outbound:
+              - cidr: 203.0.113.10/32
+                port: 443
+    status_code: 422
+    return_content: true
+  register: egress_rejection
+  failed_when: "egress_rejection.json.code != 'policy_denied'"
+  no_log: true

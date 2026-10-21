@@ -1,0 +1,52 @@
+---
+- name: >-
+    Transfer deployment sources without local secrets or runtime data
+  when: not ansible_check_mode
+  block:
+
+    - name: Allocate local source archive
+      ansible.builtin.tempfile:
+        state: file
+        suffix: .tar.gz
+      delegate_to: localhost
+      become: false
+      register: platform_archive
+
+    - name: Package deployment files
+      ansible.builtin.command:
+        argv:
+          - tar
+          - --exclude=__pycache__
+          - --exclude=*.pyc
+          - --exclude=infrastructure/monitoring/private
+          - -czf
+          - "{{ platform_archive.path }}"
+          - -C
+          - "{{ platform_source_dir }}"
+          - compose.yaml
+          - .env.example
+          - infrastructure
+          - identity
+          - persistence
+          - platform
+          - scripts
+          - operations/backup/scripts
+      delegate_to: localhost
+      become: false
+      changed_when: true
+
+    - name: Extract deployment files on the host
+      ansible.builtin.unarchive:
+        src: "{{ platform_archive.path }}"
+        dest: "{{ platform_install_dir }}"
+        owner: root
+        group: root
+  always:
+
+    - name: Remove local source archive
+      ansible.builtin.file:
+        path: "{{ platform_archive.path }}"
+        state: absent
+      delegate_to: localhost
+      become: false
+      when: platform_archive.path is defined

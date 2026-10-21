@@ -15,47 +15,64 @@ all:
         platform_image_registries: docker.io,ghcr.io,quay.io  # optional
         platform_drift_scan_interval_seconds: 300  # optional
         platform_revision_retention: 25  # optional
-        platform_capacity_admission_enabled: false  # optional; measure reserves before enabling
+        # optional; measure reserves before enabling
+        platform_capacity_admission_enabled: false
         platform_capacity_reserve_cpu_millicores: 2000  # optional
         platform_capacity_reserve_memory_mib: 8192  # optional
-        platform_capacity_host_overhead_cpu_millicores: 2000  # OS, uncapped CPU services and transient work
+        # OS, uncapped CPU services and transient work
+        platform_capacity_host_overhead_cpu_millicores: 2000
         platform_capacity_host_overhead_memory_mib: 1024
-        platform_capacity_kubernetes_overhead_memory_mib: 4096  # k3s/containerd; calibrate under representative load
-        platform_allowed_egress_cidrs: ""  # optional; comma-separated CIDRs, e.g. 0.0.0.0/0,::/0
-        platform_allowed_egress_ports: ""  # optional; comma-separated TCP ports, e.g. 443,80
+        # k3s/containerd; calibrate under representative load
+        platform_capacity_kubernetes_overhead_memory_mib: 4096
+        # optional; comma-separated CIDRs, e.g. 0.0.0.0/0,::/0
+        platform_allowed_egress_cidrs: ""
+        # optional; comma-separated TCP ports, e.g. 443,80
+        platform_allowed_egress_ports: ""
 
-        # Installation and version pins. Existing clusters are not upgraded by deploy.yml.
+        # Installation and version pins. Existing clusters are not upgraded by
+        # deploy.yml.
         platform_install_dir: /opt/developer-platform
         # platform_source_dir: /absolute/path/to/developer-platform
-        platform_install_docker: true  # use false to retain an existing Docker installation
+        # use false to retain an existing Docker installation
+        platform_install_docker: true
         platform_kubectl_version: v1.36.4
         platform_k3s_image: rancher/k3s:v1.36.4-k3s1
         platform_bootstrap_timeout_seconds: 3600  # build/start budget; 60–14400
-        platform_readiness_timeout_seconds: 300  # API readiness after bootstrap; 5–3600
-        # Immutable initial administrator subject. Omit to preserve the remote setting.
+        # API readiness after bootstrap; 5–3600
+        platform_readiness_timeout_seconds: 300
+        # Immutable initial administrator subject. Omit to preserve the remote
+        # setting.
         # platform_bootstrap_subject: your-keycloak-user-subject
 
-        # These optional groups manage remote .env settings when present. Omitting a
-        # group preserves its existing values. Explicit profiles: [] selects PostgreSQL only.
+        # These optional groups manage remote .env settings when present.
+        # Omitting a
+        # group preserves its existing values. Explicit profiles: [] selects
+        # PostgreSQL only.
         platform_stores:
           profiles: []  # select any of: [s3, qdrant, opensearch, neo4j]
           capacity_bytes:
             postgresql: 17179869184
-            # Allocate every selected provider after reviewing host/disk headroom:
+            # Allocate every selected provider after reviewing host/disk
+            # headroom:
             # s3: 8589934592
             # qdrant: 4294967296
             # opensearch: 4294967296
             # neo4j: 4294967296
           neo4j:
             max_instances: 4  # retained instances platform-wide; 1–64
-            memory_bytes: 1610612736  # per instance; 1–16 GiB; independent of data capacity
+            # per instance; 1–16 GiB; independent of data capacity
+            memory_bytes: 1610612736
 
-        # Choose networks before first installation. Existing network subnet changes
-        # require a separate migration; deployment refuses them before the outage.
-        # All fixed service addresses are derived from the subnet with standard offsets.
+        # Choose networks before first installation. Existing network subnet
+        # changes
+        # require a separate migration; deployment refuses them before the
+        # outage.
+        # All fixed service addresses are derived from the subnet with standard
+        # offsets.
         platform_network:
           subnet: 172.30.80.0/24
-          # Optional service-name overrides; omitted addresses keep standard offsets:
+          # Optional service-name overrides; omitted addresses keep standard
+          # offsets:
           # addresses:
           #   store-access: 172.30.80.15
           #   neo4j-controller: 172.30.80.31
@@ -65,15 +82,20 @@ all:
           #   platform-api: 172.30.81.2
           #   opensearch-dashboards: 172.30.81.3
 
-        # The bastion installer is a separate opt-in playbook. Empty host advertises
-        # no SSH route. For remote access set an actual management bind IP and host,
-        # restrict the port in the firewall, deploy, then run the bastion installer.
+        # The bastion installer is a separate opt-in playbook. Empty host
+        # advertises
+        # no SSH route. For remote access set an actual management bind IP and
+        # host,
+        # restrict the port in the firewall, deploy, then run the bastion
+        # installer.
         platform_store_ssh_host: ""
         platform_database_bastion_bind_ip: 127.0.0.1
         platform_database_bastion_port: 2222
 
         # Chosen tracing defaults; dashboards are auto-provisioned.
         platform_trace_sample_rate: 1.0  # fraction from 0 (off) to 1 (100%)
-        platform_trace_retention: 24h  # positive whole hours; review bounded trace-disk capacity
-        # Secrets are generated/preserved on the target. Keep backup, watchdog and
+        # positive whole hours; review bounded trace-disk capacity
+        platform_trace_retention: 24h
+        # Secrets are generated/preserved on the target. Keep backup, watchdog
+        # and
         # alert-delivery settings in their separate operations inventories.

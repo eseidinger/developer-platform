@@ -1,9 +1,11 @@
 ---
-- name: Verify a dedicated test-runner credential before or after expiry
+- name: >-
+    Verify a dedicated test-runner credential before or after expiry
   hosts: localhost
   connection: local
   gather_facts: false
   tasks:
+
     - name: Require a protected dedicated expiry-drill credential
       ansible.builtin.assert:
         that:
@@ -34,7 +36,8 @@
       when: platform_expiry_drill_phase == 'active'
       no_log: true
 
-    - name: Verify the active dedicated runner can use the Platform API
+    - name: >-
+        Verify the active dedicated runner can use the Platform API
       ansible.builtin.uri:
         url: "{{ platform_api_url }}/projects"
         headers:
@@ -43,7 +46,8 @@
       when: platform_expiry_drill_phase == 'active'
       no_log: true
 
-    - name: Verify the expired dedicated runner cannot obtain a token
+    - name: >-
+        Verify the expired dedicated runner cannot obtain a token
       ansible.builtin.uri:
         url: "{{ platform_oidc_token_url }}"
         method: POST
@@ -52,13 +56,15 @@
           grant_type: client_credentials
           client_id: "{{ platform_test_runner_client_id }}"
           client_secret: "{{ platform_test_runner_client_secret }}"
-        status_code: [400, 401]
+        status_code:
+          - 400
+          - 401
       when: platform_expiry_drill_phase == 'expired'
       no_log: true
 
     - name: Report non-secret expiry-drill evidence
       ansible.builtin.debug:
         msg: >-
-          PASS: dedicated test runner {{ platform_test_runner_credential_id }} was
-          {{ platform_expiry_drill_phase }}-checked against its expiry at
-          {{ platform_test_runner_expires_at }}.
+          PASS: dedicated test runner {{ platform_test_runner_credential_id }}
+          was {{ platform_expiry_drill_phase }}-checked against its expiry at {{
+          platform_test_runner_expires_at }}.

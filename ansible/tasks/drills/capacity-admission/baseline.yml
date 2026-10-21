@@ -1,0 +1,122 @@
+---
+- name: Enable request admission with a valid temporary reserve
+  ansible.builtin.lineinfile:
+    path: "{{ platform_capacity_drill_install_dir }}/.env"
+    regexp: "^{{ item.key }}="
+    line: "{{ item.key }}={{ item.value }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop:
+    - key: CAPACITY_ADMISSION_ENABLED
+      value: 'true'
+    - key: CAPACITY_RESERVE_CPU_MILLICORES
+      value: '0'
+    - key: CAPACITY_RESERVE_MEMORY_MIB
+      value: '0'
+  delegate_to: "{{ platform_capacity_drill_host }}"
+  become: true
+  no_log: true
+
+- name: >-
+    Recreate only the Platform API with temporary admission policy
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - up
+      - -d
+      - --force-recreate
+      - --wait
+      - --wait-timeout
+      - '120'
+      - platform-api
+    chdir: "{{ platform_capacity_drill_install_dir }}"
+  delegate_to: "{{ platform_capacity_drill_host }}"
+  become: true
+  changed_when: true
+
+- name: Exchange the runner credential after API recreation
+  ansible.builtin.uri:
+    url: "{{ platform_oidc_token_url }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: client_credentials
+      client_id: "{{ platform_test_runner_client_id }}"
+      client_secret: "{{ platform_test_runner_client_secret }}"
+    status_code: 200
+  register: capacity_runner_token
+  retries: 24
+  delay: 5
+  until: capacity_runner_token.status | default(0) == 200
+  no_log: true
+
+- name: Create the disposable capacity project
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ capacity_project }}"
+    status_code: 201
+  no_log: true
+
+- name: >-
+    Inspect current cluster capacity before admission checks
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/operator/capacity"
+    headers:
+      Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
+    status_code: 200
+  register: capacity_inventory
+  no_log: true
+
+- name: Require the deployed admission snapshot contract
+  ansible.builtin.assert:
+    that:
+      - capacity_inventory.json.get('state', '') == 'ok'
+      - capacity_inventory.json.get('nodes', []) | length > 0
+      - >-
+        capacity_inventory.json.get('admission', {}).get('state', '') == 'ok'
+      - >-
+        capacity_inventory.json.get('admission', {}).get('enabled', false)
+    fail_msg: >-
+      The deployed Platform API does not expose usable enabled admission
+      accounting. Cluster capacity state={{ capacity_inventory.json.get('state',
+      'missing') }}, reason={{ capacity_inventory.json.get('reason', 'missing')
+      }}; admission state={{ capacity_inventory.json.get('admission',
+      {}).get('state', 'missing') }}, reason={{
+      capacity_inventory.json.get('admission', {}).get('reason', 'missing') }},
+      enabled={{ capacity_inventory.json.get('admission', {}).get('enabled',
+      false) }}. Deploy the current source and verify Kubernetes core Node/Pod
+      and metrics access.
+
+- name: >-
+    Require enough baseline capacity for the accepted workload
+  ansible.builtin.assert:
+    that:
+      - >-
+        capacity_inventory.json.admission.available.cpu_millicores | int >= 100
+      - >-
+        capacity_inventory.json.admission.available.memory_mib | int >= 128
+    fail_msg: >-
+      Capacity admission is enabled, but less than 100m CPU or 128Mi memory
+      remains. Recover capacity before running this acceptance drill.
+
+- name: Calculate a temporary request reservation
+  ansible.builtin.set_fact:
+    capacity_padding_cpu_millicores: >-
+      {{ capacity_inventory.json.admission.available.cpu_millicores | int - 50
+      }}
+    capacity_padding_memory_mib: >-
+      {{ capacity_inventory.json.admission.available.memory_mib | int - 64 }}
+
+
+- name: Report the non-secret synthetic reservation size
+  ansible.builtin.debug:
+    msg: >-
+      Reserving {{ capacity_padding_cpu_millicores }}m CPU and {{
+      capacity_padding_memory_mib }}Mi memory as Kubernetes requests.

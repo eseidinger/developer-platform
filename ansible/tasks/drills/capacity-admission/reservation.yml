@@ -1,0 +1,154 @@
+---
+- name: Create the temporary capacity-reservation namespace
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ platform_capacity_drill_kubeconfig }}"
+      - create
+      - namespace
+      - "{{ capacity_padding_namespace }}"
+  delegate_to: "{{ platform_capacity_drill_host }}"
+  become: true
+  changed_when: true
+
+- name: >-
+    Enforce restricted pod security in the reservation namespace
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ platform_capacity_drill_kubeconfig }}"
+      - label
+      - namespace
+      - "{{ capacity_padding_namespace }}"
+      - pod-security.kubernetes.io/enforce=restricted
+      - pod-security.kubernetes.io/enforce-version=v1.36
+      - --overwrite
+  delegate_to: "{{ platform_capacity_drill_host }}"
+  become: true
+  changed_when: true
+
+- name: >-
+    Create a bounded synthetic pod request that leaves less than one workload
+    available
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ platform_capacity_drill_kubeconfig }}"
+      - -n
+      - "{{ capacity_padding_namespace }}"
+      - apply
+      - -f
+      - "-"
+    stdin: "{{ capacity_padding_manifest | to_json }}"
+  vars:
+    capacity_padding_manifest:
+      apiVersion: v1
+      kind: Pod
+      metadata:
+        name: request-reservation
+      spec:
+        restartPolicy: Never
+        automountServiceAccountToken: false
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 10000
+          runAsGroup: 10000
+          seccompProfile:
+            type: RuntimeDefault
+        containers:
+          - name: reservation
+            image: "{{ platform_capacity_padding_image }}"
+            command:
+              - /bin/sh
+              - -ec
+            args:
+              - sleep 900
+            resources:
+              requests:
+                cpu: "{{ capacity_padding_cpu_millicores }}m"
+                memory: "{{ capacity_padding_memory_mib }}Mi"
+              limits:
+                cpu: "{{ capacity_padding_cpu_millicores }}m"
+                memory: "{{ capacity_padding_memory_mib }}Mi"
+            securityContext:
+              allowPrivilegeEscalation: false
+              readOnlyRootFilesystem: true
+              capabilities:
+                drop:
+                  - ALL
+  delegate_to: "{{ platform_capacity_drill_host }}"
+  become: true
+  register: capacity_padding_create
+  changed_when: capacity_padding_create.rc == 0
+  failed_when: false
+
+- name: >-
+    Require the synthetic reservation Pod to be accepted by Kubernetes
+  ansible.builtin.assert:
+    that: capacity_padding_create.rc == 0
+    fail_msg: >-
+      Kubernetes rejected the non-secret synthetic reservation manifest: {{
+      capacity_padding_create.stderr | default('no stderr returned') | trim }}
+
+- name: >-
+    Wait for admission accounting to include the synthetic request
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/operator/capacity"
+    headers:
+      Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
+    status_code: 200
+  register: capacity_with_padding
+  until:
+    - >-
+      capacity_with_padding.json.admission.state | default('') == 'ok'
+    - >-
+        capacity_with_padding.json.admission.available.cpu_millicores | int <
+        100 or capacity_with_padding.json.admission.available.memory_mib | int <
+        128
+  retries: 24
+  delay: 2
+  no_log: true
+
+- name: >-
+    Require the configured oversized request to be rejected before side effects
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ capacity_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
+    body_format: json
+    body:
+      apiVersion: platform.example/v1alpha2
+      kind: Application
+      metadata:
+        name: "{{ capacity_project }}"
+      spec:
+        components:
+          - name: api
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_capacity_image }}"
+              args:
+                - '-listen=:5678'
+                - '-text=capacity-rejected'
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+            resources:
+              requests:
+                cpu: 100m
+                memory: 128Mi
+              limits:
+                cpu: 100m
+                memory: 128Mi
+    status_code: 422
+  register: rejected_capacity
+  failed_when: >-
+    rejected_capacity.status != 422 or rejected_capacity.json.detail !=
+    'Requested rollout exceeds remaining host or Kubernetes capacity'
+  no_log: true

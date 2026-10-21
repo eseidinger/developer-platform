@@ -1,5 +1,7 @@
 ---
-- name: Retire an explicitly confirmed project or a generated disposable drill project
+- name: >-
+    Retire an explicitly confirmed project or a generated disposable drill
+    project
   hosts: localhost
   gather_facts: false
   vars:
@@ -12,7 +14,9 @@
     platform_retire_disposable_image: hashicorp/http-echo:1.0.0
     platform_retire_verify_credential_revocation: false
   tasks:
-    - name: Require protected runner configuration and a safe retirement target mode
+
+    - name: >-
+        Require protected runner configuration and a safe retirement target mode
       ansible.builtin.assert:
         that:
           - platform_api_url is defined
@@ -20,33 +24,41 @@
           - platform_test_runner_client_id is defined
           - platform_test_runner_client_secret is defined
           - >-
-            (platform_retire_create_disposable_project | bool) or
-            (platform_retire_project is defined and
-            platform_confirm_retire_project is defined)
+              (platform_retire_create_disposable_project | bool) or
+              (platform_retire_project is defined and
+              platform_confirm_retire_project is defined)
         fail_msg: >-
-          Supply protected runner configuration and either enable generated disposable-project
-          mode or provide platform_retire_project with a matching confirmation.
+          Supply protected runner configuration and either enable generated
+          disposable-project mode or provide platform_retire_project with a
+          matching confirmation.
       no_log: true
 
     - name: Establish the retirement target
       ansible.builtin.set_fact:
         retirement_project: >-
-          {{ platform_retire_project | default('retire-drill-' +
-          lookup('pipe', 'date +%s') + '-' + (99999 | random | string)) }}
+          {{ platform_retire_project | default('retire-drill-' + lookup('pipe',
+          'date +%s') + '-' + (99999 | random | string)) }}
 
     - name: Require a valid generated retirement target name
       ansible.builtin.assert:
-        that: retirement_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
-        fail_msg: Generated retirement project name is not a valid platform project name.
+        that: >-
+          retirement_project is
+          match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+        fail_msg: >-
+          Generated retirement project name is not a valid platform project
+          name.
 
     - name: Require an exact confirmation for an existing project
       ansible.builtin.assert:
         that: platform_confirm_retire_project == retirement_project
-        fail_msg: platform_confirm_retire_project must exactly match the existing retirement target.
+        fail_msg: >-
+          platform_confirm_retire_project must exactly match the existing
+          retirement target.
       when: not (platform_retire_create_disposable_project | bool)
       no_log: true
 
-    - name: Exchange the runner credential for a fresh retirement token
+    - name: >-
+        Exchange the runner credential for a fresh retirement token
       ansible.builtin.uri:
         url: "{{ platform_oidc_token_url }}"
         method: POST
@@ -65,7 +77,8 @@
         url: "{{ platform_api_url }}/projects"
         method: POST
         headers:
-          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+          Authorization: >-
+            Bearer {{ retirement_runner_token.json.access_token }}
         body_format: json
         body:
           name: "{{ retirement_project }}"
@@ -73,15 +86,18 @@
       register: retirement_project_created
       no_log: true
 
-    - name: Deploy a minimal public workload in generated disposable-project mode
+    - name: >-
+        Deploy a minimal public workload in generated disposable-project mode
       when:
         - platform_retire_create_disposable_project | bool
         - platform_retire_deploy_disposable_workload | bool
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/projects/{{ retirement_project }}"
+        url: >-
+          {{ platform_api_url }}/projects/{{ retirement_project }}
         method: PUT
         headers:
-          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+          Authorization: >-
+            Bearer {{ retirement_runner_token.json.access_token }}
         body_format: json
         body:
           name: "{{ retirement_project }}"
@@ -92,30 +108,43 @@
       register: retirement_workload_deployment
       no_log: true
 
-    - name: Wait for the generated disposable workload to become ready
+    - name: >-
+        Wait for the generated disposable workload to become ready
       when:
         - platform_retire_create_disposable_project | bool
         - platform_retire_deploy_disposable_workload | bool
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}{{ retirement_workload_deployment.json.status_url }}"
+        url: >-
+          {{ platform_api_url }}{{
+          retirement_workload_deployment.json.status_url }}
         headers:
-          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+          Authorization: >-
+            Bearer {{ retirement_runner_token.json.access_token }}
         status_code: 200
       register: retirement_workload_operation
       until:
-        - (retirement_workload_operation.json.state | default('')) == 'succeeded'
-        - (retirement_workload_operation.json.readiness.state | default('')) == 'ready'
+        - >-
+            (retirement_workload_operation.json.state | default('')) ==
+            'succeeded'
+        - >-
+            (retirement_workload_operation.json.readiness.state | default(''))
+            == 'ready'
       retries: 60
       delay: 5
       no_log: true
 
-    - name: Create a disposable credential-revocation probe when explicitly requested
+    - name: >-
+        Create a disposable credential-revocation probe when explicitly
+        requested
       when: platform_retire_verify_credential_revocation | bool
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/projects/{{ retirement_project }}/deployment-credentials"
+        url: >-
+          {{ platform_api_url }}/projects/{{ retirement_project
+          }}/deployment-credentials
         method: POST
         headers:
-          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+          Authorization: >-
+            Bearer {{ retirement_runner_token.json.access_token }}
         body_format: json
         body:
           name: "retire-probe-{{ 999999 | random }}"
@@ -124,7 +153,8 @@
       register: retirement_probe
       no_log: true
 
-    - name: Exchange the optional retirement probe credential before retirement
+    - name: >-
+        Exchange the optional retirement probe credential before retirement
       when: platform_retire_verify_credential_revocation | bool
       ansible.builtin.uri:
         url: "{{ retirement_probe.json.token_endpoint }}"
@@ -140,61 +170,87 @@
 
     - name: Read the exact project retirement scope
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/projects/{{ retirement_project }}/retirement-preview"
+        url: >-
+          {{ platform_api_url }}/projects/{{ retirement_project
+          }}/retirement-preview
         headers:
-          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+          Authorization: >-
+            Bearer {{ retirement_runner_token.json.access_token }}
         status_code: 200
       register: retirement_preview
       no_log: true
 
-    - name: Require a scope-bound redacted access and retention inventory
+    - name: >-
+        Require a scope-bound redacted access and retention inventory
       ansible.builtin.assert:
         that:
           - retirement_preview.json.scope_token is string
-          - retirement_preview.json.access.grants_by_role is mapping
-          - retirement_preview.json.access.credentials_by_status is mapping
-          - retirement_preview.json.retains.catalog_and_revisions | bool
-        fail_msg: Retirement preview did not provide the required safe access and retained-data scope.
+          - >-
+            retirement_preview.json.access.grants_by_role is mapping
+          - >-
+            retirement_preview.json.access.credentials_by_status is mapping
+          - >-
+            retirement_preview.json.retains.catalog_and_revisions | bool
+        fail_msg: >-
+          Retirement preview did not provide the required safe access and
+          retained-data scope.
       no_log: true
 
-    - name: Require generated workload retirement scope to include its route and workload
+    - name: >-
+        Require generated workload retirement scope to include its route and
+        workload
       when:
         - platform_retire_create_disposable_project | bool
         - platform_retire_deploy_disposable_workload | bool
       ansible.builtin.assert:
         that:
-          - retirement_preview.json.removes | selectattr('kind', 'equalto', 'Deployment') | list | length == 1
-          - retirement_preview.json.removes | selectattr('kind', 'equalto', 'Ingress') | list | length == 1
+          - >-
+              retirement_preview.json.removes | selectattr('kind', 'equalto',
+              'Deployment') | list | length == 1
+          - >-
+              retirement_preview.json.removes | selectattr('kind', 'equalto',
+              'Ingress') | list | length == 1
           - retirement_preview.json.routes | length == 1
-        fail_msg: Generated workload retirement preview is missing its Deployment or public route.
+        fail_msg: >-
+          Generated workload retirement preview is missing its Deployment or
+          public route.
       no_log: true
 
-    - name: Retire the explicitly confirmed project and its workload resources
+    - name: >-
+        Retire the explicitly confirmed project and its workload resources
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/projects/{{ retirement_project }}/retire"
+        url: >-
+          {{ platform_api_url }}/projects/{{ retirement_project }}/retire
         method: POST
         headers:
-          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+          Authorization: >-
+            Bearer {{ retirement_runner_token.json.access_token }}
         body_format: json
         body:
           confirm_name: "{{ retirement_project }}"
           scope_token: "{{ retirement_preview.json.scope_token }}"
-        status_code: [200, 202]
+        status_code:
+          - 200
+          - 202
       register: project_retirement
       until: project_retirement.status == 200
       retries: "{{ platform_retire_project_retries | int }}"
       delay: "{{ platform_retire_project_delay_seconds | int }}"
       no_log: true
 
-    - name: Require completed project retirement to retain data and revoke project access
+    - name: >-
+        Require completed project retirement to retain data and revoke project
+        access
       ansible.builtin.assert:
         that:
           - project_retirement.json.data_retained | bool
           - project_retirement.json.status == 'retired'
-        fail_msg: Retirement did not complete with the expected retained-data status.
+        fail_msg: >-
+          Retirement did not complete with the expected retained-data status.
       no_log: true
 
-    - name: Require the optional retired-project credential to be denied
+    - name: >-
+        Require the optional retired-project credential to be denied
       when: platform_retire_verify_credential_revocation | bool
       ansible.builtin.uri:
         url: "{{ platform_api_url }}/projects"
@@ -206,19 +262,27 @@
     - name: Wait for retired-project credential provider cleanup
       when: platform_retire_verify_credential_revocation | bool
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/operator/projects/{{ retirement_project }}/retirement"
+        url: >-
+          {{ platform_api_url }}/operator/projects/{{ retirement_project
+          }}/retirement
         headers:
-          Authorization: "Bearer {{ retirement_runner_token.json.access_token }}"
+          Authorization: >-
+            Bearer {{ retirement_runner_token.json.access_token }}
         status_code: 200
       register: retirement_cleanup_status
       until:
         - retirement_cleanup_status.json.status == 'retired'
-        - (retirement_cleanup_status.json.credential_cleanup.revoked | default(0) | int) >= 1
-        - (retirement_cleanup_status.json.credential_cleanup.revocation_pending | default(0) | int) == 0
+        - >-
+            (retirement_cleanup_status.json.credential_cleanup.revoked |
+            default(0) | int) >= 1
+        - "(retirement_cleanup_status.json.credential_cleanup.revocation_pendin\
+            g | default(0) | int) == 0"
       retries: "{{ platform_retire_credential_cleanup_retries | int }}"
-      delay: "{{ platform_retire_credential_cleanup_delay_seconds | int }}"
+      delay: >-
+        {{ platform_retire_credential_cleanup_delay_seconds | int }}
       no_log: true
 
     - name: Report non-secret retirement evidence
       ansible.builtin.debug:
-        msg: "PASS: disposable project {{ retirement_project }} is retired."
+        msg: >-
+          PASS: disposable project {{ retirement_project }} is retired.

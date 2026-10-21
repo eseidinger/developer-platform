@@ -1,0 +1,12 @@
+set -e
+
+# Record the controller checkout, including an explicit dirty-worktree marker.
+rev=$(
+  git -C "{{ platform_source_dir }}" rev-parse HEAD 2>/dev/null || echo unknown
+)
+if [ -n "$(git -C "{{ platform_source_dir }}" \
+  status --porcelain 2>/dev/null)" ]; then
+  rev="$rev+dirty"
+fi
+
+echo "$rev"

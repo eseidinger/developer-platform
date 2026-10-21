@@ -1,5 +1,6 @@
 ---
-- name: Prove revocation fails closed during a controlled identity-provider outage
+- name: >-
+    Prove revocation fails closed during a controlled identity-provider outage
   hosts: localhost
   gather_facts: false
   vars:
@@ -7,11 +8,16 @@
     platform_identity_drill_install_dir: /opt/developer-platform
     platform_identity_outage_credential_name: identity-outage-drill
   tasks:
-    - name: Require explicit approval and protected outage-drill inputs
+
+    - name: >-
+        Require explicit approval and protected outage-drill inputs
       ansible.builtin.assert:
         that:
-          - platform_allow_identity_outage_drill | default(false) | bool
-          - platform_identity_outage_acknowledgement == 'I_ACCEPT_IDENTITY_OUTAGE'
+          - >-
+            platform_allow_identity_outage_drill | default(false) | bool
+          - >-
+              platform_identity_outage_acknowledgement ==
+              'I_ACCEPT_IDENTITY_OUTAGE'
           - platform_api_url is defined
           - platform_oidc_token_url is defined
           - platform_test_runner_client_id is defined
@@ -20,22 +26,29 @@
           - platform_identity_drill_host in groups['all']
           - platform_identity_drill_install_dir | length > 1
         fail_msg: >-
-          This drill stops Keycloak. Supply protected runner configuration, a reachable platform
-          inventory host, platform_allow_identity_outage_drill=true, and the acknowledgement.
+          This drill stops Keycloak. Supply protected runner configuration, a
+          reachable platform inventory host,
+          platform_allow_identity_outage_drill=true, and the acknowledgement.
       no_log: true
 
     - name: Establish unique disposable identity-outage inputs
       ansible.builtin.set_fact:
         identity_drill_run_id: "identity-drill-{{ lookup('pipe', 'date +%s') }}"
-        identity_drill_project: "{{ platform_identity_drill_project | default('id-drill-' + lookup('pipe', 'date +%s') + '-' + (9999 | random | string)) }}"
+        identity_drill_project: >-
+          {{ platform_identity_drill_project | default('id-drill-' +
+          lookup('pipe', 'date +%s') + '-' + (9999 | random | string)) }}
 
     - name: Require a valid generated identity-outage project name
       ansible.builtin.assert:
-        that: identity_drill_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+        that: >-
+          identity_drill_project is
+          match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
 
     - name: Report the non-secret disposable project name
       ansible.builtin.debug:
-        msg: "Identity-provider outage drill target: {{ identity_drill_project }}"
+        msg: >-
+          Identity-provider outage drill target: {{ identity_drill_project }}
+
 
     - name: Exchange the runner credential
       ansible.builtin.uri:
@@ -52,13 +65,17 @@
 
     - name: Exercise the controlled identity-provider outage
       block:
+
         - name: Create the disposable identity-outage project
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects"
             method: POST
-            headers: {Authorization: "Bearer {{ identity_runner_token.json.access_token }}"}
+            headers:
+              Authorization: >-
+                Bearer {{ identity_runner_token.json.access_token }}
             body_format: json
-            body: {name: "{{ identity_drill_project }}"}
+            body:
+              name: "{{ identity_drill_project }}"
             status_code: 201
           no_log: true
 
@@ -66,7 +83,9 @@
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/platform/test-identities"
             method: POST
-            headers: {Authorization: "Bearer {{ identity_runner_token.json.access_token }}"}
+            headers:
+              Authorization: >-
+                Bearer {{ identity_runner_token.json.access_token }}
             body_format: json
             body:
               name: "administrator-{{ identity_drill_run_id }}"
@@ -86,16 +105,21 @@
             body:
               grant_type: client_credentials
               client_id: "{{ identity_admin_credential.json.client_id }}"
-              client_secret: "{{ identity_admin_credential.json.client_secret }}"
+              client_secret: >-
+                {{ identity_admin_credential.json.client_secret }}
             status_code: 200
           register: identity_admin_token
           no_log: true
 
         - name: Create a disposable deployment credential
           ansible.builtin.uri:
-            url: "{{ platform_api_url }}/projects/{{ identity_drill_project }}/deployment-credentials"
+            url: >-
+              {{ platform_api_url }}/projects/{{ identity_drill_project
+              }}/deployment-credentials
             method: POST
-            headers: {Authorization: "Bearer {{ identity_admin_token.json.access_token }}"}
+            headers:
+              Authorization: >-
+                Bearer {{ identity_admin_token.json.access_token }}
             body_format: json
             body:
               name: "{{ platform_identity_outage_credential_name }}"
@@ -120,25 +144,37 @@
         - name: Verify disposable credential access before the outage
           ansible.builtin.uri:
             url: "{{ platform_api_url }}/projects"
-            headers: {Authorization: "Bearer {{ outage_token.json.access_token }}"}
+            headers:
+              Authorization: "Bearer {{ outage_token.json.access_token }}"
             status_code: 200
           no_log: true
 
         - name: Run controlled Keycloak stop and restoration
           block:
+
             - name: Stop Keycloak for the approved outage drill
               ansible.builtin.command:
-                argv: [docker, compose, stop, keycloak]
+                argv:
+                  - docker
+                  - compose
+                  - stop
+                  - keycloak
                 chdir: "{{ platform_identity_drill_install_dir }}"
               delegate_to: "{{ platform_identity_drill_host }}"
               become: true
               changed_when: true
 
-            - name: Revoke the credential while provider cleanup is unavailable
+            - name: >-
+                Revoke the credential while provider cleanup is unavailable
               ansible.builtin.uri:
-                url: "{{ platform_api_url }}/projects/{{ identity_drill_project }}/deployment-credentials/{{ outage_credential.json.credential_id }}"
+                url: >-
+                  {{ platform_api_url }}/projects/{{ identity_drill_project
+                  }}/deployment-credentials/{{
+                  outage_credential.json.credential_id }}
                 method: DELETE
-                headers: {Authorization: "Bearer {{ identity_admin_token.json.access_token }}"}
+                headers:
+                  Authorization: >-
+                    Bearer {{ identity_admin_token.json.access_token }}
                 status_code: 202
               register: pending_revocation
               no_log: true
@@ -148,22 +184,34 @@
                 that: pending_revocation.json.status == 'revocation_pending'
               no_log: true
 
-            - name: Prove the already-issued credential token is immediately denied
+            - name: >-
+                Prove the already-issued credential token is immediately denied
               ansible.builtin.uri:
                 url: "{{ platform_api_url }}/projects"
-                headers: {Authorization: "Bearer {{ outage_token.json.access_token }}"}
+                headers:
+                  Authorization: "Bearer {{ outage_token.json.access_token }}"
                 status_code: 403
               no_log: true
           always:
+
             - name: Restore Keycloak even if the outage drill fails
               ansible.builtin.command:
-                argv: [docker, compose, up, -d, --wait, --wait-timeout, '120', keycloak]
+                argv:
+                  - docker
+                  - compose
+                  - up
+                  - -d
+                  - --wait
+                  - --wait-timeout
+                  - '120'
+                  - keycloak
                 chdir: "{{ platform_identity_drill_install_dir }}"
               delegate_to: "{{ platform_identity_drill_host }}"
               become: true
               changed_when: true
 
-        - name: Refresh the project administrator token after Keycloak recovery
+        - name: >-
+            Refresh the project administrator token after Keycloak recovery
           ansible.builtin.uri:
             url: "{{ identity_admin_credential.json.token_endpoint }}"
             method: POST
@@ -171,20 +219,29 @@
             body:
               grant_type: client_credentials
               client_id: "{{ identity_admin_credential.json.client_id }}"
-              client_secret: "{{ identity_admin_credential.json.client_secret }}"
+              client_secret: >-
+                {{ identity_admin_credential.json.client_secret }}
             status_code: 200
           register: identity_recovered_admin_token
           retries: 24
           delay: 5
-          until: identity_recovered_admin_token.status | default(0) == 200
+          until: >-
+            identity_recovered_admin_token.status | default(0) == 200
           no_log: true
 
         - name: Retry provider cleanup after Keycloak recovery
           ansible.builtin.uri:
-            url: "{{ platform_api_url }}/projects/{{ identity_drill_project }}/deployment-credentials/{{ outage_credential.json.credential_id }}"
+            url: >-
+              {{ platform_api_url }}/projects/{{ identity_drill_project
+              }}/deployment-credentials/{{ outage_credential.json.credential_id
+              }}
             method: DELETE
-            headers: {Authorization: "Bearer {{ identity_recovered_admin_token.json.access_token }}"}
-            status_code: [200, 202]
+            headers:
+              Authorization: >-
+                Bearer {{ identity_recovered_admin_token.json.access_token }}
+            status_code:
+              - 200
+              - 202
           register: completed_revocation
           until:
             - completed_revocation.status == 200
@@ -193,6 +250,7 @@
           delay: 5
           no_log: true
       always:
+
         - name: Refresh runner token before identity-outage cleanup
           ansible.builtin.uri:
             url: "{{ platform_oidc_token_url }}"
@@ -212,14 +270,21 @@
 
         - name: Select the identity-outage cleanup token
           ansible.builtin.set_fact:
-            identity_cleanup_token: "{{ identity_cleanup_response.get('json', {}).get('access_token', '') }}"
+            identity_cleanup_token: >-
+              {{ identity_cleanup_response.get('json', {}).get('access_token',
+              '') }}
           no_log: true
 
         - name: Read identity-outage project retirement scope
           ansible.builtin.uri:
-            url: "{{ platform_api_url }}/projects/{{ identity_drill_project }}/retirement-preview"
-            headers: {Authorization: "Bearer {{ identity_cleanup_token }}"}
-            status_code: [200, 404]
+            url: >-
+              {{ platform_api_url }}/projects/{{ identity_drill_project
+              }}/retirement-preview
+            headers:
+              Authorization: "Bearer {{ identity_cleanup_token }}"
+            status_code:
+              - 200
+              - 404
           register: identity_cleanup_preview
           failed_when: false
           when: identity_cleanup_token | length > 0
@@ -227,14 +292,21 @@
 
         - name: Retire the disposable identity-outage project
           ansible.builtin.uri:
-            url: "{{ platform_api_url }}/projects/{{ identity_drill_project }}/retire"
+            url: >-
+              {{ platform_api_url }}/projects/{{ identity_drill_project
+              }}/retire
             method: POST
-            headers: {Authorization: "Bearer {{ identity_cleanup_token }}"}
+            headers:
+              Authorization: "Bearer {{ identity_cleanup_token }}"
             body_format: json
             body:
               confirm_name: "{{ identity_drill_project }}"
               scope_token: "{{ identity_cleanup_preview.json.scope_token }}"
-            status_code: [200, 202, 404, 409]
+            status_code:
+              - 200
+              - 202
+              - 404
+              - 409
           register: identity_cleanup
           until: identity_cleanup.status != 202
           retries: 60
@@ -242,15 +314,22 @@
           failed_when: false
           when:
             - identity_cleanup_token | length > 0
-            - identity_cleanup_preview.status | default(0) | int == 200
+            - >-
+              identity_cleanup_preview.status | default(0) | int == 200
           no_log: true
 
         - name: Revoke the disposable project administrator persona
           ansible.builtin.uri:
-            url: "{{ platform_api_url }}/platform/test-identities/{{ identity_admin_credential.json.credential_id }}"
+            url: >-
+              {{ platform_api_url }}/platform/test-identities/{{
+              identity_admin_credential.json.credential_id }}
             method: DELETE
-            headers: {Authorization: "Bearer {{ identity_cleanup_token }}"}
-            status_code: [200, 202, 404]
+            headers:
+              Authorization: "Bearer {{ identity_cleanup_token }}"
+            status_code:
+              - 200
+              - 202
+              - 404
           failed_when: false
           when:
             - identity_admin_credential is defined
@@ -260,5 +339,6 @@
     - name: Report non-secret outage-drill evidence
       ansible.builtin.debug:
         msg: >-
-          PASS: {{ identity_drill_project }} denied its revoked deployment credential while
-          Keycloak was unavailable and completed provider cleanup after recovery.
+          PASS: {{ identity_drill_project }} denied its revoked deployment
+          credential while Keycloak was unavailable and completed provider
+          cleanup after recovery.

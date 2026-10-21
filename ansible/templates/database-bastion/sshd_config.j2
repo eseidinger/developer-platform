@@ -1,0 +1,24 @@
+Port {{ database_bastion_port }}
+ListenAddress {{ database_bastion_bind_ip }}
+HostKey /etc/ssh/ssh_host_ed25519_key
+PidFile /run/sshd-platform-db.pid
+LogLevel VERBOSE
+UsePAM no
+PermitRootLogin no
+AllowUsers platform-db
+PasswordAuthentication no
+KbdInteractiveAuthentication no
+PubkeyAuthentication yes
+AuthorizedKeysFile none
+AuthorizedKeysCommand /usr/local/libexec/platform-db-authorized-key %f
+AuthorizedKeysCommandUser platform-db-keylookup
+AllowTcpForwarding local
+PermitOpen {{ database_store_relay_ip }}:*
+PermitListen none
+AllowStreamLocalForwarding no
+AllowAgentForwarding no
+X11Forwarding no
+PermitTunnel no
+PermitTTY no
+PermitUserEnvironment no
+MaxSessions 0

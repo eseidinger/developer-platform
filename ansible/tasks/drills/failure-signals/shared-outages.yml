@@ -1,0 +1,127 @@
+---
+- name: Exercise the shared ingress failure boundary
+  block:
+
+    - name: Stop the shared edge proxy
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - stop
+          - proxy
+        chdir: "{{ platform_failure_drill_install_dir }}"
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      changed_when: true
+
+    - name: Wait for a project-attributed ingress failure alert
+      ansible.builtin.uri:
+        url: >-
+          http://127.0.0.1:9090/api/v1/query?query={{
+          ('ALERTS{alertname="ApplicationUnavailable",project="' +
+          failure_project + '",alertstate="firing"}') | urlencode }}
+        status_code: 200
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      register: failure_ingress_alert
+      until: >-
+        failure_ingress_alert.json.data.result | default([]) | length > 0
+      retries: 55
+      delay: 5
+      no_log: true
+  always:
+
+    - name: Restore the shared edge proxy
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - up
+          - -d
+          - --wait
+          - --wait-timeout
+          - '120'
+          - proxy
+        chdir: "{{ platform_failure_drill_install_dir }}"
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      changed_when: true
+
+- name: Wait for ingress alert resolution
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:9090/api/v1/query?query={{
+      ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+      '",alertstate="firing"}') | urlencode }}
+    status_code: 200
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  register: failure_ingress_resolution
+  until: >-
+    failure_ingress_resolution.json.data.result | default([]) | length == 0
+  retries: 40
+  delay: 5
+  no_log: true
+
+- name: Exercise the local monitoring failure boundary
+  block:
+
+    - name: Stop Prometheus
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - stop
+          - prometheus
+        chdir: "{{ platform_failure_drill_install_dir }}"
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      changed_when: true
+
+    - name: >-
+        Require the Prometheus readiness endpoint to be unavailable
+      ansible.builtin.command:
+        argv:
+          - curl
+          - --fail
+          - --silent
+          - --show-error
+          - http://127.0.0.1:9090/-/ready
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      register: failure_prometheus_down
+      changed_when: false
+      failed_when: failure_prometheus_down.rc == 0
+  always:
+
+    - name: Restore Prometheus
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - up
+          - -d
+          - --wait
+          - --wait-timeout
+          - '120'
+          - prometheus
+        chdir: "{{ platform_failure_drill_install_dir }}"
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      changed_when: true
+
+- name: Require Prometheus readiness after recovery
+  ansible.builtin.command:
+    argv:
+      - curl
+      - --fail
+      - --silent
+      - --show-error
+      - http://127.0.0.1:9090/-/ready
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  register: failure_prometheus_recovered
+  until: failure_prometheus_recovered.rc == 0
+  retries: 30
+  delay: 2
+  changed_when: false

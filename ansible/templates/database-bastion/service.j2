@@ -1,0 +1,14 @@
+[Unit]
+Description=Restricted Developer Platform database SSH tunnel
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/install -d -m 0755 /run/sshd
+ExecStartPre=/usr/sbin/sshd -t -f /etc/ssh/sshd_config_platform_db
+ExecStart=/usr/sbin/sshd -D -e -f /etc/ssh/sshd_config_platform_db
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

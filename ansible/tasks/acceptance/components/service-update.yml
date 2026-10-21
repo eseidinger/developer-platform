@@ -1,0 +1,166 @@
+---
+- name: >-
+    Capture the unchanged peer Deployment generation before an API-only update
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_component_kubectl }}"
+      - --kubeconfig
+      - "{{ platform_component_kubeconfig }}"
+      - get
+      - deployment
+      - peer
+      - -n
+      - "project-{{ component_project }}"
+      - -o
+      - jsonpath={.metadata.generation}
+  delegate_to: "{{ platform_component_drill_host }}"
+  become: "{{ platform_component_drill_become | bool }}"
+  register: peer_before
+  changed_when: false
+
+- name: >-
+    Refresh the project administrator token before the API-only update
+  ansible.builtin.uri:
+    url: "{{ component_admin_credential.json.token_endpoint }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: client_credentials
+      client_id: "{{ component_admin_credential.json.client_id }}"
+      client_secret: "{{ component_admin_credential.json.client_secret }}"
+    status_code: 200
+  register: component_admin_token_refresh
+  no_log: true
+
+- name: >-
+    Use the refreshed project administrator token for the API-only update
+  ansible.builtin.set_fact:
+    component_admin_access_token: >-
+      {{ component_admin_token_refresh.json.access_token }}
+  no_log: true
+
+- name: Update only the API component
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_access_token }}"
+    body_format: json
+    body:
+      apiVersion: platform.example/v1alpha2
+      kind: Application
+      metadata:
+        name: "{{ component_project }}"
+      spec:
+        components:
+          - name: api
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+              args:
+                - '-listen=:5678'
+                - '-text=component-api-v2'
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+          - name: peer
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+              args:
+                - '-listen=:5678'
+                - '-text=component-peer'
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+          - name: probe
+            type: scheduled
+            runtime:
+              type: container
+              image: "{{ platform_component_job_image }}"
+              command:
+                - '/bin/sh'
+                - '-ec'
+              args:
+                - >-
+                    for n in $(seq 1 10); do wget -qO- http://api:5678/ && wget
+                    -qO- http://peer:5678/ && sleep 75 && exit 0; sleep 2; done;
+                    exit 1
+            schedule: '* * * * *'
+            timeZone: UTC
+            concurrencyPolicy: Forbid
+          - name: failing-probe
+            type: scheduled
+            runtime:
+              type: container
+              image: "{{ platform_component_job_image }}"
+              command:
+                - '/bin/sh'
+                - '-ec'
+              args:
+                - 'echo scheduled-failure >&2; exit 1'
+            schedule: '* * * * *'
+            timeZone: UTC
+            concurrencyPolicy: Forbid
+    status_code: 202
+  register: api_only_update
+  no_log: true
+
+- name: Wait for the API-only update
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ api_only_update.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ component_admin_access_token }}"
+    status_code: 200
+  register: api_update_operation
+  until: >-
+    (api_update_operation.json.state | default('')) == 'succeeded'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: >-
+    Verify changing the API service to private removes its obsolete public route
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project }}/resources
+    headers:
+      Authorization: "Bearer {{ component_admin_access_token }}"
+    status_code: 200
+  register: private_component_inventory
+  until: >-
+    'api-public' not in (private_component_inventory.json.routes | list)
+  retries: 12
+  delay: 5
+  no_log: true
+
+- name: >-
+    Capture the peer Deployment generation after the API-only update
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_component_kubectl }}"
+      - --kubeconfig
+      - "{{ platform_component_kubeconfig }}"
+      - get
+      - deployment
+      - peer
+      - -n
+      - "project-{{ component_project }}"
+      - -o
+      - jsonpath={.metadata.generation}
+  delegate_to: "{{ platform_component_drill_host }}"
+  become: "{{ platform_component_drill_become | bool }}"
+  register: peer_after
+  changed_when: false
+
+- name: Require the unchanged peer Deployment not to roll
+  ansible.builtin.assert:
+    that: peer_before.stdout == peer_after.stdout
+    fail_msg: >-
+      The unchanged peer Deployment generation changed during the API-only
+      update.

@@ -1,0 +1,94 @@
+---
+- name: Delete the disposable application Deployment
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ platform_failure_drill_kubeconfig }}"
+      - -n
+      - "project-{{ failure_project }}"
+      - delete
+      - deployment
+      - "{{ failure_project }}"
+      - --wait=true
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  changed_when: true
+
+- name: Wait for a firing project-attributed application alert
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:9090/api/v1/query?query={{
+      ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+      '",alertstate="firing"}') | urlencode }}
+    status_code: 200
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  register: failure_application_alert
+  until: >-
+    failure_application_alert.json.data.result | default([]) | length > 0
+  retries: 55
+  delay: 5
+  no_log: true
+
+- name: Refresh the runner token before application recovery
+  ansible.builtin.uri:
+    url: "{{ platform_oidc_token_url }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: client_credentials
+      client_id: "{{ platform_test_runner_client_id }}"
+      client_secret: "{{ platform_test_runner_client_secret }}"
+    status_code: 200
+  register: failure_recovery_token
+  no_log: true
+
+- name: Reconcile the disposable application after failure
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ failure_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ failure_recovery_token.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ failure_project }}"
+      image: "{{ platform_failure_drill_image }}"
+      port: 5678
+      probe_profile: hello-world
+    status_code: 202
+  register: failure_recovery_deployment
+  no_log: true
+
+- name: Wait for application recovery
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ failure_recovery_deployment.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ failure_recovery_token.json.access_token }}"
+    status_code: 200
+  register: failure_recovery_operation
+  until:
+    - >-
+      (failure_recovery_operation.json.state | default('')) == 'succeeded'
+    - >-
+      (failure_recovery_operation.json.readiness.state | default('')) == 'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: Wait for application alert resolution
+  ansible.builtin.uri:
+    url: >-
+      http://127.0.0.1:9090/api/v1/query?query={{
+      ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+      '",alertstate="firing"}') | urlencode }}
+    status_code: 200
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  register: failure_application_resolution
+  until: >-
+    failure_application_resolution.json.data.result | default([]) | length == 0
+  retries: 40
+  delay: 5
+  no_log: true

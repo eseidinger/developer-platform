@@ -7,7 +7,9 @@
     platform_test_runner_name: platform-acceptance-suite
     platform_test_runner_expires_in_days: 7
   tasks:
-    - name: Require human bootstrap inputs and a protected output path
+
+    - name: >-
+        Require human bootstrap inputs and a protected output path
       ansible.builtin.assert:
         that:
           - platform_api_url is defined
@@ -15,28 +17,32 @@
           - platform_test_runner_output is defined
           - platform_test_runner_output | length > 0
         fail_msg: >-
-          Supply platform_api_url, platform_human_admin_token, and an explicit protected
-          platform_test_runner_output path.
+          Supply platform_api_url, platform_human_admin_token, and an explicit
+          protected platform_test_runner_output path.
       no_log: true
 
-    - name: Inspect the controller output directory before creating an identity
+    - name: >-
+        Inspect the controller output directory before creating an identity
       ansible.builtin.stat:
         path: "{{ platform_test_runner_output | dirname }}"
       register: platform_test_runner_output_directory
       no_log: true
 
-    - name: Require a writable protected controller output directory
+    - name: >-
+        Require a writable protected controller output directory
       ansible.builtin.assert:
         that:
           - platform_test_runner_output_directory.stat.exists
           - platform_test_runner_output_directory.stat.isdir
           - platform_test_runner_output_directory.stat.writeable
         fail_msg: >-
-          Create a writable protected directory on the controller before bootstrapping.
-          platform_test_runner_output is written locally, not on the platform host.
+          Create a writable protected directory on the controller before
+          bootstrapping. platform_test_runner_output is written locally, not on
+          the platform host.
       no_log: true
 
-    - name: Refuse to overwrite an existing one-time credential output
+    - name: >-
+        Refuse to overwrite an existing one-time credential output
       ansible.builtin.stat:
         path: "{{ platform_test_runner_output }}"
       register: platform_test_runner_output_file
@@ -46,8 +52,9 @@
       ansible.builtin.assert:
         that: not platform_test_runner_output_file.stat.exists
         fail_msg: >-
-          Refusing to overwrite an existing test-runner credential output. Choose a new
-          protected path or revoke and remove the old credential deliberately.
+          Refusing to overwrite an existing test-runner credential output.
+          Choose a new protected path or revoke and remove the old credential
+          deliberately.
       no_log: true
 
     - name: Create an expiring test-runner identity
@@ -64,22 +71,23 @@
       register: test_runner
       no_log: true
 
-    - name: Write the one-time credential to its protected destination
+    - name: >-
+        Write the one-time credential to its protected destination
       ansible.builtin.copy:
         dest: "{{ platform_test_runner_output }}"
         mode: "0600"
         content: >-
-          {{ {'platform_api_url': platform_api_url,
-              'platform_oidc_token_url': test_runner.json.token_endpoint,
-              'platform_test_runner_client_id': test_runner.json.client_id,
-              'platform_test_runner_client_secret': test_runner.json.client_secret,
-              'platform_test_runner_credential_id': test_runner.json.credential_id,
-              'platform_test_runner_expires_at': test_runner.json.expires_at} | to_nice_json }}
+          {{ {'platform_api_url': platform_api_url, 'platform_oidc_token_url':
+          test_runner.json.token_endpoint, 'platform_test_runner_client_id':
+          test_runner.json.client_id, 'platform_test_runner_client_secret':
+          test_runner.json.client_secret, 'platform_test_runner_credential_id':
+          test_runner.json.credential_id, 'platform_test_runner_expires_at':
+          test_runner.json.expires_at} | to_nice_json }}
       no_log: true
 
     - name: Report the safe bootstrap result
       ansible.builtin.debug:
         msg: >-
-          Test runner {{ test_runner.json.credential_id }} expires at
-          {{ test_runner.json.expires_at }}; its protected configuration was written to
-          {{ platform_test_runner_output }}.
+          Test runner {{ test_runner.json.credential_id }} expires at {{
+          test_runner.json.expires_at }}; its protected configuration was
+          written to {{ platform_test_runner_output }}.

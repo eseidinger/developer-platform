@@ -1,0 +1,26 @@
+set -eo pipefail
+
+# Keep the installation record limited to tool versions and image references.
+echo "docker=$(docker version --format '{{ '{{' }}.Server.Version{{ '}}' }}')"
+echo "compose=$(docker compose version --short)"
+echo "k3d=$(.runtime/bin/k3d version | head -1)"
+echo "kubectl=$(.runtime/bin/kubectl version --client | head -1)"
+
+# Compose may return one JSON document or newline-delimited JSON.
+docker compose images --format json | python3 -c '
+import json
+import sys
+
+raw = sys.stdin.read().strip()
+try:
+    rows = json.loads(raw)
+except ValueError:
+    rows = [json.loads(line) for line in raw.splitlines() if line.strip()]
+if isinstance(rows, dict):
+    rows = [rows]
+for r in sorted(rows, key=lambda r: r.get("ContainerName", "")):
+    name = r.get("ContainerName", "").replace("developer-platform-", "")
+    print("image.%s=%s:%s@%s" % (
+        name, r.get("Repository"), r.get("Tag"), r.get("ID")
+    ))
+'

@@ -1,0 +1,188 @@
+---
+- name: >-
+    Migrate to two services and a non-overlapping scheduled component
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    body_format: json
+    body:
+      apiVersion: platform.example/v1alpha2
+      kind: Application
+      metadata:
+        name: "{{ component_project }}"
+      spec:
+        components:
+          - name: api
+            type: service
+            replicas: 2
+            exposure: public
+            resources:
+              requests:
+                cpu: 200m
+                memory: 256Mi
+              limits:
+                cpu: 500m
+                memory: 512Mi
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+              args:
+                - '-listen=:5678'
+                - '-text=component-api'
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+          - name: peer
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+              args:
+                - '-listen=:5678'
+                - '-text=component-peer'
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+          - name: probe
+            type: scheduled
+            runtime:
+              type: container
+              image: "{{ platform_component_job_image }}"
+              command:
+                - '/bin/sh'
+                - '-ec'
+              # A Pod can begin before the node has installed its Service
+              # rules. Retry the
+              # disposable connectivity assertion briefly, then keep the
+              # Job alive long
+              # enough to prove Forbid prevents overlap.
+              args:
+                - >-
+                    for n in $(seq 1 10); do wget -qO- http://api:5678/ && wget
+                    -qO- http://peer:5678/ && sleep 75 && exit 0; sleep 2; done;
+                    exit 1
+            schedule: '* * * * *'
+            timeZone: UTC
+            concurrencyPolicy: Forbid
+          - name: failing-probe
+            type: scheduled
+            runtime:
+              type: container
+              image: "{{ platform_component_job_image }}"
+              command:
+                - '/bin/sh'
+                - '-ec'
+              args:
+                - 'echo scheduled-failure >&2; exit 1'
+            schedule: '* * * * *'
+            timeZone: UTC
+            concurrencyPolicy: Forbid
+    status_code: 202
+  register: component_deployment
+  no_log: true
+
+- name: >-
+    Require the component deployment operation to complete successfully
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ component_deployment.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    status_code: 200
+  register: component_deployment_operation
+  until: >-
+    component_deployment_operation.json.state not in ['queued', 'running']
+  retries: 60
+  delay: 5
+  failed_when: >-
+    component_deployment_operation.json.state != 'succeeded'
+  no_log: true
+
+- name: Wait for both long-running components to become ready
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project }}/components
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    status_code: 200
+  register: component_status
+  until: >-
+    (component_status.json.components | selectattr('type', 'equalto', 'service')
+    | map(attribute='status.state') | list) == ['ready', 'ready']
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: Require the declared API replica count in Kubernetes
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_component_kubectl }}"
+      - --kubeconfig
+      - "{{ platform_component_kubeconfig }}"
+      - get
+      - deployment
+      - api
+      - -n
+      - "project-{{ component_project }}"
+      - -o
+      - jsonpath={.spec.replicas}
+  delegate_to: "{{ platform_component_drill_host }}"
+  register: api_replicas
+  changed_when: false
+
+- name: Assert the API service scaled to two replicas
+  ansible.builtin.assert:
+    that: api_replicas.stdout == '2'
+
+- name: Require stable internal Services on Kubernetes
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_component_kubectl }}"
+      - --kubeconfig
+      - "{{ platform_component_kubeconfig }}"
+      - get
+      - service
+      - -n
+      - "project-{{ component_project }}"
+      - -o
+      - jsonpath={.items[*].metadata.name}
+  delegate_to: "{{ platform_component_drill_host }}"
+  become: "{{ platform_component_drill_become | bool }}"
+  register: component_resources
+  changed_when: false
+
+- name: Assert both internal Service names exist
+  ansible.builtin.assert:
+    that:
+      - "'api' in component_resources.stdout.split()"
+      - "'peer' in component_resources.stdout.split()"
+
+- name: Wait for the scheduled CronJob to appear on Kubernetes
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_component_kubectl }}"
+      - --kubeconfig
+      - "{{ platform_component_kubeconfig }}"
+      - get
+      - cronjob
+      - probe
+      - -n
+      - "project-{{ component_project }}"
+  delegate_to: "{{ platform_component_drill_host }}"
+  register: scheduled_component_resource
+  until: scheduled_component_resource.rc == 0
+  retries: 12
+  delay: 5
+  changed_when: false
+  failed_when: false
+
+- name: Require the expected scheduled CronJob
+  ansible.builtin.assert:
+    that: scheduled_component_resource.rc == 0
+    fail_msg: >-
+      CronJob probe was not found in project-{{ component_project }} after the
+      component deployment succeeded.

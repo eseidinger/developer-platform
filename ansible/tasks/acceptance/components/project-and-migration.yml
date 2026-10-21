@@ -1,0 +1,140 @@
+---
+- name: Create the empty disposable project
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ component_project }}"
+    status_code: 201
+  no_log: true
+
+- name: Create a short-lived project administrator persona
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/platform/test-identities"
+    method: POST
+    headers:
+      Authorization: "Bearer {{ component_runner_token.json.access_token }}"
+    body_format: json
+    body:
+      name: "component-admin-{{ component_run_id }}"
+      role: project-admin
+      project: "{{ component_project }}"
+      test_run_id: "{{ component_run_id }}"
+      expires_in_hours: 2
+    status_code: 201
+  register: component_admin_credential
+  no_log: true
+
+- name: Exchange the project administrator credential
+  ansible.builtin.uri:
+    url: "{{ component_admin_credential.json.token_endpoint }}"
+    method: POST
+    body_format: form-urlencoded
+    body:
+      grant_type: client_credentials
+      client_id: "{{ component_admin_credential.json.client_id }}"
+      client_secret: "{{ component_admin_credential.json.client_secret }}"
+    status_code: 200
+  register: component_admin_token
+  no_log: true
+
+- name: >-
+    Deploy the legacy single-service revision to establish migration history
+  ansible.builtin.uri:
+    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    body_format: json
+    body:
+      name: "{{ component_project }}"
+      image: "{{ platform_component_service_image }}"
+      port: 5678
+      probe_profile: hello-world
+    status_code: 202
+  register: legacy_deployment
+  no_log: true
+
+- name: Wait for the legacy revision
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ legacy_deployment.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    status_code: 200
+  register: legacy_operation
+  until:
+    - >-
+      (legacy_operation.json.state | default('')) == 'succeeded'
+    - >-
+      (legacy_operation.json.readiness.state | default('')) == 'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: Add configuration before migrating the legacy revision
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project }}/configuration
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    body_format: json
+    body:
+      values:
+        COMPONENT_ACCEPTANCE_RUN: "{{ component_run_id }}"
+    status_code: 202
+  register: legacy_configuration
+  no_log: true
+
+- name: Wait for configuration activation before migration
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}{{ legacy_configuration.json.status_url }}
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    status_code: 200
+  register: legacy_configuration_operation
+  until:
+    - >-
+      (legacy_configuration_operation.json.state | default('')) == 'succeeded'
+    - >-
+        (legacy_configuration_operation.json.readiness.state | default('')) ==
+        'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: >-
+    Add a write-only secret before migrating the legacy revision
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project
+      }}/secrets/COMPONENT_ACCEPTANCE_SECRET
+    method: PUT
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    body_format: json
+    body:
+      value: "{{ component_run_id }}-secret"
+    status_code: 202
+  register: legacy_secret
+  no_log: true
+
+- name: Require the migrated secret to remain write-only
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project }}/secrets
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    status_code: 200
+  register: legacy_secret_listing
+  until: >-
+    legacy_secret_listing.json.secrets | selectattr('name', 'equalto',
+    'COMPONENT_ACCEPTANCE_SECRET') | list | length == 1
+  retries: 24
+  delay: 5
+  no_log: true

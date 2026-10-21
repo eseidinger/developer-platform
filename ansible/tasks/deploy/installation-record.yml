@@ -1,0 +1,72 @@
+---
+- name: Resolve the source revision being installed
+  ansible.builtin.shell: >-
+    {{ lookup('ansible.builtin.template',
+       playbook_dir ~ '/templates/deploy/source-revision.sh.j2') }}
+  args:
+    executable: /bin/bash
+  delegate_to: localhost
+  become: false
+  register: platform_source_revision
+  changed_when: false
+
+- name: Collect tool versions and running images
+  ansible.builtin.shell: >-
+    {{ lookup('ansible.builtin.template',
+       playbook_dir ~ '/templates/deploy/runtime-versions.sh.j2') }}
+  args:
+    chdir: "{{ platform_install_dir }}"
+    executable: /bin/bash
+  register: platform_versions
+  changed_when: false
+
+- name: >-
+    Record the installation (versions and non-secret parameters only)
+  ansible.builtin.copy:
+    dest: >-
+      {{ platform_install_dir }}/.runtime/installation-record.json
+    owner: root
+    group: root
+    mode: '0600'
+    content: "{{ record | to_nice_json }}\n"
+  vars:
+    record:
+      recorded_at: "{{ ansible_facts['date_time']['iso8601'] }}"
+      source_revision: "{{ platform_source_revision.stdout | trim }}"
+      host:
+        distribution: >-
+          {{ ansible_facts['distribution'] }} {{
+          ansible_facts['distribution_version'] }}
+        architecture: "{{ ansible_facts['architecture'] }}"
+      parameters:
+        platform_domain: "{{ platform_domain }}"
+        platform_apps_domain: "{{ platform_apps_domain }}"
+        platform_identity_domain: "{{ platform_identity_domain }}"
+        platform_edge_bind_ip: "{{ platform_edge_bind_ip }}"
+        platform_image_registries: "{{ platform_image_registries }}"
+        platform_drift_scan_interval_seconds: >-
+          {{ platform_drift_scan_interval_seconds | int }}
+        platform_revision_retention: "{{ platform_revision_retention | int }}"
+        platform_capacity_admission_enabled: >-
+          {{ platform_capacity_admission_enabled | bool }}
+        platform_capacity_reserve_cpu_millicores: >-
+          {{ platform_capacity_reserve_cpu_millicores | int }}
+        platform_capacity_reserve_memory_mib: >-
+          {{ platform_capacity_reserve_memory_mib | int }}
+        platform_capacity_host_overhead_cpu_millicores: >-
+          {{ platform_capacity_host_overhead_cpu_millicores | int }}
+        platform_capacity_host_overhead_memory_mib: >-
+          {{ platform_capacity_host_overhead_memory_mib | int }}
+        platform_capacity_kubernetes_overhead_memory_mib: >-
+          {{ platform_capacity_kubernetes_overhead_memory_mib | int }}
+        platform_install_docker: "{{ platform_install_docker | bool }}"
+        platform_kubectl_version: "{{ platform_kubectl_version }}"
+        managed_environment: "{{ platform_managed_settings }}"
+        tracing: "{{ platform_tracing_settings }}"
+        platform_bootstrap_timeout_seconds: >-
+          {{ platform_bootstrap_timeout_seconds | default(3600) | int }}
+        platform_readiness_timeout_seconds: >-
+          {{ platform_readiness_timeout_seconds | default(300) | int }}
+      versions: >-
+        {{ platform_versions.stdout_lines | select('match', '^[a-z0-9._-]+=') |
+        map('regex_replace', '^([^=]+)=(.*)$', '\1: \2') | list }}

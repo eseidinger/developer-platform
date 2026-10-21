@@ -1,0 +1,113 @@
+---
+- name: >-
+    Wait for the deliberately failing scheduled component to report a safe
+    failure
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project }}/components
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    status_code: 200
+  register: failing_scheduled_status
+  until: >-
+    (failing_scheduled_status.json.components | selectattr('name', 'equalto',
+    'failing-probe') | first).last_result == 'failed'
+  retries: 48
+  delay: 5
+  no_log: true
+
+- name: >-
+    Require the failed scheduled component to expose only a safe reason
+  ansible.builtin.assert:
+    that:
+      - >-
+        (failing_scheduled_status.json.components | selectattr('name',
+        'equalto', 'failing-probe') | first).failure.reason is defined
+      - >-
+        'scheduled-failure' not in ((failing_scheduled_status.json.components |
+        selectattr('name', 'equalto', 'failing-probe') | first).failure |
+        to_json)
+  no_log: true
+
+- name: >-
+    Wait for a successful scheduled internal connectivity probe without overlap
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project }}/components
+    headers:
+      Authorization: "Bearer {{ component_admin_token.json.access_token }}"
+    status_code: 200
+  register: scheduled_status
+  until: >-
+    (scheduled_status.json.components | selectattr('name', 'equalto', 'probe') |
+     first).last_result == 'succeeded'
+  failed_when: >-
+    (scheduled_status.json.components | selectattr('name', 'equalto', 'probe') |
+     first).active_runs | int > 1
+  retries: 48
+  delay: 5
+  no_log: true
+
+- name: Report non-secret scheduled component status
+  ansible.builtin.debug:
+    msg: >-
+      Scheduled probe status: {{ scheduled_status.json.components |
+      selectattr('name', 'equalto', 'probe') | first }}
+
+- name: Read raw scheduled Job status before asserting success
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_component_kubectl }}"
+      - --kubeconfig
+      - "{{ platform_component_kubeconfig }}"
+      - get
+      - jobs
+      - -n
+      - "project-{{ component_project }}"
+      - -l
+      - platform.example/component=probe
+      - -o
+      - "jsonpath={range .items[*]}{.metadata.name}{' \
+          succeeded='}{.status.succeeded}{' failed='}{.status.failed}{' \
+          active='}{.status.active}{' conditions='}{range \
+          .status.conditions[*]}{.type}{','}{end}{'\\n'}{end}"
+  delegate_to: "{{ platform_component_drill_host }}"
+  register: scheduled_job_status
+  changed_when: false
+  failed_when: false
+
+- name: Read raw scheduled pod status before asserting success
+  ansible.builtin.command:
+    argv:
+      - "{{ platform_component_kubectl }}"
+      - --kubeconfig
+      - "{{ platform_component_kubeconfig }}"
+      - get
+      - pods
+      - -n
+      - "project-{{ component_project }}"
+      - -l
+      - platform.example/component=probe
+      - -o
+      - "jsonpath={range .items[*]}{.metadata.name}{' \
+          phase='}{.status.phase}{' reason='}{.status.reason}{'\\n'}{end}"
+  delegate_to: "{{ platform_component_drill_host }}"
+  register: scheduled_pod_status
+  changed_when: false
+  failed_when: false
+
+- name: Report non-secret scheduled Job and pod evidence
+  ansible.builtin.debug:
+    msg: >-
+      Scheduled Job status: {{ scheduled_job_status.stdout | default('') }};
+      scheduled pod status: {{ scheduled_pod_status.stdout | default('') }}
+
+- name: >-
+    Require the scheduled internal connectivity probe to succeed
+  ansible.builtin.assert:
+    that: >-
+      (scheduled_status.json.components | selectattr('name', 'equalto', 'probe')
+      | first).last_result == 'succeeded'
+    fail_msg: >-
+      The scheduled probe did not succeed. Its non-secret status was reported
+      above; inspect its retained Kubernetes Job and pod logs before rerunning.

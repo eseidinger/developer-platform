@@ -1,0 +1,37 @@
+---
+- name: >-
+    Install checksum-verified k3d using the repository installer
+  ansible.builtin.command:
+    argv:
+      - python3
+      - scripts/setup/install-k3d.py
+    chdir: "{{ platform_install_dir }}"
+  changed_when: true
+
+- name: Install checksum-verified kubectl alongside k3d
+  ansible.builtin.get_url:
+    url: >-
+      https://dl.k8s.io/release/{{ platform_kubectl_version }}/bin/linux/{{
+      platform_arch }}/kubectl
+    checksum: >-
+      sha256:https://dl.k8s.io/release/{{ platform_kubectl_version
+      }}/bin/linux/{{ platform_arch }}/kubectl.sha256
+    dest: "{{ platform_install_dir }}/.runtime/bin/kubectl"
+    mode: '0755'
+
+- name: Create system-wide local binary directory
+  ansible.builtin.file:
+    path: /usr/local/bin
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install kubectl for host administration
+  ansible.builtin.copy:
+    src: "{{ platform_install_dir }}/.runtime/bin/kubectl"
+    dest: /usr/local/bin/kubectl
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0755'

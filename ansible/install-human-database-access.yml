@@ -4,11 +4,16 @@
   become: true
   gather_facts: true
   vars:
-    database_bastion_bind_ip: "{{ platform_database_bastion_bind_ip | default('127.0.0.1') }}"
-    database_bastion_port: "{{ platform_database_bastion_port | default(2222) | int }}"
-    database_install_dir: "{{ platform_install_dir | default('/opt/developer-platform') }}"
+    database_bastion_bind_ip: >-
+      {{ platform_database_bastion_bind_ip | default('127.0.0.1') }}
+    database_bastion_port: >-
+      {{ platform_database_bastion_port | default(2222) | int }}
+    database_install_dir: >-
+      {{ platform_install_dir | default('/opt/developer-platform') }}
+
 
   tasks:
+
     - name: Validate the deliberately selected listener
       ansible.builtin.assert:
         that:
@@ -16,11 +21,15 @@
           - database_bastion_bind_ip != '0.0.0.0'
           - database_bastion_port | int >= 1024
           - database_bastion_port | int <= 65535
-        fail_msg: Set a specific IPv4 bind address and unprivileged port for the database bastion.
+        fail_msg: >-
+          Set a specific IPv4 bind address and unprivileged port for the
+          database bastion.
 
-    - name: Validate advertised SSH settings against the selected listener
+    - name: >-
+        Validate advertised SSH settings against the selected listener
       ansible.builtin.set_fact:
-        database_advertised_settings: "{{ database_inventory_options | platform_inventory_settings }}"
+        database_advertised_settings: >-
+          {{ database_inventory_options | platform_inventory_settings }}
       vars:
         database_inventory_options:
           store_ssh_host: "{{ platform_store_ssh_host | default(none) }}"
@@ -29,7 +38,9 @@
 
     - name: Install OpenSSH server and Python
       ansible.builtin.apt:
-        name: [openssh-server, python3]
+        name:
+          - openssh-server
+          - python3
         state: present
 
     - name: Read the installed platform configuration
@@ -40,11 +51,26 @@
 
     - name: Extract the bastion token and private database address
       ansible.builtin.set_fact:
-        database_bastion_token: "{{ (database_environment.content | b64decode | regex_search('(?m)^DATABASE_BASTION_TOKEN=([A-Fa-f0-9]{64})$', '\\1')) | first | default('') }}"
-        database_postgres_ip: "{{ (database_environment.content | b64decode | regex_search('(?m)^POSTGRES_IP=([0-9.]+)$', '\\1')) | first | default('') }}"
-        database_store_relay_ip: "{{ (database_environment.content | b64decode | regex_search('(?m)^STORE_RELAY_IP=([0-9.]+)$', '\\1')) | default([], true) | first | default('172.30.80.15') }}"
-        database_deployed_ssh_port: "{{ (database_environment.content | b64decode | regex_search('(?m)^STORE_SSH_PORT=([0-9]+)$', '\\1')) | default([], true) | first | default('2222') }}"
-        database_deployed_ssh_host: "{{ (database_environment.content | b64decode | regex_search('(?m)^STORE_SSH_HOST=([^\\r\\n]*)$', '\\1')) | default([], true) | first | default('') }}"
+        database_bastion_token: >-
+          {{ (database_environment.content | b64decode |
+          regex_search('(?m)^DATABASE_BASTION_TOKEN=([A-Fa-f0-9]{64})$', '\1'))
+          | first | default('') }}
+        database_postgres_ip: >-
+          {{ (database_environment.content | b64decode |
+          regex_search('(?m)^POSTGRES_IP=([0-9.]+)$', '\1')) | first |
+          default('') }}
+        database_store_relay_ip: >-
+          {{ (database_environment.content | b64decode |
+          regex_search('(?m)^STORE_RELAY_IP=([0-9.]+)$', '\1')) | default([],
+          true) | first | default('172.30.80.15') }}
+        database_deployed_ssh_port: >-
+          {{ (database_environment.content | b64decode |
+          regex_search('(?m)^STORE_SSH_PORT=([0-9]+)$', '\1')) | default([],
+          true) | first | default('2222') }}
+        database_deployed_ssh_host: >-
+          {{ (database_environment.content | b64decode |
+          regex_search('(?m)^STORE_SSH_HOST=([^\r\n]*)$', '\1')) | default([],
+          true) | first | default('') }}
       no_log: true
 
     - name: Require generated token and fixed PostgreSQL address
@@ -55,9 +81,14 @@
           - database_postgres_ip != '0.0.0.0'
           - database_store_relay_ip is match('^[0-9.]+$')
           - database_store_relay_ip != '0.0.0.0'
-          - database_deployed_ssh_port | int == database_bastion_port | int
-          - platform_store_ssh_host is not defined or database_deployed_ssh_host == platform_store_ssh_host
-        fail_msg: Deploy first; require generated credentials, private database/relay addresses and a matching advertised SSH port.
+          - >-
+            database_deployed_ssh_port | int == database_bastion_port | int
+          - >-
+              platform_store_ssh_host is not defined or
+              database_deployed_ssh_host == platform_store_ssh_host
+        fail_msg: >-
+          Deploy first; require generated credentials, private database/relay
+          addresses and a matching advertised SSH port.
       no_log: true
 
     - name: Create noninteractive forwarding account
@@ -113,59 +144,23 @@
         mode: '0755'
 
     - name: Install isolated SSH daemon configuration
-      ansible.builtin.copy:
+      ansible.builtin.template:
         dest: /etc/ssh/sshd_config_platform_db
         owner: root
         group: root
         mode: '0600'
-        content: |
-          Port {{ database_bastion_port }}
-          ListenAddress {{ database_bastion_bind_ip }}
-          HostKey /etc/ssh/ssh_host_ed25519_key
-          PidFile /run/sshd-platform-db.pid
-          LogLevel VERBOSE
-          UsePAM no
-          PermitRootLogin no
-          AllowUsers platform-db
-          PasswordAuthentication no
-          KbdInteractiveAuthentication no
-          PubkeyAuthentication yes
-          AuthorizedKeysFile none
-          AuthorizedKeysCommand /usr/local/libexec/platform-db-authorized-key %f
-          AuthorizedKeysCommandUser platform-db-keylookup
-          AllowTcpForwarding local
-          PermitOpen {{ database_store_relay_ip }}:*
-          PermitListen none
-          AllowStreamLocalForwarding no
-          AllowAgentForwarding no
-          X11Forwarding no
-          PermitTunnel no
-          PermitTTY no
-          PermitUserEnvironment no
-          MaxSessions 0
+        src: >-
+          {{ playbook_dir }}/templates/database-bastion/sshd_config.j2
       notify: Restart database bastion
 
     - name: Install dedicated SSH service
-      ansible.builtin.copy:
+      ansible.builtin.template:
         dest: /etc/systemd/system/platform-db-bastion.service
         owner: root
         group: root
         mode: '0644'
-        content: |
-          [Unit]
-          Description=Restricted Developer Platform database SSH tunnel
-          After=network-online.target
-          Wants=network-online.target
-
-          [Service]
-          Type=simple
-          ExecStartPre=/usr/bin/install -d -m 0755 /run/sshd
-          ExecStartPre=/usr/sbin/sshd -t -f /etc/ssh/sshd_config_platform_db
-          ExecStart=/usr/sbin/sshd -D -e -f /etc/ssh/sshd_config_platform_db
-          Restart=on-failure
-
-          [Install]
-          WantedBy=multi-user.target
+        src: >-
+          {{ playbook_dir }}/templates/database-bastion/service.j2
       notify: Restart database bastion
 
     - name: Enable the dedicated bastion
@@ -176,6 +171,7 @@
         daemon_reload: true
 
   handlers:
+
     - name: Restart database bastion
       ansible.builtin.systemd_service:
         name: platform-db-bastion.service
