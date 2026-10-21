@@ -1841,11 +1841,17 @@ def cleanup(journal, api, keycloak):
             ),
             "cleanup_project_changed",
         )
-        preview = api.request("GET", "/projects/" + project + "/retirement-preview")
-        require(not preview["blockers"], "cleanup_retirement_blocked")
-        confirmation = {"confirm_name": project, "scope_token": preview["scope_token"]}
 
-        def retired():
+        def retired(project=project):
+            # Retiring named stores advances the preview's scope token. Fetch
+            # the current scope on each poll rather than reusing the pre-retire
+            # token and aborting cleanup after the first accepted request.
+            preview = api.request("GET", "/projects/" + project + "/retirement-preview")
+            require(not preview["blockers"], "cleanup_retirement_blocked")
+            confirmation = {
+                "confirm_name": project,
+                "scope_token": preview["scope_token"],
+            }
             result = api.request(
                 "POST",
                 "/projects/" + project + "/retire",
@@ -1854,7 +1860,7 @@ def cleanup(journal, api, keycloak):
             )
             return result.get("status") == "retired"
 
-        wait_for(retired, "fixture_retirement", 180)
+        wait_for(retired, "fixture_retirement", 300)
     known = api.request(
         "GET", "/platform/test-identities?test_run_id=" + state["runId"]
     )["credentials"]
