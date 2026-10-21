@@ -1,6 +1,17 @@
 """Pinned pgAdmin server policy. Only the edge proxy and lease relay are reachable."""
 
 import os
+from pathlib import Path
+
+# Public issuers use the image's system roots. For local development, bootstrap
+# exports only Caddy's public CA into this read-only mount; no CA keys are shared.
+identity_domain = os.environ["IDENTITY_DOMAIN"].lower().rstrip(".")
+local_identity = identity_domain == "localhost" or identity_domain.endswith(
+    ".localhost"
+)
+identity_verification = "/run/platform-trust/local-ca.pem" if local_identity else True
+if local_identity and not Path(identity_verification).is_file():
+    raise RuntimeError("Run scripts/setup/prepare-local-trust.py before local pgAdmin")
 
 AUTHENTICATION_SOURCES = ["oauth2"]
 OAUTH2_AUTO_CREATE_USER = True
@@ -18,7 +29,7 @@ OAUTH2_CONFIG = [
         "OAUTH2_USERNAME_CLAIM": "sub",
         "OAUTH2_CHALLENGE_METHOD": "S256",
         "OAUTH2_RESPONSE_TYPE": "code",
-        "OAUTH2_SSL_CERT_VERIFICATION": True,
+        "OAUTH2_SSL_CERT_VERIFICATION": identity_verification,
     }
 ]
 # No durable data passwords or shared administrator server registrations.

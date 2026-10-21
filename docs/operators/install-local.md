@@ -87,7 +87,13 @@ cleanup.
 ## Noninteractive functional tests
 
 Local HTTPS uses Caddy's internal certificate authority, including native store
-consoles under `*.apps.localhost`. Export its public root certificate:
+consoles under `*.apps.localhost`. Bootstrap starts the proxy and runs
+`scripts/setup/prepare-local-trust.py` before starting pgAdmin. That isolated
+service receives only the public root certificate in a read-only mount and
+keeps OIDC certificate verification enabled. Public identity issuers continue
+to use the image's system certificate roots.
+
+For your own clients, export its public root certificate:
 
 ```bash
 mkdir -p .runtime/trust

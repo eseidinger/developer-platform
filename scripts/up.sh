@@ -248,6 +248,11 @@ python3 scripts/checks/check-network-addresses.py
 echo "Starting fixed-address identity and Platform API services first..."
 docker compose up -d --build --wait --wait-timeout 180 platform-api
 
+# The local identity issuer uses Caddy's internal CA. Export its public root
+# before the isolated PostgreSQL console attempts verified OIDC discovery.
+docker compose up -d proxy
+python3 scripts/setup/prepare-local-trust.py
+
 # Check fixed-address ownership again before starting the remaining services.
 python3 scripts/checks/check-network-addresses.py
 docker compose up -d --build --remove-orphans

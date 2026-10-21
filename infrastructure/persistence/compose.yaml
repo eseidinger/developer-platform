@@ -37,6 +37,7 @@ services:
       IDENTITY_DOMAIN: ${IDENTITY_DOMAIN:-identity.localhost}
     volumes:
       - ./console/config_local.py:/pgadmin4/config_local.py:ro
+      - ../../.runtime/trust:/run/platform-trust:ro
       - postgres_console:/var/lib/pgadmin
     networks:
       store-consoles: {}
