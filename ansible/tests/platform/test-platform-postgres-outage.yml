@@ -1,7 +1,6 @@
 ---
 - name: >-
-    Prove managed PostgreSQL failure and recovery handling on a disposable
-    project
+    Prove control-plane PostgreSQL and catalog recovery on an unbound project
   hosts: localhost
   gather_facts: false
   vars:
@@ -73,6 +72,15 @@
       register: postgres_runner_token
       no_log: true
 
+    - name: Reset cleanup ownership for this run
+      ansible.builtin.set_fact:
+        platform_cleanup_project_creation: {}
+        platform_cleanup_personas: {}
+        platform_cleanup_credentials: {}
+        postgres_developer_credential: {}
+        platform_cleanup_restoration_ok: true
+      no_log: true
+
     - name: >-
         Exercise the controlled PostgreSQL outage with disposable identities
       block:
@@ -88,6 +96,7 @@
             body:
               name: "{{ postgres_drill_project }}"
             status_code: 201
+          register: platform_cleanup_project_creation
           no_log: true
 
         - name: >-
@@ -123,7 +132,7 @@
           register: postgres_developer_token
           no_log: true
 
-        - name: Deploy a disposable database-bound workload
+        - name: Deploy a disposable unbound workload
           ansible.builtin.uri:
             url: >-
               {{ platform_api_url }}/projects/{{ postgres_drill_project }}
@@ -330,95 +339,23 @@
           no_log: true
       always:
 
-        - name: >-
-            Refresh the runner token before disposable-project cleanup
-          ansible.builtin.uri:
-            url: "{{ platform_oidc_token_url }}"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              grant_type: client_credentials
-              client_id: "{{ platform_test_runner_client_id }}"
-              client_secret: "{{ platform_test_runner_client_secret }}"
-            status_code: 200
-          register: postgres_cleanup_runner_token
-          failed_when: false
-          no_log: true
 
-        - name: >-
-            Select a cleanup token only when the token exchange completed
+        - name: Select confirmed fixture ownership for cleanup
           ansible.builtin.set_fact:
-            postgres_cleanup_token: >-
-              {{ postgres_cleanup_runner_token.get('json',
-              {}).get('access_token', '') }}
+            platform_cleanup_project_creation: >-
+              {{ platform_cleanup_project_creation | default({}) }}
+            platform_cleanup_personas: >-
+              {{ postgres_developer_credential | default({}) }}
+            platform_cleanup_credentials: []
           no_log: true
 
-        - name: >-
-            Read the disposable project's retirement scope for cleanup
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ postgres_drill_project
-              }}/retirement-preview
-            headers:
-              Authorization: "Bearer {{ postgres_cleanup_token }}"
-            status_code:
-              - 200
-              - 404
-          register: postgres_cleanup_preview
-          failed_when: false
-          when: postgres_cleanup_token | length > 0
-          no_log: true
-
-        - name: Retire the disposable PostgreSQL outage project
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ postgres_drill_project
-              }}/retire
-            method: POST
-            headers:
-              Authorization: "Bearer {{ postgres_cleanup_token }}"
-            body_format: json
-            body:
-              confirm_name: "{{ postgres_drill_project }}"
-              scope_token: "{{ postgres_cleanup_preview.json.scope_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-              - 409
-          register: postgres_cleanup
-          until: postgres_cleanup.status != 202
-          retries: 60
-          delay: 5
-          failed_when: false
-          when:
-            - postgres_cleanup_token | length > 0
-            - >-
-              postgres_cleanup_preview.status | default(0) | int == 200
-          no_log: true
-
-        - name: >-
-            Revoke the disposable PostgreSQL outage developer persona
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/platform/test-identities/{{
-              postgres_developer_credential.json.credential_id }}
-            method: DELETE
-            headers:
-              Authorization: "Bearer {{ postgres_cleanup_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-          failed_when: false
-          when:
-            - postgres_developer_credential is defined
-            - postgres_cleanup_token | length > 0
-          no_log: true
+        - name: Clean owned fixtures and require complete cleanup
+          ansible.builtin.import_tasks: ../../tasks/tests/support/cleanup.yml
 
     - name: Report non-secret PostgreSQL outage-drill evidence
       ansible.builtin.debug:
         msg: >-
           PASS: {{ postgres_drill_project }} exposed PostgreSQL unavailability,
-          recovered API and database readiness, and a resolved developer-visible
+          recovered control-plane API readiness, and a resolved
+          developer-visible
           recovery outcome.

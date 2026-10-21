@@ -2,13 +2,12 @@ import logging
 import sys
 import unittest
 from pathlib import Path
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from app.inventory import observe_inventory, observe_cluster_capacity
 from app import main
 from app.identity import Principal
+from app.inventory import observe_cluster_capacity, observe_inventory
 
 
 def item(name, spec=None, status=None):
@@ -16,75 +15,263 @@ def item(name, spec=None, status=None):
 
 
 class InventoryTests(unittest.TestCase):
-    def test_lists_safe_project_topology_and_managed_data_service(self):
+    def test_lists_safe_project_topology_without_inventing_a_database(self):
         runtime = Mock()
         resources = runtime.resources.get
         values = {
-            "Deployment": [item("web", {"replicas": 2, "template": {"spec": {"containers": [
-                {"name": "web", "resources": {"requests": {"cpu": "100m"}, "limits": {"cpu": "500m"}}}]}}}, {"ready_replicas": 1})],
-            "Pod": [item("web-1", status={"phase": "Running"})], "Service": [item("web")],
-            "Ingress": [item("web", {"rules": [{"host": "smoke.apps.test"}]})], "ResourceQuota": [item("project", status={"hard": {
-                "requests.cpu": "250m", "limits.cpu": "900m"}})],
-            "LimitRange": [item("defaults")]}
-        resources.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
+            "Deployment": [
+                item(
+                    "web",
+                    {
+                        "replicas": 2,
+                        "template": {
+                            "spec": {
+                                "containers": [
+                                    {
+                                        "name": "web",
+                                        "resources": {
+                                            "requests": {"cpu": "100m"},
+                                            "limits": {"cpu": "500m"},
+                                        },
+                                    }
+                                ]
+                            }
+                        },
+                    },
+                    {"ready_replicas": 1},
+                )
+            ],
+            "Pod": [item("web-1", status={"phase": "Running"})],
+            "Service": [item("web")],
+            "Ingress": [item("web", {"rules": [{"host": "smoke.apps.test"}]})],
+            "ResourceQuota": [
+                item(
+                    "project",
+                    status={"hard": {"requests.cpu": "250m", "limits.cpu": "900m"}},
+                )
+            ],
+            "LimitRange": [item("defaults")],
+        }
+        resources.side_effect = lambda api_version, kind: Mock(
+            get=Mock(return_value={"items": values[kind]})
+        )
         result = observe_inventory(runtime, "smoke", logging.getLogger("test"))
         self.assertEqual(result["state"], "ok")
-        self.assertEqual(result["deployments"][0], {"name": "web", "replicas": 2, "ready_replicas": 1,
-                         "containers": [{"name": "web", "requests": {"cpu": "100m"}, "limits": {"cpu": "500m"}}]})
+        self.assertEqual(
+            result["deployments"][0],
+            {
+                "name": "web",
+                "replicas": 2,
+                "ready_replicas": 1,
+                "containers": [
+                    {
+                        "name": "web",
+                        "requests": {"cpu": "100m"},
+                        "limits": {"cpu": "500m"},
+                    }
+                ],
+            },
+        )
         self.assertEqual(result["instances"][0]["phase"], "Running")
-        self.assertEqual(result["declared_totals"], {"requests": {"cpu_millicores": 200, "memory_bytes": 0},
-                                                       "limits": {"cpu_millicores": 1000, "memory_bytes": 0}})
-        self.assertEqual(result["quota_comparisons"], [{"name": "project", "resources": {
-            "requests.cpu": {"declared": 200, "hard": 250, "remaining": 50, "state": "within"},
-            "limits.cpu": {"declared": 1000, "hard": 900, "remaining": 0, "state": "exceeded"}}}])
-        self.assertEqual(result["data_services"], [{"type": "postgresql", "name": "managed", "scope": "project"}])
-        self.assertEqual(result["public_endpoints"], [{"route": "web", "url": "https://smoke.apps.test",
-                                                         "tls": {"state": "unknown", "reason": "EdgeCertificateNotObserved"}}])
+        self.assertEqual(
+            result["declared_totals"],
+            {
+                "requests": {"cpu_millicores": 200, "memory_bytes": 0},
+                "limits": {"cpu_millicores": 1000, "memory_bytes": 0},
+            },
+        )
+        self.assertEqual(
+            result["quota_comparisons"],
+            [
+                {
+                    "name": "project",
+                    "resources": {
+                        "requests.cpu": {
+                            "declared": 200,
+                            "hard": 250,
+                            "remaining": 50,
+                            "state": "within",
+                        },
+                        "limits.cpu": {
+                            "declared": 1000,
+                            "hard": 900,
+                            "remaining": 0,
+                            "state": "exceeded",
+                        },
+                    },
+                }
+            ],
+        )
+        self.assertEqual(result["data_services"], [])
+        self.assertEqual(
+            result["public_endpoints"],
+            [
+                {
+                    "route": "web",
+                    "url": "https://smoke.apps.test",
+                    "tls": {"state": "unknown", "reason": "EdgeCertificateNotObserved"},
+                }
+            ],
+        )
 
     def test_provider_failure_is_not_reported_as_empty_inventory(self):
         runtime = Mock()
         runtime.resources.get.side_effect = RuntimeError("private detail")
         result = observe_inventory(runtime, "smoke", logging.getLogger("test"))
-        self.assertEqual(result, {"state": "unavailable", "reason": "KubernetesApiUnavailable"})
+        self.assertEqual(
+            result, {"state": "unavailable", "reason": "KubernetesApiUnavailable"}
+        )
 
     def test_cluster_capacity_reports_allocatable_nodes(self):
         runtime = Mock()
-        values = {"Node": [item("agent", status={"capacity": {"cpu": "4"}, "allocatable": {"cpu": "3900m"}})],
-                  "NodeMetrics": [{"metadata": {"name": "agent"}, "usage": {"cpu": "120m"}}]}
-        runtime.resources.get.side_effect = lambda api_version, kind: Mock(get=Mock(return_value={"items": values[kind]}))
+        values = {
+            "Node": [
+                item(
+                    "agent",
+                    status={"capacity": {"cpu": "4"}, "allocatable": {"cpu": "3900m"}},
+                )
+            ],
+            "NodeMetrics": [{"metadata": {"name": "agent"}, "usage": {"cpu": "120m"}}],
+        }
+        runtime.resources.get.side_effect = lambda api_version, kind: Mock(
+            get=Mock(return_value={"items": values[kind]})
+        )
         result = observe_cluster_capacity(runtime, logging.getLogger("test"))
-        self.assertEqual(result["nodes"], [{"name": "agent", "capacity": {"cpu": "4"},
-                                             "allocatable": {"cpu": "3900m"}, "usage": {"cpu": "120m"}, "usage_state": "ok"}])
+        self.assertEqual(
+            result["nodes"],
+            [
+                {
+                    "name": "agent",
+                    "capacity": {"cpu": "4"},
+                    "allocatable": {"cpu": "3900m"},
+                    "usage": {"cpu": "120m"},
+                    "usage_state": "ok",
+                }
+            ],
+        )
 
     def test_cluster_capacity_labels_node_metrics_provider_failure(self):
         runtime = Mock()
         runtime.resources.get.side_effect = RuntimeError("forbidden")
         result = observe_cluster_capacity(runtime, logging.getLogger("test"))
-        self.assertEqual(result, {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []})
+        self.assertEqual(
+            result,
+            {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []},
+        )
 
     def test_operator_capacity_includes_request_admission_accounting(self):
         principal = Principal("https://issuer.example", "operator", "Operator")
         observed = {"state": "ok", "nodes": [{"name": "agent"}]}
-        admission = {"state": "ok", "enabled": True, "available": {
-            "cpu_millicores": 750, "memory_mib": 896}}
-        with patch.object(main, "require_platform_admin"), patch.object(main, "required_audit"), \
-             patch.object(main, "observe_cluster_capacity", return_value=observed), \
-             patch.object(main, "capacity_admission_snapshot", return_value=admission):
+        admission = {
+            "state": "ok",
+            "enabled": True,
+            "available": {"cpu_millicores": 750, "memory_mib": 896},
+        }
+        with (
+            patch.object(main, "require_platform_admin"),
+            patch.object(main, "required_audit"),
+            patch.object(main, "observe_cluster_capacity", return_value=observed),
+            patch.object(main, "capacity_admission_snapshot", return_value=admission),
+        ):
             result = main.operator_capacity(principal)
         self.assertEqual(result, {**observed, "admission": admission})
 
     def test_resource_endpoint_combines_inventory_with_labelled_usage(self):
         conn = Mock()
         conn.execute.return_value.fetchone.return_value = ("applied",)
+        conn.execute.return_value.fetchall.return_value = []
         inventory = {"state": "ok", "reason": None}
-        usage = {"state": "missing", "reason": "NoMetricsForProject", "pods": [], "totals": None}
+        usage = {
+            "state": "missing",
+            "reason": "NoMetricsForProject",
+            "pods": [],
+            "totals": None,
+        }
         principal = Principal("https://issuer.example", "person", "Person")
-        with patch.object(main, "require_permission"), patch.object(main, "required_audit"), \
-             patch.object(main, "connect", return_value=__import__("contextlib").nullcontext(conn)), \
-             patch.object(main, "observe_inventory", return_value=inventory), \
-             patch.object(main, "observe_usage", return_value=usage):
+        with (
+            patch.object(main, "require_permission"),
+            patch.object(main, "required_audit"),
+            patch.object(
+                main, "connect", return_value=__import__("contextlib").nullcontext(conn)
+            ),
+            patch.object(main, "observe_inventory", return_value=inventory),
+            patch.object(main, "observe_usage", return_value=usage),
+        ):
             result = main.resource_inventory("smoke", principal)
-        self.assertEqual(result, {"project": "smoke", **inventory, "usage": usage})
+        self.assertEqual(
+            result,
+            {
+                "project": "smoke",
+                **inventory,
+                "usage": usage,
+                "data_services": [],
+                "bindings": [],
+            },
+        )
+
+    def test_resource_inventory_reports_actual_named_resources_and_bindings(self):
+        conn = Mock()
+        conn.execute.side_effect = [
+            Mock(fetchone=Mock(return_value=("applied",))),
+            Mock(
+                fetchall=Mock(
+                    return_value=[
+                        (
+                            "resource-1",
+                            "smoke",
+                            "state",
+                            "postgresql",
+                            "active",
+                            "active",
+                            None,
+                        ),
+                        (
+                            "resource-2",
+                            "provider",
+                            "artifacts",
+                            "s3",
+                            "active",
+                            "pending",
+                            None,
+                        ),
+                    ]
+                )
+            ),
+            Mock(
+                fetchall=Mock(
+                    return_value=[
+                        (
+                            "binding-1",
+                            "resource-2",
+                            "web",
+                            "active",
+                            "pending",
+                            None,
+                            False,
+                        )
+                    ]
+                )
+            ),
+        ]
+        principal = Principal("https://issuer.example", "person", "Person")
+        with (
+            patch.object(main, "require_permission"),
+            patch.object(main, "required_audit"),
+            patch.object(
+                main, "connect", return_value=__import__("contextlib").nullcontext(conn)
+            ),
+            patch.object(main, "observe_inventory", return_value={"state": "ok"}),
+            patch.object(main, "observe_usage", return_value={"state": "missing"}),
+        ):
+            result = main.resource_inventory("smoke", principal)
+        self.assertEqual(
+            [row["name"] for row in result["data_services"]], ["state", "artifacts"]
+        )
+        self.assertEqual(
+            [row["state"] for row in result["data_services"]], ["available", "pending"]
+        )
+        self.assertEqual(result["bindings"][0]["resource_id"], "resource-2")
+        self.assertFalse(result["bindings"][0]["credential_active"])
 
 
 if __name__ == "__main__":

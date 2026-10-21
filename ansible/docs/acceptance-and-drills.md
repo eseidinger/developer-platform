@@ -143,3 +143,24 @@ The failure-signal drill also temporarily disables capacity admission so its
 disposable canary tests only application, ingress, and monitoring signals. It
 restores the exact host `.env` and recreates `platform-api` in its `always`
 cleanup.
+
+## Assertion scope and cleanup results
+
+The egress suite tests both API declaration rejection and a real connection
+from the unapproved workload. It then grants the narrow policy and requires
+successful connectivity to the same target as a positive control. The target
+must remain reachable throughout this comparison.
+
+The component suite waits for both services to be ready after rollback and
+expects no data services unless named resources were explicitly provisioned.
+The resource inventory now reports actual named-store resources and bindings.
+The PostgreSQL outage suite checks the control-plane database, catalog access,
+and recovery-request workflow using an unbound workload. Application data
+continuity through named PostgreSQL bindings remains the separate rollback and
+data-preservation scenario.
+
+API cleanup uses confirmed creation responses, retries changing retirement
+scopes, and waits for provider revocation. A conflict, unavailable provider, or
+failed shared-service restoration prevents a successful final test result.
+Cleanup attempts remaining owned fixtures after an error and never purges
+retained named-store data. Review incomplete cleanup before rerunning a drill.

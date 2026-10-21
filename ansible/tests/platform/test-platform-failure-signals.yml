@@ -57,6 +57,14 @@
       register: failure_original_environment
       no_log: true
 
+    - name: Reset cleanup ownership for this run
+      ansible.builtin.set_fact:
+        platform_cleanup_project_creation: {}
+        platform_cleanup_personas: {}
+        platform_cleanup_credentials: {}
+        platform_cleanup_restoration_ok: true
+      no_log: true
+
     - name: >-
         Exercise failure signals with a disposable public workload
       block:
@@ -76,6 +84,7 @@
       always:
 
         - name: Restore the exact original platform environment
+          failed_when: false
           ansible.builtin.copy:
             content: "{{ failure_original_environment.content | b64decode }}"
             dest: "{{ platform_failure_drill_install_dir }}/.env"
@@ -85,11 +94,13 @@
           delegate_to: "{{ platform_failure_drill_host }}"
           become: true
           when: failure_original_environment is defined
+          register: platform_restore_1
           no_log: true
 
         - name: >-
             Recreate only the Platform API with its original failure-drill
             policy
+          failed_when: false
           ansible.builtin.command:
             argv:
               - docker
@@ -104,6 +115,7 @@
             chdir: "{{ platform_failure_drill_install_dir }}"
           delegate_to: "{{ platform_failure_drill_host }}"
           become: true
+          register: platform_restore_2
           changed_when: true
           when: failure_original_environment is defined
 
@@ -121,6 +133,7 @@
             chdir: "{{ platform_failure_drill_install_dir }}"
           delegate_to: "{{ platform_failure_drill_host }}"
           become: true
+          register: platform_restore_3
           changed_when: false
           failed_when: false
 
@@ -138,74 +151,26 @@
             chdir: "{{ platform_failure_drill_install_dir }}"
           delegate_to: "{{ platform_failure_drill_host }}"
           become: true
+          register: platform_restore_4
           changed_when: false
           failed_when: false
 
-        - name: Refresh runner token before failure-project cleanup
-          ansible.builtin.uri:
-            url: "{{ platform_oidc_token_url }}"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              grant_type: client_credentials
-              client_id: "{{ platform_test_runner_client_id }}"
-              client_secret: "{{ platform_test_runner_client_secret }}"
-            status_code: 200
-          register: failure_cleanup_response
-          retries: 24
-          delay: 5
-          until: failure_cleanup_response.status | default(0) == 200
-          failed_when: false
-          no_log: true
 
-        - name: Select the failure-project cleanup token
+        - name: Select confirmed fixture ownership for cleanup
           ansible.builtin.set_fact:
-            failure_cleanup_token: >-
-              {{ failure_cleanup_response.get('json', {}).get('access_token',
-              '') }}
+            platform_cleanup_project_creation: >-
+              {{ platform_cleanup_project_creation | default({}) }}
+            platform_cleanup_restoration_ok: >-
+              {{ (platform_restore_1.get('checksum', '') | length > 0) and
+              (platform_restore_2.get('rc', -1) == 0) and
+              (platform_restore_3.get('rc', -1) == 0) and
+              (platform_restore_4.get('rc', -1) == 0) }}
+            platform_cleanup_personas: {}
+            platform_cleanup_credentials: []
           no_log: true
 
-        - name: Read failure-project retirement scope
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ failure_project
-              }}/retirement-preview
-            headers:
-              Authorization: "Bearer {{ failure_cleanup_token }}"
-            status_code:
-              - 200
-              - 404
-          register: failure_cleanup_preview
-          failed_when: false
-          when: failure_cleanup_token | length > 0
-          no_log: true
-
-        - name: Retire the disposable failure-signal project
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ failure_project }}/retire
-            method: POST
-            headers:
-              Authorization: "Bearer {{ failure_cleanup_token }}"
-            body_format: json
-            body:
-              confirm_name: "{{ failure_project }}"
-              scope_token: "{{ failure_cleanup_preview.json.scope_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-              - 409
-          register: failure_cleanup
-          until: failure_cleanup.status != 202
-          retries: 60
-          delay: 5
-          failed_when: false
-          when:
-            - failure_cleanup_token | length > 0
-            - >-
-              failure_cleanup_preview.status | default(0) | int == 200
-          no_log: true
+        - name: Clean owned fixtures and require complete cleanup
+          ansible.builtin.import_tasks: ../../tasks/tests/support/cleanup.yml
 
     - name: Report non-secret failure-signal evidence
       ansible.builtin.debug:

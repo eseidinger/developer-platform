@@ -11,27 +11,27 @@ There are two execution environments:
 From the repository root:
 
 ```bash
-python3 -m unittest discover -s ansible/tests/unit -v
+uv run --project platform/app --with 'ansible-core>=2.16,<2.22' \
+  --with pyyaml python -m unittest discover -s ansible/tests/unit -v
 ansible-playbook -i ansible/inventory.example.yml \
   ansible/tests/platform/test-platform.yml --syntax-check
 ```
 
 The platform playbooks cover:
 
-| Playbook suffix            | Scenario                                  |
-| -------------------------- | ----------------------------------------- |
-| `base`                     | Roles, deployment, and credentials.       |
-| `ci-credential`            | CI credentials and revocation.            |
-| `components`               | Services, jobs, updates, and retirement.  |
-| `hosted-access`            | Hosted authorization; defaults to plan.   |
-| `human-database-access`    | SQL tunnel and grants; defaults to plan.  |
-| `capacity-admission`       | Resource-pressure rejection and recovery. |
-| `egress-policy`            | Allowed and denied outbound connections.  |
-| `failure-signals`          | Application and monitoring failures.      |
-| `identity-provider-outage` | Keycloak outage and credential cleanup.   |
-| `postgres-outage`          | Database outage and recovery.             |
-| `rollback-data`            | Rollback with retained data/secrets.      |
-| `expiry`                   | Before/after expiry checks.               |
+| Playbook suffix            | Scenario                                    |
+| -------------------------- | ------------------------------------------- |
+| `base`                     | Roles, deployment, and credentials.         |
+| `components`               | Services, jobs, updates, and retirement.    |
+| `hosted-access`            | Hosted authorization; defaults to plan.     |
+| `human-database-access`    | SQL tunnel and grants; defaults to plan.    |
+| `capacity-admission`       | Resource-pressure rejection and recovery.   |
+| `egress-policy`            | Allowed and denied outbound connections.    |
+| `failure-signals`          | Application and monitoring failures.        |
+| `identity-provider-outage` | Keycloak outage and credential cleanup.     |
+| `postgres-outage`          | Control-plane catalog outage and recovery.  |
+| `rollback-data`            | Rollback with retained data/secrets.        |
+| `expiry`                   | Expiry boundary with an unexpired held JWT. |
 
 Suffixes belong to `test-platform-<suffix>.yml`, except `base`, which is
 `test-platform.yml`, and `expiry`, which is
@@ -43,3 +43,25 @@ and explicit acknowledgements. Details and cleanup contracts are in the
 Test-runner creation/revocation and deliberate project retirement are
 operational actions under [`operations/`](../operations/README.md), separate
 from tests. Imported test implementation lives under `ansible/tasks/tests/`.
+
+## Ownership and cleanup
+
+The main platform suite includes project-scoped CI deployment, cross-project
+and administration denial, secret-mutation denial, rotation, and revocation.
+The former standalone CI-credential playbook has been consolidated into it.
+
+API suites register successful project creation responses. Their `always`
+blocks invoke the shared cleanup helper with those responses; a name alone
+never establishes ownership. Partial creation cleans only confirmed fixtures.
+Cleanup refreshes retirement scopes, waits for provider revocation, attempts
+remaining fixtures after an error, and fails the final result if incomplete.
+Named-store data remains retained; tests do not purge it.
+
+Shared environment/service restoration stays in the relevant playbook's
+`always` block. Restoration failures are recorded while remaining cleanup is
+attempted, then cause the final assertion to fail. Offline tests verify these
+boundaries and exercise cleanup failures without contacting a platform.
+
+The rollback-schema contract requires application dependencies and no longer
+silently skips when they are missing. CI runs it in the application environment.
+Release-workflow tests live under `scripts/tests/unit/`.

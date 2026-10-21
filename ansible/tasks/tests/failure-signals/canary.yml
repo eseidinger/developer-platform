@@ -55,6 +55,7 @@
     body:
       name: "{{ failure_project }}"
     status_code: 201
+  register: platform_cleanup_project_creation
   no_log: true
 
 - name: Deploy the disposable public canary

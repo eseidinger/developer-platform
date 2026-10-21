@@ -44,6 +44,7 @@ from .drift import drift_loop, observe_drift
 from .readiness import observe_deployment
 from .usage import observe_usage
 from .inventory import observe_inventory, observe_cluster_capacity
+from .stores.observation import named_data_service_status
 from .capacity_admission import assess as assess_capacity, snapshot as capacity_admission_snapshot
 from .rollback import dependency_report
 from .logs import observe_logs
@@ -1869,7 +1870,11 @@ def resource_inventory(name: str, principal: Principal = Depends(current_princip
         raise HTTPException(404, "Unknown project")
     if known[0] == "empty":
         raise HTTPException(409, "Project has not been deployed")
+    with connect() as conn:
+        services, bindings = named_data_service_status(conn, name)
     inventory = observe_inventory(runtime, name, log)
+    inventory["data_services"] = services
+    inventory["bindings"] = bindings
     inventory["usage"] = observe_usage(runtime, name, log)
     required_audit(actor, "project.resources.inspect", "project", name, "succeeded",
                    {"project": name}, {"state": inventory["state"], "usage_state": inventory["usage"]["state"]})
@@ -2000,20 +2005,7 @@ def data_services(name: str, principal: Principal = Depends(current_principal)):
         with connect() as conn:
             if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
                 raise HTTPException(404, "Unknown project")
-            resources = conn.execute("""SELECT resource_id::text,owner_project,name,provider,state,
-                    observed_state,error_code FROM store_resources r
-                WHERE state<>'purged' AND (owner_project=%s OR EXISTS (
-                    SELECT 1 FROM store_grants g WHERE g.resource_id=r.resource_id
-                    AND g.kind='binding' AND g.consumer_project=%s AND g.state IN ('pending','active')))
-                ORDER BY owner_project,name,resource_id LIMIT 256""", (name, name)).fetchall()
-            bindings = conn.execute("""SELECT g.grant_id::text,g.resource_id::text,g.component,g.state,
-                    g.observed_state,g.error_code,EXISTS (
-                    SELECT 1 FROM store_credentials c WHERE c.grant_id=g.grant_id
-                    AND c.grant_version=g.version AND c.state='active'
-                    AND c.observed_state='active' AND c.expires_at>now())
-                FROM store_grants g WHERE g.kind='binding' AND g.consumer_project=%s
-                    AND g.state IN ('pending','active')
-                ORDER BY g.component,g.grant_id LIMIT 256""", (name,)).fetchall()
+            services, binding_status = named_data_service_status(conn, name)
             request = conn.execute("""SELECT request_id, reason, status, requested_at, reviewed_at
                 FROM data_service_recovery_requests WHERE project=%s ORDER BY requested_at DESC LIMIT 1""",
                                    (name,)).fetchone()
@@ -2022,15 +2014,6 @@ def data_services(name: str, principal: Principal = Depends(current_principal)):
     except Exception as exc:
         log.error("Data-service observation failed project=%s error_type=%s", name, type(exc).__name__)
         raise HTTPException(503, "Data-service observation is temporarily unavailable") from None
-    services = [{"resource_id": resource_id, "owner_project": owner, "name": resource_name,
-                 "type": provider, "state": "available" if state == observed == "active"
-                 else "unavailable" if error_code else "pending" if state == "active" else state,
-                 "observed_state": observed, "reason": error_code}
-                for resource_id, owner, resource_name, provider, state, observed, error_code in resources]
-    binding_status = [{"binding_id": grant_id, "resource_id": resource_id, "component": component,
-                       "state": state, "observed_state": observed, "reason": error_code,
-                       "credential_active": credential_active}
-                      for grant_id, resource_id, component, state, observed, error_code, credential_active in bindings]
     required_audit(actor_for(principal), "data-service.inspect", "project", name, "succeeded", {"project": name},
                    {"resource_count": len(services), "binding_count": len(binding_status)})
     return {"project": name, "services": services, "bindings": binding_status,

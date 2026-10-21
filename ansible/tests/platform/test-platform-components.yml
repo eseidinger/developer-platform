@@ -81,6 +81,15 @@
       register: component_runner_token
       no_log: true
 
+    - name: Reset cleanup ownership for this run
+      ansible.builtin.set_fact:
+        platform_cleanup_project_creation: {}
+        platform_cleanup_personas: {}
+        platform_cleanup_credentials: {}
+        component_admin_credential: {}
+        platform_cleanup_restoration_ok: true
+      no_log: true
+
     - name: >-
         Exercise the component contract with a disposable project
       block:
@@ -119,78 +128,14 @@
             ../../tasks/tests/components/history-and-rollback.yml
       always:
 
-        - name: >-
-            Refresh the runner token before disposable-project cleanup
-          ansible.builtin.uri:
-            url: "{{ platform_oidc_token_url }}"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              grant_type: client_credentials
-              client_id: "{{ platform_test_runner_client_id }}"
-              client_secret: "{{ platform_test_runner_client_secret }}"
-            status_code: 200
-          register: component_cleanup_runner_token
-          failed_when: false
+        - name: Select confirmed fixture ownership for cleanup
+          ansible.builtin.set_fact:
+            platform_cleanup_project_creation: >-
+              {{ platform_cleanup_project_creation | default({}) }}
+            platform_cleanup_personas: >-
+              {{ component_admin_credential | default({}) }}
+            platform_cleanup_credentials: []
           no_log: true
 
-        - name: Retire the disposable component project
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ component_project
-              }}/retirement-preview
-            headers:
-              Authorization: >-
-                Bearer {{ component_cleanup_runner_token.json.access_token }}
-            status_code:
-              - 200
-              - 404
-          register: component_cleanup_preview
-          failed_when: false
-          no_log: true
-
-        - name: Confirm disposable component project retirement
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ component_project }}/retire
-            method: POST
-            headers:
-              Authorization: >-
-                Bearer {{ component_cleanup_runner_token.json.access_token }}
-            body_format: json
-            body:
-              confirm_name: "{{ component_project }}"
-              scope_token: "{{ component_cleanup_preview.json.scope_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-              - 409
-          register: component_cleanup
-          until: component_cleanup.status != 202
-          # Namespace garbage collection is asynchronous; allow the same bounded
-          # window used
-          # for workload operations before recording an incomplete cleanup.
-          retries: 60
-          delay: 5
-          failed_when: false
-          when: >-
-            component_cleanup_preview.status | default(0) | int == 200
-          no_log: true
-
-        - name: Revoke the disposable component administrator persona
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/platform/test-identities/{{
-              component_admin_credential.json.credential_id }}
-            method: DELETE
-            headers:
-              Authorization: >-
-                Bearer {{ component_cleanup_runner_token.json.access_token }}
-            status_code:
-              - 200
-              - 202
-              - 404
-          failed_when: false
-          when: component_admin_credential is defined
-          no_log: true
+        - name: Clean owned fixtures and require complete cleanup
+          ansible.builtin.import_tasks: ../../tasks/tests/support/cleanup.yml

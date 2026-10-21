@@ -78,6 +78,14 @@
           egress_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
 
 
+    - name: Reset cleanup ownership for this run
+      ansible.builtin.set_fact:
+        platform_cleanup_project_creation: {}
+        platform_cleanup_personas: {}
+        platform_cleanup_credentials: {}
+        platform_cleanup_restoration_ok: true
+      no_log: true
+
     - name: Exercise egress policy with a disposable project
       block:
 
@@ -146,6 +154,7 @@
             body:
               name: "{{ egress_project }}"
             status_code: 201
+          register: platform_cleanup_project_creation
           no_log: true
 
         - name: >-
@@ -177,6 +186,89 @@
           failed_when: >-
             egress_denial.json.code | default('') != 'policy_denied'
           no_log: true
+
+        - name: Deploy a probe with no external egress permission
+          ansible.builtin.uri:
+            url: "{{ platform_api_url }}/projects/{{ egress_project }}"
+            method: PUT
+            headers:
+              Authorization: >-
+                Bearer {{ egress_runner_token.json.access_token }}
+            body_format: json
+            body:
+              apiVersion: platform.example/v1alpha2
+              kind: Application
+              metadata:
+                name: "{{ egress_project }}"
+              spec:
+                components:
+                  - name: probe
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_egress_drill_image }}"
+                      command: [/bin/sh, -ec]
+                      args: ["exec httpd -f -p 8080"]
+                    ports:
+                      - name: http
+                        protocol: http
+                        port: 8080
+            status_code: 202
+          register: egress_unapproved_deployment
+          no_log: true
+
+        - name: Wait for the probe without external permission
+          ansible.builtin.uri:
+            url: >-
+              {{ platform_api_url }}{{
+              egress_unapproved_deployment.json.status_url }}
+            headers:
+              Authorization: >-
+                Bearer {{ egress_runner_token.json.access_token }}
+            status_code: 200
+          register: egress_unapproved_operation
+          until:
+            - egress_unapproved_operation.json.state == 'succeeded'
+            - egress_unapproved_operation.json.readiness.state == 'ready'
+          retries: 60
+          delay: 5
+          no_log: true
+
+        - name: Prove an actual external connection is blocked before approval
+          ansible.builtin.command:
+            argv:
+              - >-
+                {{ platform_egress_drill_install_dir }}/.runtime/bin/kubectl
+              - --kubeconfig
+              - >-
+                {{ platform_egress_drill_install_dir
+                }}/.runtime/admin.kubeconfig
+              - -n
+              - "project-{{ egress_project }}"
+              - exec
+              - deployment/probe
+              - --
+              - /bin/sh
+              - -ec
+              - >-
+                  command -v nc >/dev/null;
+                  if nc -z -w 5 {{ platform_egress_target_host }}
+                  {{ platform_egress_target_port | int }};
+                  then echo EGRESS_ALLOWED; else echo EGRESS_DENIED; fi
+          delegate_to: "{{ platform_egress_drill_host }}"
+          become: true
+          register: egress_denied_connection
+          # Allow the node's NetworkPolicy rules to converge before observing
+          # denial; the later allowed connection supplies the positive control.
+          until: >-
+            egress_denied_connection.rc == 0 and
+            egress_denied_connection.stdout | trim == 'EGRESS_DENIED'
+          retries: 12
+          delay: 2
+          changed_when: false
+          failed_when: >-
+            egress_denied_connection.rc != 0 or
+            egress_denied_connection.stdout | trim != 'EGRESS_DENIED'
 
         - name: >-
             Deploy a service whose startup requires approved connectivity
@@ -253,6 +345,7 @@
       always:
 
         - name: Restore the exact original platform environment
+          failed_when: false
           ansible.builtin.copy:
             content: "{{ egress_original_environment.content | b64decode }}"
             dest: "{{ platform_egress_drill_install_dir }}/.env"
@@ -262,10 +355,12 @@
           delegate_to: "{{ platform_egress_drill_host }}"
           become: true
           when: egress_original_environment is defined
+          register: platform_restore_1
           no_log: true
 
         - name: >-
             Recreate only the Platform API with its original egress policy
+          failed_when: false
           ansible.builtin.command:
             argv:
               - docker
@@ -280,76 +375,31 @@
             chdir: "{{ platform_egress_drill_install_dir }}"
           delegate_to: "{{ platform_egress_drill_host }}"
           become: true
+          register: platform_restore_2
           changed_when: true
           when: egress_original_environment is defined
 
-        - name: Refresh the runner token before egress-project cleanup
-          ansible.builtin.uri:
-            url: "{{ platform_oidc_token_url }}"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              grant_type: client_credentials
-              client_id: "{{ platform_test_runner_client_id }}"
-              client_secret: "{{ platform_test_runner_client_secret }}"
-            status_code: 200
-          register: egress_cleanup_response
-          failed_when: false
-          no_log: true
 
-        - name: Select the egress cleanup token
+        - name: Select confirmed fixture ownership for cleanup
           ansible.builtin.set_fact:
-            egress_cleanup_token: >-
-              {{ egress_cleanup_response.get('json', {}).get('access_token', '')
-              }}
+            platform_cleanup_project_creation: >-
+              {{ platform_cleanup_project_creation | default({}) }}
+            platform_cleanup_restoration_ok: >-
+              {{ (platform_restore_1.get('checksum', '') | length > 0) and
+              (platform_restore_2.get('rc', -1) == 0) }}
+            platform_cleanup_personas: {}
+            platform_cleanup_credentials: []
           no_log: true
 
-        - name: Read egress-project retirement scope
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ egress_project
-              }}/retirement-preview
-            headers:
-              Authorization: "Bearer {{ egress_cleanup_token }}"
-            status_code:
-              - 200
-              - 404
-          register: egress_cleanup_preview
-          failed_when: false
-          when: egress_cleanup_token | length > 0
-          no_log: true
-
-        - name: Retire the disposable egress project
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ egress_project }}/retire
-            method: POST
-            headers:
-              Authorization: "Bearer {{ egress_cleanup_token }}"
-            body_format: json
-            body:
-              confirm_name: "{{ egress_project }}"
-              scope_token: "{{ egress_cleanup_preview.json.scope_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-              - 409
-          register: egress_cleanup
-          until: egress_cleanup.status != 202
-          retries: 60
-          delay: 5
-          failed_when: false
-          when:
-            - egress_cleanup_token | length > 0
-            - egress_cleanup_preview.status | default(0) | int == 200
-          no_log: true
+        - name: Clean owned fixtures and require complete cleanup
+          ansible.builtin.import_tasks: ../../tasks/tests/support/cleanup.yml
 
     - name: Report non-secret egress-policy evidence
       ansible.builtin.debug:
         msg: >-
-          PASS: {{ egress_project }} rejected an unapproved destination and
-          became ready only after connecting to {{ platform_egress_target_host
+          PASS: {{ egress_project }} rejected an unapproved declaration, blocked
+          the actual connection before permission, and became ready after
+          connecting to {{ platform_egress_target_host
           }}:{{ platform_egress_target_port }} through a temporary approved {{
           platform_egress_target_cidr }} policy; the original Platform API
           environment was restored during cleanup.

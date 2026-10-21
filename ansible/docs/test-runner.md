@@ -11,8 +11,8 @@ output file does not already exist before creating the one-time credential. The
 repeatable `test-platform.yml` playbook consumes that protected file, creates
 empty disposable projects and short-lived role personas, performs the first
 deployment with a project CI credential, and cleans up without retaining the
-human token. `test-platform-ci-credential.yml` is the narrower compatibility
-check for an already prepared project.
+human token. It also checks that deployment credentials cannot mutate secrets;
+there is no separate CI-credential playbook.
 
 ## Revocation and expiry
 
@@ -24,8 +24,21 @@ and set `platform_confirm_test_runner_revocation` to that same name. The
 playbook refuses no or ambiguous active matches, revokes Platform API access
 before provider cleanup, and polls until cleanup is complete.
 
-`verify-platform-test-runner-expiry.yml` is a two-stage, scheduled-safe expiry
-drill for a dedicated one-day test runner: run it once with
-`platform_expiry_drill_phase=active`, then schedule the same protected
-credential file after its recorded expiry with
-`platform_expiry_drill_phase=expired`.
+`verify-platform-test-runner-expiry.yml` tests a dedicated runner at its expiry
+boundary. Set `platform_expiry_evidence_file` to an absolute, new path in a
+private directory on the controller (directory mode `0700`). Use the same
+protected runner configuration and evidence path in both phases:
+
+1. Run `platform_expiry_drill_phase=active` shortly **before** the credential's
+   recorded expiry. The returned JWT must remain valid beyond that expiry;
+   running a day early fails this prerequisite. The check verifies actual API
+   access and writes the held JWT and identity metadata to a mode-`0600` file.
+1. Run `platform_expiry_drill_phase=expired` **after** credential expiry and
+   **before** that JWT expires. The helper verifies matching credential
+   identity, retries asynchronous provider cleanup within the JWT lifetime,
+   requires token-endpoint rejection, and proves the held, unexpired JWT is
+   denied by the Platform API with HTTP 403.
+
+A wrong secret, an early expired-phase invocation, or an already expired JWT
+cannot satisfy the test. Retain the private evidence only as long as needed;
+it contains a bearer token. This is a timed lab check, not a routine CI test.

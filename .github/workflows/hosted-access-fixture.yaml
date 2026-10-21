@@ -12,7 +12,7 @@ on:
       - platform/app/uv.lock
       - scripts/tests/platform/check-hosted-access.py
       - scripts/release/hosted-access-release.py
-      - ansible/tests/unit/test_hosted_access_workflow.py
+      - scripts/tests/unit/test_hosted_access_workflow.py
 
 permissions:
   contents: read
@@ -44,7 +44,9 @@ jobs:
       - name: Install test dependencies
         run: uv sync --project platform/app --locked
       - name: Validate release metadata and workflow safety
-        run: python3 -m unittest discover -s ansible/tests/unit -p test_hosted_access_workflow.py -v
+        run: >-
+          uv run --project platform/app python -m unittest discover
+          -s scripts/tests/unit -p test_hosted_access_workflow.py -v
       - name: Test harness safety and real fixture PostgreSQL persistence
         run: uv run --project platform/app python -m unittest discover -s platform/app/tests -p test_hosted_access_acceptance.py -v
       - name: Build fixture for runtime smoke test

@@ -9,11 +9,8 @@
     body:
       name: "{{ rollback_project }}"
     status_code: 201
+  register: platform_cleanup_project_creation
   no_log: true
-
-- name: Record confirmed ownership of the disposable project
-  ansible.builtin.set_fact:
-    rollback_project_created: true
 
 - name: >-
     Create a named PostgreSQL resource for the rollback project

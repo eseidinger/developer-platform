@@ -1,0 +1,29 @@
+---
+- name: Clean confirmed fixtures without exposing credentials
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_playbook_python }}"
+      - -m
+      - scripts.tests.support.platform_cleanup
+    chdir: "{{ playbook_dir }}/../../.."
+    stdin: >-
+      {{ {'api': platform_api_url, 'token_url': platform_oidc_token_url,
+          'client_id': platform_test_runner_client_id,
+          'client_secret': platform_test_runner_client_secret,
+          'project_creation': platform_cleanup_project_creation | default({}),
+          'personas': platform_cleanup_personas | default({}),
+          'credentials': platform_cleanup_credentials | default([])} | to_json
+          }}
+  register: platform_cleanup_result
+  changed_when: true
+  failed_when: false
+  no_log: true
+
+- name: Require all fixture cleanup and shared-service restoration to complete
+  ansible.builtin.assert:
+    that:
+      - platform_cleanup_result.rc == 0
+      - platform_cleanup_restoration_ok | default(true) | bool
+    fail_msg: >-
+      Test cleanup is incomplete. Inspect the run's disposable resources and
+      shared services before retrying; retained SQL data was not purged.

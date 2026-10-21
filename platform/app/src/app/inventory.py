@@ -115,7 +115,7 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
             "quotas": [{"name": _name(item), "hard": _get(_get(item, "status", {}), "hard", {})} for item in quotas],
             "quota_comparisons": _quota_comparisons(quotas, declared),
             "limit_ranges": [_name(item) for item in limits],
-            "data_services": [{"type": "postgresql", "name": "managed", "scope": "project"}]}
+            "data_services": []}
 
 
 def observe_cluster_capacity(runtime: Any, log) -> dict:

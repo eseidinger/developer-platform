@@ -64,6 +64,17 @@
         'ok') | list | length) == 0
       no_log: true
 
+    - name: Reset cleanup ownership for this run
+      ansible.builtin.set_fact:
+        platform_cleanup_project_creation: {}
+        platform_cleanup_personas: {}
+        platform_cleanup_credentials: {}
+        persona_credentials: {}
+        deployment_credential: {}
+        rotated_credential: {}
+        platform_cleanup_restoration_ok: true
+      no_log: true
+
     - name: >-
         Exercise the platform using disposable identities and projects
       block:
@@ -89,85 +100,16 @@
             ../../tasks/tests/platform/credential-rotation.yml
       always:
 
-        - name: Revoke disposable deployment credentials
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ test_project
-              }}/deployment-credentials/{{ item }}
-            method: DELETE
-            headers:
-              Authorization: >-
-                Bearer {{ project_admin_token |
-                default(runner_token_response.json.access_token) }}
-            status_code:
-              - 200
-              - 202
-              - 404
-          loop: >-
-            {{ ([deployment_credential.json.credential_id] if
-            deployment_credential is defined and deployment_credential.json is
-            defined else []) + ([rotated_credential.json.credential_id] if
-            rotated_credential is defined and rotated_credential.json is defined
-            else []) }}
-          failed_when: false
+        - name: Select confirmed fixture ownership for cleanup
+          ansible.builtin.set_fact:
+            platform_cleanup_project_creation: >-
+              {{ platform_cleanup_project_creation | default({}) }}
+            platform_cleanup_personas: "{{ persona_credentials | default({}) }}"
+            platform_cleanup_credentials: >-
+              {{ [{'project': test_project, 'creation': deployment_credential |
+              default({})}, {'project': test_project, 'creation':
+              rotated_credential | default({})}] }}
           no_log: true
 
-        - name: Read disposable project retirement scopes
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ item }}/retirement-preview
-            headers:
-              Authorization: >-
-                Bearer {{ runner_token_response.json.access_token }}
-            status_code:
-              - 200
-              - 404
-          loop:
-            - "{{ test_project }}"
-            - "{{ forbidden_project }}"
-          register: retirement_previews
-          failed_when: false
-          no_log: true
-
-        - name: Retire disposable projects and their workload resources
-          ansible.builtin.uri:
-            url: "{{ platform_api_url }}/projects/{{ item.item }}/retire"
-            method: POST
-            headers:
-              Authorization: >-
-                Bearer {{ runner_token_response.json.access_token }}
-            body_format: json
-            body:
-              confirm_name: "{{ item.item }}"
-              scope_token: "{{ item.json.scope_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-              - 409
-          loop: >-
-            {{ retirement_previews.results | default([])
-               | selectattr('status', 'equalto', 200) | list }}
-          register: retirement_results
-          until: retirement_results.status != 202
-          retries: 20
-          delay: 2
-          failed_when: false
-          no_log: true
-
-        - name: Revoke temporary test personas
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/platform/test-identities/{{
-              item.json.credential_id }}
-            method: DELETE
-            headers:
-              Authorization: >-
-                Bearer {{ runner_token_response.json.access_token }}
-            status_code:
-              - 200
-              - 202
-              - 404
-          loop: "{{ persona_credentials.results | default([]) }}"
-          failed_when: false
-          no_log: true
+        - name: Clean owned fixtures and require complete cleanup
+          ansible.builtin.import_tasks: ../../tasks/tests/support/cleanup.yml

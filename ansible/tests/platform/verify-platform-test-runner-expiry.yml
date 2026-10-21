@@ -22,49 +22,37 @@
           platform_expiry_drill_phase to active or expired explicitly.
       no_log: true
 
-    - name: Exchange the dedicated runner while it is active
-      ansible.builtin.uri:
-        url: "{{ platform_oidc_token_url }}"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          grant_type: client_credentials
-          client_id: "{{ platform_test_runner_client_id }}"
-          client_secret: "{{ platform_test_runner_client_secret }}"
-        status_code: 200
-      register: active_runner_token
-      when: platform_expiry_drill_phase == 'active'
-      no_log: true
+    - name: Require a protected evidence path shared by both phases
+      ansible.builtin.assert:
+        that:
+          - platform_expiry_evidence_file is defined
+          - platform_expiry_evidence_file.startswith('/')
+        fail_msg: >-
+          Set platform_expiry_evidence_file in a private controller directory.
+          Run active just before credential expiry, then expired while the held
+          JWT remains valid. Both phases must use the same credential and file.
 
-    - name: >-
-        Verify the active dedicated runner can use the Platform API
-      ansible.builtin.uri:
-        url: "{{ platform_api_url }}/projects"
-        headers:
-          Authorization: "Bearer {{ active_runner_token.json.access_token }}"
-        status_code: 200
-      when: platform_expiry_drill_phase == 'active'
-      no_log: true
-
-    - name: >-
-        Verify the expired dedicated runner cannot obtain a token
-      ansible.builtin.uri:
-        url: "{{ platform_oidc_token_url }}"
-        method: POST
-        body_format: form-urlencoded
-        body:
-          grant_type: client_credentials
-          client_id: "{{ platform_test_runner_client_id }}"
-          client_secret: "{{ platform_test_runner_client_secret }}"
-        status_code:
-          - 400
-          - 401
-      when: platform_expiry_drill_phase == 'expired'
+    - name: Verify the expiry boundary without exposing credentials
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - -m
+          - scripts.tests.support.runner_expiry
+        chdir: "{{ playbook_dir }}/../../.."
+        stdin: >-
+          {{ {'phase': platform_expiry_drill_phase,
+              'api': platform_api_url, 'token_url': platform_oidc_token_url,
+              'client_id': platform_test_runner_client_id,
+              'client_secret': platform_test_runner_client_secret,
+              'credential_id': platform_test_runner_credential_id,
+              'expires_at': platform_test_runner_expires_at,
+              'state_file': platform_expiry_evidence_file} | to_json }}
+      changed_when: platform_expiry_drill_phase == 'active'
       no_log: true
 
     - name: Report non-secret expiry-drill evidence
       ansible.builtin.debug:
         msg: >-
-          PASS: dedicated test runner {{ platform_test_runner_credential_id }}
-          was {{ platform_expiry_drill_phase }}-checked against its expiry at {{
-          platform_test_runner_expires_at }}.
+          PASS: dedicated runner {{ platform_test_runner_credential_id }}
+          passed {{ platform_expiry_drill_phase }} boundary checks. The held
+          JWT outlives credential expiry; evidence remains private.

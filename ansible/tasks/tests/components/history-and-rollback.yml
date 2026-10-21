@@ -98,8 +98,27 @@
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
   register: component_rollback_operation
+  until:
+    - (component_rollback_operation.json.state | default('')) == 'succeeded'
+    - >-
+      (component_rollback_operation.json.readiness.state | default('')) ==
+      'ready'
+  retries: 60
+  delay: 5
+  no_log: true
+
+- name: Require both restored services to become ready
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ component_project }}/components
+    headers:
+      Authorization: "Bearer {{ component_admin_access_token }}"
+    status_code: 200
+  register: component_rollback_services
   until: >-
-    (component_rollback_operation.json.state | default('')) == 'succeeded'
+    (component_rollback_services.json.components |
+    selectattr('type', 'equalto', 'service') |
+    map(attribute='status.state') | list) == ['ready', 'ready']
   retries: 60
   delay: 5
   no_log: true

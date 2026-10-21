@@ -13,6 +13,7 @@
   loop:
     - "{{ test_project }}"
     - "{{ forbidden_project }}"
+  register: platform_cleanup_project_creation
   no_log: true
 
 - name: Create short-lived standard-role test personas

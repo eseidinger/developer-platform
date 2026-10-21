@@ -15,7 +15,10 @@ jobs:
       - run: uv sync --project platform/app --locked
       - run: uv pip install --system 'ansible-core>=2.16,<2.22'
       - run: python3 -m unittest discover -s scripts/tests/unit -v
-      - run: python3 -m unittest discover -s ansible/tests/unit -v
+      - run: >-
+          uv run --project platform/app
+          --with 'ansible-core>=2.16,<2.22' --with pyyaml python
+          -m unittest discover -s ansible/tests/unit -v
       - run: python3 -m unittest discover -s operations/backup/tests -v
       - run: python3 -m unittest discover -s operations/heartbeat/tests -v
       - run: >-

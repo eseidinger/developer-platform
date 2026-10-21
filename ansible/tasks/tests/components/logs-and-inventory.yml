@@ -73,8 +73,7 @@
     (component_inventory.json.routes | list) and
     (component_inventory.json.deployments | selectattr('name', 'equalto', 'api')
     | first).containers[0].requests.cpu == '200m' and
-    (component_inventory.json.data_services | selectattr('type', 'equalto',
-    'postgresql') | list | length) == 1 and
+    (component_inventory.json.data_services | length) == 0 and
     (component_inventory.json.quota_comparisons | length) > 0
   retries: 12
   delay: 5

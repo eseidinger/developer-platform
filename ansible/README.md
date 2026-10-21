@@ -67,7 +67,8 @@ ruff check ansible
 ruff format --check ansible
 pymarkdown scan --recurse ansible
 mdformat --check ansible
-python3 -m unittest discover -s ansible/tests/unit -v
+uv run --project platform/app --with 'ansible-core>=2.16,<2.22' \
+  --with pyyaml python -m unittest discover -s ansible/tests/unit -v
 ansible-playbook -i ansible/inventory.example.yml \
   ansible/deploy.yml --syntax-check
 ```

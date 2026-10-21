@@ -10,6 +10,7 @@
       - "{{ capacity_padding_namespace }}"
   delegate_to: "{{ platform_capacity_drill_host }}"
   become: true
+  register: capacity_namespace_creation
   changed_when: true
 
 - name: >-

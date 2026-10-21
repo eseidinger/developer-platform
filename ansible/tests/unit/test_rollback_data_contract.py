@@ -9,13 +9,7 @@ from playbook_helpers import load_playbook
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "platform/app/src"))
-try:
-    from app.spec import ApplicationEnvelopeV1Alpha2, to_flat
-except (
-    ModuleNotFoundError
-):  # Ansible's controller Python omits app/Kubernetes dependencies.
-    ApplicationEnvelopeV1Alpha2 = None
-    to_flat = None
+from app.spec import ApplicationEnvelopeV1Alpha2, to_flat
 
 PLAYBOOK = load_playbook(
     ROOT / "ansible/tests/platform/test-platform-rollback-data.yml"
@@ -48,10 +42,6 @@ def render(body):
 
 
 class RollbackDataContractTests(unittest.TestCase):
-    @unittest.skipIf(
-        ApplicationEnvelopeV1Alpha2 is None,
-        "application schema dependencies unavailable",
-    )
     def test_both_declarations_are_valid_and_keep_same_named_binding(self):
         specs = []
         for name in (
@@ -109,21 +99,23 @@ class RollbackDataContractTests(unittest.TestCase):
             self.assertNotIn("psql", command)
 
     def test_cleanup_requires_confirmed_project_creation(self):
-        names = [row["name"] for row in TASKS]
-        self.assertEqual(
-            names[names.index("Create the disposable rollback project") + 1],
-            "Record confirmed ownership of the disposable project",
-        )
         self.assertNotIn(
             "platform_rollback_project",
             PLAYBOOK["tasks"][1]["ansible.builtin.set_fact"]["rollback_project"],
         )
-        for row in CLEANUP:
-            if row["name"] in (
-                "Read rollback-project retirement scope",
-                "Retire the disposable rollback project",
-            ):
-                self.assertIn("rollback_project_created | default(false)", row["when"])
+        creation = task("Create the disposable rollback project")
+        self.assertEqual(creation["register"], "platform_cleanup_project_creation")
+        cleanup = next(
+            row for row in CLEANUP if row.get("register") == "platform_cleanup_result"
+        )
+        self.assertIn(
+            "platform_cleanup_project_creation",
+            cleanup["ansible.builtin.command"]["stdin"],
+        )
+        self.assertEqual(
+            CLEANUP[-1]["ansible.builtin.assert"]["that"][0],
+            "platform_cleanup_result.rc == 0",
+        )
         secret_check = task(
             "Verify the current secret is injected after rollback without disclosing it"
         )

@@ -1,3 +1,7 @@
+import os
+import shutil
+import subprocess
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -18,6 +22,158 @@ def mappings(value):
 
 
 class PlaybookCommandTests(unittest.TestCase):
+    def assert_restoration_in_always(self, play):
+        scope = next(task for task in play["tasks"] if "always" in task)
+        cleanup = scope["always"]
+        copies = [task for task in cleanup if "ansible.builtin.copy" in task]
+        self.assertEqual(len(copies), 1)
+        copy = copies[0]
+        self.assertIn("b64decode", copy["ansible.builtin.copy"]["content"])
+        self.assertTrue(copy["ansible.builtin.copy"]["dest"].endswith("/.env"))
+        commands = [task for task in cleanup if "ansible.builtin.command" in task]
+        restore = next(
+            task
+            for task in commands
+            if task["ansible.builtin.command"]["argv"][:3]
+            == ["docker", "compose", "up"]
+            and task["ansible.builtin.command"]["argv"][-1] == "platform-api"
+        )
+        self.assertLess(cleanup.index(copy), cleanup.index(restore))
+        self.assertFalse(copy["failed_when"])
+        self.assertFalse(restore["failed_when"])
+        facts = next(
+            task["ansible.builtin.set_fact"]
+            for task in cleanup
+            if "platform_cleanup_restoration_ok"
+            in task.get("ansible.builtin.set_fact", {})
+        )
+        for variable in (copy["register"], restore["register"]):
+            self.assertIn(variable, facts["platform_cleanup_restoration_ok"])
+        self.assertIn(
+            "platform_cleanup_restoration_ok | default(true) | bool",
+            cleanup[-1]["ansible.builtin.assert"]["that"],
+        )
+
+    def test_all_api_suites_clean_only_registered_creations_in_always(self):
+        count = 0
+        for path in (ANSIBLE_DIR / "tests/platform").glob("*.yml"):
+            play = load_playbook(path)[0]
+            scopes = [task for task in play["tasks"] if "always" in task]
+            if not scopes:
+                continue
+            count += 1
+            with self.subTest(playbook=path.name):
+                scope = scopes[0]
+                creation = next(
+                    task
+                    for task in mappings(scope["block"])
+                    if task.get("register") == "platform_cleanup_project_creation"
+                )
+                self.assertEqual(creation["ansible.builtin.uri"]["method"], "POST")
+                self.assertEqual(creation["ansible.builtin.uri"]["status_code"], 201)
+                cleanup = scope["always"]
+                command = next(
+                    task
+                    for task in cleanup
+                    if task.get("register") == "platform_cleanup_result"
+                )
+                self.assertTrue(command["no_log"])
+                self.assertIn(
+                    "platform_cleanup_project_creation",
+                    command["ansible.builtin.command"]["stdin"],
+                )
+                self.assertIn(
+                    "platform_cleanup_result.rc == 0",
+                    cleanup[-1]["ansible.builtin.assert"]["that"],
+                )
+        self.assertEqual(count, 8)
+
+    @unittest.skipUnless(shutil.which("ansible-playbook"), "Ansible required")
+    def test_real_cleanup_caller_fails_for_unconfirmed_creation_or_restore(self):
+        root = ANSIBLE_DIR.parent
+        shared = yaml.safe_load(
+            (ANSIBLE_DIR / "tasks/tests/support/cleanup.yml").read_text()
+        )
+        shared[0]["ansible.builtin.command"]["chdir"] = str(root)
+        for creation, restored, expected in (
+            ({}, True, 0),
+            ({"status": 409}, True, 2),
+            ({}, False, 2),
+        ):
+            with (
+                self.subTest(creation=creation, restored=restored),
+                tempfile.TemporaryDirectory() as directory,
+            ):
+                play = [
+                    {
+                        "hosts": "localhost",
+                        "connection": "local",
+                        "gather_facts": False,
+                        "vars": {
+                            "platform_api_url": "https://unused.invalid",
+                            "platform_oidc_token_url": "https://unused.invalid/token",
+                            "platform_test_runner_client_id": "unused",
+                            "platform_test_runner_client_secret": "must-not-be-disclosed",
+                            "platform_cleanup_project_creation": creation,
+                            "platform_cleanup_restoration_ok": restored,
+                        },
+                        "tasks": shared,
+                    }
+                ]
+                file = Path(directory) / "check.yml"
+                file.write_text(yaml.safe_dump(play, sort_keys=False))
+                environment = {
+                    **os.environ,
+                    "ANSIBLE_LOCAL_TEMP": directory,
+                    "ANSIBLE_NOCOLOR": "1",
+                }
+                result = subprocess.run(
+                    ["ansible-playbook", "-i", "localhost,", str(file)],
+                    env=environment,
+                    capture_output=True,
+                    text=True,
+                    timeout=30,
+                    check=False,
+                )
+                self.assertEqual(
+                    result.returncode, expected, result.stdout + result.stderr
+                )
+                self.assertNotIn("must-not-be-disclosed", result.stdout + result.stderr)
+
+    def test_component_rollback_waits_for_readiness(self):
+        play = load_playbook(
+            ANSIBLE_DIR / "tests/platform/test-platform-components.yml"
+        )
+        task = next(
+            row
+            for row in mappings(play)
+            if row.get("register") == "component_rollback_operation"
+        )
+        self.assertTrue(
+            any(
+                "readiness.state" in condition and "ready" in condition
+                for condition in task["until"]
+            )
+        )
+
+    def test_egress_negative_connection_precedes_positive_control(self):
+        play = load_playbook(
+            ANSIBLE_DIR / "tests/platform/test-platform-egress-policy.yml"
+        )
+        tasks = list(mappings(play))
+        negative = next(
+            row for row in tasks if row.get("register") == "egress_denied_connection"
+        )
+        positive = next(
+            row for row in tasks if row.get("register") == "egress_deployment"
+        )
+        self.assertLess(tasks.index(negative), tasks.index(positive))
+        self.assertIn("EGRESS_DENIED", negative["failed_when"])
+        command = negative["ansible.builtin.command"]["argv"]
+        self.assertIn("exec", command)
+        self.assertIn("deployment/probe", command)
+        self.assertIn("platform_egress_target_host", command[-1])
+
     def test_network_settings_are_validated_before_deployment_outage(self):
         tasks = list(mappings(load_playbook(ANSIBLE_DIR / "deploy.yml")))
         names = [task.get("name") for task in tasks]
@@ -83,11 +239,7 @@ class PlaybookCommandTests(unittest.TestCase):
                 for row in tasks
             )
         )
-        names = [task.get("name") for task in tasks]
-        self.assertIn("Restore the exact original platform environment", names)
-        self.assertIn(
-            "Recreate only the Platform API with its original egress policy", names
-        )
+        self.assert_restoration_in_always(load_playbook(path)[0])
 
     def test_failure_signal_drill_restores_admission_policy(self):
         """The disruptive signal drill must not retain its admission bypass."""
@@ -102,12 +254,7 @@ class PlaybookCommandTests(unittest.TestCase):
                 for row in tasks
             )
         )
-        names = [task.get("name") for task in tasks]
-        self.assertIn("Restore the exact original platform environment", names)
-        self.assertIn(
-            "Recreate only the Platform API with its original failure-drill policy",
-            names,
-        )
+        self.assert_restoration_in_always(playbook[0])
 
     def test_inventory_egress_settings_are_rendered_into_platform_environment(self):
         deploy = yaml.safe_load(

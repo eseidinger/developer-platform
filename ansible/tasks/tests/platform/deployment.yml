@@ -83,3 +83,17 @@
         Bearer {{ deployment_token_response.json.access_token }}
     status_code: 403
   no_log: true
+
+- name: Verify deployment identity cannot mutate application secrets
+  ansible.builtin.uri:
+    url: >-
+      {{ platform_api_url }}/projects/{{ test_project }}/secrets/CI_FORBIDDEN
+    method: PUT
+    headers:
+      Authorization: >-
+        Bearer {{ deployment_token_response.json.access_token }}
+    body_format: json
+    body:
+      value: must-not-be-written
+    status_code: 403
+  no_log: true

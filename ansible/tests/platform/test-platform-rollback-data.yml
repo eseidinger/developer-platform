@@ -61,6 +61,14 @@
         rollback_access_token: "{{ rollback_runner_token.json.access_token }}"
       no_log: true
 
+    - name: Reset cleanup ownership for this run
+      ansible.builtin.set_fact:
+        platform_cleanup_project_creation: {}
+        platform_cleanup_personas: {}
+        platform_cleanup_credentials: {}
+        platform_cleanup_restoration_ok: true
+      no_log: true
+
     - name: Exercise data-aware rollback on a disposable project
       block:
 
@@ -77,72 +85,16 @@
             ../../tasks/tests/rollback-data/rollback.yml
       always:
 
-        - name: >-
-            Refresh the runner token before rollback-project cleanup
-          ansible.builtin.uri:
-            url: "{{ platform_oidc_token_url }}"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              grant_type: client_credentials
-              client_id: "{{ platform_test_runner_client_id }}"
-              client_secret: "{{ platform_test_runner_client_secret }}"
-            status_code: 200
-          register: rollback_cleanup_response
-          failed_when: false
-          no_log: true
-
-        - name: Select the rollback cleanup token
+        - name: Select confirmed fixture ownership for cleanup
           ansible.builtin.set_fact:
-            rollback_cleanup_token: >-
-              {{ rollback_cleanup_response.get('json', {}).get('access_token',
-              '') }}
+            platform_cleanup_project_creation: >-
+              {{ platform_cleanup_project_creation | default({}) }}
+            platform_cleanup_personas: {}
+            platform_cleanup_credentials: []
           no_log: true
 
-        - name: Read rollback-project retirement scope
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ rollback_project
-              }}/retirement-preview
-            headers:
-              Authorization: "Bearer {{ rollback_cleanup_token }}"
-            status_code:
-              - 200
-              - 404
-          register: rollback_cleanup_preview
-          failed_when: false
-          when:
-            - rollback_cleanup_token | length > 0
-            - rollback_project_created | default(false)
-          no_log: true
-
-        - name: Retire the disposable rollback project
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ rollback_project }}/retire
-            method: POST
-            headers:
-              Authorization: "Bearer {{ rollback_cleanup_token }}"
-            body_format: json
-            body:
-              confirm_name: "{{ rollback_project }}"
-              scope_token: "{{ rollback_cleanup_preview.json.scope_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-              - 409
-          register: rollback_cleanup
-          until: rollback_cleanup.status != 202
-          retries: 60
-          delay: 5
-          failed_when: false
-          when:
-            - rollback_cleanup_token | length > 0
-            - rollback_project_created | default(false)
-            - >-
-              rollback_cleanup_preview.status | default(0) | int == 200
-          no_log: true
+        - name: Clean owned fixtures and require complete cleanup
+          ansible.builtin.import_tasks: ../../tasks/tests/support/cleanup.yml
 
     - name: Report non-secret data-aware rollback evidence
       ansible.builtin.debug:

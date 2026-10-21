@@ -26,8 +26,11 @@ uv run --project platform/app python -m unittest discover \
   -s platform/app/tests -p test_script_fixtures.py -v
 ```
 
-These use mocks and temporary files. They never deploy the platform. CI also
-checks every deployment, operations, and platform-test Ansible playbook.
+These use mocks and temporary files. They never deploy the platform.
+Ansible fixture cleanup, timed expiry evidence, and release-workflow checks
+also have offline regression tests under `unit/`. Their shared implementations
+live in `support/`; live Ansible callers pass credentials over private stdin.
+CI also checks deployment, operations, and platform-test Ansible playbooks.
 
 ## Disposable component tests
 

@@ -223,7 +223,10 @@ Content-Type: application/json
 {"name":"example","image":"registry.example/application:release","port":8080}
 ```
 
-The focused legacy `test-platform-ci-credential.yml` remains available when an operator specifically wants to test an already prepared project's credential path with a protected project-administrator token. The normal fresh-deployment acceptance path is `test-platform.yml` and does not retain a human token.
+The former standalone CI-credential check is consolidated into
+`test-platform.yml`, including denial of secret mutation. The suite owns its
+disposable projects and does not retain a human token. Cleanup failure prevents
+a successful final result.
 
 ## 6. Optional credential lifecycle drills (accepted as deferred)
 

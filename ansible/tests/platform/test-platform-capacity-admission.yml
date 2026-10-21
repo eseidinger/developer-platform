@@ -63,6 +63,15 @@
       register: capacity_original_environment
       no_log: true
 
+    - name: Reset cleanup ownership for this run
+      ansible.builtin.set_fact:
+        platform_cleanup_project_creation: {}
+        platform_cleanup_personas: {}
+        platform_cleanup_credentials: {}
+        capacity_namespace_creation: {}
+        platform_cleanup_restoration_ok: true
+      no_log: true
+
     - name: Exercise capacity admission
       block:
 
@@ -94,10 +103,15 @@
               - --wait=false
           delegate_to: "{{ platform_capacity_drill_host }}"
           become: true
+          register: platform_restore_1
           changed_when: false
           failed_when: false
 
+          when: >-
+            (capacity_namespace_creation | default({})).get('rc', -1) == 0
+
         - name: Restore the exact original platform environment
+          failed_when: false
           ansible.builtin.copy:
             content: "{{ capacity_original_environment.content | b64decode }}"
             dest: "{{ platform_capacity_drill_install_dir }}/.env"
@@ -106,9 +120,11 @@
             mode: '0600'
           delegate_to: "{{ platform_capacity_drill_host }}"
           become: true
+          register: platform_restore_2
           no_log: true
 
         - name: Recreate only the Platform API with its original policy
+          failed_when: false
           ansible.builtin.command:
             argv:
               - docker
@@ -123,75 +139,28 @@
             chdir: "{{ platform_capacity_drill_install_dir }}"
           delegate_to: "{{ platform_capacity_drill_host }}"
           become: true
-          register: capacity_policy_restore
-          until: capacity_policy_restore.rc == 0
+          register: platform_restore_3
+          until: platform_restore_3.rc == 0
           retries: 3
           delay: 5
           changed_when: true
 
-        - name: Refresh runner token before capacity-project cleanup
-          ansible.builtin.uri:
-            url: "{{ platform_oidc_token_url }}"
-            method: POST
-            body_format: form-urlencoded
-            body:
-              grant_type: client_credentials
-              client_id: "{{ platform_test_runner_client_id }}"
-              client_secret: "{{ platform_test_runner_client_secret }}"
-            status_code: 200
-          register: capacity_cleanup_token
-          failed_when: false
+
+        - name: Select confirmed fixture ownership for cleanup
+          ansible.builtin.set_fact:
+            platform_cleanup_project_creation: >-
+              {{ platform_cleanup_project_creation | default({}) }}
+            platform_cleanup_restoration_ok: >-
+              {{ (platform_restore_1.get('skipped', false) or
+              platform_restore_1.get('rc', -1) == 0) and
+              (platform_restore_2.get('checksum', '') | length > 0) and
+              (platform_restore_3.get('rc', -1) == 0) }}
+            platform_cleanup_personas: {}
+            platform_cleanup_credentials: []
           no_log: true
 
-        - name: Read capacity-project retirement scope
-          vars:
-            capacity_cleanup_access_token: >-
-              {{ capacity_cleanup_token.get('json', {}).get('access_token', '')
-              }}
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ capacity_project
-              }}/retirement-preview
-            headers:
-              Authorization: "Bearer {{ capacity_cleanup_access_token }}"
-            status_code:
-              - 200
-              - 404
-          register: capacity_cleanup_preview
-          failed_when: false
-          when: capacity_cleanup_access_token | length > 0
-          no_log: true
-
-        - name: Retire the disposable capacity project
-          vars:
-            capacity_cleanup_access_token: >-
-              {{ capacity_cleanup_token.get('json', {}).get('access_token', '')
-              }}
-          ansible.builtin.uri:
-            url: >-
-              {{ platform_api_url }}/projects/{{ capacity_project }}/retire
-            method: POST
-            headers:
-              Authorization: "Bearer {{ capacity_cleanup_access_token }}"
-            body_format: json
-            body:
-              confirm_name: "{{ capacity_project }}"
-              scope_token: "{{ capacity_cleanup_preview.json.scope_token }}"
-            status_code:
-              - 200
-              - 202
-              - 404
-              - 409
-          register: capacity_cleanup
-          until: capacity_cleanup.status != 202
-          retries: 60
-          delay: 5
-          failed_when: false
-          when:
-            - capacity_cleanup_access_token | length > 0
-            - >-
-              capacity_cleanup_preview.status | default(0) | int == 200
-          no_log: true
+        - name: Clean owned fixtures and require complete cleanup
+          ansible.builtin.import_tasks: ../../tasks/tests/support/cleanup.yml
 
     - name: Report non-secret capacity admission evidence
       ansible.builtin.debug:

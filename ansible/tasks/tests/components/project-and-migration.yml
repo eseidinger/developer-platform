@@ -9,6 +9,7 @@
     body:
       name: "{{ component_project }}"
     status_code: 201
+  register: platform_cleanup_project_creation
   no_log: true
 
 - name: Create a short-lived project administrator persona
