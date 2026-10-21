@@ -86,6 +86,22 @@ cleanup.
 
 ## Noninteractive functional tests
 
+Local HTTPS uses Caddy's internal certificate authority, including native store
+consoles under `*.apps.localhost`. Export its public root certificate:
+
+```bash
+mkdir -p .runtime/trust
+docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt \
+  .runtime/trust/local-ca.pem
+```
+
+Import that certificate into your browser's trusted authorities. Node-based
+test clients can use `NODE_EXTRA_CA_CERTS` with its absolute path; Python clients
+need an SSL context that trusts it. Some system resolvers do not map
+`*.localhost` to loopback automatically, even when browsers do; configure local
+name resolution for API clients when necessary. These are client prerequisites,
+and do not require disabling TLS verification.
+
 Once the API is ready, follow the
 [test-runner bootstrap](../../ansible/docs/test-runner.md#local-bootstrap-without-interactive-login)
 to issue a one-day, private machine credential using local Docker access.

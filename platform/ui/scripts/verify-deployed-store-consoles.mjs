@@ -1,6 +1,7 @@
 // Live Phase 7 helper. Input contains ephemeral personas and runner credentials;
 // never print input, native credentials, URLs with assertions, traces or storage state.
 import { chromium } from '@playwright/test'
+import { deploymentOrigin, unitVector } from './live-config.mjs'
 import { createHash, createHmac } from 'node:crypto'
 
 const sha = (value) => createHash('sha256').update(value).digest('hex')
@@ -62,7 +63,7 @@ const signedS3 = async (
 let input = ''
 for await (const chunk of process.stdin) input += chunk
 const config = JSON.parse(input)
-const base = 'https://platform.eseidinger.de'
+const base = deploymentOrigin(config.base)
 const browser = await chromium.launch({ headless: true })
 let stage = 'start'
 
@@ -154,16 +155,20 @@ const native = async (provider, mode, person, credential, origin) => {
   const page = person.page
   const c = credential.connection
   if (provider === 's3') {
+    stage += '-login-form'
     await page
       .getByPlaceholder('Please enter account')
       .fill(c.RUSTFS_CONSOLE_ACCESS_KEY)
+    stage += '-secret-field'
     await page
       .getByPlaceholder('Please enter key')
       .fill(c.RUSTFS_CONSOLE_SECRET_KEY)
     await page.getByRole('button', { name: 'Login', exact: true }).click()
+    stage += '-sts-session'
     await page.waitForFunction(() =>
       Boolean(localStorage.getItem('auth.credentials')),
     )
+    stage += '-bucket-list'
     await page.goto(origin + '/rustfs/console/browser/')
     await page.getByText(c.S3_BUCKET, { exact: true }).first().waitFor()
     const session = await page.evaluate(() =>
@@ -240,8 +245,17 @@ const native = async (provider, mode, person, credential, origin) => {
     await page.locator('input[type="password"]').fill(c.QDRANT_API_KEY)
     await page.getByRole('button', { name: 'Apply', exact: true }).click()
     await page.getByText(c.QDRANT_COLLECTION, { exact: true }).first().waitFor()
+    const collection = await person.context.request.get(
+      origin + '/collections/' + c.QDRANT_COLLECTION,
+      { headers: { 'api-key': c.QDRANT_API_KEY } },
+    )
+    if (collection.status() !== 200)
+      throw Error('Collection configuration unavailable')
+    const vector = unitVector(
+      (await collection.json()).result.config.params.vectors.size,
+    )
     const status = await page.evaluate(
-      async ({ c, mode }) => {
+      async ({ c, mode, vector }) => {
         const headers = {
           'api-key': c.QDRANT_API_KEY,
           'Content-Type': 'application/json',
@@ -255,7 +269,7 @@ const native = async (provider, mode, person, credential, origin) => {
           {
             method: 'PUT',
             headers,
-            body: JSON.stringify({ points: [{ id: 7, vector: [1, 0, 0] }] }),
+            body: JSON.stringify({ points: [{ id: 7, vector }] }),
           },
         )
         const drop = await fetch('/collections/' + c.QDRANT_COLLECTION, {
@@ -269,7 +283,7 @@ const native = async (provider, mode, person, credential, origin) => {
           drop: drop.status,
         }
       },
-      { c, mode },
+      { c, mode, vector },
     )
     if (
       status.list !== 200 ||
@@ -449,11 +463,23 @@ try {
     }
   }
 } catch (error) {
+  const diagnostic = [
+    'certificate',
+    'ENOTFOUND',
+    'ECONNREFUSED',
+    'Timeout',
+    'Lease issue',
+    'Lease did not become active',
+    'Console launch',
+  ].find((value) => error.message?.includes(value))
+  if (diagnostic) console.log('Diagnostic: ' + diagnostic)
+  if (/^Console launch [0-9]{3}$/.test(error.message))
+    console.log(error.message)
   console.error(
     'FAIL deployed console stage=' +
       stage +
       ' error=' +
-      String(error).slice(0, 300),
+      (error instanceof Error ? error.constructor.name : 'Failure'),
   )
   process.exitCode = 1
 } finally {

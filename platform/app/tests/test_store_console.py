@@ -79,7 +79,14 @@ class ConsoleBoundaryTests(TestCase):
     ):
         self.assertEqual(self.client.get("/").status_code, 401)
         response = self.launch()
-        self.assertEqual(response.status_code, 303)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('http-equiv="refresh"', response.text)
+        self.assertIn('content="0;url=/rustfs/console/"', response.text)
+        self.assertNotIn("location", response.headers)
+        self.assertNotIn("launch", response.text)
+        self.assertNotIn("<script", response.text)
+        self.assertEqual(response.headers["cache-control"], "no-store")
+        self.assertIn("default-src 'none'", response.headers["content-security-policy"])
         cookie = response.headers["set-cookie"]
         for flag in ("Secure", "HttpOnly", "SameSite=strict", "Path=/"):
             self.assertIn(flag, cookie)
@@ -217,7 +224,7 @@ class ConsoleBoundaryTests(TestCase):
     def test_static_asset_routes_are_read_only_and_never_use_the_data_relay(self):
         self.row["provider"] = "qdrant"
         response = self.launch()
-        self.assertEqual(response.headers["location"], "/dashboard/")
+        self.assertIn('content="0;url=/dashboard/"', response.text)
         seen = []
 
         async def handler(request):

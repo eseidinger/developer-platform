@@ -54,6 +54,7 @@ npm run format:check
 npm run format
 npm run typecheck
 npm test
+npm run test:scripts
 npm run test:e2e
 npm run api:generate
 npm run api:check
@@ -63,7 +64,8 @@ npm run preview
 ```
 
 `check` verifies the generated API contract, lint (including accessibility),
-formatting, types, unit tests, and production build. CI runs this same command.
+formatting, types, application and helper unit tests, and production build. CI
+runs this same command.
 Accessibility lint uses `eslint-plugin-jsx-a11y-x`, whose declared peer range
 supports the project's ESLint 10; the original plugin currently supports up to
 ESLint 9.
@@ -74,6 +76,18 @@ artifacts are excluded. Markdown uses the repository's Markdown tools.
 
 `test:e2e` requires Playwright's browser binaries. Install them with
 `npx playwright install` when preparing a local browser-test environment.
+
+The `scripts/verify-deployed-*.mjs` helpers exercise a running installation with
+disposable identities supplied as private JSON on stdin. Every helper requires
+an explicit `base` deployment origin; there is no default remote target. Trust
+the installation's certificate authority in both Chromium and Node before
+testing local HTTPS. Keep certificate verification enabled and never save
+traces, screenshots, or input containing passwords and runner credentials.
+Native console checks issue leases, perform scoped writes for writer accounts,
+and revoke the supplied writer grants. Use only grants owned by the test run.
+`verify-deployed-platform.mjs` reads an existing completed AI run and checks its
+history, evidence, project navigation, and named-store catalog without making
+another model request.
 
 ## Contract and security boundaries
 

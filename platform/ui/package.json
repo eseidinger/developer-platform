@@ -14,9 +14,10 @@
     "test:e2e": "playwright test",
     "api:generate": "openapi-typescript ../../docs/api/openapi.json -o src/api/generated/schema.ts",
     "api:check": "node scripts/check-api.mjs",
-    "check": "npm run api:check && npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build",
+    "check": "npm run api:check && npm run lint && npm run format:check && npm run typecheck && npm run test && npm run test:scripts && npm run build",
     "format": "prettier --write .",
-    "format:check": "prettier --check ."
+    "format:check": "prettier --check .",
+    "test:scripts": "node --test scripts/*.test.mjs"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

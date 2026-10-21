@@ -26,6 +26,7 @@ import jwt
 from fastapi import FastAPI, HTTPException, Request, WebSocket
 from fastapi.responses import (
     FileResponse,
+    HTMLResponse,
     JSONResponse,
     RedirectResponse,
     Response,
@@ -464,13 +465,21 @@ def create_gateway(
                 raise HTTPException(400) from None
             row = await authorize(token, "launch", port)
             target = landing(row["provider"])
-            response = RedirectResponse(
-                target,
-                status_code=303,
+            # A redirect after a cross-site POST would omit our Strict cookie
+            # on the first console GET (notably platform.localhost ->
+            # console-N.apps.localhost). Establish a console-origin document
+            # before navigating, retaining the strict cookie/CSRF boundary.
+            # Landing paths are fixed provider constants, never caller input.
+            response = HTMLResponse(
+                '<!doctype html><html><head><meta charset="utf-8">'
+                f'<meta http-equiv="refresh" content="0;url={target}">'
+                "<title>Opening store console</title></head><body>"
+                f'<a href="{target}">Open store console</a></body></html>',
                 headers={
                     "Cache-Control": "no-store",
                     "Referrer-Policy": "no-referrer",
                     "Clear-Site-Data": '"cache", "storage"',
+                    "Content-Security-Policy": "default-src 'none'; base-uri 'none'; frame-ancestors 'none'",
                 },
             )
             response.set_cookie(

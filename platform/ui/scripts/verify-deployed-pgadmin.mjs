@@ -1,6 +1,7 @@
 // Live acceptance helper. Read ephemeral test identities and tokens from stdin;
 // print only fixed stage names and results, never credentials or browser traces.
 import { chromium } from '@playwright/test'
+import { deploymentOrigin } from './live-config.mjs'
 
 let input = ''
 for await (const part of process.stdin) input += part
@@ -9,7 +10,7 @@ let stage = 'browser-start'
 let lastPath = ''
 let activePage
 const browser = await chromium.launch({ headless: true })
-const base = config.base.replace(/\/$/, '')
+const base = deploymentOrigin(config.base)
 const requestJson = async (context, path, token, method = 'GET', data) => {
   const response = await context.request.fetch(base + path, {
     method,
