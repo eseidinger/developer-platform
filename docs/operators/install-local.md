@@ -62,3 +62,11 @@ and `/readyz` checks PostgreSQL plus Kubernetes connectivity; neither proves
 every workload. Use [platform acceptance](validation/acceptance.md) for the
 broader suite and [lifecycle](lifecycle.md) for stop, restart, recreation, and
 cleanup.
+
+## Noninteractive functional tests
+
+Once the API is ready, follow the
+[test-runner bootstrap](../../ansible/docs/test-runner.md#local-bootstrap-without-interactive-login)
+to issue a one-day, private machine credential using local Docker access.
+Routine runners renew tokens without a human login. Initial administrator
+configuration and tests of human authentication remain separate requirements.

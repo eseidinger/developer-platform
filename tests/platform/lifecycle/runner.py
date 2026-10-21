@@ -115,7 +115,7 @@ class Fixture:
         )
 
     def provision(self):
-        self.api.request("GET", "/platform/test-runner-credentials")
+        self.api.request("GET", "/platform/test-context")
         rows = self.api.request("GET", "/projects")
         require(
             not any(row["name"] == self.project for row in rows),

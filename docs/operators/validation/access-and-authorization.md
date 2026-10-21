@@ -264,6 +264,12 @@ operator session in memory; it never writes renewed credentials to the journal.
 Obtain a fresh session for crash recovery if the original session is no longer
 usable. The existing operator account and its grants are not changed.
 
+For routine machine-driven acceptance, the harness also accepts the protected
+client-credentials file described in the
+[noninteractive bootstrap guide](../../../ansible/docs/test-runner.md#local-bootstrap-without-interactive-login).
+This avoids interactive operator login. Human database-access checks still need
+a human session; machine credentials do not satisfy those identity assertions.
+
 ### Update the runner without redeploying platform services
 
 A runner/fixture-only release does not require `ansible/deploy.yml`. From the

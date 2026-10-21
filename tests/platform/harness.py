@@ -5,6 +5,7 @@ database. `plan` is offline. `run` creates only uniquely named fixture resources
 Recovery requires separate consent and an otherwise empty lab. Outage drills
 remain explicitly deferred; this harness does not stop platform services.
 """
+
 import argparse
 import base64
 import copy
@@ -31,11 +32,18 @@ import jwt
 ROOT = Path(__file__).resolve().parents[2]
 RUN_PATTERN = re.compile(r"[0-9a-f]{12}")
 IMAGE_PATTERN = re.compile(r"[a-zA-Z0-9][a-zA-Z0-9._:/-]+@sha256:[0-9a-f]{64}")
-DEFERRED = ["real-backup-restore", "browser-30-minute-idle-and-8-hour-absolute-expiry",
-            "24-hour-rotation-adoption-timeout", "30/90-day-request-retention",
-            "component-monitoring-and-central-log-retention", "control-plane-outage",
-            "dns-address-change-reapply", "held-machine-token-expiry",
-            "recovery-reconciliation-rehearsal", "external-use-case-suite"]
+DEFERRED = [
+    "real-backup-restore",
+    "browser-30-minute-idle-and-8-hour-absolute-expiry",
+    "24-hour-rotation-adoption-timeout",
+    "30/90-day-request-retention",
+    "component-monitoring-and-central-log-retention",
+    "control-plane-outage",
+    "dns-address-change-reapply",
+    "held-machine-token-expiry",
+    "recovery-reconciliation-rehearsal",
+    "external-use-case-suite",
+]
 
 
 class DrillError(Exception):
@@ -53,8 +61,13 @@ def utc():
 
 def origin(url, *, internal=False):
     parts = urlsplit(url)
-    require(not parts.username and not parts.password and not parts.query and not parts.fragment,
-            "invalid_origin")
+    require(
+        not parts.username
+        and not parts.password
+        and not parts.query
+        and not parts.fragment,
+        "invalid_origin",
+    )
     require(parts.hostname and parts.path in ("", "/"), "invalid_origin")
     allowed_http = parts.hostname in {"localhost", "127.0.0.1", "::1"}
     if internal and parts.hostname:
@@ -62,7 +75,10 @@ def origin(url, *, internal=False):
             allowed_http = ipaddress.ip_address(parts.hostname).is_private
         except ValueError:
             pass
-    require(parts.scheme == "https" or (parts.scheme == "http" and allowed_http), "https_required")
+    require(
+        parts.scheme == "https" or (parts.scheme == "http" and allowed_http),
+        "https_required",
+    )
     return urlunsplit((parts.scheme, parts.netloc, "", "", ""))
 
 
@@ -95,50 +111,128 @@ def project_names(run_id):
 
 def declaration(project, role, image, run_id, provider_url, issuer, bindings=None):
     names = project_names(run_id)
-    require(project == names[role] and IMAGE_PATTERN.fullmatch(image), "invalid_fixture_declaration")
-    outbound = [{"dns": urlsplit(url).hostname, "port": 443} for url in (provider_url, issuer)] if role == "consumer" else []
-    limits = {"requests": {"cpu": "50m", "memory": "64Mi"}, "limits": {"cpu": "250m", "memory": "128Mi"}}
+    require(
+        project == names[role] and IMAGE_PATTERN.fullmatch(image),
+        "invalid_fixture_declaration",
+    )
+    outbound = (
+        [{"dns": urlsplit(url).hostname, "port": 443} for url in (provider_url, issuer)]
+        if role == "consumer"
+        else []
+    )
+    limits = {
+        "requests": {"cpu": "50m", "memory": "64Mi"},
+        "limits": {"cpu": "250m", "memory": "128Mi"},
+    }
+
     def component(name, public):
-        return {"name": name, "type": "service", "runtime": {"type": "container", "image": image,
-                    **({"args": ["fixture.py", "--worker"], "command": ["python"]} if not public else {})},
+        return {
+            "name": name,
+            "type": "service",
+            "runtime": {
+                "type": "container",
+                "image": image,
+                **(
+                    {"args": ["fixture.py", "--worker"], "command": ["python"]}
+                    if not public
+                    else {}
+                ),
+            },
             "ports": [{"name": "http", "protocol": "http", "port": 8080}],
-            "replicas": 1, "exposure": "public" if public else "private", "resources": copy.deepcopy(limits),
-            "bindings": ([{"bindingId": bindings[name], "envPrefix": ""}] if bindings and name in bindings else []),
+            "replicas": 1,
+            "exposure": "public" if public else "private",
+            "resources": copy.deepcopy(limits),
+            "bindings": (
+                [{"bindingId": bindings[name], "envPrefix": ""}]
+                if bindings and name in bindings
+                else []
+            ),
             "health": {"readiness": {"path": "/health/ready", "port": 8080}},
-            "outbound": copy.deepcopy(outbound) if public else []}
-    return {"apiVersion": "platform.example/v1alpha2", "kind": "Application", "metadata": {"name": project},
-        "spec": {"components": [component("api", True), component("worker", False)],
-            "configuration": {"values": {"ACCEPTANCE_RUN_ID": run_id, "FIXTURE_ROLE": role,
-                                            "PROVIDER_URL": provider_url}}}}
+            "outbound": copy.deepcopy(outbound) if public else [],
+        }
+
+    return {
+        "apiVersion": "platform.example/v1alpha2",
+        "kind": "Application",
+        "metadata": {"name": project},
+        "spec": {
+            "components": [component("api", True), component("worker", False)],
+            "configuration": {
+                "values": {
+                    "ACCEPTANCE_RUN_ID": run_id,
+                    "FIXTURE_ROLE": role,
+                    "PROVIDER_URL": provider_url,
+                }
+            },
+        },
+    }
 
 
 def access_policy(readers, humans, administrators):
     def route(name, prefix, mode, groups, methods):
-        return {"name": name, "match": {"pathPrefix": prefix, "methods": methods},
-                "authentication": {"mode": mode}, "authorization": {"anyOfGroups": groups}}
-    return {"component": "api", "defaultDecision": "deny", "identityAttributes": {"displayName": False, "email": False},
-        "routes": [route("browser", "/app/", "browser-session", [humans], ["GET", "POST"]),
+        return {
+            "name": name,
+            "match": {"pathPrefix": prefix, "methods": methods},
+            "authentication": {"mode": mode},
+            "authorization": {"anyOfGroups": groups},
+        }
+
+    return {
+        "component": "api",
+        "defaultDecision": "deny",
+        "identityAttributes": {"displayName": False, "email": False},
+        "routes": [
+            route("browser", "/app/", "browser-session", [humans], ["GET", "POST"]),
             route("machine", "/api/", "bearer-token", [readers], ["GET", "POST"]),
-            route("machine-admin", "/machine-admin/", "bearer-token", [administrators], ["GET"])]}
+            route(
+                "machine-admin",
+                "/machine-admin/",
+                "bearer-token",
+                [administrators],
+                ["GET"],
+            ),
+        ],
+    }
 
 
 class Journal:
     """Evidence is a whitelist; recovery handles are private and contain NO credentials."""
+
     def __init__(self, directory, api, run_id, *, resume=False):
         self.directory = Path(directory)
         require(not self.directory.is_symlink(), "unsafe_output_directory")
         if resume:
             self.state = json.loads(private_text(self.directory / "state.json"))
             self.report = json.loads(private_text(self.directory / "report.json"))
-            require(self.state["runId"] == run_id and self.state["api"] == api, "journal_scope_mismatch")
-            require(self.state["projects"] == project_names(run_id), "journal_scope_mismatch")
+            require(
+                self.state["runId"] == run_id and self.state["api"] == api,
+                "journal_scope_mismatch",
+            )
+            require(
+                self.state["projects"] == project_names(run_id),
+                "journal_scope_mismatch",
+            )
         else:
             require(not self.directory.exists(), "run_directory_exists")
             self.directory.mkdir(parents=True, mode=0o700)
-            self.state = {"runId": run_id, "api": api, "projects": project_names(run_id),
-                          "createdProjects": [], "personas": [], "human": None, "clients": []}
-            self.report = {"format": 1, "runId": run_id, "startedAt": utc(), "result": "running",
-                           "gateClosed": False, "checks": [], "deferred": list(DEFERRED)}
+            self.state = {
+                "runId": run_id,
+                "api": api,
+                "projects": project_names(run_id),
+                "createdProjects": [],
+                "personas": [],
+                "human": None,
+                "clients": [],
+            }
+            self.report = {
+                "format": 1,
+                "runId": run_id,
+                "startedAt": utc(),
+                "result": "running",
+                "gateClosed": False,
+                "checks": [],
+                "deferred": list(DEFERRED),
+            }
             self.save()
 
     def save(self):
@@ -155,11 +249,24 @@ class Journal:
     def check(self, name, passed, **measurements):
         require(re.fullmatch(r"[a-z0-9-]+", name), "invalid_check_name")
         # Dependency payloads, free-form errors, identifiers and arbitrary strings are forbidden.
-        require(all(isinstance(v, (bool, int, float)) and not isinstance(v, str) for v in measurements.values()),
-                "unsafe_evidence")
-        require(all(re.fullmatch(r"[a-zA-Z]+", k) for k in measurements), "unsafe_evidence")
-        self.report["checks"].append({"name": name, "result": "passed" if passed else "failed",
-                                       "at": utc(), **measurements})
+        require(
+            all(
+                isinstance(v, (bool, int, float)) and not isinstance(v, str)
+                for v in measurements.values()
+            ),
+            "unsafe_evidence",
+        )
+        require(
+            all(re.fullmatch(r"[a-zA-Z]+", k) for k in measurements), "unsafe_evidence"
+        )
+        self.report["checks"].append(
+            {
+                "name": name,
+                "result": "passed" if passed else "failed",
+                "at": utc(),
+                **measurements,
+            }
+        )
         self.save()
         print(("PASS " if passed else "FAIL ") + name, flush=True)
         require(passed, name)
@@ -186,7 +293,9 @@ class Tokens:
 
     def get(self):
         if self.refresh:
-            claims = jwt.decode(self.token, options={"verify_signature": False})  # Expiry scheduling ONLY.
+            claims = jwt.decode(
+                self.token, options={"verify_signature": False}
+            )  # Expiry scheduling ONLY.
             if claims["exp"] <= time.time() + 45:
                 self.token, self.refresh = self.client.refresh(self.refresh)
         return self.token
@@ -195,6 +304,8 @@ class Tokens:
 class API:
     def __init__(self, url, tokens):
         self.url, self.tokens = origin(url), tokens
+        if isinstance(tokens, RunnerTokens):
+            require(self.url == tokens.api_origin, "runner_api_mismatch")
         self.http = httpx.Client(timeout=20, follow_redirects=False, trust_env=False)
 
     def request(self, method, path, body=None, *, etag=None, key=None, statuses=(200,)):
@@ -205,16 +316,24 @@ class API:
         if key:
             headers["Idempotency-Key"] = key
         result = self.http.request(method, self.url + path, json=body, headers=headers)
-        require(result.status_code in statuses, "control_api_http_" + str(result.status_code))
+        require(
+            result.status_code in statuses,
+            "control_api_http_" + str(result.status_code),
+        )
         return result.json()
 
     def operation(self, response, seconds=180):
         path = response["status_url"]
-        require(re.fullmatch(r"/v1/(?:access-)?operations/[0-9a-f-]+", path), "invalid_operation_url")
+        require(
+            re.fullmatch(r"/v1/(?:access-)?operations/[0-9a-f-]+", path),
+            "invalid_operation_url",
+        )
+
         def finished():
             row = self.request("GET", path)
             require(row["state"] != "failed", "operation_failed")
             return row if row["state"] == "succeeded" else None
+
         return wait_for(finished, "operation_pending", seconds)
 
 
@@ -229,7 +348,12 @@ class Form(HTMLParser):
         attrs = dict(attrs)
         if tag == "form" and attrs.get("id") == "kc-form-login":
             self.action, self.inside = attrs.get("action"), True
-        if self.inside and tag == "input" and attrs.get("type") == "hidden" and attrs.get("name"):
+        if (
+            self.inside
+            and tag == "input"
+            and attrs.get("type") == "hidden"
+            and attrs.get("name")
+        ):
             self.hidden[attrs["name"]] = attrs.get("value", "")
 
     def handle_endtag(self, tag):
@@ -242,66 +366,151 @@ def submit_login(http, page, issuer, username, password):
     form.feed(page.text)
     require(form.action is not None, "login_form_missing")
     target, trusted = urlsplit(form.action), urlsplit(issuer)
-    require((target.scheme, target.netloc) == (trusted.scheme, trusted.netloc)
-            and target.path.startswith(trusted.path + "/login-actions/"), "untrusted_login_destination")
-    return http.post(form.action, data={**form.hidden, "username": username, "password": password,
-                                      "credentialId": ""})
+    require(
+        (target.scheme, target.netloc) == (trusted.scheme, trusted.netloc)
+        and target.path.startswith(trusted.path + "/login-actions/"),
+        "untrusted_login_destination",
+    )
+    return http.post(
+        form.action,
+        data={
+            **form.hidden,
+            "username": username,
+            "password": password,
+            "credentialId": "",
+        },
+    )
 
 
 class Keycloak:
     def __init__(self, config):
-        self.issuer = config.get("OIDC_ISSUER") or "https://" + config["IDENTITY_DOMAIN"] + "/realms/platform"
+        self.issuer = (
+            config.get("OIDC_ISSUER")
+            or "https://" + config["IDENTITY_DOMAIN"] + "/realms/platform"
+        )
         require(urlsplit(self.issuer).path == "/realms/platform", "unsupported_realm")
         origin(urlunsplit((*urlsplit(self.issuer)[:2], "", "", "")))
-        self.internal = origin("http://" + config.get("KEYCLOAK_IP", "172.30.80.12") + ":8080", internal=True)
+        self.internal = origin(
+            "http://" + config.get("KEYCLOAK_IP", "172.30.80.12") + ":8080",
+            internal=True,
+        )
         self.provisioner_secret = config["KEYCLOAK_PROVISIONER_SECRET"]
         self.http = httpx.Client(timeout=15, follow_redirects=False, trust_env=False)
 
     def admin(self, method, path, body=None, statuses=(200, 201, 204)):
-        result = self.http.post(self.internal + "/realms/platform/protocol/openid-connect/token", data={
-            "grant_type": "client_credentials", "client_id": "platform-credential-provisioner",
-            "client_secret": self.provisioner_secret})
+        result = self.http.post(
+            self.internal + "/realms/platform/protocol/openid-connect/token",
+            data={
+                "grant_type": "client_credentials",
+                "client_id": "platform-credential-provisioner",
+                "client_secret": self.provisioner_secret,
+            },
+        )
         require(result.status_code == 200, "identity_provisioner_unavailable")
-        result = self.http.request(method, self.internal + "/admin/realms/platform/" + path,
-                                  json=body, headers={"Authorization": "Bearer " + result.json()["access_token"]})
-        require(result.status_code in statuses, "identity_admin_http_" + str(result.status_code))
+        result = self.http.request(
+            method,
+            self.internal + "/admin/realms/platform/" + path,
+            json=body,
+            headers={"Authorization": "Bearer " + result.json()["access_token"]},
+        )
+        require(
+            result.status_code in statuses,
+            "identity_admin_http_" + str(result.status_code),
+        )
         return result
 
     def client(self, run_id, suffix, audience, *, browser=False):
         client_id, secret = "ha-" + run_id + "-" + suffix, secrets.token_urlsafe(32)
-        representation = {"clientId": client_id, "enabled": True, "protocol": "openid-connect", "publicClient": False,
-            "secret": secret, "standardFlowEnabled": browser, "serviceAccountsEnabled": not browser,
-            "directAccessGrantsEnabled": False, "fullScopeAllowed": False,
-            "defaultClientScopes": ["basic"] if browser else [], "optionalClientScopes": [],
-            "redirectUris": ["https://" + urlsplit(self.issuer).hostname + "/acceptance/callback"] if browser else [],
-            "attributes": {"access.token.lifespan": "300", "pkce.code.challenge.method": "S256"},
-            "protocolMappers": [{"name": "target", "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
-                "config": {"included.client.audience": audience, "access.token.claim": "true", "id.token.claim": "false"}}]}
+        representation = {
+            "clientId": client_id,
+            "enabled": True,
+            "protocol": "openid-connect",
+            "publicClient": False,
+            "secret": secret,
+            "standardFlowEnabled": browser,
+            "serviceAccountsEnabled": not browser,
+            "directAccessGrantsEnabled": False,
+            "fullScopeAllowed": False,
+            "defaultClientScopes": ["basic"] if browser else [],
+            "optionalClientScopes": [],
+            "redirectUris": [
+                "https://" + urlsplit(self.issuer).hostname + "/acceptance/callback"
+            ]
+            if browser
+            else [],
+            "attributes": {
+                "access.token.lifespan": "300",
+                "pkce.code.challenge.method": "S256",
+            },
+            "protocolMappers": [
+                {
+                    "name": "target",
+                    "protocol": "openid-connect",
+                    "protocolMapper": "oidc-audience-mapper",
+                    "config": {
+                        "included.client.audience": audience,
+                        "access.token.claim": "true",
+                        "id.token.claim": "false",
+                    },
+                }
+            ],
+        }
         existing = self.admin("GET", "clients", statuses=(200,)).json()
-        require(not any(c["clientId"] == client_id for c in existing), "identity_client_collision")
+        require(
+            not any(c["clientId"] == client_id for c in existing),
+            "identity_client_collision",
+        )
         self.admin("POST", "clients", representation)
-        found = self.admin("GET", "clients?clientId=" + client_id, statuses=(200,)).json()
+        found = self.admin(
+            "GET", "clients?clientId=" + client_id, statuses=(200,)
+        ).json()
         require(len(found) == 1, "identity_client_missing")
-        return {"id": found[0]["id"], "clientId": client_id}, secret, representation["redirectUris"]
+        return (
+            {"id": found[0]["id"], "clientId": client_id},
+            secret,
+            representation["redirectUris"],
+        )
 
     def human(self, run_id):
         username, password = "ha-" + run_id + "-human", secrets.token_urlsafe(24)
-        result = self.admin("POST", "users", {"username": username, "enabled": True, "firstName": "Synthetic",
-            "lastName": "Fixture", "email": username + "@example.invalid", "emailVerified": False,
-            "credentials": [{"type": "password", "value": password, "temporary": False}]})
+        result = self.admin(
+            "POST",
+            "users",
+            {
+                "username": username,
+                "enabled": True,
+                "firstName": "Synthetic",
+                "lastName": "Fixture",
+                "email": username + "@example.invalid",
+                "emailVerified": False,
+                "credentials": [
+                    {"type": "password", "value": password, "temporary": False}
+                ],
+            },
+        )
         subject = result.headers["location"].rsplit("/", 1)[1]
         return {"id": subject, "username": username}, password
 
 
 class OperatorRefresh:
     """Renew an existing operator's public-client session; never persist renewed tokens."""
+
     def __init__(self, keycloak, client_id):
-        require(client_id in {"platform-cli", "platform-portal"}, "unsupported_operator_client")
+        require(
+            client_id in {"platform-cli", "platform-portal"},
+            "unsupported_operator_client",
+        )
         self.keycloak, self.client_id = keycloak, client_id
 
     def refresh(self, refresh):
-        result = self.keycloak.http.post(self.keycloak.issuer + "/protocol/openid-connect/token", data={
-            "grant_type": "refresh_token", "client_id": self.client_id, "refresh_token": refresh})
+        result = self.keycloak.http.post(
+            self.keycloak.issuer + "/protocol/openid-connect/token",
+            data={
+                "grant_type": "refresh_token",
+                "client_id": self.client_id,
+                "refresh_token": refresh,
+            },
+        )
         require(result.status_code == 200, "operator_token_refresh_failed")
         payload = result.json()
         return payload["access_token"], payload["refresh_token"]
@@ -309,10 +518,20 @@ class OperatorRefresh:
 
 class Kube:
     def __init__(self, config):
-        self.command = [str(config), "--kubeconfig", str(ROOT / ".runtime/admin.kubeconfig")]
+        self.command = [
+            str(config),
+            "--kubeconfig",
+            str(ROOT / ".runtime/admin.kubeconfig"),
+        ]
 
     def call(self, *args, data=None, timeout=30):
-        result = subprocess.run(self.command + list(args), input=data, text=True, capture_output=True, timeout=timeout)
+        result = subprocess.run(
+            self.command + list(args),
+            input=data,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
         require(result.returncode == 0, "kubernetes_command_failed")
         return result.stdout
 
@@ -323,27 +542,71 @@ class Kube:
         require(re.fullmatch(r"ACCESS_[0-9A-F]{12}", prefix), "invalid_binding_prefix")
         # Only a known fixture project's secret is read, and values never enter evidence/state.
         secret = self.obj("secret", "app-secrets", "project-" + project)["data"]
-        return {suffix: base64.b64decode(secret[prefix + "_" + suffix]).decode()
-                for suffix in ("CLIENT_ID", "CLIENT_SECRET", "TOKEN_URL")}
+        return {
+            suffix: base64.b64decode(secret[prefix + "_" + suffix]).decode()
+            for suffix in ("CLIENT_ID", "CLIENT_SECRET", "TOKEN_URL")
+        }
 
     def exec_json(self, project, component, script, body):
-        result = self.call("-n", "project-" + project, "exec", "-i", "deploy/" + component,
-                           "--", "python", "-c", script, data=json.dumps(body), timeout=45)
+        result = self.call(
+            "-n",
+            "project-" + project,
+            "exec",
+            "-i",
+            "deploy/" + component,
+            "--",
+            "python",
+            "-c",
+            script,
+            data=json.dumps(body),
+            timeout=45,
+        )
         return json.loads(result)
 
     def authorizer_probe(self, body):
         # Read-only TCP control from the existing, policy-authorized backend caller.
-        result = self.call("-n", "platform-access", "exec", "-i", "deploy/authorizer",
-                           "--", "python", "-c", NETWORK_PROBE, data=json.dumps(body), timeout=45)
+        result = self.call(
+            "-n",
+            "platform-access",
+            "exec",
+            "-i",
+            "deploy/authorizer",
+            "--",
+            "python",
+            "-c",
+            NETWORK_PROBE,
+            data=json.dumps(body),
+            timeout=45,
+        )
         return json.loads(result)
 
     def pod_ip_versions(self, project, component):
-        pods = json.loads(self.call("-n", "project-" + project, "get", "pods",
-            "-l", "platform.example/component=" + component, "-o", "json"))["items"]
-        live = [p for p in pods if not p["metadata"].get("deletionTimestamp") and any(
-            c.get("type") == "Ready" and c.get("status") == "True" for c in p.get("status", {}).get("conditions", []))]
-        versions = {ipaddress.ip_address(ip["ip"]).version for p in live
-                    for ip in p.get("status", {}).get("podIPs", [])}
+        pods = json.loads(
+            self.call(
+                "-n",
+                "project-" + project,
+                "get",
+                "pods",
+                "-l",
+                "platform.example/component=" + component,
+                "-o",
+                "json",
+            )
+        )["items"]
+        live = [
+            p
+            for p in pods
+            if not p["metadata"].get("deletionTimestamp")
+            and any(
+                c.get("type") == "Ready" and c.get("status") == "True"
+                for c in p.get("status", {}).get("conditions", [])
+            )
+        ]
+        versions = {
+            ipaddress.ip_address(ip["ip"]).version
+            for p in live
+            for ip in p.get("status", {}).get("podIPs", [])
+        }
         require(bool(versions), "fixture_network_families_unavailable")
         return sorted(versions)
 
@@ -380,46 +643,115 @@ print(json.dumps(r))
 
 def host_network_probe(body):
     """Outside-policy reachability control; no HTTP headers or credentials are used."""
-    result = subprocess.run([sys.executable, "-c", NETWORK_PROBE], input=json.dumps(body),
-                            text=True, capture_output=True, timeout=45)
+    result = subprocess.run(
+        [sys.executable, "-c", NETWORK_PROBE],
+        input=json.dumps(body),
+        text=True,
+        capture_output=True,
+        timeout=45,
+    )
     require(result.returncode == 0, "host_network_probe_failed")
     return json.loads(result.stdout)
 
 
 def network_control_ready(result):
-    return (result.get("resolved") is True and bool(result.get("addresses"))
-            and not result.get("dnsError") and not result.get("addressMismatch")
-            and result.get("connected") == len(result["addresses"])
-            and all(result.get(k) == 0 for k in ("refused", "timedOut", "unexpectedErrors")))
+    return (
+        result.get("resolved") is True
+        and bool(result.get("addresses"))
+        and not result.get("dnsError")
+        and not result.get("addressMismatch")
+        and result.get("connected") == len(result["addresses"])
+        and all(result.get(k) == 0 for k in ("refused", "timedOut", "unexpectedErrors"))
+    )
 
 
 class MachineTokens(Tokens):
     def __init__(self, credentials):
         super().__init__()
         endpoint = urlsplit(credentials["TOKEN_URL"])
-        require(endpoint.scheme == "https" and endpoint.hostname and not endpoint.username
-                and not endpoint.password and not endpoint.query and not endpoint.fragment,
-                "unsafe_token_endpoint")
+        require(
+            endpoint.scheme == "https"
+            and endpoint.hostname
+            and not endpoint.username
+            and not endpoint.password
+            and not endpoint.query
+            and not endpoint.fragment,
+            "unsafe_token_endpoint",
+        )
         self.credentials = credentials
         self.http = httpx.Client(timeout=15, follow_redirects=False, trust_env=False)
 
     def get(self):
-        if self.token and jwt.decode(self.token, options={"verify_signature": False})["exp"] > time.time() + 45:
+        if (
+            self.token
+            and jwt.decode(self.token, options={"verify_signature": False})["exp"]
+            > time.time() + 45
+        ):
             return self.token
         value = self.credentials
-        result = self.http.post(value["TOKEN_URL"], data={"grant_type": "client_credentials",
-            "client_id": value["CLIENT_ID"], "client_secret": value["CLIENT_SECRET"]})
+        result = self.http.post(
+            value["TOKEN_URL"],
+            data={
+                "grant_type": "client_credentials",
+                "client_id": value["CLIENT_ID"],
+                "client_secret": value["CLIENT_SECRET"],
+            },
+        )
         require(result.status_code == 200, "service_token_unavailable")
         self.token = result.json()["access_token"]
         return self.token
 
 
+class RunnerTokens(Tokens):
+    """Renew a test runner through client credentials, without a human session."""
+
+    def __init__(self, payload, keycloak):
+        super().__init__()
+        self.api_origin = origin(payload["platform_api_url"])
+        self.endpoint = payload["platform_oidc_token_url"]
+        require(
+            self.endpoint == keycloak.issuer + "/protocol/openid-connect/token",
+            "runner_token_endpoint_mismatch",
+        )
+        self.client_id = payload["platform_test_runner_client_id"]
+        self.client_secret = payload["platform_test_runner_client_secret"]
+        self.http = keycloak.http
+
+    def get(self):
+        if (
+            self.token
+            and jwt.decode(self.token, options={"verify_signature": False})["exp"]
+            > time.time() + 45
+        ):
+            return self.token
+        response = self.http.post(
+            self.endpoint,
+            data={
+                "grant_type": "client_credentials",
+                "client_id": self.client_id,
+                "client_secret": self.client_secret,
+            },
+        )
+        require(response.status_code == 200, "runner_token_unavailable")
+        self.token = response.json()["access_token"]
+        return self.token
+
+
 class Drill:
     def __init__(self, args, journal, api, keycloak, kube):
-        self.args, self.journal, self.api, self.keycloak, self.kube = args, journal, api, keycloak, kube
+        self.args, self.journal, self.api, self.keycloak, self.kube = (
+            args,
+            journal,
+            api,
+            keycloak,
+            kube,
+        )
         self.run_id = journal.state["runId"]
         self.projects = project_names(self.run_id)
-        self.urls = {role: "https://api-" + project + "." + args.apps_domain for role, project in self.projects.items()}
+        self.urls = {
+            role: "https://api-" + project + "." + args.apps_domain
+            for role, project in self.projects.items()
+        }
         self.owners, self.policies, self.groups = {}, {}, {}
         self.public = httpx.Client(timeout=15, follow_redirects=False, trust_env=False)
         self.browser = httpx.Client(timeout=20, follow_redirects=False, trust_env=False)
@@ -428,44 +760,96 @@ class Drill:
         self.journal.check(name, condition, **measurements)
 
     def resource(self, role, kind, rid=None):
-        return "/v1/projects/" + self.projects[role] + "/" + kind + ("/" + rid if rid else "")
+        return (
+            "/v1/projects/"
+            + self.projects[role]
+            + "/"
+            + kind
+            + ("/" + rid if rid else "")
+        )
 
     def policy_path(self, role):
-        return self.resource(role, "applications") + "/" + self.projects[role] + "/access-policy"
+        return (
+            self.resource(role, "applications")
+            + "/"
+            + self.projects[role]
+            + "/access-policy"
+        )
 
     def fetch_service(self, row):
-        rows = self.api.request("GET", "/v1/projects/" + row["project"] + "/service-access-requests")["items"]
+        rows = self.api.request(
+            "GET", "/v1/projects/" + row["project"] + "/service-access-requests"
+        )["items"]
         return next(r for r in rows if r["id"] == row["id"])
 
-    def public_call(self, path, token=None, *, role="provider", method="GET", headers=None, body=None):
-        return self.public.request(method, self.urls[role] + path, json=body,
-            headers={**({"Authorization": "Bearer " + token} if token else {}), **(headers or {})})
+    def public_call(
+        self,
+        path,
+        token=None,
+        *,
+        role="provider",
+        method="GET",
+        headers=None,
+        body=None,
+    ):
+        return self.public.request(
+            method,
+            self.urls[role] + path,
+            json=body,
+            headers={
+                **({"Authorization": "Bearer " + token} if token else {}),
+                **(headers or {}),
+            },
+        )
 
     def approved_identity(self, token, *, role="provider"):
         result = self.public_call("/api/identity", token, role=role)
         require(result.status_code == 200, "approved_request_failed")
         data = result.json()
-        require(data["fixtureVersion"] == 1 and data["runId"] == self.run_id, "wrong_fixture")
-        require(not data["authorizationPresent"] and not data["platformCookiePresent"], "credential_forwarded")
+        require(
+            data["fixtureVersion"] == 1 and data["runId"] == self.run_id,
+            "wrong_fixture",
+        )
+        require(
+            not data["authorizationPresent"] and not data["platformCookiePresent"],
+            "credential_forwarded",
+        )
         principal = data["principal"]
-        require(principal["Kind"] == "service" and principal["Id"] and principal["Client-Id"], "identity_headers_missing")
+        require(
+            principal["Kind"] == "service"
+            and principal["Id"]
+            and principal["Client-Id"],
+            "identity_headers_missing",
+        )
         return principal
 
     def browser_follow(self, response):
-        allowed = {origin(self.urls["provider"]), origin(self.keycloak.issuer.split("/realms/")[0])}
+        allowed = {
+            origin(self.urls["provider"]),
+            origin(self.keycloak.issuer.split("/realms/")[0]),
+        }
         for _ in range(12):
             if response.status_code not in (302, 303):
                 return response
             target = str(response.url.join(response.headers["location"]))
             parts = urlsplit(target)
-            require(urlunsplit((parts.scheme, parts.netloc, "", "", "")) in allowed, "untrusted_browser_redirect")
+            require(
+                urlunsplit((parts.scheme, parts.netloc, "", "", "")) in allowed,
+                "untrusted_browser_redirect",
+            )
             response = self.browser.get(target)
         raise DrillError("browser_redirect_loop")
 
     def browser_login(self, username, password):
-        response = self.browser_follow(self.browser.get(self.urls["provider"] + "/app/identity"))
+        response = self.browser_follow(
+            self.browser.get(self.urls["provider"] + "/app/identity")
+        )
         if response.status_code == 200 and "kc-form-login" in response.text:
-            response = self.browser_follow(submit_login(self.browser, response, self.keycloak.issuer, username, password))
+            response = self.browser_follow(
+                submit_login(
+                    self.browser, response, self.keycloak.issuer, username, password
+                )
+            )
         return response
 
     def bootstrap(self):
@@ -473,14 +857,24 @@ class Drill:
         self.journal.state["human"] = human
         self.journal.state["issuer"] = self.keycloak.issuer
         self.journal.save()
-        self.api.request("PUT", "/platform/grants", {"issuer": self.keycloak.issuer, "subject": human["id"],
-                                                     "role": "platform-admin"})
+        self.api.request(
+            "PUT",
+            "/platform/grants",
+            {
+                "issuer": self.keycloak.issuer,
+                "subject": human["id"],
+                "role": "platform-admin",
+            },
+        )
         return human, password
 
     def setup(self):
         capabilities = self.api.request("GET", "/v1/capabilities")
-        require(set(capabilities["hostedApplicationAccess"]["modes"]) == {"browser-session", "bearer-token"},
-                "hosted_access_not_installed")
+        require(
+            set(capabilities["hostedApplicationAccess"]["modes"])
+            == {"browser-session", "bearer-token"},
+            "hosted_access_not_installed",
+        )
         self.journal.state["image"] = self.args.fixture_image
         self.journal.state["appsDomain"] = self.args.apps_domain
         self.journal.state["marker"] = "durable-" + self.run_id
@@ -491,112 +885,293 @@ class Drill:
             self.api.request("POST", "/projects", {"name": project}, statuses=(201,))
             self.journal.state["createdProjects"].append(project)
             self.journal.save()
-            persona = self.api.request("POST", "/platform/test-identities", {"name": "ha-" + self.run_id + "-" + role,
-                "role": "project-admin", "project": project, "test_run_id": self.run_id, "expires_in_hours": 2}, statuses=(201,))
+            persona = self.api.request(
+                "POST",
+                "/platform/test-identities",
+                {
+                    "name": "ha-" + self.run_id + "-" + role,
+                    "role": "project-admin",
+                    "project": project,
+                    "test_run_id": self.run_id,
+                    "expires_in_hours": 2,
+                },
+                statuses=(201,),
+            )
             self.journal.state["personas"].append(persona["credential_id"])
             self.journal.save()
-            owner = API(self.api.url, MachineTokens({"CLIENT_ID": persona["client_id"], "CLIENT_SECRET": persona["client_secret"],
-                                                     "TOKEN_URL": persona["token_endpoint"]}))
+            owner = API(
+                self.api.url,
+                MachineTokens(
+                    {
+                        "CLIENT_ID": persona["client_id"],
+                        "CLIENT_SECRET": persona["client_secret"],
+                        "TOKEN_URL": persona["token_endpoint"],
+                    }
+                ),
+            )
             self.owners[role] = owner
-            storage = owner.request("POST", "/v1/projects/" + project + "/resources",
-                {"name": "state", "provider": "postgresql", "quota_bytes": 1073741824}, statuses=(202,))
+            storage = owner.request(
+                "POST",
+                "/v1/projects/" + project + "/resources",
+                {"name": "state", "provider": "postgresql", "quota_bytes": 1073741824},
+                statuses=(202,),
+            )
+
             def resource_ready():
                 found = owner.request("GET", "/v1/resources/" + storage["resource_id"])
                 return found["observed_state"] == "active"
+
             wait_for(resource_ready, "named_database_not_ready")
             bindings = {}
             for component in ("api", "worker"):
-                grant = owner.request("POST", "/v1/projects/" + project + "/resource-bindings",
-                    {"resource_id": storage["resource_id"], "component": component, "mode": "read-write"}, statuses=(202,))
+                grant = owner.request(
+                    "POST",
+                    "/v1/projects/" + project + "/resource-bindings",
+                    {
+                        "resource_id": storage["resource_id"],
+                        "component": component,
+                        "mode": "read-write",
+                    },
+                    statuses=(202,),
+                )
                 bindings[component] = grant["grant_id"]
+
             def bindings_ready():
-                found = owner.request("GET", "/v1/projects/" + project + "/resource-bindings")["bindings"]
-                return all(any(g["grant_id"] == value and g["observed_state"] == "active" for g in found)
-                           for value in bindings.values())
+                found = owner.request(
+                    "GET", "/v1/projects/" + project + "/resource-bindings"
+                )["bindings"]
+                return all(
+                    any(
+                        g["grant_id"] == value and g["observed_state"] == "active"
+                        for g in found
+                    )
+                    for value in bindings.values()
+                )
+
             wait_for(bindings_ready, "named_database_bindings_not_ready")
-            spec = declaration(project, role, self.args.fixture_image, self.run_id, self.urls["provider"], self.keycloak.issuer, bindings)
-            deployed = owner.request("PUT", "/projects/" + project, spec, etag=0, statuses=(202,))
+            spec = declaration(
+                project,
+                role,
+                self.args.fixture_image,
+                self.run_id,
+                self.urls["provider"],
+                self.keycloak.issuer,
+                bindings,
+            )
+            deployed = owner.request(
+                "PUT", "/projects/" + project, spec, etag=0, statuses=(202,)
+            )
             operation = owner.operation(deployed)
-            require(re.fullmatch(r"[0-9a-f-]{36}", deployed["operation_id"]), "invalid_operation_id")
+            require(
+                re.fullmatch(r"[0-9a-f-]{36}", deployed["operation_id"]),
+                "invalid_operation_id",
+            )
             operation_ids[role] = {"deployment": deployed["operation_id"]}
             self.journal.state[role + "Revision"] = operation["revision"]
-            self.kube.call("-n", "project-" + project, "rollout", "status", "deployment/api", "--timeout=120s", timeout=130)
-            self.kube.call("-n", "project-" + project, "rollout", "status", "deployment/worker", "--timeout=120s", timeout=130)
+            self.kube.call(
+                "-n",
+                "project-" + project,
+                "rollout",
+                "status",
+                "deployment/api",
+                "--timeout=120s",
+                timeout=130,
+            )
+            self.kube.call(
+                "-n",
+                "project-" + project,
+                "rollout",
+                "status",
+                "deployment/worker",
+                "--timeout=120s",
+                timeout=130,
+            )
             for component in ("api", "worker"):
-                deployment = self.kube.obj("deployment", component, "project-" + project)
-                require(deployment["spec"]["template"]["spec"]["containers"][0]["image"] == self.args.fixture_image,
-                        "fixture_image_mismatch")
-                require(deployment["spec"]["template"]["spec"]["containers"][0]["resources"]
-                        == spec["spec"]["components"][0]["resources"], "fixture_resource_mismatch")
-            owner.request("PUT", "/v1/projects/" + project + "/governance", {
-                "maximumDataClassification": "Internal", "maximumTelemetryClassification": "Internal",
-                "personalData": False, "domainRetentionOwner": "Acceptance operator",
-                "domainRetentionPolicy": "Synthetic markers only. Retire on exit; retained database purge requires separate operator approval.",
-                "purgeAuthority": "Acceptance operator", "recoveryOwner": "Acceptance operator"})
+                deployment = self.kube.obj(
+                    "deployment", component, "project-" + project
+                )
+                require(
+                    deployment["spec"]["template"]["spec"]["containers"][0]["image"]
+                    == self.args.fixture_image,
+                    "fixture_image_mismatch",
+                )
+                require(
+                    deployment["spec"]["template"]["spec"]["containers"][0]["resources"]
+                    == spec["spec"]["components"][0]["resources"],
+                    "fixture_resource_mismatch",
+                )
+            owner.request(
+                "PUT",
+                "/v1/projects/" + project + "/governance",
+                {
+                    "maximumDataClassification": "Internal",
+                    "maximumTelemetryClassification": "Internal",
+                    "personalData": False,
+                    "domainRetentionOwner": "Acceptance operator",
+                    "domainRetentionPolicy": "Synthetic markers only. Retire on exit; retained database purge requires separate operator approval.",
+                    "purgeAuthority": "Acceptance operator",
+                    "recoveryOwner": "Acceptance operator",
+                },
+            )
             groups = {}
             for name in ("readers", "humans", "administrators"):
-                row = owner.request("POST", self.resource(role, "application-groups"),
-                    {"name": name, "displayName": name.capitalize()}, key=self.run_id + "-" + name, statuses=(201,))
+                row = owner.request(
+                    "POST",
+                    self.resource(role, "application-groups"),
+                    {"name": name, "displayName": name.capitalize()},
+                    key=self.run_id + "-" + name,
+                    statuses=(201,),
+                )
                 groups[name] = row["id"]
             self.groups[role] = groups
-            policy = owner.request("PUT", self.policy_path(role), access_policy(groups["readers"], groups["humans"], groups["administrators"]), statuses=(202,))
+            policy = owner.request(
+                "PUT",
+                self.policy_path(role),
+                access_policy(
+                    groups["readers"], groups["humans"], groups["administrators"]
+                ),
+                statuses=(202,),
+            )
             owner.operation(policy)
-            require(re.fullmatch(r"[0-9a-f-]{36}", policy["operation_id"]), "invalid_operation_id")
+            require(
+                re.fullmatch(r"[0-9a-f-]{36}", policy["operation_id"]),
+                "invalid_operation_id",
+            )
             operation_ids[role]["policy"] = policy["operation_id"]
             self.policies[role] = owner.request("GET", self.policy_path(role))
-        self.journal.report["fixture"] = {"image": self.args.fixture_image, "projects": self.projects,
-            "urls": self.urls, "revisions": {r: self.journal.state[r + "Revision"] for r in self.projects},
-            "operationIds": operation_ids, "resourcesPerComponent": spec["spec"]["components"][0]["resources"]}
+        self.journal.report["fixture"] = {
+            "image": self.args.fixture_image,
+            "projects": self.projects,
+            "urls": self.urls,
+            "revisions": {r: self.journal.state[r + "Revision"] for r in self.projects},
+            "operationIds": operation_ids,
+            "resourcesPerComponent": spec["spec"]["components"][0]["resources"],
+        }
         self.journal.save()
-        self.check("digest-pinned-multi-component-readiness", True, projects=2, components=4)
+        self.check(
+            "digest-pinned-multi-component-readiness", True, projects=2, components=4
+        )
         return human, password
 
     def service(self, consumer, provider):
-        row = self.owners[consumer].request("POST", self.resource(consumer, "service-access-requests"), {
-            "name": "reader", "providerProject": self.projects[provider], "application": self.projects[provider],
-            "projectWideCredential": True}, key=self.run_id + "-reader", statuses=(201,))
-        require(row["state"] == "pending" and row["spec"]["credentials"] == [], "unapproved_credential_exists")
-        wrong = self.owners[consumer].request("POST", self.resource(consumer, "service-access-requests", row["id"]) + "/approve",
-            {"groups": [self.groups[provider]["readers"]]}, etag=row["version"], statuses=(404,))
+        row = self.owners[consumer].request(
+            "POST",
+            self.resource(consumer, "service-access-requests"),
+            {
+                "name": "reader",
+                "providerProject": self.projects[provider],
+                "application": self.projects[provider],
+                "projectWideCredential": True,
+            },
+            key=self.run_id + "-reader",
+            statuses=(201,),
+        )
+        require(
+            row["state"] == "pending" and row["spec"]["credentials"] == [],
+            "unapproved_credential_exists",
+        )
+        wrong = self.owners[consumer].request(
+            "POST",
+            self.resource(consumer, "service-access-requests", row["id"]) + "/approve",
+            {"groups": [self.groups[provider]["readers"]]},
+            etag=row["version"],
+            statuses=(404,),
+        )
         require("detail" in wrong, "consumer_approved_provider_access")
-        approved = self.owners[provider].request("POST", self.resource(provider, "service-access-requests", row["id"]) + "/approve",
-            {"groups": [self.groups[provider]["readers"]]}, etag=row["version"], statuses=(202,))
+        approved = self.owners[provider].request(
+            "POST",
+            self.resource(provider, "service-access-requests", row["id"]) + "/approve",
+            {"groups": [self.groups[provider]["readers"]]},
+            etag=row["version"],
+            statuses=(202,),
+        )
         self.owners[provider].operation(approved)
         row = self.fetch_service(row)
         require(row["state"] == "active", "service_not_active")
-        return row, MachineTokens(self.kube.binding(row["project"], row["spec"]["secretPrefix"]))
+        return row, MachineTokens(
+            self.kube.binding(row["project"], row["spec"]["secretPrefix"])
+        )
 
     def human_checks(self, human, password):
         pending = self.browser_login(human["username"], password)
-        self.check("human-platform-admin-first-login-pending", pending.status_code == 403
-                   and pending.json().get("code") == "application_access_pending")
+        self.check(
+            "human-platform-admin-first-login-pending",
+            pending.status_code == 403
+            and pending.json().get("code") == "application_access_pending",
+        )
         request_id = pending.json()["requestId"]
-        rows = self.owners["provider"].request("GET", self.resource("provider", "application-access-requests"))["items"]
+        rows = self.owners["provider"].request(
+            "GET", self.resource("provider", "application-access-requests")
+        )["items"]
         row = next(r for r in rows if r["id"] == request_id)
-        granted = self.owners["provider"].request("POST", self.resource("provider", "application-access-requests", request_id) + "/approve",
-            {"groups": [self.groups["provider"]["humans"]]}, etag=row["version"], statuses=(202,))
+        granted = self.owners["provider"].request(
+            "POST",
+            self.resource("provider", "application-access-requests", request_id)
+            + "/approve",
+            {"groups": [self.groups["provider"]["humans"]]},
+            etag=row["version"],
+            statuses=(202,),
+        )
+
         # Human approval has multiple membership operations, not a single status URL.
         def effective():
             result = self.browser.get(self.urls["provider"] + "/app/identity")
             require(result.status_code in (200, 403), "browser_refresh_failed")
             return result if result.status_code == 200 else None
+
         started = time.monotonic()
         approved = wait_for(effective, "human_claim_refresh", 305)
         principal = approved.json()["principal"]
-        self.check("human-approval-and-bounded-claim-refresh", principal["Kind"] == "user"
-                   and principal["Group-Ids"] == self.groups["provider"]["humans"], seconds=round(time.monotonic() - started, 3))
-        self.check("optional-personal-attributes-withheld", principal["Name"] is None and principal["Email"] is None)
-        cookies = [c for c in self.browser.cookies.jar if c.name.startswith("__Host-platform-")]
-        self.check("browser-secure-cookie-boundary", bool(cookies) and all(c.secure and c.path == "/" and not c.domain_specified
-            for c in cookies) and all(c.has_nonstandard_attr("HttpOnly") for c in cookies if c.name != "__Host-platform-csrf"))
+        self.check(
+            "human-approval-and-bounded-claim-refresh",
+            principal["Kind"] == "user"
+            and principal["Group-Ids"] == self.groups["provider"]["humans"],
+            seconds=round(time.monotonic() - started, 3),
+        )
+        self.check(
+            "optional-personal-attributes-withheld",
+            principal["Name"] is None and principal["Email"] is None,
+        )
+        cookies = [
+            c for c in self.browser.cookies.jar if c.name.startswith("__Host-platform-")
+        ]
+        self.check(
+            "browser-secure-cookie-boundary",
+            bool(cookies)
+            and all(
+                c.secure and c.path == "/" and not c.domain_specified for c in cookies
+            )
+            and all(
+                c.has_nonstandard_attr("HttpOnly")
+                for c in cookies
+                if c.name != "__Host-platform-csrf"
+            ),
+        )
         denied = self.browser.post(self.urls["provider"] + "/app/identity")
-        valid = self.browser.post(self.urls["provider"] + "/app/identity", headers={
-            "Origin": self.urls["provider"], "X-Platform-CSRF-Token": self.browser.cookies.get("__Host-platform-csrf")})
-        self.check("browser-csrf", denied.status_code == 403 and valid.status_code == 200)
-        self.keycloak.admin("PUT", "users/" + human["id"], {"firstName": "Renamed", "lastName": "Fixture"})
+        valid = self.browser.post(
+            self.urls["provider"] + "/app/identity",
+            headers={
+                "Origin": self.urls["provider"],
+                "X-Platform-CSRF-Token": self.browser.cookies.get(
+                    "__Host-platform-csrf"
+                ),
+            },
+        )
+        self.check(
+            "browser-csrf", denied.status_code == 403 and valid.status_code == 200
+        )
+        self.keycloak.admin(
+            "PUT",
+            "users/" + human["id"],
+            {"firstName": "Renamed", "lastName": "Fixture"},
+        )
         self.browser.cookies.clear()
         renamed = self.browser_login(human["username"], password)
-        self.check("human-stable-identity-after-rename", renamed.status_code == 200 and renamed.json()["principal"]["Id"] == principal["Id"])
+        self.check(
+            "human-stable-identity-after-rename",
+            renamed.status_code == 200
+            and renamed.json()["principal"]["Id"] == principal["Id"],
+        )
         self.journal.state["humanPrincipalHash"] = fingerprint(principal["Id"])
         self.journal.save()
         return principal["Id"]
@@ -605,45 +1180,117 @@ class Drill:
         token = machines.get()
         principal = self.approved_identity(token)
         decoded = jwt.decode(token, options={"verify_signature": False})
-        self.check("machine-audience-and-client-scoped-groups", decoded["aud"] == service["spec"]["audience"]
+        self.check(
+            "machine-audience-and-client-scoped-groups",
+            decoded["aud"] == service["spec"]["audience"]
             and decoded.get("groups") == [self.groups["provider"]["readers"]]
-            and decoded["exp"] - decoded["iat"] <= 300 and principal["Group-Ids"] == self.groups["provider"]["readers"])
+            and decoded["exp"] - decoded["iat"] <= 300
+            and principal["Group-Ids"] == self.groups["provider"]["readers"],
+        )
         self.journal.state["machinePrincipalHash"] = fingerprint(principal["Id"])
         self.journal.save()
-        for name, path, sent, expected in (("missing-token", "/api/identity", None, 401),
-                ("invalid-token", "/api/identity", "invalid", 401),
-                ("wrong-audience", "/api/identity", wrong_machines.get(), 401),
-                ("wrong-group", "/machine-admin/identity", token, 403),
-                ("unmatched-route", "/not-configured", token, 403),
-                ("segment-prefix", "/apiculture/identity", token, 403),
-                ("encoded-slash", "/api/%2Fidentity", token, 400)):
+        for name, path, sent, expected in (
+            ("missing-token", "/api/identity", None, 401),
+            ("invalid-token", "/api/identity", "invalid", 401),
+            ("wrong-audience", "/api/identity", wrong_machines.get(), 401),
+            ("wrong-group", "/machine-admin/identity", token, 403),
+            ("unmatched-route", "/not-configured", token, 403),
+            ("segment-prefix", "/apiculture/identity", token, 403),
+            ("encoded-slash", "/api/%2Fidentity", token, 400),
+        ):
             result = self.public_call(path, sent)
-            self.check(name, result.status_code == expected and "location" not in result.headers, httpStatus=result.status_code)
+            self.check(
+                name,
+                result.status_code == expected and "location" not in result.headers,
+                httpStatus=result.status_code,
+            )
         head = self.public_call("/api/identity", token, method="HEAD")
         options = self.public_call("/api/identity", token, method="OPTIONS")
-        self.check("head-and-explicit-options", head.status_code == 200 and options.status_code == 403)
-        forged = self.public_call("/api/identity", token, headers={"X-Platform-Principal-Id": "forged",
-            "X-Platform-Principal-Group-Ids": "forged", "X-Platform-Principal-Kind": "user", "X-Original-URL": "/machine-admin/identity"})
-        self.check("forged-headers-replaced-and-bearer-stripped", forged.status_code == 200
-            and forged.json()["principal"] == principal and not forged.json()["authorizationPresent"])
-        client, secret, _ = self.keycloak.client(self.run_id, "unapproved", service["spec"]["audience"])
+        self.check(
+            "head-and-explicit-options",
+            head.status_code == 200 and options.status_code == 403,
+        )
+        forged = self.public_call(
+            "/api/identity",
+            token,
+            headers={
+                "X-Platform-Principal-Id": "forged",
+                "X-Platform-Principal-Group-Ids": "forged",
+                "X-Platform-Principal-Kind": "user",
+                "X-Original-URL": "/machine-admin/identity",
+            },
+        )
+        self.check(
+            "forged-headers-replaced-and-bearer-stripped",
+            forged.status_code == 200
+            and forged.json()["principal"] == principal
+            and not forged.json()["authorizationPresent"],
+        )
+        client, secret, _ = self.keycloak.client(
+            self.run_id, "unapproved", service["spec"]["audience"]
+        )
         self.journal.state["clients"].append(client)
         self.journal.save()
-        unapproved = MachineTokens({"CLIENT_ID": client["clientId"], "CLIENT_SECRET": secret,
-                                   "TOKEN_URL": self.keycloak.issuer + "/protocol/openid-connect/token"})
-        self.check("valid-but-unapproved-machine", self.public_call("/api/identity", unapproved.get()).status_code == 403)
-        self.kube.call("-n", "project-" + self.projects["consumer"], "rollout", "status", "deployment/api", "--timeout=120s", timeout=130)
-        self.kube.call("-n", "project-" + self.projects["consumer"], "rollout", "status", "deployment/worker", "--timeout=120s", timeout=130)
-        binding = self.kube.exec_json(self.projects["consumer"], "worker", "import hashlib,json,os,sys; p=json.load(sys.stdin); "
+        unapproved = MachineTokens(
+            {
+                "CLIENT_ID": client["clientId"],
+                "CLIENT_SECRET": secret,
+                "TOKEN_URL": self.keycloak.issuer + "/protocol/openid-connect/token",
+            }
+        )
+        self.check(
+            "valid-but-unapproved-machine",
+            self.public_call("/api/identity", unapproved.get()).status_code == 403,
+        )
+        self.kube.call(
+            "-n",
+            "project-" + self.projects["consumer"],
+            "rollout",
+            "status",
+            "deployment/api",
+            "--timeout=120s",
+            timeout=130,
+        )
+        self.kube.call(
+            "-n",
+            "project-" + self.projects["consumer"],
+            "rollout",
+            "status",
+            "deployment/worker",
+            "--timeout=120s",
+            timeout=130,
+        )
+        binding = self.kube.exec_json(
+            self.projects["consumer"],
+            "worker",
+            "import hashlib,json,os,sys; p=json.load(sys.stdin); "
             "v=os.environ.get(p['prefix']+'_CLIENT_ID',''); print(json.dumps({'present':bool(v) and bool(os.environ.get(p['prefix']+'_CLIENT_SECRET')) "
             "and bool(os.environ.get(p['prefix']+'_TOKEN_URL')), 'matches':hashlib.sha256(v.encode()).hexdigest()==p['clientHash']}))",
-            {"prefix": service["spec"]["secretPrefix"], "clientHash": fingerprint(principal["Client-Id"])})
-        self.check("project-wide-binding-visible-to-private-worker", binding.get("present") and binding.get("matches"))
-        probe = self.public_call("/api/probe", wrong_machines.get(), role="consumer",
-                                 headers={"X-Correlation-Id": self.run_id})
-        self.check("consumer-public-https-managed-binding", probe.status_code == 200 and probe.json()["providerStatus"] == 200
-                   and probe.json()["provider"]["principal"]["Id"] == principal["Id"])
-        self.check("synthetic-cross-project-correlation", probe.json()["provider"]["correlationHash"] == fingerprint(self.run_id))
+            {
+                "prefix": service["spec"]["secretPrefix"],
+                "clientHash": fingerprint(principal["Client-Id"]),
+            },
+        )
+        self.check(
+            "project-wide-binding-visible-to-private-worker",
+            binding.get("present") and binding.get("matches"),
+        )
+        probe = self.public_call(
+            "/api/probe",
+            wrong_machines.get(),
+            role="consumer",
+            headers={"X-Correlation-Id": self.run_id},
+        )
+        self.check(
+            "consumer-public-https-managed-binding",
+            probe.status_code == 200
+            and probe.json()["providerStatus"] == 200
+            and probe.json()["provider"]["principal"]["Id"] == principal["Id"],
+        )
+        self.check(
+            "synthetic-cross-project-correlation",
+            probe.json()["provider"]["correlationHash"] == fingerprint(self.run_id),
+        )
         return principal
 
     def monitoring_checks(self):
@@ -652,76 +1299,180 @@ class Drill:
         Ingestion/restart readback is not proof that seven days have elapsed.
         """
         prometheus = origin(self.args.prometheus)
+
         def metric(expression):
-            response = self.public.get(prometheus + "/api/v1/query", params={"query": expression})
+            response = self.public.get(
+                prometheus + "/api/v1/query", params={"query": expression}
+            )
             require(response.status_code == 200, "monitoring_query_failed")
             return response.json()["data"]["result"]
+
         for role, project in self.projects.items():
             expression = 'probe_success{job="applications",project="' + project + '"}'
+
             def boundary():
                 rows = metric(expression)
-                return (len(rows) == 1 and rows[0]["value"][1] == "1"
-                        and rows[0]["metric"].get("component") == "api"
-                        and rows[0]["metric"].get("probe_kind") == "access-boundary"
-                        and rows[0]["metric"].get("instance") == self.urls[role] + "/health/ready")
+                return (
+                    len(rows) == 1
+                    and rows[0]["value"][1] == "1"
+                    and rows[0]["metric"].get("component") == "api"
+                    and rows[0]["metric"].get("probe_kind") == "access-boundary"
+                    and rows[0]["metric"].get("instance")
+                    == self.urls[role] + "/health/ready"
+                )
+
             wait_for(boundary, "component_public_probe_unavailable", 120)
             self.check(role + "-component-public-boundary-probe", True)
-            readiness = ('sum(kube_pod_status_ready{namespace="project-' + project + '",condition="true"}'
-                         ' * on(namespace,pod) group_left(label_platform_example_component) '
-                         'kube_pod_labels{namespace="project-' + project + '",label_platform_example_component="api"})')
-            wait_for(lambda: any(float(row["value"][1]) >= 1 for row in metric(readiness)),
-                     "component_semantic_readiness_unavailable", 120)
+            readiness = (
+                'sum(kube_pod_status_ready{namespace="project-'
+                + project
+                + '",condition="true"}'
+                " * on(namespace,pod) group_left(label_platform_example_component) "
+                'kube_pod_labels{namespace="project-'
+                + project
+                + '",label_platform_example_component="api"})'
+            )
+            wait_for(
+                lambda: any(float(row["value"][1]) >= 1 for row in metric(readiness)),
+                "component_semantic_readiness_unavailable",
+                120,
+            )
             self.check(role + "-component-semantic-readiness", True)
+
             def retained():
-                result = self.api.request("GET", "/projects/" + project + "/retained-logs?component=api&since_seconds=600")
+                result = self.api.request(
+                    "GET",
+                    "/projects/"
+                    + project
+                    + "/retained-logs?component=api&since_seconds=600",
+                )
                 expected = fingerprint(self.run_id)[:32]
-                return any(json.loads(line["message"]).get("correlationId") == expected
-                           and line.get("revision") == "1" and line.get("operation_id")
-                           for line in result["lines"]) if result["state"] == "ok" else False
+                return (
+                    any(
+                        json.loads(line["message"]).get("correlationId") == expected
+                        and line.get("revision") == "1"
+                        and line.get("operation_id")
+                        for line in result["lines"]
+                    )
+                    if result["state"] == "ok"
+                    else False
+                )
+
             wait_for(retained, "component_retained_correlation_unavailable", 120)
             self.check(role + "-centralized-safe-correlation", True)
-        self.journal.report["monitoring"] = {"componentProbes": "passed", "centralIngestion": "passed",
-                                              "sevenDayRetention": "not-time-verified"}
+        self.journal.report["monitoring"] = {
+            "componentProbes": "passed",
+            "centralIngestion": "passed",
+            "sevenDayRetention": "not-time-verified",
+        }
 
-    def controlled_network_check(self, name, host, port, probe, control, *, ip_versions):
+    def controlled_network_check(
+        self, name, host, port, probe, control, *, ip_versions
+    ):
         body = {"host": host, "port": port, "ipVersions": ip_versions}
         before = control(body)
         before_ready = network_control_ready(before)
         # Never accept refusal (or timeout) against an unavailable target.
-        result = {"resolved": False, "connected": 0, "refused": 0, "timedOut": 0,
-                  "unexpectedErrors": 0, "dnsError": False, "addressMismatch": False}
+        result = {
+            "resolved": False,
+            "connected": 0,
+            "refused": 0,
+            "timedOut": 0,
+            "unexpectedErrors": 0,
+            "dnsError": False,
+            "addressMismatch": False,
+        }
         after = dict(result)
         after_ready = False
         if before_ready:
             pinned = {**body, "expectedAddresses": before["addresses"]}
             result = probe(pinned)
             after = control(pinned)
-            after_ready = network_control_ready(after) and after.get("addresses") == before["addresses"]
-        denied = (before_ready and after_ready and result.get("resolved") is True
-                  and result.get("addresses") == before["addresses"]
-                  and not result.get("dnsError") and not result.get("addressMismatch")
-                  and result.get("connected") == 0 and result.get("unexpectedErrors") == 0
-                  and result.get("refused", 0) + result.get("timedOut", 0) == len(before["addresses"]))
-        fields = ("resolved", "connected", "refused", "timedOut", "unexpectedErrors", "dnsError", "addressMismatch")
+            after_ready = (
+                network_control_ready(after)
+                and after.get("addresses") == before["addresses"]
+            )
+        denied = (
+            before_ready
+            and after_ready
+            and result.get("resolved") is True
+            and result.get("addresses") == before["addresses"]
+            and not result.get("dnsError")
+            and not result.get("addressMismatch")
+            and result.get("connected") == 0
+            and result.get("unexpectedErrors") == 0
+            and result.get("refused", 0) + result.get("timedOut", 0)
+            == len(before["addresses"])
+        )
+        fields = (
+            "resolved",
+            "connected",
+            "refused",
+            "timedOut",
+            "unexpectedErrors",
+            "dnsError",
+            "addressMismatch",
+        )
         measurements = {k: result[k] for k in fields}
         for prefix, outcome in (("controlBefore", before), ("controlAfter", after)):
-            measurements.update({prefix + k[0].upper() + k[1:]: outcome.get(k, result[k]) for k in fields})
-        self.check(name, denied, controlBefore=before_ready, controlAfter=after_ready,
-                   ipvFour=4 in ip_versions, ipvSix=6 in ip_versions, **measurements)
+            measurements.update(
+                {
+                    prefix + k[0].upper() + k[1:]: outcome.get(k, result[k])
+                    for k in fields
+                }
+            )
+        self.check(
+            name,
+            denied,
+            controlBefore=before_ready,
+            controlAfter=after_ready,
+            ipvFour=4 in ip_versions,
+            ipvSix=6 in ip_versions,
+            **measurements,
+        )
 
     def network_checks(self):
         backend = "api.project-" + self.projects["provider"] + ".svc.cluster.local"
         for role in ("provider", "consumer"):
-            self.controlled_network_check(role + "-direct-backend-bypass-denied", backend, 8080,
-                lambda body: self.kube.exec_json(self.projects[role], "worker", NETWORK_PROBE, body),
-                self.kube.authorizer_probe, ip_versions=self.kube.pod_ip_versions(self.projects[role], "worker"))
-        self.controlled_network_check("unrelated-egress-denied", self.args.unrelated_host, 443,
-            lambda body: self.kube.exec_json(self.projects["consumer"], "api", NETWORK_PROBE, body),
-            host_network_probe, ip_versions=self.kube.pod_ip_versions(self.projects["consumer"], "api"))
-        policy = self.kube.obj("networkpolicy", "api-egress", "project-" + self.projects["consumer"])
-        destinations = [peer["ipBlock"]["cidr"] for rule in policy["spec"]["egress"] for peer in rule.get("to", []) if "ipBlock" in peer]
-        self.check("dns-egress-pinned-to-host-addresses", bool(destinations) and all(ipaddress.ip_network(c).prefixlen
-            == ipaddress.ip_network(c).max_prefixlen for c in destinations), addresses=len(destinations))
+            self.controlled_network_check(
+                role + "-direct-backend-bypass-denied",
+                backend,
+                8080,
+                lambda body: self.kube.exec_json(
+                    self.projects[role], "worker", NETWORK_PROBE, body
+                ),
+                self.kube.authorizer_probe,
+                ip_versions=self.kube.pod_ip_versions(self.projects[role], "worker"),
+            )
+        self.controlled_network_check(
+            "unrelated-egress-denied",
+            self.args.unrelated_host,
+            443,
+            lambda body: self.kube.exec_json(
+                self.projects["consumer"], "api", NETWORK_PROBE, body
+            ),
+            host_network_probe,
+            ip_versions=self.kube.pod_ip_versions(self.projects["consumer"], "api"),
+        )
+        policy = self.kube.obj(
+            "networkpolicy", "api-egress", "project-" + self.projects["consumer"]
+        )
+        destinations = [
+            peer["ipBlock"]["cidr"]
+            for rule in policy["spec"]["egress"]
+            for peer in rule.get("to", [])
+            if "ipBlock" in peer
+        ]
+        self.check(
+            "dns-egress-pinned-to-host-addresses",
+            bool(destinations)
+            and all(
+                ipaddress.ip_network(c).prefixlen
+                == ipaddress.ip_network(c).max_prefixlen
+                for c in destinations
+            ),
+            addresses=len(destinations),
+        )
         self.journal.report["pinnedEgressCidrs"] = sorted(destinations)
         self.journal.save()
 
@@ -733,25 +1484,55 @@ class Drill:
                 body = response.json()
             except ValueError:
                 return None
-            if not isinstance(body, dict) or body.get("fixtureVersion") != 1 or body.get("runId") != self.run_id:
+            if (
+                not isinstance(body, dict)
+                or body.get("fixtureVersion") != 1
+                or body.get("runId") != self.run_id
+            ):
                 return None
             value = body.get("marker")
             return value if isinstance(value, str) and 1 <= len(value) <= 100 else None
 
         marker = self.journal.state["marker"]
-        written = self.public_call("/api/state", machines.get(), method="POST", body={"marker": marker})
+        written = self.public_call(
+            "/api/state", machines.get(), method="POST", body={"marker": marker}
+        )
         isolated = self.public_call("/api/state", other.get(), role="consumer")
         write_matches = state_marker(written) == marker
         consumer_isolated = state_marker(isolated) == "consumer-" + self.run_id
-        self.check("separate-project-postgresql-state", write_matches and consumer_isolated,
-                   writeHttpStatus=written.status_code, consumerReadHttpStatus=isolated.status_code,
-                   writeMarkerMatches=write_matches, consumerMarkerMatches=consumer_isolated)
-        operation = self.api.request("POST", "/projects/" + self.projects["provider"] + "/restart", statuses=(202,))
+        self.check(
+            "separate-project-postgresql-state",
+            write_matches and consumer_isolated,
+            writeHttpStatus=written.status_code,
+            consumerReadHttpStatus=isolated.status_code,
+            writeMarkerMatches=write_matches,
+            consumerMarkerMatches=consumer_isolated,
+        )
+        operation = self.api.request(
+            "POST",
+            "/projects/" + self.projects["provider"] + "/restart",
+            statuses=(202,),
+        )
         restarted = self.api.operation(operation)
-        self.check("restart-preserves-provider-revision", restarted["revision"] == self.journal.state["providerRevision"])
-        self.kube.call("-n", "project-" + self.projects["provider"], "rollout", "status", "deployment/api", "--timeout=120s", timeout=130)
+        self.check(
+            "restart-preserves-provider-revision",
+            restarted["revision"] == self.journal.state["providerRevision"],
+        )
+        self.kube.call(
+            "-n",
+            "project-" + self.projects["provider"],
+            "rollout",
+            "status",
+            "deployment/api",
+            "--timeout=120s",
+            timeout=130,
+        )
         read = self.public_call("/api/state", machines.get())
-        self.check("state-retained-after-restart", state_marker(read) == marker, readHttpStatus=read.status_code)
+        self.check(
+            "state-retained-after-restart",
+            state_marker(read) == marker,
+            readHttpStatus=read.status_code,
+        )
 
     def policy_checks(self, machines):
         owner = self.owners["provider"]
@@ -760,19 +1541,46 @@ class Drill:
         body = {k: copy.deepcopy(current["spec"][k]) for k in fields}
         invalid = copy.deepcopy(body)
         invalid["routes"].append({**invalid["routes"][0], "name": "overlap"})
-        owner.request("PUT", self.policy_path("provider"), invalid, etag=current["version"], statuses=(422,))
+        owner.request(
+            "PUT",
+            self.policy_path("provider"),
+            invalid,
+            etag=current["version"],
+            statuses=(422,),
+        )
         self.check("overlapping-policy-rejected", True)
         body["routes"][1]["match"]["pathPrefix"] = "/api/state"
-        changed = owner.request("PUT", self.policy_path("provider"), body, etag=current["version"], statuses=(202,))
+        changed = owner.request(
+            "PUT",
+            self.policy_path("provider"),
+            body,
+            etag=current["version"],
+            statuses=(202,),
+        )
         owner.operation(changed)
-        wait_for(lambda: self.public_call("/api/identity", machines.get()).status_code == 403,
-                 "restrictive_policy_activation", 60)
+        wait_for(
+            lambda: (
+                self.public_call("/api/identity", machines.get()).status_code == 403
+            ),
+            "restrictive_policy_activation",
+            60,
+        )
         self.check("restrictive-policy-activation", True)
         current = owner.request("GET", self.policy_path("provider"))
-        rollback = owner.request("POST", self.policy_path("provider") + "/rollback", etag=current["version"], statuses=(202,))
+        rollback = owner.request(
+            "POST",
+            self.policy_path("provider") + "/rollback",
+            etag=current["version"],
+            statuses=(202,),
+        )
         owner.operation(rollback)
-        wait_for(lambda: self.public_call("/api/identity", machines.get()).status_code == 200,
-                 "policy_rollback_activation", 60)
+        wait_for(
+            lambda: (
+                self.public_call("/api/identity", machines.get()).status_code == 200
+            ),
+            "policy_rollback_activation",
+            60,
+        )
         self.check("immutable-policy-rollback", True)
 
     def rotate(self, service, machines, *, emergency=False):
@@ -780,27 +1588,60 @@ class Drill:
         token = machines.get()
         previous = self.approved_identity(token)
         path = self.resource("consumer", "service-access-requests", service["id"])
-        rotated = self.owners["consumer"].request("POST", path + "/rotate", {"emergency": emergency},
-                                                  etag=service["version"], statuses=(202,))
+        rotated = self.owners["consumer"].request(
+            "POST",
+            path + "/rotate",
+            {"emergency": emergency},
+            etag=service["version"],
+            statuses=(202,),
+        )
         self.owners["consumer"].operation(rotated)
         service = self.fetch_service(service)
-        replacement = MachineTokens(self.kube.binding(service["project"], service["spec"]["secretPrefix"]))
-        wait_for(lambda: self.public_call("/api/identity", replacement.get()).status_code == 200,
-                 "replacement_activation", 60)
+        replacement = MachineTokens(
+            self.kube.binding(service["project"], service["spec"]["secretPrefix"])
+        )
+        wait_for(
+            lambda: (
+                self.public_call("/api/identity", replacement.get()).status_code == 200
+            ),
+            "replacement_activation",
+            60,
+        )
         current = self.approved_identity(replacement.get())
-        self.check("emergency-stable-principal" if emergency else "normal-rotation-stable-principal",
-                   current["Id"] == previous["Id"] and current["Client-Id"] != previous["Client-Id"])
+        self.check(
+            "emergency-stable-principal"
+            if emergency
+            else "normal-rotation-stable-principal",
+            current["Id"] == previous["Id"]
+            and current["Client-Id"] != previous["Client-Id"],
+        )
         if not emergency:
-            overlapping = [c for c in service["spec"]["credentials"] if c["state"] == "overlap"]
-            self.check("normal-overlap-bounded", len(overlapping) == 1 and
-                datetime.fromisoformat(overlapping[0]["expiresAt"]).timestamp() - time.time() <= 86400
-                and self.public_call("/api/identity", token).status_code == 200)
-            confirmed = self.owners["consumer"].request("POST", path + "/confirm", etag=service["version"], statuses=(202,))
+            overlapping = [
+                c for c in service["spec"]["credentials"] if c["state"] == "overlap"
+            ]
+            self.check(
+                "normal-overlap-bounded",
+                len(overlapping) == 1
+                and datetime.fromisoformat(overlapping[0]["expiresAt"]).timestamp()
+                - time.time()
+                <= 86400
+                and self.public_call("/api/identity", token).status_code == 200,
+            )
+            confirmed = self.owners["consumer"].request(
+                "POST", path + "/confirm", etag=service["version"], statuses=(202,)
+            )
             self.owners["consumer"].operation(confirmed)
         started = time.monotonic()
-        wait_for(lambda: self.public_call("/api/identity", token).status_code == 403, "old-client-denial", 300)
-        self.check("emergency-no-overlap" if emergency else "adoption-revokes-old-client", True,
-                   seconds=round(time.monotonic() - started, 3))
+        wait_for(
+            lambda: self.public_call("/api/identity", token).status_code == 403,
+            "old-client-denial",
+            300,
+        )
+        self.check(
+            "emergency-no-overlap" if emergency else "adoption-revokes-old-client",
+            True,
+            seconds=round(time.monotonic() - started, 3),
+        )
         return self.fetch_service(service), replacement
 
     def expiry(self, machines):
@@ -810,74 +1651,151 @@ class Drill:
         require(0 < remaining <= 300, "unexpected_token_lifetime")
         # Hold THIS token; renewing it would make the expiry assertion meaningless.
         started = time.monotonic()
-        wait_for(lambda: self.public_call("/api/identity", token).status_code == 401,
-                 "held_token_expiry", remaining + 5)
-        self.check("expired-machine-token-denied", True, seconds=round(time.monotonic() - started, 3))
+        wait_for(
+            lambda: self.public_call("/api/identity", token).status_code == 401,
+            "held_token_expiry",
+            remaining + 5,
+        )
+        self.check(
+            "expired-machine-token-denied",
+            True,
+            seconds=round(time.monotonic() - started, 3),
+        )
 
     def isolated_lab(self):
         rows = self.api.request("GET", "/projects")
-        require(all(r["name"] in self.projects.values() for r in rows),
-                "recovery_requires_empty_lab")
+        require(
+            all(r["name"] in self.projects.values() for r in rows),
+            "recovery_requires_empty_lab",
+        )
 
     def recovery(self, service, machines, human, password):
         self.isolated_lab()
         old_token = machines.get()
         previous = self.approved_identity(old_token)
         started = time.monotonic()
-        response = self.api.request("POST", "/operator/application-access/recover", statuses=(202,))
-        require(response["browserSessionsInvalidated"], "recovery_sessions_not_invalidated")
+        response = self.api.request(
+            "POST", "/operator/application-access/recover", statuses=(202,)
+        )
+        require(
+            response["browserSessionsInvalidated"], "recovery_sessions_not_invalidated"
+        )
         for operation_id in response["operationIds"]:
             self.api.operation({"status_url": "/v1/access-operations/" + operation_id})
         service = self.fetch_service(service)
-        replacement = MachineTokens(self.kube.binding(service["project"], service["spec"]["secretPrefix"]))
-        wait_for(lambda: self.public_call("/api/identity", replacement.get()).status_code == 200,
-                 "recovery_activation", 60)
+        replacement = MachineTokens(
+            self.kube.binding(service["project"], service["spec"]["secretPrefix"])
+        )
+        wait_for(
+            lambda: (
+                self.public_call("/api/identity", replacement.get()).status_code == 200
+            ),
+            "recovery_activation",
+            60,
+        )
         current = self.approved_identity(replacement.get())
-        wait_for(lambda: self.public_call("/api/identity", old_token).status_code == 403,
-                 "recovery_old_token", 60)
+        wait_for(
+            lambda: self.public_call("/api/identity", old_token).status_code == 403,
+            "recovery_old_token",
+            60,
+        )
         stale = self.browser.get(self.urls["provider"] + "/app/identity")
-        self.check("recovery-invalidates-browser-and-machine-credentials", stale.status_code == 302
-                   and current["Id"] == previous["Id"] and current["Client-Id"] != previous["Client-Id"],
-                   seconds=round(time.monotonic() - started, 3))
+        self.check(
+            "recovery-invalidates-browser-and-machine-credentials",
+            stale.status_code == 302
+            and current["Id"] == previous["Id"]
+            and current["Client-Id"] != previous["Client-Id"],
+            seconds=round(time.monotonic() - started, 3),
+        )
         self.browser.cookies.clear()
         renewed = self.browser_login(human["username"], password)
         read = self.public_call("/api/state", replacement.get())
-        self.check("recovery-reconciles-principals-groups-and-state", renewed.status_code == 200
-                   and fingerprint(renewed.json()["principal"]["Id"]) == self.journal.state["humanPrincipalHash"]
-                   and read.status_code == 200 and read.json()["marker"] == self.journal.state["marker"])
+        self.check(
+            "recovery-reconciles-principals-groups-and-state",
+            renewed.status_code == 200
+            and fingerprint(renewed.json()["principal"]["Id"])
+            == self.journal.state["humanPrincipalHash"]
+            and read.status_code == 200
+            and read.json()["marker"] == self.journal.state["marker"],
+        )
         return service, replacement
 
     def revocations(self, service, machines, human_principal):
         owner = self.owners["provider"]
-        memberships = owner.request("GET", self.resource("provider", "application-group-memberships"))["items"]
-        rows = [m for m in memberships if m["spec"]["principalId"] == human_principal and m["state"] == "active"]
+        memberships = owner.request(
+            "GET", self.resource("provider", "application-group-memberships")
+        )["items"]
+        rows = [
+            m
+            for m in memberships
+            if m["spec"]["principalId"] == human_principal and m["state"] == "active"
+        ]
         require(rows, "human_membership_missing")
         started = time.monotonic()
         for row in rows:
-            result = owner.request("DELETE", self.resource("provider", "application-group-memberships", row["id"]),
-                                   etag=row["version"], statuses=(202,))
+            result = owner.request(
+                "DELETE",
+                self.resource("provider", "application-group-memberships", row["id"]),
+                etag=row["version"],
+                statuses=(202,),
+            )
             owner.operation(result)
-        wait_for(lambda: self.browser.get(self.urls["provider"] + "/app/identity").status_code == 403,
-                 "human_revocation", 300)
-        self.check("human-revocation-with-existing-session", True, seconds=round(time.monotonic() - started, 3))
+        wait_for(
+            lambda: (
+                self.browser.get(self.urls["provider"] + "/app/identity").status_code
+                == 403
+            ),
+            "human_revocation",
+            300,
+        )
+        self.check(
+            "human-revocation-with-existing-session",
+            True,
+            seconds=round(time.monotonic() - started, 3),
+        )
         service = self.fetch_service(service)
         token = machines.get()
         started = time.monotonic()
-        result = owner.request("DELETE", self.resource("provider", "service-access-requests", service["id"]),
-                               etag=service["version"], statuses=(202,))
+        result = owner.request(
+            "DELETE",
+            self.resource("provider", "service-access-requests", service["id"]),
+            etag=service["version"],
+            statuses=(202,),
+        )
         owner.operation(result)
-        wait_for(lambda: self.public_call("/api/identity", token).status_code == 403, "machine_revocation", 300)
-        self.check("machine-revocation-with-issued-token", True, seconds=round(time.monotonic() - started, 3))
+        wait_for(
+            lambda: self.public_call("/api/identity", token).status_code == 403,
+            "machine_revocation",
+            300,
+        )
+        self.check(
+            "machine-revocation-with-issued-token",
+            True,
+            seconds=round(time.monotonic() - started, 3),
+        )
 
     def run(self):
         human, password = self.setup()
         service, machines = self.service("consumer", "provider")
         _, reverse = self.service("provider", "consumer")
         # Wait for snapshot publication, not just the asynchronous operation result.
-        wait_for(lambda: self.public_call("/api/identity", machines.get()).status_code == 200,
-                 "service_activation", 60)
-        wait_for(lambda: self.public_call("/api/identity", reverse.get(), role="consumer").status_code == 200,
-                 "reverse_service_activation", 60)
+        wait_for(
+            lambda: (
+                self.public_call("/api/identity", machines.get()).status_code == 200
+            ),
+            "service_activation",
+            60,
+        )
+        wait_for(
+            lambda: (
+                self.public_call(
+                    "/api/identity", reverse.get(), role="consumer"
+                ).status_code
+                == 200
+            ),
+            "reverse_service_activation",
+            60,
+        )
         principal = self.human_checks(human, password)
         self.machine_checks(service, machines, reverse)
         if self.args.monitoring:
@@ -900,7 +1818,11 @@ def cleanup(journal, api, keycloak):
     """Retire ONLY owned fixture projects. Never purge their retained databases."""
     state = journal.state
     names = project_names(state["runId"])
-    require(state["projects"] == names and set(state["createdProjects"]) <= set(names.values()), "cleanup_scope_mismatch")
+    require(
+        state["projects"] == names
+        and set(state["createdProjects"]) <= set(names.values()),
+        "cleanup_scope_mismatch",
+    )
     rows = {r["name"]: r for r in api.request("GET", "/projects")}
     for project in state["createdProjects"]:
         row = rows.get(project)
@@ -908,39 +1830,92 @@ def cleanup(journal, api, keycloak):
         if row["status"] == "retired":
             continue
         spec = row["spec"]
-        require(spec is None or ((spec.get("configuration") or {}).get("ACCEPTANCE_RUN_ID") == state["runId"]
-            and all(c["image"] == state["image"] for c in spec.get("components", []))), "cleanup_project_changed")
+        require(
+            spec is None
+            or (
+                (spec.get("configuration") or {}).get("ACCEPTANCE_RUN_ID")
+                == state["runId"]
+                and all(
+                    c["image"] == state["image"] for c in spec.get("components", [])
+                )
+            ),
+            "cleanup_project_changed",
+        )
         preview = api.request("GET", "/projects/" + project + "/retirement-preview")
         require(not preview["blockers"], "cleanup_retirement_blocked")
         confirmation = {"confirm_name": project, "scope_token": preview["scope_token"]}
+
         def retired():
-            result = api.request("POST", "/projects/" + project + "/retire", confirmation, statuses=(200, 202))
+            result = api.request(
+                "POST",
+                "/projects/" + project + "/retire",
+                confirmation,
+                statuses=(200, 202),
+            )
             return result.get("status") == "retired"
+
         wait_for(retired, "fixture_retirement", 180)
-    known = api.request("GET", "/platform/test-identities?test_run_id=" + state["runId"])["credentials"]
-    require(set(state["personas"]) <= {p["credential_id"] for p in known}, "cleanup_persona_scope_mismatch")
+    known = api.request(
+        "GET", "/platform/test-identities?test_run_id=" + state["runId"]
+    )["credentials"]
+    require(
+        set(state["personas"]) <= {p["credential_id"] for p in known},
+        "cleanup_persona_scope_mismatch",
+    )
     for persona in known:
-        require(persona["test_run_id"] == state["runId"] and persona["project"] in names.values(),
-                "cleanup_persona_scope_mismatch")
+        require(
+            persona["test_run_id"] == state["runId"]
+            and persona["project"] in names.values(),
+            "cleanup_persona_scope_mismatch",
+        )
+
         def revoked():
-            return api.request("DELETE", "/platform/test-identities/" + persona["credential_id"], statuses=(200, 202))["status"] == "revoked"
+            return (
+                api.request(
+                    "DELETE",
+                    "/platform/test-identities/" + persona["credential_id"],
+                    statuses=(200, 202),
+                )["status"]
+                == "revoked"
+            )
+
         wait_for(revoked, "fixture_persona_revocation", 60)
     for client in state["clients"]:
-        require(re.fullmatch(r"ha-" + state["runId"] + r"-[a-z]+", client["clientId"]), "cleanup_client_scope_mismatch")
-        require(re.fullmatch(r"[0-9a-f-]{36}", client["id"]), "cleanup_client_scope_mismatch")
+        require(
+            re.fullmatch(r"ha-" + state["runId"] + r"-[a-z]+", client["clientId"]),
+            "cleanup_client_scope_mismatch",
+        )
+        require(
+            re.fullmatch(r"[0-9a-f-]{36}", client["id"]),
+            "cleanup_client_scope_mismatch",
+        )
         response = keycloak.admin("GET", "clients/" + client["id"], statuses=(200, 404))
         if response.status_code == 200:
-            require(response.json()["clientId"] == client["clientId"], "cleanup_client_changed")
+            require(
+                response.json()["clientId"] == client["clientId"],
+                "cleanup_client_changed",
+            )
             keycloak.admin("DELETE", "clients/" + client["id"], statuses=(204, 404))
     human = state["human"]
     if human:
-        require(human["username"] == "ha-" + state["runId"] + "-human"
-                and re.fullmatch(r"[0-9a-f-]{36}", human["id"]), "cleanup_human_scope_mismatch")
+        require(
+            human["username"] == "ha-" + state["runId"] + "-human"
+            and re.fullmatch(r"[0-9a-f-]{36}", human["id"]),
+            "cleanup_human_scope_mismatch",
+        )
         require(state["issuer"] == keycloak.issuer, "cleanup_issuer_mismatch")
         response = keycloak.admin("GET", "users/" + human["id"], statuses=(200, 404))
         if response.status_code == 200:
-            require(response.json()["username"] == human["username"], "cleanup_human_changed")
-        api.request("DELETE", "/platform/grants", {"issuer": state["issuer"], "subject": human["id"]}, statuses=(200, 404))
+            require(
+                response.json()["username"] == human["username"],
+                "cleanup_human_changed",
+            )
+        api.request(
+            "DELETE",
+            "/platform/grants",
+            {"issuer": state["issuer"], "subject": human["id"]},
+            statuses=(200, 404),
+        )
         keycloak.admin("DELETE", "users/" + human["id"], statuses=(204, 404))
     journal.report["cleanup"] = "completed-data-retained"
     journal.save()
@@ -948,22 +1923,54 @@ def cleanup(journal, api, keycloak):
 
 def parser():
     result = argparse.ArgumentParser(description=__doc__)
-    result.add_argument("command", choices=("plan", "run", "cleanup"), nargs="?", default="plan")
+    result.add_argument(
+        "command", choices=("plan", "run", "cleanup"), nargs="?", default="plan"
+    )
     result.add_argument("--api", default="http://127.0.0.1:8000")
     result.add_argument("--run-id", default=None)
     result.add_argument("--output", type=Path)
     result.add_argument("--fixture-image")
     result.add_argument("--apps-domain", default="apps.example.invalid")
-    result.add_argument("--issuer", default="https://identity.example.invalid/realms/platform", help="Offline plan only")
-    result.add_argument("--unrelated-host", default="example.com", help="Resolvable destination outside permitted egress")
+    result.add_argument(
+        "--issuer",
+        default="https://identity.example.invalid/realms/platform",
+        help="Offline plan only",
+    )
+    result.add_argument(
+        "--unrelated-host",
+        default="example.com",
+        help="Resolvable destination outside permitted egress",
+    )
     result.add_argument("--settings", type=Path, default=ROOT / ".env")
-    result.add_argument("--operator-token-file", type=Path, help="0600 JSON: access_token, refresh_token, client_id")
+    result.add_argument(
+        "--operator-token-file",
+        type=Path,
+        help="0600 runner credential JSON or renewable human session JSON",
+    )
     result.add_argument("--kubectl", default="kubectl")
-    result.add_argument("--confirm-environment", help="For live commands, repeat the exact API origin")
-    result.add_argument("--timed", action="store_true", help="Also hold a machine token until its real expiry")
-    result.add_argument("--monitoring", action="store_true", help="Also verify deployed component probes and safe central log correlation")
-    result.add_argument("--prometheus", default="http://127.0.0.1:9090", help="Operator-only Prometheus origin for --monitoring")
-    result.add_argument("--allow-recovery-reconcile", action="store_true", help="GLOBAL reconciliation; isolated empty lab only, NOT a backup restore")
+    result.add_argument(
+        "--confirm-environment", help="For live commands, repeat the exact API origin"
+    )
+    result.add_argument(
+        "--timed",
+        action="store_true",
+        help="Also hold a machine token until its real expiry",
+    )
+    result.add_argument(
+        "--monitoring",
+        action="store_true",
+        help="Also verify deployed component probes and safe central log correlation",
+    )
+    result.add_argument(
+        "--prometheus",
+        default="http://127.0.0.1:9090",
+        help="Operator-only Prometheus origin for --monitoring",
+    )
+    result.add_argument(
+        "--allow-recovery-reconcile",
+        action="store_true",
+        help="GLOBAL reconciliation; isolated empty lab only, NOT a backup restore",
+    )
     return result
 
 
@@ -971,24 +1978,60 @@ def validate(args):
     args.api = origin(args.api)
     if args.monitoring:
         args.prometheus = origin(args.prometheus)
-    require(args.command != "cleanup" or args.run_id is not None, "cleanup_requires_run_id")
+    require(
+        args.command != "cleanup" or args.run_id is not None, "cleanup_requires_run_id"
+    )
     args.run_id = args.run_id or uuid4().hex[:12]
     project_names(args.run_id)
-    require(re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", args.apps_domain), "invalid_apps_domain")
-    require(re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", args.unrelated_host), "invalid_unrelated_host")
+    require(
+        re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", args.apps_domain),
+        "invalid_apps_domain",
+    )
+    require(
+        re.fullmatch(r"[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?", args.unrelated_host),
+        "invalid_unrelated_host",
+    )
     if args.command != "cleanup":
-        require(args.fixture_image and IMAGE_PATTERN.fullmatch(args.fixture_image), "digest_pinned_fixture_image_required")
+        require(
+            args.fixture_image and IMAGE_PATTERN.fullmatch(args.fixture_image),
+            "digest_pinned_fixture_image_required",
+        )
     if args.command != "plan":
-        require(args.confirm_environment == args.api, "explicit_environment_confirmation_required")
+        require(
+            args.confirm_environment == args.api,
+            "explicit_environment_confirmation_required",
+        )
         require(args.operator_token_file is not None, "operator_token_file_required")
     args.output = args.output or ROOT / ".runtime/hosted-access" / args.run_id
 
 
 def operator_tokens(path, keycloak):
     payload = json.loads(private_text(path))
-    require(set(payload) == {"access_token", "refresh_token", "client_id"}
-            and all(isinstance(v, str) and v for v in payload.values()), "invalid_operator_session")
-    return Tokens(payload["access_token"], OperatorRefresh(keycloak, payload["client_id"]), payload["refresh_token"])
+    runner_keys = {
+        "platform_api_url",
+        "platform_oidc_token_url",
+        "platform_test_runner_client_id",
+        "platform_test_runner_client_secret",
+        "platform_test_runner_credential_id",
+        "platform_test_runner_expires_at",
+    }
+    if isinstance(payload, dict) and set(payload) == runner_keys:
+        require(
+            all(isinstance(value, str) and value for value in payload.values()),
+            "invalid_runner_credentials",
+        )
+        return RunnerTokens(payload, keycloak)
+    require(
+        isinstance(payload, dict)
+        and set(payload) == {"access_token", "refresh_token", "client_id"}
+        and all(isinstance(v, str) and v for v in payload.values()),
+        "invalid_operator_session",
+    )
+    return Tokens(
+        payload["access_token"],
+        OperatorRefresh(keycloak, payload["client_id"]),
+        payload["refresh_token"],
+    )
 
 
 def main(argv=None):
@@ -998,21 +2041,55 @@ def main(argv=None):
         validate(args)
         if args.command == "plan":
             names = project_names(args.run_id)
-            print(json.dumps({"format": 1, "runId": args.run_id, "mutates": False,
-                "declarations": [declaration(p, r, args.fixture_image, args.run_id,
-                    "https://api-" + names["provider"] + "." + args.apps_domain, args.issuer) for r, p in names.items()],
-                "accessPolicyIntent": access_policy("readers", "humans", "administrators"),
-                "serviceAccessIntent": {"consumer": names["consumer"], "provider": names["provider"],
-                                        "groups": ["readers"], "requiresProviderApproval": True, "projectWideCredential": True},
-                "deferred": DEFERRED, "gateClosed": False}, indent=2))
+            print(
+                json.dumps(
+                    {
+                        "format": 1,
+                        "runId": args.run_id,
+                        "mutates": False,
+                        "declarations": [
+                            declaration(
+                                p,
+                                r,
+                                args.fixture_image,
+                                args.run_id,
+                                "https://api-"
+                                + names["provider"]
+                                + "."
+                                + args.apps_domain,
+                                args.issuer,
+                            )
+                            for r, p in names.items()
+                        ],
+                        "accessPolicyIntent": access_policy(
+                            "readers", "humans", "administrators"
+                        ),
+                        "serviceAccessIntent": {
+                            "consumer": names["consumer"],
+                            "provider": names["provider"],
+                            "groups": ["readers"],
+                            "requiresProviderApproval": True,
+                            "projectWideCredential": True,
+                        },
+                        "deferred": DEFERRED,
+                        "gateClosed": False,
+                    },
+                    indent=2,
+                )
+            )
             return 0
         config = settings(args.settings)
         keycloak = Keycloak(config)
-        require(args.command != "run" or config["APPS_DOMAIN"] == args.apps_domain, "apps_domain_mismatch")
+        require(
+            args.command != "run" or config["APPS_DOMAIN"] == args.apps_domain,
+            "apps_domain_mismatch",
+        )
         api = API(args.api, operator_tokens(args.operator_token_file, keycloak))
-        # Validate a renewable HUMAN administrator before provisioning anything.
-        api.request("GET", "/platform/test-runner-credentials")
-        journal = Journal(args.output, args.api, args.run_id, resume=args.command == "cleanup")
+        # Validate suite authority before provisioning anything; credential administration stays human-only.
+        api.request("GET", "/platform/test-context")
+        journal = Journal(
+            args.output, args.api, args.run_id, resume=args.command == "cleanup"
+        )
         if args.command == "cleanup":
             try:
                 cleanup(journal, api, keycloak)
@@ -1021,22 +2098,35 @@ def main(argv=None):
                 journal.save()
                 raise
             return 0
-        journal.report["requestedDrills"] = {"tokenExpiry": args.timed, "recoveryReconcile": args.allow_recovery_reconcile,
-                                             "componentMonitoring": args.monitoring}
-        journal.report["harnessSha256"] = hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
+        journal.report["requestedDrills"] = {
+            "tokenExpiry": args.timed,
+            "recoveryReconcile": args.allow_recovery_reconcile,
+            "componentMonitoring": args.monitoring,
+        }
+        journal.report["harnessSha256"] = hashlib.sha256(
+            Path(__file__).read_bytes()
+        ).hexdigest()
         journal.save()
         error = None
         try:
             Drill(args, journal, api, keycloak, Kube(args.kubectl)).run()
         except (Exception, KeyboardInterrupt) as exc:
-            error = str(exc) if isinstance(exc, DrillError) else "interrupted" if isinstance(exc, KeyboardInterrupt) else "dependency_failure"
+            error = (
+                str(exc)
+                if isinstance(exc, DrillError)
+                else "interrupted"
+                if isinstance(exc, KeyboardInterrupt)
+                else "dependency_failure"
+            )
         finally:
             try:
                 cleanup(journal, api, keycloak)
             except (Exception, KeyboardInterrupt):
                 journal.report["cleanup"] = "incomplete-retry-required"
                 error = error or "cleanup_failed"
-        journal.report.update(result="failed" if error else "core-passed", finishedAt=utc())
+        journal.report.update(
+            result="failed" if error else "core-passed", finishedAt=utc()
+        )
         if error:
             journal.report["errorCode"] = error
         journal.save()
@@ -1044,6 +2134,12 @@ def main(argv=None):
         print("Full acceptance gate remains open; see deferred checks.", flush=True)
         return 1 if error else 0
     except (Exception, KeyboardInterrupt) as exc:
-        code = str(exc) if isinstance(exc, DrillError) else "interrupted" if isinstance(exc, KeyboardInterrupt) else "configuration_or_dependency_failure"
+        code = (
+            str(exc)
+            if isinstance(exc, DrillError)
+            else "interrupted"
+            if isinstance(exc, KeyboardInterrupt)
+            else "configuration_or_dependency_failure"
+        )
         print("ERROR " + code, flush=True)
         return 1

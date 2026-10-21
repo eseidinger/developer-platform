@@ -94,9 +94,13 @@ uv run --project platform/app python \
   --other-token-file /path/to/private-ungranted-user-token
 ```
 
-The operator session is the private JSON file used by the hosted-access harness,
-containing `access_token`, `refresh_token`, and `client_id` for a renewable human
-administrator session. The other file contains a bearer token for an authenticated
+The operator file can be the private client-credentials JSON produced by
+`python3 scripts/setup/bootstrap-test-runner.py`, or a renewable human session
+containing `access_token`, `refresh_token`, and `client_id`. The test-runner
+credential renews without interactive login; see the
+[bootstrap and permission boundaries](../../ansible/docs/test-runner.md#local-bootstrap-without-interactive-login).
+
+The other file contains a bearer token for an authenticated
 user with no project or platform grants. Both files must have private permissions
 (for example, mode `0600`). Full lifecycle execution requires both identities;
 authorization and audit assertions cannot silently skip themselves.

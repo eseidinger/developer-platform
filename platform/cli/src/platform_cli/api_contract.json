@@ -2597,6 +2597,28 @@
         "summary": "Put Platform Grant"
       }
     },
+    "/platform/test-context": {
+      "get": {
+        "description": "Confirm suite authority without exposing or administering runner credentials.",
+        "operationId": "test_context_platform_test_context_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Test Context"
+      }
+    },
     "/platform/test-identities": {
       "get": {
         "operationId": "list_test_identities_platform_test_identities_get",

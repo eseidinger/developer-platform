@@ -85,6 +85,7 @@ from .authorization import (
 from .authorization import grant as grant_role
 from .authorization import initialize as initialize_authorization
 from .authorization import revoke as revoke_role
+from .automation_credentials import issue_test_runner
 from .capacity_admission import assess as assess_capacity
 from .capacity_admission import snapshot as capacity_admission_snapshot
 from .catalog import component_view, ensure_default_application
@@ -535,7 +536,7 @@ def require_test_identity_manager(principal: Principal) -> None:
     require_platform_admin(principal)
     with connect() as conn:
         machine = access_scope(conn, principal)
-    if machine is None or machine.kind == "test-runner":
+    if machine is None or (machine.kind == "test-runner" and machine.active):
         return
     required_audit(
         actor_for(principal),
@@ -1040,6 +1041,15 @@ def revoke_deployment_credential(
     return {"credential_id": str(credential_id), "status": "revoked"}
 
 
+@app.get("/platform/test-context")
+def test_context(principal: Principal = Depends(current_principal)):
+    """Confirm suite authority without exposing or administering runner credentials."""
+    require_test_identity_manager(principal)
+    with connect() as conn:
+        machine = access_scope(conn, principal)
+    return {"kind": "human" if machine is None else machine.kind}
+
+
 @app.post("/platform/test-runner-credentials")
 def create_test_runner_credential(
     body: TestRunnerCredentialCreate, principal: Principal = Depends(current_principal)
@@ -1047,66 +1057,7 @@ def create_test_runner_credential(
     """Create the reusable suite identity; automation identities cannot invoke this endpoint."""
     require_human_platform_admin(principal)
     actor = actor_for(principal)
-    provider = None
-    try:
-        provider = create_credential_client("Platform test runner: " + body.name)
-        machine = Principal(
-            verifier.issuer, provider["subject"], "Test runner " + body.name
-        )
-        with connect() as conn, conn.transaction():
-            grant_role(conn, machine, "platform", None, "platform-admin")
-            row = conn.execute(
-                """INSERT INTO deployment_credentials(
-                    name, kind, project, issuer, subject, provider_client_id, provider_resource_id,
-                    status, created_by_issuer, created_by_subject, expires_at)
-                VALUES (%s,'test-runner',NULL,%s,%s,%s,%s,'active',%s,%s,
-                        now()+make_interval(days => %s))
-                RETURNING credential_id, name, kind, project, environment, status, created_at,
-                          expires_at, expires_at<=now(), last_used_at, rotated_from, test_run_id""",
-                (
-                    body.name,
-                    machine.issuer,
-                    machine.subject,
-                    provider["client_id"],
-                    provider["provider_resource_id"],
-                    principal.issuer,
-                    principal.subject,
-                    body.expires_in_days,
-                ),
-            ).fetchone()
-        result = {
-            **public_credential_record(row),
-            "token_endpoint": verifier.issuer + "/protocol/openid-connect/token",
-            "client_id": provider["client_id"],
-            "client_secret": provider["client_secret"],
-        }
-    except Exception as exc:
-        if provider:
-            try:
-                delete_credential_client(provider["provider_resource_id"])
-            except Exception:
-                pass
-        required_audit(
-            actor,
-            "test-runner-credential.create",
-            "platform",
-            None,
-            "failed",
-            {"scope": "platform"},
-            {"error_type": type(exc).__name__},
-        )
-        raise HTTPException(
-            503, "Test-runner creation failed without returning a usable secret"
-        )
-    required_audit(
-        actor,
-        "test-runner-credential.create",
-        "automation-credential",
-        result["credential_id"],
-        "succeeded",
-        {"scope": "platform"},
-        {"name": body.name, "expires_at": result["expires_at"]},
-    )
+    result = issue_test_runner(sys.modules[__name__], body, principal, actor)
     return JSONResponse(status_code=201, content=jsonable_encoder(result))
 
 

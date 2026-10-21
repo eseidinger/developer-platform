@@ -708,3 +708,15 @@ def test_tunnel_rejects_untrusted_endpoint_and_exposed_key(monkeypatch, tmp_path
     credential["ssh"]["host"] = "bastion.example"
     key.chmod(0o644)
     assert runner.invoke(app, args).exit_code == 2
+
+
+def test_runner_preflight_has_a_domain_command(monkeypatch, tmp_path):
+    def handler(request):
+        assert request.method == "GET"
+        assert request.url.path == "/platform/test-context"
+        return httpx.Response(200, json={"kind": "test-runner"})
+
+    runner = _cli(monkeypatch, tmp_path, handler)
+    result = runner.invoke(app, ["operator", "test-context", "get", "--output", "json"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.stdout) == {"kind": "test-runner"}

@@ -14,6 +14,41 @@ deployment with a project CI credential, and cleans up without retaining the
 human token. It also checks that deployment credentials cannot mutate secrets;
 there is no separate CI-credential playbook.
 
+## Local bootstrap without interactive login
+
+After the local API is ready, an operator with Docker access can issue the same
+protected credential format directly through the trusted API container:
+
+```bash
+python3 scripts/setup/bootstrap-test-runner.py \
+  --confirm-environment http://127.0.0.1:8000
+```
+
+This defaults to a one-day credential in `.runtime/test-runner.json`. It refuses
+existing output files and requires a private parent directory. The one-time
+secret goes straight to a mode-`0600` file, never into command arguments or
+terminal output. Select `--api` and the matching `--confirm-environment` when
+using a different API origin. The platform records the bootstrap as a system
+operator action, rather than a fabricated human login.
+
+Docker access is privileged host administration. This command adds no public
+bootstrap endpoint and is not available to a runner through the API. The
+credential retains the existing platform-wide test-runner authority; use it in
+the intended lab, not as a project-scoped production credential. It remains
+subject to database-backed expiry and revocation on every API request.
+
+Python runners accept this file through their existing `--operator-token-file`
+option. They obtain and renew access tokens with client credentials and verify
+that the file targets the selected API and configured issuer. Their preflight
+uses `/platform/test-context`; root runner credential-management endpoints
+remain restricted to human administrators. Project deployment credentials and
+short-lived test personas keep their existing test-runner permissions.
+Existing Ansible playbooks consume the same file.
+
+Checks whose purpose is human authentication or human database access still
+require a real human session. Machine personas are never treated as humans,
+and this credential does not establish browser-login coverage.
+
 ## Revocation and expiry
 
 `revoke-platform-test-runner.yml` removes exactly one active named runner.

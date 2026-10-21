@@ -494,6 +494,7 @@ for command, path in (
     ("operator purge preview", "/operator/projects/{name}/purge-preview"),
     ("operator recovery-requests list", "/operator/data-service-recovery-requests"),
     ("operator grants list", "/platform/grants"),
+    ("operator test-context get", "/platform/test-context"),
     ("operator test-identities list", "/platform/test-identities"),
     ("operator test-runner-credentials list", "/platform/test-runner-credentials"),
 ):

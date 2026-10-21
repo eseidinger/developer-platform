@@ -63,3 +63,8 @@ been consolidated into this layout. Python test helpers are imported through
 `scripts.tests.support`; production helpers remain in `scripts.internal`. Update
 imports, root-relative paths, CI, and documentation whenever moving a script.
 Keep `__init__.py` files in importable helper packages.
+
+The local [test-runner bootstrap](setup/bootstrap-test-runner.py) issues an
+expiring machine credential through the running API container without an
+interactive login. It writes private JSON accepted by both Python runners and
+Ansible; see the [credential guide](../ansible/docs/test-runner.md).

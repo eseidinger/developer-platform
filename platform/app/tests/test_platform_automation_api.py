@@ -159,6 +159,10 @@ class PlatformAutomationApiTests(unittest.TestCase):
         body = json.loads(response.body)
         self.assertEqual(body["kind"], "test-runner")
         self.assertEqual(body["client_secret"], "runner-secret")
+        self.assertEqual(
+            body["token_endpoint"],
+            "https://issuer.example/protocol/openid-connect/token",
+        )
         grant = next(
             params
             for query, params in conn.statements
@@ -211,6 +215,90 @@ class PlatformAutomationApiTests(unittest.TestCase):
             ):
                 main.require_human_platform_admin(machine)
         self.assertEqual(raised.exception.status_code, 403)
+
+    def test_preflight_accepts_only_humans_and_active_root_test_runners(self):
+        cases = [
+            (None, "human"),
+            (CredentialAccess(UUID(int=1), "test-runner", None, True), "test-runner"),
+            (CredentialAccess(UUID(int=1), "test-runner", None, False), None),
+            (CredentialAccess(UUID(int=2), "test-persona", None, True), None),
+            (CredentialAccess(UUID(int=3), "deployment", "demo", True), None),
+        ]
+        for access, expected in cases:
+            with (
+                self.subTest(access=access),
+                patch.object(main, "connect", return_value=AutomationConnection()),
+                patch.object(main, "require_platform_admin"),
+                patch.object(main, "access_scope", return_value=access),
+                patch.object(main, "required_audit"),
+            ):
+                if expected is None:
+                    with self.assertRaises(HTTPException) as denied:
+                        main.test_context(self.human)
+                    self.assertEqual(denied.exception.status_code, 403)
+                else:
+                    self.assertEqual(main.test_context(self.human), {"kind": expected})
+
+    def test_runner_cannot_administer_credentials_or_change_human_policy(self):
+        access = CredentialAccess(UUID(int=1), "test-runner", None, True)
+        calls = [
+            lambda: main.create_test_runner_credential(
+                main.TestRunnerCredentialCreate(name="forbidden"), self.human
+            ),
+            lambda: main.list_test_runner_credentials(self.human),
+            lambda: main.rotate_test_runner_credential(
+                UUID(int=1), main.DeploymentCredentialRotate(), self.human
+            ),
+            lambda: main.revoke_test_runner_credential(UUID(int=1), self.human),
+            lambda: main.set_ai_policy(
+                "demo", main.AIProjectPolicy(classification="internal"), self.human
+            ),
+        ]
+        with (
+            patch.object(main, "connect", return_value=AutomationConnection()),
+            patch.object(main, "require_platform_admin"),
+            patch.object(main, "access_scope", return_value=access),
+            patch.object(main, "required_audit"),
+        ):
+            for call in calls:
+                with self.assertRaises(HTTPException) as denied:
+                    call()
+                self.assertEqual(denied.exception.status_code, 403)
+
+    def test_host_issuance_records_system_actor_and_keeps_existing_ttl(self):
+        from app.audit import Actor
+        from app.automation_credentials import issue_test_runner
+
+        provider = {
+            "provider_resource_id": "provider",
+            "client_id": "client",
+            "client_secret": "secret",
+            "subject": "runner",
+        }
+        conn = AutomationConnection()
+        actor = Actor("system", "host-test-runner-bootstrap")
+        principal = Principal("https://issuer.example", "host-test-runner-bootstrap")
+        with (
+            patch.object(main, "connect", return_value=conn),
+            patch.object(main, "verifier", Mock(issuer=principal.issuer)),
+            patch.object(main, "create_credential_client", return_value=provider),
+            patch.object(main, "required_audit") as audit,
+        ):
+            result = issue_test_runner(
+                main,
+                main.TestRunnerCredentialCreate(name="suite", expires_in_days=1),
+                principal,
+                actor,
+            )
+        self.assertEqual(result["client_secret"], "secret")
+        self.assertEqual(audit.call_args.args[0], actor)
+        self.assertEqual(audit.call_args.args[1], "test-runner-credential.create")
+        insert = next(
+            params
+            for query, params in conn.statements
+            if "INSERT INTO deployment_credentials" in query
+        )
+        self.assertEqual(insert[-1], 1)
 
     def test_test_identity_listing_types_optional_run_filter(self):
         for run_id in (None, "run-1"):
