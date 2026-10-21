@@ -15,25 +15,39 @@ class PortalTests(unittest.TestCase):
 
     def test_portal_routes_serve_the_single_page_ui(self):
         self.assertTrue(main.portal_route().path.endswith("app/static/index.html"))
-        self.assertTrue(main.portal_route("example").path.endswith("app/static/index.html"))
+        self.assertTrue(
+            main.portal_route("example").path.endswith("app/static/index.html")
+        )
         for path in ("/projects/{name}/application-access", "/projects/{name}/ai"):
-            self.assertIn(path, {getattr(route, 'path', None) for route in main.app.routes})
+            self.assertIn(
+                path, {getattr(route, "path", None) for route in main.app.routes}
+            )
 
     def test_portal_config_has_only_public_oidc_settings(self):
         request = Mock()
         request.base_url = "https://platform.example.com/"
         request.url.hostname = "platform.example.com"
-        with patch.dict(os.environ, {"OIDC_ISSUER": "https://identity.example.com/realms/platform",
-                                     "PLATFORM_DOMAIN": "platform.example.com"}):
+        with patch.dict(
+            os.environ,
+            {
+                "OIDC_ISSUER": "https://identity.example.com/realms/platform",
+                "PLATFORM_DOMAIN": "platform.example.com",
+            },
+        ):
             config = main.portal_config(request)
-        self.assertEqual(config, {
-            "issuer": "https://identity.example.com/realms/platform",
-            "client_id": "platform-portal",
-            "redirect_uri": "https://platform.example.com/",
-        })
+        self.assertEqual(
+            config,
+            {
+                "issuer": "https://identity.example.com/realms/platform",
+                "client_id": "platform-portal",
+                "redirect_uri": "https://platform.example.com/",
+            },
+        )
 
     def test_portal_config_uses_local_request_uri_for_local_development(self):
         request = Mock()
         request.base_url = "http://localhost:8000/"
         request.url.hostname = "localhost"
-        self.assertEqual(main.portal_config(request)["redirect_uri"], "http://localhost:8000/")
+        self.assertEqual(
+            main.portal_config(request)["redirect_uri"], "http://localhost:8000/"
+        )

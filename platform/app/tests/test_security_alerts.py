@@ -21,9 +21,12 @@ class SecurityAlertTests(unittest.TestCase):
         self.assertIn("make_interval", query)
 
     def test_render_uses_resource_labels_not_actor_or_event_detail(self):
-        text = render([
-            ("access_denial", "project", "demo", "demo", 5, 42, 1700000000),
-        ], now=1700000010)
+        text = render(
+            [
+                ("access_denial", "project", "demo", "demo", 5, 42, 1700000000),
+            ],
+            now=1700000010,
+        )
         self.assertIn('category="access_denial"', text)
         self.assertIn('target_id="demo"', text)
         self.assertIn("platform_security_latest_event_id", text)
@@ -33,7 +36,11 @@ class SecurityAlertTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             target = Path(directory) / "security-events.prom"
             target.write_text("previous\n")
-            with patch("app.security_alerts.audit_reader_connect", side_effect=RuntimeError):
-                with self.assertRaises(RuntimeError):
-                    publish(directory, now=1)
+            with (
+                patch(
+                    "app.security_alerts.audit_reader_connect", side_effect=RuntimeError
+                ),
+                self.assertRaises(RuntimeError),
+            ):
+                publish(directory, now=1)
             self.assertEqual(target.read_text(), "previous\n")

@@ -5,7 +5,9 @@ def dependency_report(spec: dict) -> dict:
     """Describe rollback dependencies without disclosing any secret value or name."""
     return {
         "database": {"state": "retained", "rollback": "not_performed"},
-        "configuration": {"state": "reapplied" if spec.get("configuration") else "none"},
+        "configuration": {
+            "state": "reapplied" if spec.get("configuration") else "none"
+        },
         "application_secrets": {
             "state": "current_only",
             "rollback": "not_restored",

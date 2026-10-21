@@ -1,4 +1,5 @@
 """Provider-neutral hosted-application access intent and unambiguous route matching."""
+
 import re
 from typing import Literal
 from urllib.parse import unquote
@@ -15,10 +16,14 @@ class Strict(BaseModel):
 def canonical_path(path: str) -> str:
     if not isinstance(path, str) or not path.startswith("/") or len(path) > 2048:
         raise ValueError("Invalid absolute path")
-    if re.search(r"%(?![0-9a-fA-F]{2})", path) or re.search(r"%(?:2f|5c|25)", path, re.I):
+    if re.search(r"%(?![0-9a-fA-F]{2})", path) or re.search(
+        r"%(?:2f|5c|25)", path, re.IGNORECASE
+    ):
         raise ValueError("Ambiguous path encoding")
     decoded = unquote(path, encoding="utf-8", errors="strict")
-    if any(c in decoded for c in "\\?#") or any(ord(c) < 32 or ord(c) == 127 for c in decoded):
+    if any(c in decoded for c in "\\?#") or any(
+        ord(c) < 32 or ord(c) == 127 for c in decoded
+    ):
         raise ValueError("Invalid path characters")
     if "//" in decoded or any(p in {".", ".."} for p in decoded.split("/")):
         raise ValueError("Ambiguous path segments")
@@ -38,7 +43,9 @@ class GroupCreate(Strict):
 class RouteMatch(Strict):
     path: str | None = None
     pathPrefix: str | None = None
-    methods: list[Literal["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]] = Field(min_length=1)
+    methods: list[Literal["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"]] = Field(
+        min_length=1
+    )
 
     @model_validator(mode="after")
     def check(self):
@@ -46,7 +53,9 @@ class RouteMatch(Strict):
             raise ValueError("Specify exactly one of path or pathPrefix")
         value = self.path if self.path is not None else self.pathPrefix
         if canonical_path(value) != value or value.startswith("/oauth2"):
-            raise ValueError("Use canonical paths outside the reserved /oauth2 namespace")
+            raise ValueError(
+                "Use canonical paths outside the reserved /oauth2 namespace"
+            )
         if len(self.methods) != len(set(self.methods)):
             raise ValueError("Methods must be unique; HEAD follows GET")
         return self
@@ -62,7 +71,9 @@ class Authorization(Strict):
     @field_validator("anyOfGroups")
     @classmethod
     def groups_valid(cls, value):
-        if len(set(value)) != len(value) or any(not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", v) for v in value):
+        if len(set(value)) != len(value) or any(
+            not re.fullmatch(r"[a-zA-Z0-9_-]{1,64}", v) for v in value
+        ):
             raise ValueError("Group references must be unique names or stable IDs")
         return value
 
@@ -89,7 +100,8 @@ def overlap(left: dict, right: dict) -> bool:
     if right.get("path") is not None:
         return contains(left, right["path"])
     return contains(left, right["pathPrefix"].rstrip("/") or "/") or contains(
-        right, left["pathPrefix"].rstrip("/") or "/")
+        right, left["pathPrefix"].rstrip("/") or "/"
+    )
 
 
 class IdentityAttributes(Strict):
@@ -116,7 +128,7 @@ class PolicyCreate(Strict):
         if browser and not any("GET" in r.match.methods for r in browser):
             raise ValueError("Browser authentication requires a GET entry route")
         for i, route in enumerate(self.routes):
-            for other in self.routes[i + 1:]:
+            for other in self.routes[i + 1 :]:
                 if overlap(route.match.model_dump(), other.match.model_dump()):
                     raise ValueError("Overlapping route/method rules are not supported")
         return self
@@ -155,5 +167,11 @@ class Governance(Strict):
 def match_route(policy: dict, raw_path: str, method: str) -> dict | None:
     path = canonical_path(raw_path)
     method = "GET" if method == "HEAD" else method
-    return next((r for r in policy["routes"] if method in r["match"]["methods"]
-                 and contains(r["match"], path)), None)
+    return next(
+        (
+            r
+            for r in policy["routes"]
+            if method in r["match"]["methods"] and contains(r["match"], path)
+        ),
+        None,
+    )

@@ -1,8 +1,8 @@
 import logging
 import sys
 import unittest
-from unittest.mock import Mock
 from pathlib import Path
+from unittest.mock import Mock
 
 from kubernetes.client.exceptions import ApiException
 
@@ -17,15 +17,23 @@ def condition(condition_type, status, reason=None):
 def deployment(*, ready=0, updated=0, total=None, conditions=None):
     return {
         "metadata": {"generation": 2},
-        "spec": {"replicas": 1, "template": {"spec": {"containers": [
-            {"name": "app", "image": "example:v1"},
-        ]}}},
+        "spec": {
+            "replicas": 1,
+            "template": {
+                "spec": {
+                    "containers": [
+                        {"name": "app", "image": "example:v1"},
+                    ]
+                }
+            },
+        },
         "status": {
             "observedGeneration": 2,
             "readyReplicas": ready,
             "updatedReplicas": updated,
             "replicas": max(ready, updated) if total is None else total,
-            "conditions": conditions or [condition("Progressing", "True", "NewReplicaSetAvailable")],
+            "conditions": conditions
+            or [condition("Progressing", "True", "NewReplicaSetAvailable")],
         },
     }
 
@@ -64,32 +72,87 @@ class Resources:
 
 class ReadinessObservationTests(unittest.TestCase):
     def test_opt_in_diagnostics_survive_deadline_and_exclude_sidecar_and_messages(self):
-        self.deployment.value = deployment(conditions=[condition("Progressing", "False", "ProgressDeadlineExceeded")])
-        self.pods.value = {"items": [{"status": {"containerStatuses": [
-            {"name": "app", "ready": False, "restartCount": 5,
-             "state": {"waiting": {"reason": "CrashLoopBackOff", "message": "private-secret"}},
-             "lastState": {"terminated": {"reason": "Error", "exitCode": 2, "message": "private-secret"}}},
-            {"name": "sidecar", "ready": False, "state": {"waiting": {"reason": "private-secret"}}}
-        ]}}]}
-        result = observe_deployment(self.runtime, "smoke", "example:v1", self.log, include_pod_diagnostics=True)
+        self.deployment.value = deployment(
+            conditions=[condition("Progressing", "False", "ProgressDeadlineExceeded")]
+        )
+        self.pods.value = {
+            "items": [
+                {
+                    "status": {
+                        "containerStatuses": [
+                            {
+                                "name": "app",
+                                "ready": False,
+                                "restartCount": 5,
+                                "state": {
+                                    "waiting": {
+                                        "reason": "CrashLoopBackOff",
+                                        "message": "private-secret",
+                                    }
+                                },
+                                "lastState": {
+                                    "terminated": {
+                                        "reason": "Error",
+                                        "exitCode": 2,
+                                        "message": "private-secret",
+                                    }
+                                },
+                            },
+                            {
+                                "name": "sidecar",
+                                "ready": False,
+                                "state": {"waiting": {"reason": "private-secret"}},
+                            },
+                        ]
+                    }
+                }
+            ]
+        }
+        result = observe_deployment(
+            self.runtime, "smoke", "example:v1", self.log, include_pod_diagnostics=True
+        )
         self.assertEqual(result["state"], "failed")
         self.assertEqual(result["reason"], "ProgressDeadlineExceeded")
-        self.assertEqual(result["pod_diagnostics"], {"containers": [{"ready": False, "revision": None, "restart_count": 5,
-            "current_reason": "CrashLoopBackOff", "previous_reason": "Error", "previous_exit_code": 2}], "truncated": False})
+        self.assertEqual(
+            result["pod_diagnostics"],
+            {
+                "containers": [
+                    {
+                        "ready": False,
+                        "revision": None,
+                        "restart_count": 5,
+                        "current_reason": "CrashLoopBackOff",
+                        "previous_reason": "Error",
+                        "previous_exit_code": 2,
+                    }
+                ],
+                "truncated": False,
+            },
+        )
         self.assertNotIn("private-secret", str(result))
         self.assertNotIn("pod_diagnostics", self.observe())
 
     def setUp(self):
         self.deployment = Resource(deployment(ready=1, updated=1))
-        self.pods = Resource({"items": [{
-            "status": {
-                "conditions": [condition("Ready", "True")],
-                "containerStatuses": [{
-                    "name": "app", "ready": True, "image": "example:v1",
-                    "imageID": "docker-pullable://example@sha256:abc",
-                }],
-            },
-        }]})
+        self.pods = Resource(
+            {
+                "items": [
+                    {
+                        "status": {
+                            "conditions": [condition("Ready", "True")],
+                            "containerStatuses": [
+                                {
+                                    "name": "app",
+                                    "ready": True,
+                                    "image": "example:v1",
+                                    "imageID": "docker-pullable://example@sha256:abc",
+                                }
+                            ],
+                        },
+                    }
+                ]
+            }
+        )
         self.runtime = Mock()
         self.runtime.resources = Resources(self.deployment, self.pods)
         self.log = Mock(spec=logging.Logger)
@@ -106,24 +169,44 @@ class ReadinessObservationTests(unittest.TestCase):
         self.assertEqual(result["desired_image"], "example:v1")
         self.assertEqual(result["deployment_image"], "example:v1")
         self.assertEqual(result["active_images"], ["example:v1"])
-        self.assertEqual(result["active_image_ids"], ["docker-pullable://example@sha256:abc"])
+        self.assertEqual(
+            result["active_image_ids"], ["docker-pullable://example@sha256:abc"]
+        )
         self.assertIsNone(result["reason"])
-        self.assertEqual(self.deployment.calls, [{"name": "smoke", "namespace": "project-smoke"}])
-        self.assertEqual(self.pods.calls, [{
-            "namespace": "project-smoke",
-            "label_selector": "app.kubernetes.io/name=smoke",
-        }])
+        self.assertEqual(
+            self.deployment.calls, [{"name": "smoke", "namespace": "project-smoke"}]
+        )
+        self.assertEqual(
+            self.pods.calls,
+            [
+                {
+                    "namespace": "project-smoke",
+                    "label_selector": "app.kubernetes.io/name=smoke",
+                }
+            ],
+        )
 
     def test_reports_image_pull_diagnostic_while_rollout_is_progressing(self):
-        self.deployment.value = deployment(conditions=[
-            condition("Progressing", "True", "ReplicaSetUpdated"),
-        ])
-        self.pods.value = {"items": [{
-            "status": {"containerStatuses": [{
-                "name": "app", "ready": False,
-                "state": {"waiting": {"reason": "ImagePullBackOff"}},
-            }]},
-        }]}
+        self.deployment.value = deployment(
+            conditions=[
+                condition("Progressing", "True", "ReplicaSetUpdated"),
+            ]
+        )
+        self.pods.value = {
+            "items": [
+                {
+                    "status": {
+                        "containerStatuses": [
+                            {
+                                "name": "app",
+                                "ready": False,
+                                "state": {"waiting": {"reason": "ImagePullBackOff"}},
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
 
         result = self.observe()
 
@@ -132,15 +215,29 @@ class ReadinessObservationTests(unittest.TestCase):
         self.assertEqual(result["ready_replicas"], 0)
 
     def test_old_ready_pod_does_not_make_a_stalled_new_rollout_ready(self):
-        self.deployment.value = deployment(ready=1, updated=1, total=2, conditions=[
-            condition("Progressing", "True", "ReplicaSetUpdated"),
-        ])
-        self.pods.value = {"items": [{
-            "status": {"containerStatuses": [{
-                "name": "app", "ready": False,
-                "state": {"waiting": {"reason": "ErrImagePull"}},
-            }]},
-        }]}
+        self.deployment.value = deployment(
+            ready=1,
+            updated=1,
+            total=2,
+            conditions=[
+                condition("Progressing", "True", "ReplicaSetUpdated"),
+            ],
+        )
+        self.pods.value = {
+            "items": [
+                {
+                    "status": {
+                        "containerStatuses": [
+                            {
+                                "name": "app",
+                                "ready": False,
+                                "state": {"waiting": {"reason": "ErrImagePull"}},
+                            }
+                        ]
+                    },
+                }
+            ]
+        }
 
         result = self.observe()
 
@@ -149,11 +246,17 @@ class ReadinessObservationTests(unittest.TestCase):
 
     def test_reports_unschedulable_pod_diagnostic(self):
         self.deployment.value = deployment()
-        self.pods.value = {"items": [{
-            "status": {"conditions": [
-                condition("PodScheduled", "False", "Unschedulable"),
-            ]},
-        }]}
+        self.pods.value = {
+            "items": [
+                {
+                    "status": {
+                        "conditions": [
+                            condition("PodScheduled", "False", "Unschedulable"),
+                        ]
+                    },
+                }
+            ]
+        }
 
         result = self.observe()
 
@@ -161,9 +264,11 @@ class ReadinessObservationTests(unittest.TestCase):
         self.assertEqual(result["reason"], "Unschedulable")
 
     def test_reports_progress_deadline_failure(self):
-        self.deployment.value = deployment(conditions=[
-            condition("Progressing", "False", "ProgressDeadlineExceeded"),
-        ])
+        self.deployment.value = deployment(
+            conditions=[
+                condition("Progressing", "False", "ProgressDeadlineExceeded"),
+            ]
+        )
 
         result = self.observe()
 
@@ -171,10 +276,14 @@ class ReadinessObservationTests(unittest.TestCase):
         self.assertEqual(result["reason"], "ProgressDeadlineExceeded")
 
     def test_does_not_apply_old_rollout_failure_to_a_different_desired_image(self):
-        self.deployment.value = deployment(conditions=[
-            condition("Progressing", "False", "ProgressDeadlineExceeded"),
-        ])
-        self.deployment.value["spec"]["template"]["spec"]["containers"][0]["image"] = "example:v0"
+        self.deployment.value = deployment(
+            conditions=[
+                condition("Progressing", "False", "ProgressDeadlineExceeded"),
+            ]
+        )
+        self.deployment.value["spec"]["template"]["spec"]["containers"][0]["image"] = (
+            "example:v0"
+        )
 
         result = self.observe()
 

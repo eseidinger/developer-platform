@@ -1,14 +1,28 @@
 """Provider-neutral project resource inventory for the developer API."""
+
 from typing import Any
+
 from .usage import parse_cpu, parse_memory
 
 
 def _get(value: Any, name: str, default=None):
-    return value.get(name, default) if isinstance(value, dict) else getattr(value, name, default)
+    return (
+        value.get(name, default)
+        if isinstance(value, dict)
+        else getattr(value, name, default)
+    )
 
 
 def _items(runtime: Any, api_version: str, kind: str, namespace: str) -> list[Any]:
-    return _get(runtime.resources.get(api_version=api_version, kind=kind).get(namespace=namespace), "items") or []
+    return (
+        _get(
+            runtime.resources.get(api_version=api_version, kind=kind).get(
+                namespace=namespace
+            ),
+            "items",
+        )
+        or []
+    )
 
 
 def _name(item: Any) -> str:
@@ -17,25 +31,36 @@ def _name(item: Any) -> str:
 
 def _allocation(item: Any) -> list[dict]:
     template = _get(_get(_get(item, "spec", {}), "template", {}), "spec", {})
-    return [{"name": _get(container, "name", ""),
-             "requests": _get(_get(container, "resources", {}), "requests", {}),
-             "limits": _get(_get(container, "resources", {}), "limits", {})}
-            for container in (_get(template, "containers", []) or [])]
+    return [
+        {
+            "name": _get(container, "name", ""),
+            "requests": _get(_get(container, "resources", {}), "requests", {}),
+            "limits": _get(_get(container, "resources", {}), "limits", {}),
+        }
+        for container in (_get(template, "containers", []) or [])
+    ]
 
 
 def _totals(deployments: list[Any]) -> dict:
-    totals = {section: {"cpu_millicores": 0.0, "memory_bytes": 0} for section in ("requests", "limits")}
+    totals = {
+        section: {"cpu_millicores": 0.0, "memory_bytes": 0}
+        for section in ("requests", "limits")
+    }
     for deployment in deployments:
         replicas = _get(_get(deployment, "spec", {}), "replicas", 0) or 0
         for container in _allocation(deployment):
-            for section in totals:
+            for section, section_totals in totals.items():
                 values = container[section]
                 if values.get("cpu") is not None:
-                    totals[section]["cpu_millicores"] += replicas * parse_cpu(values["cpu"])
+                    section_totals["cpu_millicores"] += replicas * parse_cpu(
+                        values["cpu"]
+                    )
                 if values.get("memory") is not None:
-                    totals[section]["memory_bytes"] += replicas * parse_memory(values["memory"])
-    for section in totals:
-        totals[section]["cpu_millicores"] = round(totals[section]["cpu_millicores"], 3)
+                    section_totals["memory_bytes"] += replicas * parse_memory(
+                        values["memory"]
+                    )
+    for section, section_totals in totals.items():
+        section_totals["cpu_millicores"] = round(section_totals["cpu_millicores"], 3)
     return totals
 
 
@@ -59,9 +84,12 @@ def _quota_comparisons(quotas: list[Any], declared: dict) -> list[dict]:
             except (TypeError, ValueError):
                 continue
             allocated = declared[section][unit]
-            resources[resource] = {"declared": allocated, "hard": limit,
-                                   "remaining": max(0, round(limit - allocated, 3)),
-                                   "state": "within" if allocated <= limit else "exceeded"}
+            resources[resource] = {
+                "declared": allocated,
+                "hard": limit,
+                "remaining": max(0, round(limit - allocated, 3)),
+                "state": "within" if allocated <= limit else "exceeded",
+            }
         comparisons.append({"name": _name(quota), "resources": resources})
     return comparisons
 
@@ -75,11 +103,19 @@ def _public_endpoints(ingresses: list[Any]) -> list[dict]:
     """
     endpoints = []
     for ingress in ingresses:
-        for rule in (_get(_get(ingress, "spec", {}), "rules", []) or []):
+        for rule in _get(_get(ingress, "spec", {}), "rules", []) or []:
             host = _get(rule, "host")
             if host:
-                endpoints.append({"route": _name(ingress), "url": "https://" + host,
-                                  "tls": {"state": "unknown", "reason": "EdgeCertificateNotObserved"}})
+                endpoints.append(
+                    {
+                        "route": _name(ingress),
+                        "url": "https://" + host,
+                        "tls": {
+                            "state": "unknown",
+                            "reason": "EdgeCertificateNotObserved",
+                        },
+                    }
+                )
     return endpoints
 
 
@@ -94,43 +130,88 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
         services = _items(runtime, "v1", "Service", namespace)
         ingresses = _items(runtime, "networking.k8s.io/v1", "Ingress", namespace)
         shared = _items(runtime, "networking.k8s.io/v1", "Ingress", "platform-access")
-        ingresses += [i for i in shared if _get(_get(_get(i, "metadata", {}), "labels", {}), "platform.example/project") == project]
+        ingresses += [
+            i
+            for i in shared
+            if _get(
+                _get(_get(i, "metadata", {}), "labels", {}), "platform.example/project"
+            )
+            == project
+        ]
         quotas = _items(runtime, "v1", "ResourceQuota", namespace)
         limits = _items(runtime, "v1", "LimitRange", namespace)
     except Exception as exc:
-        log.error("Project inventory query failed project=%s error_type=%s", project, type(exc).__name__)
+        log.error(
+            "Project inventory query failed project=%s error_type=%s",
+            project,
+            type(exc).__name__,
+        )
         return {"state": "unavailable", "reason": "KubernetesApiUnavailable"}
     declared = _totals(deployments)
-    return {"state": "ok", "reason": None, "namespace": namespace,
-            "deployments": [{"name": _name(item), "replicas": _get(_get(item, "spec", {}), "replicas", 0),
-                              "ready_replicas": _get(_get(item, "status", {}), "ready_replicas", 0),
-                              "containers": _allocation(item)}
-                            for item in deployments],
-            "declared_totals": declared,
-            "instances": [{"name": _name(item), "phase": _get(_get(item, "status", {}), "phase", "Unknown")}
-                          for item in pods],
-            "services": [_name(item) for item in services],
-            "routes": [_name(item) for item in ingresses],
-            "public_endpoints": _public_endpoints(ingresses),
-            "quotas": [{"name": _name(item), "hard": _get(_get(item, "status", {}), "hard", {})} for item in quotas],
-            "quota_comparisons": _quota_comparisons(quotas, declared),
-            "limit_ranges": [_name(item) for item in limits],
-            "data_services": []}
+    return {
+        "state": "ok",
+        "reason": None,
+        "namespace": namespace,
+        "deployments": [
+            {
+                "name": _name(item),
+                "replicas": _get(_get(item, "spec", {}), "replicas", 0),
+                "ready_replicas": _get(_get(item, "status", {}), "ready_replicas", 0),
+                "containers": _allocation(item),
+            }
+            for item in deployments
+        ],
+        "declared_totals": declared,
+        "instances": [
+            {
+                "name": _name(item),
+                "phase": _get(_get(item, "status", {}), "phase", "Unknown"),
+            }
+            for item in pods
+        ],
+        "services": [_name(item) for item in services],
+        "routes": [_name(item) for item in ingresses],
+        "public_endpoints": _public_endpoints(ingresses),
+        "quotas": [
+            {"name": _name(item), "hard": _get(_get(item, "status", {}), "hard", {})}
+            for item in quotas
+        ],
+        "quota_comparisons": _quota_comparisons(quotas, declared),
+        "limit_ranges": [_name(item) for item in limits],
+        "data_services": [],
+    }
 
 
 def observe_cluster_capacity(runtime: Any, log) -> dict:
     """Expose allocatable Kubernetes capacity; provider failure is explicit."""
     if runtime is None:
-        return {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []}
+        return {
+            "state": "unavailable",
+            "reason": "KubernetesApiUnavailable",
+            "nodes": [],
+        }
     try:
         nodes = _items(runtime, "v1", "Node", "")
         metrics = _items(runtime, "metrics.k8s.io/v1beta1", "NodeMetrics", "")
     except Exception as exc:
         log.error("Capacity query failed error_type=%s", type(exc).__name__)
-        return {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []}
+        return {
+            "state": "unavailable",
+            "reason": "KubernetesApiUnavailable",
+            "nodes": [],
+        }
     by_name = {_name(metric): _get(metric, "usage", {}) for metric in metrics}
-    return {"state": "ok", "reason": None, "nodes": [
-        {"name": _name(node), "capacity": _get(_get(node, "status", {}), "capacity", {}),
-         "allocatable": _get(_get(node, "status", {}), "allocatable", {}),
-         "usage": by_name.get(_name(node)), "usage_state": "ok" if _name(node) in by_name else "missing"}
-        for node in nodes]}
+    return {
+        "state": "ok",
+        "reason": None,
+        "nodes": [
+            {
+                "name": _name(node),
+                "capacity": _get(_get(node, "status", {}), "capacity", {}),
+                "allocatable": _get(_get(node, "status", {}), "allocatable", {}),
+                "usage": by_name.get(_name(node)),
+                "usage_state": "ok" if _name(node) in by_name else "missing",
+            }
+            for node in nodes
+        ],
+    }

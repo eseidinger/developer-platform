@@ -1,10 +1,10 @@
 """Stable catalog identities and immutable desired-application revisions."""
+
 import os
 from typing import Any
 from uuid import UUID
 
 from psycopg.types.json import Jsonb
-
 
 DEFAULT_ENVIRONMENT = "default"
 DEFAULT_REVISION_RETENTION = 25
@@ -18,7 +18,12 @@ def component_view(spec: dict[str, Any]) -> list[dict[str, Any]]:
     image = spec.get("resolved_image", spec.get("image"))
     if image is None:
         return []
-    service = {"name": LEGACY_COMPONENT_NAME, "type": "service", "image": image, "legacy": True}
+    service = {
+        "name": LEGACY_COMPONENT_NAME,
+        "type": "service",
+        "image": image,
+        "legacy": True,
+    }
     if spec.get("port") is not None:
         service["ports"] = [{"name": "http", "port": spec["port"]}]
     return [service]
@@ -27,10 +32,16 @@ def component_view(spec: dict[str, Any]) -> list[dict[str, Any]]:
 def initialize(conn) -> None:
     with conn.transaction():
         conn.execute("ALTER TABLE projects ADD COLUMN IF NOT EXISTS project_id UUID")
-        conn.execute("UPDATE projects SET project_id=gen_random_uuid() WHERE project_id IS NULL")
-        conn.execute("ALTER TABLE projects ALTER COLUMN project_id SET DEFAULT gen_random_uuid()")
+        conn.execute(
+            "UPDATE projects SET project_id=gen_random_uuid() WHERE project_id IS NULL"
+        )
+        conn.execute(
+            "ALTER TABLE projects ALTER COLUMN project_id SET DEFAULT gen_random_uuid()"
+        )
         conn.execute("ALTER TABLE projects ALTER COLUMN project_id SET NOT NULL")
-        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS projects_project_id_idx ON projects(project_id)")
+        conn.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS projects_project_id_idx ON projects(project_id)"
+        )
         conn.execute("""CREATE TABLE IF NOT EXISTS project_environments (
             environment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
             project_id UUID NOT NULL REFERENCES projects(project_id) ON DELETE RESTRICT,
@@ -74,14 +85,24 @@ def initialize(conn) -> None:
             FOREIGN KEY(application_id, revision)
                 REFERENCES application_revisions(application_id, revision) ON DELETE RESTRICT
         )""")
-        conn.execute("ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS actor_issuer TEXT")
-        conn.execute("ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS actor_subject TEXT")
-        conn.execute("ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS origin_traceparent TEXT")
+        conn.execute(
+            "ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS actor_issuer TEXT"
+        )
+        conn.execute(
+            "ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS actor_subject TEXT"
+        )
+        conn.execute(
+            "ALTER TABLE application_operations ADD COLUMN IF NOT EXISTS origin_traceparent TEXT"
+        )
         conn.execute("""UPDATE application_operations
             SET actor_issuer=COALESCE(actor_issuer, ''), actor_subject=COALESCE(actor_subject, '')
             WHERE actor_issuer IS NULL OR actor_subject IS NULL""")
-        conn.execute("ALTER TABLE application_operations ALTER COLUMN actor_issuer SET NOT NULL")
-        conn.execute("ALTER TABLE application_operations ALTER COLUMN actor_subject SET NOT NULL")
+        conn.execute(
+            "ALTER TABLE application_operations ALTER COLUMN actor_issuer SET NOT NULL"
+        )
+        conn.execute(
+            "ALTER TABLE application_operations ALTER COLUMN actor_subject SET NOT NULL"
+        )
         conn.execute("""CREATE TABLE IF NOT EXISTS project_retirements (
             project_id UUID PRIMARY KEY REFERENCES projects(project_id) ON DELETE RESTRICT,
             retired_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -90,15 +111,21 @@ def initialize(conn) -> None:
         conn.execute("""CREATE INDEX IF NOT EXISTS application_operations_pending_idx
             ON application_operations(state, created_at)
             WHERE state IN ('queued', 'running')""")
-        conn.execute("""INSERT INTO project_environments(project_id, name)
+        conn.execute(
+            """INSERT INTO project_environments(project_id, name)
             SELECT project_id, %s FROM projects
-            ON CONFLICT(project_id, name) DO NOTHING""", (DEFAULT_ENVIRONMENT,))
-        conn.execute("""INSERT INTO project_applications(environment_id, name)
+            ON CONFLICT(project_id, name) DO NOTHING""",
+            (DEFAULT_ENVIRONMENT,),
+        )
+        conn.execute(
+            """INSERT INTO project_applications(environment_id, name)
             SELECT e.environment_id, p.name
             FROM project_environments e
             JOIN projects p ON p.project_id=e.project_id
             WHERE e.name=%s
-            ON CONFLICT(environment_id, name) DO NOTHING""", (DEFAULT_ENVIRONMENT,))
+            ON CONFLICT(environment_id, name) DO NOTHING""",
+            (DEFAULT_ENVIRONMENT,),
+        )
         conn.execute("""INSERT INTO application_revisions(application_id, revision, spec)
             SELECT a.application_id, 1, p.spec
             FROM project_applications a
@@ -108,37 +135,52 @@ def initialize(conn) -> None:
             ON CONFLICT(application_id, revision) DO NOTHING""")
 
 
-def ensure_default_application(conn, project_id: UUID, name: str,
-                               spec: dict[str, Any]) -> tuple[UUID, int]:
-    environment = conn.execute("""INSERT INTO project_environments(project_id, name)
+def ensure_default_application(
+    conn, project_id: UUID, name: str, spec: dict[str, Any]
+) -> tuple[UUID, int]:
+    environment = conn.execute(
+        """INSERT INTO project_environments(project_id, name)
         VALUES (%s, %s)
         ON CONFLICT(project_id, name) DO UPDATE SET name=excluded.name
-        RETURNING environment_id""", (project_id, DEFAULT_ENVIRONMENT)).fetchone()
+        RETURNING environment_id""",
+        (project_id, DEFAULT_ENVIRONMENT),
+    ).fetchone()
     if environment is None:
         raise RuntimeError("Could not resolve the default environment")
 
-    application = conn.execute("""INSERT INTO project_applications(environment_id, name)
+    application = conn.execute(
+        """INSERT INTO project_applications(environment_id, name)
         VALUES (%s, %s)
         ON CONFLICT(environment_id, name) DO UPDATE SET name=excluded.name
-        RETURNING application_id""", (environment[0], name)).fetchone()
+        RETURNING application_id""",
+        (environment[0], name),
+    ).fetchone()
     if application is None:
         raise RuntimeError("Could not resolve the default application")
 
-    latest = conn.execute("""SELECT revision, spec FROM application_revisions
-        WHERE application_id=%s ORDER BY revision DESC LIMIT 1""", (application[0],)).fetchone()
+    latest = conn.execute(
+        """SELECT revision, spec FROM application_revisions
+        WHERE application_id=%s ORDER BY revision DESC LIMIT 1""",
+        (application[0],),
+    ).fetchone()
     if latest is not None and latest[1] == spec:
         return application[0], latest[0]
 
     revision = 1 if latest is None else latest[0] + 1
-    conn.execute("""INSERT INTO application_revisions(application_id, revision, spec)
-        VALUES (%s, %s, %s)""", (application[0], revision, Jsonb(spec)))
+    conn.execute(
+        """INSERT INTO application_revisions(application_id, revision, spec)
+        VALUES (%s, %s, %s)""",
+        (application[0], revision, Jsonb(spec)),
+    )
     prune_revisions(conn, application[0], revision, revision_retention())
     return application[0], revision
 
 
 def revision_retention() -> int:
     try:
-        return max(1, int(os.environ.get("REVISION_RETENTION", DEFAULT_REVISION_RETENTION)))
+        return max(
+            1, int(os.environ.get("REVISION_RETENTION", DEFAULT_REVISION_RETENTION))
+        )
     except ValueError:
         return DEFAULT_REVISION_RETENTION
 
@@ -152,16 +194,20 @@ def prune_revisions(conn, application_id: UUID, latest: int, keep: int) -> None:
     cutoff = latest - keep
     if cutoff < 1:
         return
-    conn.execute("""DELETE FROM application_operations
+    conn.execute(
+        """DELETE FROM application_operations
         WHERE application_id=%s AND revision<=%s
         AND revision NOT IN (SELECT revision FROM application_operations
             WHERE application_id=%s AND state IN ('queued', 'running'))
         AND operation_id IS DISTINCT FROM (SELECT operation_id FROM application_operations
             WHERE application_id=%s AND operation_kind='restart' AND state='succeeded'
             ORDER BY completed_at DESC LIMIT 1)""",
-        (application_id, cutoff, application_id, application_id))
-    conn.execute("""DELETE FROM application_revisions r
+        (application_id, cutoff, application_id, application_id),
+    )
+    conn.execute(
+        """DELETE FROM application_revisions r
         WHERE r.application_id=%s AND r.revision<=%s
         AND NOT EXISTS (SELECT 1 FROM application_operations o
             WHERE o.application_id=r.application_id AND o.revision=r.revision)""",
-        (application_id, cutoff))
+        (application_id, cutoff),
+    )

@@ -1,17 +1,19 @@
 """Publish bounded, non-secret security-event metrics from durable audit records."""
+
 import time
 from pathlib import Path
 
 from .audit import audit_reader_connect
 from .monitoring import atomic_write
 
-
 WINDOW_SECONDS = 15 * 60
 MAX_SERIES = 200
 
 
 def _escape(value) -> str:
-    return str(value or "").replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+    return (
+        str(value or "").replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
+    )
 
 
 def _labels(**values) -> str:
@@ -20,7 +22,8 @@ def _labels(**values) -> str:
 
 def security_event_rows(conn):
     """Return recent security evidence grouped by stable affected-resource labels."""
-    return conn.execute("""WITH categorized AS (
+    return conn.execute(
+        """WITH categorized AS (
             SELECT id, occurred_at, target_kind, target_id,
                    COALESCE(scope->>'project', '') AS project,
                    CASE
@@ -37,7 +40,9 @@ def security_event_rows(conn):
         WHERE category IS NOT NULL
         GROUP BY category, target_kind, target_id, project
         ORDER BY max(occurred_at) DESC
-        LIMIT %s""", (WINDOW_SECONDS, MAX_SERIES)).fetchall()
+        LIMIT %s""",
+        (WINDOW_SECONDS, MAX_SERIES),
+    ).fetchall()
 
 
 def render(rows, now=None) -> str:
@@ -51,15 +56,24 @@ def render(rows, now=None) -> str:
         "# TYPE platform_security_latest_event_timestamp_seconds gauge",
     ]
     for category, target_kind, target_id, project, count, event_id, occurred_at in rows:
-        labels = _labels(category=category, target_kind=target_kind, target_id=target_id, project=project)
+        labels = _labels(
+            category=category,
+            target_kind=target_kind,
+            target_id=target_id,
+            project=project,
+        )
         lines.append(f"platform_security_events_in_window{{{labels}}} {count}")
         lines.append(f"platform_security_latest_event_id{{{labels}}} {event_id}")
-        lines.append(f"platform_security_latest_event_timestamp_seconds{{{labels}}} {occurred_at}")
-    lines.extend([
-        "# HELP platform_security_audit_collection_success Timestamp of the latest successful security-audit collection.",
-        "# TYPE platform_security_audit_collection_success gauge",
-        f"platform_security_audit_collection_success {int(time.time() if now is None else now)}",
-    ])
+        lines.append(
+            f"platform_security_latest_event_timestamp_seconds{{{labels}}} {occurred_at}"
+        )
+    lines.extend(
+        [
+            "# HELP platform_security_audit_collection_success Timestamp of the latest successful security-audit collection.",
+            "# TYPE platform_security_audit_collection_success gauge",
+            f"platform_security_audit_collection_success {int(time.time() if now is None else now)}",
+        ]
+    )
     return "\n".join(lines) + "\n"
 
 
@@ -77,5 +91,7 @@ def security_alert_loop(stop, directory: str, log) -> None:
             publish(directory)
         except Exception:
             # Audit data and database errors can contain sensitive context.
-            log.error("Security audit metric collection failed; retaining previous metrics")
+            log.error(
+                "Security audit metric collection failed; retaining previous metrics"
+            )
         stop.wait(30)

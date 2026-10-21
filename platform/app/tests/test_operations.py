@@ -7,21 +7,39 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from app.identity import Principal
-from app.operations import process_one, _with_telemetry
+from app.operations import _with_telemetry, process_one
 
 
 class TelemetryMetadataTests(unittest.TestCase):
-    def test_deployment_and_scheduled_pods_carry_derived_context_without_mutating_inputs(self):
+    def test_deployment_and_scheduled_pods_carry_derived_context_without_mutating_inputs(
+        self,
+    ):
         for kind in ("Deployment", "CronJob"):
             template = {"metadata": {"annotations": {"existing": "value"}}, "spec": {}}
-            spec = {"template": template} if kind == "Deployment" else {"jobTemplate": {"spec": {"template": template}}}
+            spec = (
+                {"template": template}
+                if kind == "Deployment"
+                else {"jobTemplate": {"spec": {"template": template}}}
+            )
             manifest = {"kind": kind, "spec": spec}
             marked = _with_telemetry(manifest, 3, "operation-123")
-            pod = marked["spec"]["template"] if kind == "Deployment" else marked["spec"]["jobTemplate"]["spec"]["template"]
-            self.assertEqual(pod["metadata"]["annotations"], {"existing": "value", "platform.example/revision": "3",
-                                                            "platform.example/operation-id": "operation-123"})
+            pod = (
+                marked["spec"]["template"]
+                if kind == "Deployment"
+                else marked["spec"]["jobTemplate"]["spec"]["template"]
+            )
+            self.assertEqual(
+                pod["metadata"]["annotations"],
+                {
+                    "existing": "value",
+                    "platform.example/revision": "3",
+                    "platform.example/operation-id": "operation-123",
+                },
+            )
             self.assertEqual(template["metadata"]["annotations"], {"existing": "value"})
-        self.assertEqual(_with_telemetry({"kind": "Service"}, 3, "id"), {"kind": "Service"})
+        self.assertEqual(
+            _with_telemetry({"kind": "Service"}, 3, "id"), {"kind": "Service"}
+        )
 
 
 class OperationConnection:
@@ -36,7 +54,12 @@ class OperationConnection:
         self.operation_kind = "deploy"
         self.state = state
         self.current_revision = current_revision
-        self.spec = {"name": "smoke", "image": "example:v1", "port": 8080, "probe_profile": "status"}
+        self.spec = {
+            "name": "smoke",
+            "image": "example:v1",
+            "port": 8080,
+            "probe_profile": "status",
+        }
         self.envelope = {
             "project_id": self.project_id,
             "application_id": self.application_id,
@@ -65,15 +88,28 @@ class OperationConnection:
     def execute(self, query, params=()):
         self.events.append(query)
         if query.startswith("SELECT operation_id FROM application_operations"):
-            self.result = [(self.operation_id,)] if self.state in {"queued", "running"} else []
+            self.result = (
+                [(self.operation_id,)] if self.state in {"queued", "running"} else []
+            )
         elif query.startswith("SELECT pg_try_advisory_lock"):
             self.result = [(True,)]
         elif query.startswith("SELECT o.operation_id"):
-            self.result = [(
-                self.operation_id, self.application_id, self.revision, self.operation_kind,
-                self.state, 1, self.envelope, self.actor_issuer, self.actor_subject,
-                self.project_id, self.project_name, self.project_status,
-            )]
+            self.result = [
+                (
+                    self.operation_id,
+                    self.application_id,
+                    self.revision,
+                    self.operation_kind,
+                    self.state,
+                    1,
+                    self.envelope,
+                    self.actor_issuer,
+                    self.actor_subject,
+                    self.project_id,
+                    self.project_name,
+                    self.project_status,
+                )
+            ]
         elif query.startswith("UPDATE application_operations SET state='running'"):
             self.state = "running"
             self.attempt_count += 1
@@ -82,7 +118,9 @@ class OperationConnection:
         elif query.startswith("SELECT revision, spec FROM application_revisions"):
             self.result = [(self.current_revision, self.spec)]
         elif query.startswith("SELECT spec FROM application_revisions"):
-            self.result = [(self.previous_spec,)] if self.previous_spec is not None else []
+            self.result = (
+                [(self.previous_spec,)] if self.previous_spec is not None else []
+            )
         elif query.startswith("UPDATE projects SET status='failed'"):
             self.project_status = "failed"
         elif query.startswith("UPDATE projects SET status='applied'"):
@@ -114,10 +152,13 @@ class OperationWorkerFixture(unittest.TestCase):
         self.resources = Mock(return_value=[self.secret(), self.deployment()])
         self.publish_catalog = Mock()
         self.log = Mock()
-        self.environment = patch.dict(os.environ, {
-            "APPS_DOMAIN": "apps.localhost",
-            "POSTGRES_IP": "172.30.80.10",
-        })
+        self.environment = patch.dict(
+            os.environ,
+            {
+                "APPS_DOMAIN": "apps.localhost",
+                "POSTGRES_IP": "172.30.80.10",
+            },
+        )
         self.environment.start()
         self.addCleanup(self.environment.stop)
         self.authorization = patch("app.operations.is_allowed", return_value=True)
@@ -133,90 +174,202 @@ class OperationWorkerFixture(unittest.TestCase):
 
     @staticmethod
     def deployment():
-        return {"kind": "Deployment", "metadata": {"name": "smoke"},
-                "spec": {"template": {"metadata": {"labels": {"app": "smoke"}}}}}
+        return {
+            "kind": "Deployment",
+            "metadata": {"name": "smoke"},
+            "spec": {"template": {"metadata": {"labels": {"app": "smoke"}}}},
+        }
 
     @staticmethod
     def marker(manifest):
-        return manifest["spec"]["template"]["metadata"].get("annotations", {}).get(
-            "platform.example/restarted-by")
+        return (
+            manifest["spec"]["template"]["metadata"]
+            .get("annotations", {})
+            .get("platform.example/restarted-by")
+        )
 
     def run_one(self):
         return process_one(
-            self.connect, lambda name: "derived-password", self.provision_database,
-            self.apply, self.resources, self.publish_catalog, self.log, self.remove,
+            self.connect,
+            lambda name: "derived-password",
+            self.provision_database,
+            self.apply,
+            self.resources,
+            self.publish_catalog,
+            self.log,
+            self.remove,
         )
 
 
 class OperationWorkerTests(OperationWorkerFixture):
-    def test_component_revision_uses_component_manifests_and_applies_each_workload(self):
+    def test_component_revision_uses_component_manifests_and_applies_each_workload(
+        self,
+    ):
         self.conn.spec = {
-            "name": "smoke", "components": [
-                {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
-                 "ports": [{"name": "http", "port": 8080}]},
-                {"name": "worker", "type": "scheduled", "resolved_image": "example/worker@sha256:" + "b" * 64,
-                 "schedule": "*/15 * * * *", "time_zone": "UTC", "concurrency_policy": "Forbid"},
+            "name": "smoke",
+            "components": [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "example/api@sha256:" + "a" * 64,
+                    "ports": [{"name": "http", "port": 8080}],
+                },
+                {
+                    "name": "worker",
+                    "type": "scheduled",
+                    "resolved_image": "example/worker@sha256:" + "b" * 64,
+                    "schedule": "*/15 * * * *",
+                    "time_zone": "UTC",
+                    "concurrency_policy": "Forbid",
+                },
             ],
         }
         self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
-        generated = [self.secret(), self.deployment(), {"kind": "CronJob", "metadata": {"name": "worker"},
-                     "spec": {"jobTemplate": {"spec": {"template": {"metadata": {}}}}}}]
-        with patch("app.operations.component_resources", return_value=generated) as build:
+        generated = [
+            self.secret(),
+            self.deployment(),
+            {
+                "kind": "CronJob",
+                "metadata": {"name": "worker"},
+                "spec": {"jobTemplate": {"spec": {"template": {"metadata": {}}}}},
+            },
+        ]
+        with patch(
+            "app.operations.component_resources", return_value=generated
+        ) as build:
             self.assertTrue(self.run_one())
 
-        build.assert_called_once_with("smoke", self.conn.spec["components"], "172.30.80.10",
-                                      "derived-password", None, "apps.localhost")
+        build.assert_called_once_with(
+            "smoke",
+            self.conn.spec["components"],
+            "172.30.80.10",
+            "derived-password",
+            None,
+            "apps.localhost",
+        )
         self.resources.assert_not_called()
-        self.assertEqual([call.args[0]["kind"] for call in self.apply.call_args_list],
-                         ["Secret", "Deployment", "CronJob"])
+        self.assertEqual(
+            [call.args[0]["kind"] for call in self.apply.call_args_list],
+            ["Secret", "Deployment", "CronJob"],
+        )
         self.assertEqual(self.conn.state, "succeeded")
 
     def test_component_reconciliation_removes_only_obsolete_workloads(self):
-        self.conn.spec = {"name": "smoke", "components": [
-            {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
-             "ports": [{"name": "http", "port": 8080}]}]}
-        self.conn.previous_spec = {"name": "smoke", "components": [
-            {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
-             "ports": [{"name": "http", "port": 8080}]},
-            {"name": "worker", "type": "scheduled", "resolved_image": "example/worker@sha256:" + "b" * 64,
-             "schedule": "*/15 * * * *"}]}
+        self.conn.spec = {
+            "name": "smoke",
+            "components": [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "example/api@sha256:" + "a" * 64,
+                    "ports": [{"name": "http", "port": 8080}],
+                }
+            ],
+        }
+        self.conn.previous_spec = {
+            "name": "smoke",
+            "components": [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "example/api@sha256:" + "a" * 64,
+                    "ports": [{"name": "http", "port": 8080}],
+                },
+                {
+                    "name": "worker",
+                    "type": "scheduled",
+                    "resolved_image": "example/worker@sha256:" + "b" * 64,
+                    "schedule": "*/15 * * * *",
+                },
+            ],
+        }
         self.conn.envelope = {**self.conn.envelope, "spec": self.conn.spec}
-        desired = [{"apiVersion": "v1", **self.secret()}, {"apiVersion": "apps/v1", **self.deployment()}]
-        obsolete = [{"apiVersion": "v1", **self.secret()}, {"apiVersion": "apps/v1", **self.deployment()},
-                    {"apiVersion": "batch/v1", "kind": "CronJob",
-                     "metadata": {"name": "worker", "namespace": "project-smoke"}},
-                    {"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
-                     "metadata": {"name": "api-public", "namespace": "project-smoke"}},
-                    {"apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
-                     "metadata": {"name": "api-egress", "namespace": "project-smoke"}}]
-        with patch("app.operations.component_resources", side_effect=[desired, obsolete]):
+        desired = [
+            {"apiVersion": "v1", **self.secret()},
+            {"apiVersion": "apps/v1", **self.deployment()},
+        ]
+        obsolete = [
+            {"apiVersion": "v1", **self.secret()},
+            {"apiVersion": "apps/v1", **self.deployment()},
+            {
+                "apiVersion": "batch/v1",
+                "kind": "CronJob",
+                "metadata": {"name": "worker", "namespace": "project-smoke"},
+            },
+            {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "Ingress",
+                "metadata": {"name": "api-public", "namespace": "project-smoke"},
+            },
+            {
+                "apiVersion": "networking.k8s.io/v1",
+                "kind": "NetworkPolicy",
+                "metadata": {"name": "api-egress", "namespace": "project-smoke"},
+            },
+        ]
+        with patch(
+            "app.operations.component_resources", side_effect=[desired, obsolete]
+        ):
             self.assertTrue(self.run_one())
 
-        self.assertEqual([call.args[0] for call in self.remove.call_args_list], obsolete[2:])
-        self.assertEqual([call.args[0]["kind"] for call in self.apply.call_args_list], ["Secret", "Deployment"])
+        self.assertEqual(
+            [call.args[0] for call in self.remove.call_args_list], obsolete[2:]
+        )
+        self.assertEqual(
+            [call.args[0]["kind"] for call in self.apply.call_args_list],
+            ["Secret", "Deployment"],
+        )
         self.assertEqual(self.conn.state, "succeeded")
 
     def test_rollback_to_legacy_removes_component_workloads_before_legacy_apply(self):
-        self.conn.previous_spec = {"name": "smoke", "components": [
-            {"name": "api", "type": "service", "resolved_image": "example/api@sha256:" + "a" * 64,
-             "ports": [{"name": "http", "port": 8080}]},
-            {"name": "worker", "type": "scheduled", "resolved_image": "example/worker@sha256:" + "b" * 64,
-             "schedule": "*/15 * * * *"}]}
-        old = [{"apiVersion": "v1", **self.secret()},
-               {"apiVersion": "apps/v1", "kind": "Deployment", "metadata": {"name": "api"}},
-               {"apiVersion": "v1", "kind": "Service", "metadata": {"name": "api"}},
-               {"apiVersion": "batch/v1", "kind": "CronJob", "metadata": {"name": "worker"}}]
-        self.resources.return_value = [{"apiVersion": "v1", **self.secret()},
-                                       {"apiVersion": "apps/v1", **self.deployment()}]
+        self.conn.previous_spec = {
+            "name": "smoke",
+            "components": [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "example/api@sha256:" + "a" * 64,
+                    "ports": [{"name": "http", "port": 8080}],
+                },
+                {
+                    "name": "worker",
+                    "type": "scheduled",
+                    "resolved_image": "example/worker@sha256:" + "b" * 64,
+                    "schedule": "*/15 * * * *",
+                },
+            ],
+        }
+        old = [
+            {"apiVersion": "v1", **self.secret()},
+            {
+                "apiVersion": "apps/v1",
+                "kind": "Deployment",
+                "metadata": {"name": "api"},
+            },
+            {"apiVersion": "v1", "kind": "Service", "metadata": {"name": "api"}},
+            {
+                "apiVersion": "batch/v1",
+                "kind": "CronJob",
+                "metadata": {"name": "worker"},
+            },
+        ]
+        self.resources.return_value = [
+            {"apiVersion": "v1", **self.secret()},
+            {"apiVersion": "apps/v1", **self.deployment()},
+        ]
         with patch("app.operations.component_resources", return_value=old):
             self.assertTrue(self.run_one())
 
-        self.assertEqual([call.args[0]["kind"] for call in self.remove.call_args_list],
-                         ["Deployment", "Service", "CronJob"])
+        self.assertEqual(
+            [call.args[0]["kind"] for call in self.remove.call_args_list],
+            ["Deployment", "Service", "CronJob"],
+        )
         self.resources.assert_called_once()
         self.assertEqual(self.conn.state, "succeeded")
 
-    def test_deploys_the_resolved_digest_reference_and_falls_back_for_legacy_specs(self):
+    def test_deploys_the_resolved_digest_reference_and_falls_back_for_legacy_specs(
+        self,
+    ):
         digest_image = "example@sha256:" + "a" * 64
         for resolved, expected in ((digest_image, digest_image), (None, "example:v1")):
             with self.subTest(resolved=resolved):
@@ -230,7 +383,10 @@ class OperationWorkerTests(OperationWorkerFixture):
                 self.assertEqual(self.resources.call_args.args[1], expected)
 
     def test_deploys_requested_resources_and_defaults_for_legacy_specs(self):
-        wanted = {"requests": {"cpu": "250m", "memory": "128Mi"}, "limits": {"cpu": "1000m", "memory": "512Mi"}}
+        wanted = {
+            "requests": {"cpu": "250m", "memory": "128Mi"},
+            "limits": {"cpu": "1000m", "memory": "512Mi"},
+        }
         for resources, expected in ((wanted, wanted), (None, None)):
             with self.subTest(resources=resources):
                 self.conn = OperationConnection()
@@ -252,12 +408,20 @@ class OperationWorkerTests(OperationWorkerFixture):
         self.assertEqual(self.conn.project_status, "applied")
         self.assertEqual(self.conn.operation_result["status"], "applied")
         self.provision_database.assert_called_once_with(
-            self.conn, "smoke", "derived-password")
+            self.conn, "smoke", "derived-password"
+        )
         self.resources.assert_called_once()
-        self.assertEqual([call.args[0] for call in self.apply.call_args_list],
-                         [self.secret(), _with_telemetry(self.deployment(), 1, self.conn.operation_id)])
+        self.assertEqual(
+            [call.args[0] for call in self.apply.call_args_list],
+            [
+                self.secret(),
+                _with_telemetry(self.deployment(), 1, self.conn.operation_id),
+            ],
+        )
         self.publish_catalog.assert_called_once_with(self.conn)
-        self.assertEqual(self.audit_mock.call_args.kwargs["operation_id"], self.conn.operation_id)
+        self.assertEqual(
+            self.audit_mock.call_args.kwargs["operation_id"], self.conn.operation_id
+        )
 
     def test_current_grant_is_rechecked_before_provider_side_effects(self):
         with patch("app.operations.is_allowed", return_value=False):
@@ -269,8 +433,10 @@ class OperationWorkerTests(OperationWorkerFixture):
         self.provision_database.assert_not_called()
         self.apply.assert_not_called()
         self.assertEqual(self.audit_mock.call_args.args[4], "denied")
-        self.assertEqual(self.audit_mock.call_args.args[0].identifier, Principal(
-            self.conn.actor_issuer, self.conn.actor_subject).audit_id)
+        self.assertEqual(
+            self.audit_mock.call_args.args[0].identifier,
+            Principal(self.conn.actor_issuer, self.conn.actor_subject).audit_id,
+        )
 
     def test_stale_revision_is_rejected_without_applying_old_spec(self):
         self.conn.current_revision = 2
@@ -291,8 +457,14 @@ class OperationWorkerTests(OperationWorkerFixture):
         self.assertEqual(self.conn.error_code, "provider_error")
         self.assertEqual(self.conn.project_status, "failed")
         self.assertNotIn("sensitive provider detail", str(self.conn.operation_result))
-        self.assertEqual(self.conn.operation_result, {
-            "error_code": "provider_error", "step": "apply:Secret", "error_type": "RuntimeError"})
+        self.assertEqual(
+            self.conn.operation_result,
+            {
+                "error_code": "provider_error",
+                "step": "apply:Secret",
+                "error_type": "RuntimeError",
+            },
+        )
         self.assertEqual(self.audit_mock.call_args.args[6]["step"], "apply:Secret")
 
     def test_provider_trace_keeps_numeric_http_status_only(self):
@@ -315,7 +487,9 @@ class RestartOperationTests(OperationWorkerFixture):
         self.conn.operation_kind = "restart"
         self.conn.project_status = "applied"
 
-    def test_interrupted_restart_reapplies_only_the_deployment_with_its_operation_marker(self):
+    def test_interrupted_restart_reapplies_only_the_deployment_with_its_operation_marker(
+        self,
+    ):
         self.conn.state = "running"
 
         self.assertTrue(self.run_one())
@@ -325,11 +499,15 @@ class RestartOperationTests(OperationWorkerFixture):
         self.assertEqual(self.conn.operation_result["status"], "restarted")
         self.assertEqual(self.conn.project_status, "applied")
         self.apply.assert_called_once()
-        self.assertEqual(self.marker(self.apply.call_args.args[0]), self.conn.operation_id)
+        self.assertEqual(
+            self.marker(self.apply.call_args.args[0]), self.conn.operation_id
+        )
         self.provision_database.assert_not_called()
         self.publish_catalog.assert_not_called()
 
-    def test_restart_of_a_project_that_is_not_applied_is_rejected_without_provider_calls(self):
+    def test_restart_of_a_project_that_is_not_applied_is_rejected_without_provider_calls(
+        self,
+    ):
         self.conn.project_status = "failed"
 
         self.assertTrue(self.run_one())
@@ -339,7 +517,9 @@ class RestartOperationTests(OperationWorkerFixture):
         self.assertEqual(self.conn.project_status, "failed")
         self.apply.assert_not_called()
 
-    def test_later_deployment_keeps_the_latest_restart_marker_to_avoid_a_second_rollout(self):
+    def test_later_deployment_keeps_the_latest_restart_marker_to_avoid_a_second_rollout(
+        self,
+    ):
         self.conn.operation_kind = "deploy"
         self.conn.last_restart = "restart-operation-0"
 

@@ -1,4 +1,5 @@
 """Keycloak projection for platform-owned groups, browser clients and service identities."""
+
 import base64
 import hashlib
 import hmac
@@ -9,8 +10,13 @@ from .keycloak_credentials import ProviderError, _admin_token, _request
 
 
 def derived_secret(identifier, purpose):
-    return base64.urlsafe_b64encode(hmac.new(os.environ["DATABASE_KEY"].encode(),
-        ("hosted-access:" + purpose + ":" + identifier).encode(), hashlib.sha256).digest()).decode()
+    return base64.urlsafe_b64encode(
+        hmac.new(
+            os.environ["DATABASE_KEY"].encode(),
+            ("hosted-access:" + purpose + ":" + identifier).encode(),
+            hashlib.sha256,
+        ).digest()
+    ).decode()
 
 
 def audience(application_id):
@@ -26,8 +32,13 @@ class KeycloakAccessProvider:
     def call(self, path, method="GET", body=None, missing=False):
         if self.token is None:
             self.token = _admin_token()
-        return _request("/admin/realms/platform/" + path, method=method, body=body,
-                        token=self.token, allow_not_found=missing)[1]
+        return _request(
+            "/admin/realms/platform/" + path,
+            method=method,
+            body=body,
+            token=self.token,
+            allow_not_found=missing,
+        )[1]
 
     def find_client(self, client_id):
         rows = self.call("clients?" + urlencode({"clientId": client_id})) or []
@@ -47,24 +58,54 @@ class KeycloakAccessProvider:
         return found["id"]
 
     def group_mapper(self, resource_client):
-        return {"name": "platform application groups", "protocol": "openid-connect",
-            "protocolMapper": "oidc-usermodel-client-role-mapper", "consentRequired": False,
-            "config": {"usermodel.clientRoleMapping.clientId": resource_client,
-                "usermodel.clientRoleMapping.rolePrefix": "", "claim.name": "groups",
-                "jsonType.label": "String", "multivalued": "true", "id.token.claim": "true",
-                "access.token.claim": "true", "userinfo.token.claim": "true"}}
+        return {
+            "name": "platform application groups",
+            "protocol": "openid-connect",
+            "protocolMapper": "oidc-usermodel-client-role-mapper",
+            "consentRequired": False,
+            "config": {
+                "usermodel.clientRoleMapping.clientId": resource_client,
+                "usermodel.clientRoleMapping.rolePrefix": "",
+                "claim.name": "groups",
+                "jsonType.label": "String",
+                "multivalued": "true",
+                "id.token.claim": "true",
+                "access.token.claim": "true",
+                "userinfo.token.claim": "true",
+            },
+        }
 
     def mappers(self, resource_client):
-        return [self.group_mapper(resource_client), {"name": "platform target audience",
-            "protocol": "openid-connect", "protocolMapper": "oidc-audience-mapper",
-            "consentRequired": False, "config": {"included.client.audience": resource_client,
-                "access.token.claim": "true", "id.token.claim": "false"}}]
+        return [
+            self.group_mapper(resource_client),
+            {
+                "name": "platform target audience",
+                "protocol": "openid-connect",
+                "protocolMapper": "oidc-audience-mapper",
+                "consentRequired": False,
+                "config": {
+                    "included.client.audience": resource_client,
+                    "access.token.claim": "true",
+                    "id.token.claim": "false",
+                },
+            },
+        ]
 
     def resource(self, application_id):
-        return self.client({"clientId": audience(application_id), "enabled": True,
-            "protocol": "openid-connect", "publicClient": False, "bearerOnly": True,
-            "standardFlowEnabled": False, "directAccessGrantsEnabled": False,
-            "fullScopeAllowed": False, "defaultClientScopes": [], "optionalClientScopes": []})
+        return self.client(
+            {
+                "clientId": audience(application_id),
+                "enabled": True,
+                "protocol": "openid-connect",
+                "publicClient": False,
+                "bearerOnly": True,
+                "standardFlowEnabled": False,
+                "directAccessGrantsEnabled": False,
+                "fullScopeAllowed": False,
+                "defaultClientScopes": [],
+                "optionalClientScopes": [],
+            }
+        )
 
     def role(self, application_id, group_id):
         cid = self.resource(application_id)
@@ -79,17 +120,34 @@ class KeycloakAccessProvider:
         app_id = policy["spec"]["applicationId"]
         resource_id = self.resource(app_id)
         client_id = "browser-" + policy["id"]
-        cid = self.client({"clientId": client_id, "enabled": True, "protocol": "openid-connect",
-            "publicClient": False, "secret": derived_secret(policy["id"], "browser"),
-            "standardFlowEnabled": True, "directAccessGrantsEnabled": False,
-            "serviceAccountsEnabled": False, "fullScopeAllowed": False,
-            "redirectUris": ["https://" + host + "/oauth2/callback"], "webOrigins": ["https://" + host],
-            "defaultClientScopes": ["basic", "profile", "email"], "optionalClientScopes": [],
-            "attributes": {"pkce.code.challenge.method": "S256", "access.token.lifespan": "300",
-                "client.session.idle.timeout": "1800", "client.session.max.lifespan": "28800"},
-            "protocolMappers": self.mappers(audience(app_id))})
+        cid = self.client(
+            {
+                "clientId": client_id,
+                "enabled": True,
+                "protocol": "openid-connect",
+                "publicClient": False,
+                "secret": derived_secret(policy["id"], "browser"),
+                "standardFlowEnabled": True,
+                "directAccessGrantsEnabled": False,
+                "serviceAccountsEnabled": False,
+                "fullScopeAllowed": False,
+                "redirectUris": ["https://" + host + "/oauth2/callback"],
+                "webOrigins": ["https://" + host],
+                "defaultClientScopes": ["basic", "profile", "email"],
+                "optionalClientScopes": [],
+                "attributes": {
+                    "pkce.code.challenge.method": "S256",
+                    "access.token.lifespan": "300",
+                    "client.session.idle.timeout": "1800",
+                    "client.session.max.lifespan": "28800",
+                },
+                "protocolMappers": self.mappers(audience(app_id)),
+            }
+        )
         roles = [self.role(app_id, gid)[1] for gid in groups]
-        self.call("clients/" + cid + "/scope-mappings/clients/" + resource_id, "POST", roles)
+        self.call(
+            "clients/" + cid + "/scope-mappings/clients/" + resource_id, "POST", roles
+        )
         return client_id
 
     def service(self, policy, credential_id, groups):
@@ -97,16 +155,30 @@ class KeycloakAccessProvider:
         resource_id = self.resource(app_id)
         client_id = "service-" + credential_id
         secret = derived_secret(credential_id, "machine")
-        cid = self.client({"clientId": client_id, "enabled": True, "protocol": "openid-connect",
-            "publicClient": False, "secret": secret, "serviceAccountsEnabled": True,
-            "standardFlowEnabled": False, "directAccessGrantsEnabled": False,
-            "fullScopeAllowed": False, "defaultClientScopes": [], "optionalClientScopes": [],
-            "attributes": {"access.token.lifespan": "300"}, "protocolMappers": self.mappers(audience(app_id))})
+        cid = self.client(
+            {
+                "clientId": client_id,
+                "enabled": True,
+                "protocol": "openid-connect",
+                "publicClient": False,
+                "secret": secret,
+                "serviceAccountsEnabled": True,
+                "standardFlowEnabled": False,
+                "directAccessGrantsEnabled": False,
+                "fullScopeAllowed": False,
+                "defaultClientScopes": [],
+                "optionalClientScopes": [],
+                "attributes": {"access.token.lifespan": "300"},
+                "protocolMappers": self.mappers(audience(app_id)),
+            }
+        )
         user = self.call("clients/" + cid + "/service-account-user")
         if not user or not user.get("id"):
             raise ProviderError("Missing service principal")
         roles = [self.role(app_id, gid)[1] for gid in groups]
-        self.call("clients/" + cid + "/scope-mappings/clients/" + resource_id, "POST", roles)
+        self.call(
+            "clients/" + cid + "/scope-mappings/clients/" + resource_id, "POST", roles
+        )
         self.set_membership(app_id, user["id"], groups)
         return {"clientId": client_id, "subject": user["id"], "secret": secret}
 
@@ -133,4 +205,8 @@ class KeycloakAccessProvider:
     def delete_role(self, application_id, group_id):
         found = self.find_client(audience(application_id))
         if found:
-            self.call("clients/" + found["id"] + "/roles/" + quote(group_id, safe=""), "DELETE", missing=True)
+            self.call(
+                "clients/" + found["id"] + "/roles/" + quote(group_id, safe=""),
+                "DELETE",
+                missing=True,
+            )

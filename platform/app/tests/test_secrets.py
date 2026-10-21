@@ -16,8 +16,10 @@ class FakeCluster:
     def __init__(self):
         self.secrets = {}
         self.version = 0
-        self.deployment = {"spec": {"replicas": 1, "template": {"metadata": {}}},
-                           "status": {"updatedReplicas": 1, "readyReplicas": 1, "replicas": 1}}
+        self.deployment = {
+            "spec": {"replicas": 1, "template": {"metadata": {}}},
+            "status": {"updatedReplicas": 1, "readyReplicas": 1, "replicas": 1},
+        }
         self.patches = []
         self.resources = Mock()
 
@@ -44,7 +46,10 @@ class FakeCluster:
 
         def create(body, namespace):
             data = {**body.get("data", {}), **body.get("stringData", {})}
-            self.secrets[body["metadata"]["name"]] = {"metadata": body["metadata"], "data": data}
+            self.secrets[body["metadata"]["name"]] = {
+                "metadata": body["metadata"],
+                "data": data,
+            }
             return self._bump(self.secrets[body["metadata"]["name"]])
 
         def patch(body, name, namespace, content_type):
@@ -54,11 +59,16 @@ class FakeCluster:
             self.patches.append(body)
             stored["data"].update(body.get("stringData", {}))
             for key, value in (body.get("data") or {}).items():
-                stored["data"].pop(key, None) if value is None else stored["data"].__setitem__(key, value)
+                stored["data"].pop(key, None) if value is None else stored[
+                    "data"
+                ].__setitem__(key, value)
             annotations = stored["metadata"].setdefault("annotations", {})
             for key, value in body["metadata"]["annotations"].items():
-                annotations.pop(key, None) if value is None else annotations.__setitem__(key, value)
+                annotations.pop(
+                    key, None
+                ) if value is None else annotations.__setitem__(key, value)
             return self._bump(stored)
+
         api.get, api.create, api.patch = get, create, patch
         return api
 
@@ -67,9 +77,11 @@ class FakeCluster:
         api.get.side_effect = lambda name, namespace: self.deployment
 
         def patch(body, name, namespace, content_type, field_manager):
-            self.deployment["spec"]["template"]["metadata"].setdefault("annotations", {}).update(
-                body["spec"]["template"]["metadata"]["annotations"])
+            self.deployment["spec"]["template"]["metadata"].setdefault(
+                "annotations", {}
+            ).update(body["spec"]["template"]["metadata"]["annotations"])
             return self.deployment
+
         api.patch = patch
         return api
 
@@ -77,7 +89,8 @@ class FakeCluster:
 def cluster():
     fake = FakeCluster()
     fake.resources.get.side_effect = lambda api_version, kind: (
-        fake.secret_api() if kind == "Secret" else fake.deployment_api())
+        fake.secret_api() if kind == "Secret" else fake.deployment_api()
+    )
     return fake
 
 
@@ -99,18 +112,31 @@ class SecretStoreTests(unittest.TestCase):
         listed = secrets.read_secret(fake, "smoke")
         self.assertEqual([s["name"] for s in listed["secrets"]], ["API_TOKEN"])
         self.assertNotIn("s3cret-value", json.dumps(listed))
-        self.assertEqual(secrets.observe_secret_activation(fake, "smoke", listed["version"])["state"], "active")
+        self.assertEqual(
+            secrets.observe_secret_activation(fake, "smoke", listed["version"])[
+                "state"
+            ],
+            "active",
+        )
         again = secrets.write_secret(fake, "smoke", "API_TOKEN", "rotated")
         self.assertNotEqual(again, version)
-        self.assertEqual(secrets.observe_secret_activation(fake, "smoke", again)["state"], "pending")
+        self.assertEqual(
+            secrets.observe_secret_activation(fake, "smoke", again)["state"], "pending"
+        )
         secrets.roll_pods(fake, "smoke", again)
-        self.assertEqual(secrets.observe_secret_activation(fake, "smoke", again)["state"], "active")
+        self.assertEqual(
+            secrets.observe_secret_activation(fake, "smoke", again)["state"], "active"
+        )
 
-    def test_rotation_keeps_previous_value_outside_the_mounted_secret_until_confirmed(self):
+    def test_rotation_keeps_previous_value_outside_the_mounted_secret_until_confirmed(
+        self,
+    ):
         fake = cluster()
         secrets.write_secret(fake, "smoke", "API_TOKEN", "one")
         self.assertIsNone(fake.previous)
-        self.assertEqual(secrets.read_secret(fake, "smoke")["secrets"][0]["state"], "active")
+        self.assertEqual(
+            secrets.read_secret(fake, "smoke")["secrets"][0]["state"], "active"
+        )
         secrets.write_secret(fake, "smoke", "API_TOKEN", "two")
         self.assertEqual(fake.previous["data"], {"API_TOKEN": "one"})
         self.assertEqual(fake.secret["data"], {"API_TOKEN": "two"})
@@ -120,7 +146,9 @@ class SecretStoreTests(unittest.TestCase):
         self.assertTrue(secrets.confirm_secret(fake, "smoke", "API_TOKEN"))
         self.assertEqual(fake.previous["data"], {})
         self.assertFalse(secrets.confirm_secret(fake, "smoke", "API_TOKEN"))
-        self.assertEqual(secrets.read_secret(fake, "smoke")["secrets"][0]["state"], "active")
+        self.assertEqual(
+            secrets.read_secret(fake, "smoke")["secrets"][0]["state"], "active"
+        )
 
     def test_revert_restores_previous_value_as_new_version(self):
         fake = cluster()
@@ -147,7 +175,10 @@ class SecretStoreTests(unittest.TestCase):
         version = secrets.remove_secret(fake, "smoke", "A_KEY")
         self.assertEqual(secrets.read_secret(fake, "smoke")["secrets"], [])
         fake.resources.get.side_effect = lambda api_version, kind: (
-            fake.secret_api() if kind == "Secret" else Mock(patch=Mock(side_effect=ApiException(status=404))))
+            fake.secret_api()
+            if kind == "Secret"
+            else Mock(patch=Mock(side_effect=ApiException(status=404)))
+        )
         self.assertFalse(secrets.roll_pods(fake, "smoke", version))
 
     def test_unavailable_cluster_is_reported_not_leaked(self):

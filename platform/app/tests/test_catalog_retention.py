@@ -15,11 +15,15 @@ class RetentionTests(unittest.TestCase):
         conn = MagicMock()
         catalog.prune_revisions(conn, "app", 30, 25)
         first, second = [call.args for call in conn.execute.call_args_list]
-        self.assertTrue(first[0].lstrip().startswith("DELETE FROM application_operations"))
+        self.assertTrue(
+            first[0].lstrip().startswith("DELETE FROM application_operations")
+        )
         self.assertIn("'queued', 'running'", first[0])
         self.assertIn("operation_kind='restart'", first[0])
         self.assertEqual(first[1][:2], ("app", 5))
-        self.assertTrue(second[0].lstrip().startswith("DELETE FROM application_revisions"))
+        self.assertTrue(
+            second[0].lstrip().startswith("DELETE FROM application_revisions")
+        )
         self.assertIn("NOT EXISTS", second[0])
         self.assertEqual(second[1], ("app", 5))
 
@@ -33,9 +37,16 @@ class RetentionTests(unittest.TestCase):
 
     def test_new_revision_triggers_pruning(self):
         conn = MagicMock()
-        conn.execute.return_value.fetchone.side_effect = [("env",), ("app",), (4, {"old": 1})]
+        conn.execute.return_value.fetchone.side_effect = [
+            ("env",),
+            ("app",),
+            (4, {"old": 1}),
+        ]
         with patch.dict(os.environ, {"REVISION_RETENTION": "2"}):
-            self.assertEqual(catalog.ensure_default_application(conn, "p", "n", {"new": 1}), ("app", 5))
+            self.assertEqual(
+                catalog.ensure_default_application(conn, "p", "n", {"new": 1}),
+                ("app", 5),
+            )
         queries = [c.args[0].lstrip() for c in conn.execute.call_args_list]
         self.assertTrue(queries[-2].startswith("DELETE FROM application_operations"))
         self.assertEqual(conn.execute.call_args_list[-2].args[1][1], 3)

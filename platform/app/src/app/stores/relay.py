@@ -4,16 +4,19 @@ The SSH account may forward only to these lease ports. Provider authentication
 still checks passwords; relay ports cannot be exchanged to extend another lease.
 No protocol payload, username, credential or query is logged.
 """
+
 import asyncio
 import contextlib
-import logging
 import hmac
+import logging
 import os
 import re
 import struct
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
+
 import psycopg
+
 from . import catalog, recovery
 
 log = logging.getLogger(__name__)
@@ -22,34 +25,51 @@ MAX_BOLT_CONNECTIONS = 16
 
 
 def backend_endpoint(lease):
-    if lease['provider'] == 'neo4j':
+    if lease["provider"] == "neo4j":
         import ipaddress
-        return str(ipaddress.IPv4Address(lease['native_host'])), 7687
-    endpoints = {'postgresql': ('POSTGRES_IP', 5432), 's3': ('RUSTFS_IP', 9000),
-                 'opensearch': ('OPENSEARCH_IP', 9200), 'qdrant': ('QDRANT_IP', 6333)}
-    setting, port = endpoints[lease['provider']]
+
+        return str(ipaddress.IPv4Address(lease["native_host"])), 7687
+    endpoints = {
+        "postgresql": ("POSTGRES_IP", 5432),
+        "s3": ("RUSTFS_IP", 9000),
+        "opensearch": ("OPENSEARCH_IP", 9200),
+        "qdrant": ("QDRANT_IP", 6333),
+    }
+    setting, port = endpoints[lease["provider"]]
     import ipaddress
+
     return str(ipaddress.ip_address(os.environ[setting])), port
 
 
 def http_tls(lease):
-    if lease['provider'] != 'opensearch':
-        return None  # Private network/SSH boundary, matching the PostgreSQL lab profile.
+    if lease["provider"] != "opensearch":
+        return (
+            None  # Private network/SSH boundary, matching the PostgreSQL lab profile.
+        )
     import ssl
-    return ssl.create_default_context(cafile=os.environ['OPENSEARCH_CA_FILE'])
+
+    return ssl.create_default_context(cafile=os.environ["OPENSEARCH_CA_FILE"])
 
 
 def connect():
-    return psycopg.connect(host=os.environ["POSTGRES_HOST"], dbname="platform", user="platform_store_relay",
-        password=os.environ["STORE_RELAY_PASSWORD"], autocommit=True, connect_timeout=2,
-        options="-c statement_timeout=2000")
+    return psycopg.connect(
+        host=os.environ["POSTGRES_HOST"],
+        dbname="platform",
+        user="platform_store_relay",
+        password=os.environ["STORE_RELAY_PASSWORD"],
+        autocommit=True,
+        connect_timeout=2,
+        options="-c statement_timeout=2000",
+    )
 
 
 def snapshot():
     with connect() as conn:
         if recovery.required(conn):
             return {}
-        if conn.execute('SELECT COALESCE(backup_until>now(),false) FROM store_control WHERE singleton').fetchone()[0]:
+        if conn.execute(
+            "SELECT COALESCE(backup_until>now(),false) FROM store_control WHERE singleton"
+        ).fetchone()[0]:
             return {}
         rows = conn.execute("""SELECT c.relay_port,c.credential_id,c.expires_at,r.resource_id,r.provider,g.kind,c.admission_sha256,host(i.host)
             FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
@@ -67,24 +87,52 @@ def snapshot():
             WHERE s.expires_at>now() AND c.state='active' AND c.expires_at>now() LIMIT 8192""").fetchall()
     sessions = {}
     for cid, key, digest, expiry in children:
-        sessions.setdefault(str(cid), {})[key] = {'token_sha256': digest, 'expires_at': expiry}
-    selected = {'postgresql', *os.environ.get('STORE_ENABLED_PROVIDERS', 'postgresql').split(',')}
-    return {row[0]: {"credential_id": str(row[1]), "expires_at": row[2], "resource_id": str(row[3]), "provider": row[4],
-                    'kind': row[5], 'admission_sha256': row[6], 'native_host': row[7], 's3_sessions': sessions.get(str(row[1]), {})}
-            for row in rows if row[4] in selected}
+        sessions.setdefault(str(cid), {})[key] = {
+            "token_sha256": digest,
+            "expires_at": expiry,
+        }
+    selected = {
+        "postgresql",
+        *os.environ.get("STORE_ENABLED_PROVIDERS", "postgresql").split(","),
+    }
+    return {
+        row[0]: {
+            "credential_id": str(row[1]),
+            "expires_at": row[2],
+            "resource_id": str(row[3]),
+            "provider": row[4],
+            "kind": row[5],
+            "admission_sha256": row[6],
+            "native_host": row[7],
+            "s3_sessions": sessions.get(str(row[1]), {}),
+        }
+        for row in rows
+        if row[4] in selected
+    }
 
 
 def initialize_identity(conn):
     from psycopg import sql
+
     password = os.environ.get("STORE_RELAY_PASSWORD", "")
     if len(password) < 32:
         raise RuntimeError("STORE_RELAY_PASSWORD must contain at least 32 characters")
-    if not conn.execute("SELECT 1 FROM pg_roles WHERE rolname='platform_store_relay'").fetchone():
-        conn.execute("CREATE ROLE platform_store_relay LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4")
-    conn.execute(sql.SQL("ALTER ROLE platform_store_relay PASSWORD {}").format(sql.Literal(password)))
+    if not conn.execute(
+        "SELECT 1 FROM pg_roles WHERE rolname='platform_store_relay'"
+    ).fetchone():
+        conn.execute(
+            "CREATE ROLE platform_store_relay LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4"
+        )
+    conn.execute(
+        sql.SQL("ALTER ROLE platform_store_relay PASSWORD {}").format(
+            sql.Literal(password)
+        )
+    )
     conn.execute("GRANT CONNECT ON DATABASE platform TO platform_store_relay")
     conn.execute("GRANT USAGE ON SCHEMA public TO platform_store_relay")
-    conn.execute("GRANT SELECT ON store_control,store_project_retirements,store_credentials,store_grants,store_resources,store_instances,store_console_sessions TO platform_store_relay")
+    conn.execute(
+        "GRANT SELECT ON store_control,store_project_retirements,store_credentials,store_grants,store_resources,store_instances,store_console_sessions TO platform_store_relay"
+    )
     conn.execute("GRANT SELECT(name,status) ON projects TO platform_store_relay")
 
 
@@ -132,52 +180,105 @@ class Relay:
 
     def allowed(self, port, lease):
         current = self.leases.get(port)
-        return (current is not None and current["credential_id"] == lease["credential_id"]
-                and current["expires_at"] > datetime.now(timezone.utc)
-                and time.monotonic() - self.last_success < 3)
+        return (
+            current is not None
+            and current["credential_id"] == lease["credential_id"]
+            and current["expires_at"] > datetime.now(UTC)
+            and time.monotonic() - self.last_success < 3
+        )
 
     def session_allowed(self, port, state):
         if state is None:
             return True
         key, digest = state
-        session = self.leases.get(port, {}).get('s3_sessions', {}).get(key)
-        return (session is not None and session['expires_at'] > datetime.now(timezone.utc)
-            and hmac.compare_digest(session['token_sha256'], digest))
+        session = self.leases.get(port, {}).get("s3_sessions", {}).get(key)
+        return (
+            session is not None
+            and session["expires_at"] > datetime.now(UTC)
+            and hmac.compare_digest(session["token_sha256"], digest)
+        )
 
     async def handle(self, port, reader, writer):
         lease = self.leases.get(port)
-        is_bolt = lease is not None and lease['provider'] == 'neo4j'
-        if (is_bolt and self.bolt_connections >= MAX_BOLT_CONNECTIONS) or lease is None or self.connections >= MAX_CONNECTIONS or self.by_credential.get(lease["credential_id"], 0) >= 20 or not self.allowed(port, lease):
+        is_bolt = lease is not None and lease["provider"] == "neo4j"
+        if (
+            (is_bolt and self.bolt_connections >= MAX_BOLT_CONNECTIONS)
+            or lease is None
+            or self.connections >= MAX_CONNECTIONS
+            or self.by_credential.get(lease["credential_id"], 0) >= 20
+            or not self.allowed(port, lease)
+        ):
             writer.close()
             return
         self.connections += 1
         self.bolt_connections += int(is_bolt)
-        self.by_credential[lease["credential_id"]] = self.by_credential.get(lease["credential_id"], 0) + 1
+        self.by_credential[lease["credential_id"]] = (
+            self.by_credential.get(lease["credential_id"], 0) + 1
+        )
         backend_writer = None
         tasks = []
         try:
-            if lease['provider'] == 'neo4j':
+            if lease["provider"] == "neo4j":
                 from .bolt_relay import exchange
+
                 async def guard_bolt():
-                    while self.allowed(port, lease): await asyncio.sleep(.25)
-                tasks = [asyncio.create_task(exchange(reader, writer, lease, self.backend(lease), observe=self.observe)),
-                    asyncio.create_task(guard_bolt())]
-                remaining = max(0, (lease['expires_at'] - datetime.now(timezone.utc)).total_seconds())
-                await asyncio.wait_for(asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining)
+                    while self.allowed(port, lease):
+                        await asyncio.sleep(0.25)
+
+                tasks = [
+                    asyncio.create_task(
+                        exchange(
+                            reader,
+                            writer,
+                            lease,
+                            self.backend(lease),
+                            observe=self.observe,
+                        )
+                    ),
+                    asyncio.create_task(guard_bolt()),
+                ]
+                remaining = max(
+                    0, (lease["expires_at"] - datetime.now(UTC)).total_seconds()
+                )
+                await asyncio.wait_for(
+                    asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining
+                )
                 return
             if lease["provider"] != "postgresql":
                 from .http_relay import exchange
+
                 session = [None]
+
                 async def guard_http():
-                    while self.allowed(port, lease) and self.session_allowed(port, session[0]):
-                        await asyncio.sleep(.25)
-                tasks = [asyncio.create_task(exchange(reader, writer, lease, self.backend(lease),
-                    tls=http_tls(lease), authorized=lambda state: session.__setitem__(0, state))), asyncio.create_task(guard_http())]
-                remaining = max(0, (lease["expires_at"] - datetime.now(timezone.utc)).total_seconds())
-                await asyncio.wait_for(asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining)
+                    while self.allowed(port, lease) and self.session_allowed(
+                        port, session[0]
+                    ):
+                        await asyncio.sleep(0.25)
+
+                tasks = [
+                    asyncio.create_task(
+                        exchange(
+                            reader,
+                            writer,
+                            lease,
+                            self.backend(lease),
+                            tls=http_tls(lease),
+                            authorized=lambda state: session.__setitem__(0, state),
+                        )
+                    ),
+                    asyncio.create_task(guard_http()),
+                ]
+                remaining = max(
+                    0, (lease["expires_at"] - datetime.now(UTC)).total_seconds()
+                )
+                await asyncio.wait_for(
+                    asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining
+                )
                 return
             startup = await asyncio.wait_for(postgres_startup(reader, writer, lease), 5)
-            backend_reader, backend_writer = await asyncio.wait_for(asyncio.open_connection(*self.backend(lease)), 3)
+            backend_reader, backend_writer = await asyncio.wait_for(
+                asyncio.open_connection(*self.backend(lease)), 3
+            )
             backend_writer.write(startup)
             await backend_writer.drain()
 
@@ -188,12 +289,19 @@ class Relay:
 
             async def guard():
                 while self.allowed(port, lease):
-                    await asyncio.sleep(.25)
+                    await asyncio.sleep(0.25)
 
-            tasks = [asyncio.create_task(copy(reader, backend_writer)), asyncio.create_task(copy(backend_reader, writer)),
-                     asyncio.create_task(guard())]
-            remaining = max(0, (lease["expires_at"] - datetime.now(timezone.utc)).total_seconds())
-            await asyncio.wait_for(asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining)
+            tasks = [
+                asyncio.create_task(copy(reader, backend_writer)),
+                asyncio.create_task(copy(backend_reader, writer)),
+                asyncio.create_task(guard()),
+            ]
+            remaining = max(
+                0, (lease["expires_at"] - datetime.now(UTC)).total_seconds()
+            )
+            await asyncio.wait_for(
+                asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining
+            )
         except (Exception, asyncio.CancelledError):
             # Fixed silence; errors/payloads must not escape to logs.
             pass
@@ -228,37 +336,73 @@ class Relay:
                 raise ValueError("Invalid managed lease port")
             if port not in self.servers:
                 self.servers[port] = await asyncio.start_server(
-                    lambda reader, writer, selected=port: self.handle(selected, reader, writer), self.host, port)
+                    lambda reader, writer, selected=port: self.handle(
+                        selected, reader, writer
+                    ),
+                    self.host,
+                    port,
+                )
 
     async def health(self, reader, writer):
         try:
             packet = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 2)
             if len(packet) > 4096:
-                raise ValueError('Invalid control request')
-            if packet.split(b'\r\n',1)[0] == b'GET /metrics HTTP/1.1':
-                counts={}
+                raise ValueError("Invalid control request")
+            if packet.split(b"\r\n", 1)[0] == b"GET /metrics HTTP/1.1":
+                counts = {}
                 for lease in self.leases.values():
-                    pair=(lease['provider'],lease['resource_id'])
-                    counts[pair]=counts.get(pair,0)+self.by_credential.get(lease['credential_id'],0)
+                    pair = (lease["provider"], lease["resource_id"])
+                    counts[pair] = counts.get(pair, 0) + self.by_credential.get(
+                        lease["credential_id"], 0
+                    )
                 import json
-                content='\n'.join('platform_store_relay_connections{provider='+json.dumps(provider)+',resource_id='+json.dumps(resource)+'} '+str(count)
-                    for (provider,resource),count in sorted(counts.items()))+'\n'
-                body=content.encode()
-                writer.write(b'HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: '+str(len(body)).encode()+b'\r\nConnection: close\r\n\r\n'+body)
+
+                content = (
+                    "\n".join(
+                        "platform_store_relay_connections{provider="
+                        + json.dumps(provider)
+                        + ",resource_id="
+                        + json.dumps(resource)
+                        + "} "
+                        + str(count)
+                        for (provider, resource), count in sorted(counts.items())
+                    )
+                    + "\n"
+                )
+                body = content.encode()
+                writer.write(
+                    b"HTTP/1.1 200 OK\r\nContent-Type: text/plain; version=0.0.4\r\nContent-Length: "
+                    + str(len(body)).encode()
+                    + b"\r\nConnection: close\r\n\r\n"
+                    + body
+                )
                 await writer.drain()
                 return
             ready = time.monotonic() - self.last_success < 3
-            line = packet.split(b'\r\n', 1)[0]
-            if line.startswith(b'GET /session/'):
-                match = re.fullmatch(rb'GET /session/(20[0-9]{3})/([A-Za-z0-9]{20})/([a-f0-9]{64}) HTTP/1\.[01]', line)
+            line = packet.split(b"\r\n", 1)[0]
+            if line.startswith(b"GET /session/"):
+                match = re.fullmatch(
+                    rb"GET /session/(20[0-9]{3})/([A-Za-z0-9]{20})/([a-f0-9]{64}) HTTP/1\.[01]",
+                    line,
+                )
                 if not match:
-                    raise ValueError('Invalid session acknowledgment')
+                    raise ValueError("Invalid session acknowledgment")
                 port = int(match[1])
                 lease = self.leases.get(port)
-                ready = (ready and lease is not None and self.allowed(port, lease)
-                    and self.session_allowed(port, (match[2].decode(), match[3].decode())))
+                ready = (
+                    ready
+                    and lease is not None
+                    and self.allowed(port, lease)
+                    and self.session_allowed(
+                        port, (match[2].decode(), match[3].decode())
+                    )
+                )
             code = b"200 OK" if ready else b"503 Service Unavailable"
-            writer.write(b"HTTP/1.1 " + code + b"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n")
+            writer.write(
+                b"HTTP/1.1 "
+                + code
+                + b"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
+            )
             await writer.drain()
         except Exception:
             pass

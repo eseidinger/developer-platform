@@ -11,7 +11,7 @@ Run from the repository root. Use disposable project names and separate human
 accounts. Do not put access tokens, Keycloak passwords, user-subject lists, or
 audit-reader credentials in Git, `.env`, shell history, or evidence output.
 
-The [access-validation portal](../../../platform/README.md#access-validation-portal)
+The [access-validation portal](../../../platform/README.md#local-endpoints)
 offers the same API actions through browser PKCE login after Keycloak bootstrap.
 It is useful for the project/grant/revocation and restricted-inspection portions
 of this runbook; create the separate Keycloak test users first and retain only

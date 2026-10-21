@@ -21,12 +21,20 @@ class Estimate:
 def estimate(model, usage, multiplier=1.0):
     usage = usage if isinstance(usage, dict) else {}
     details = usage.get("input_token_details") or {}
-    values = (usage.get("input_tokens"), details.get("cache_read", 0), usage.get("output_tokens"))
+    values = (
+        usage.get("input_tokens"),
+        details.get("cache_read", 0),
+        usage.get("output_tokens"),
+    )
     if any(type(v) is not int or v < 0 for v in values) or values[1] > values[0]:
         return Estimate(None, False, None, None, None)
     incoming, cached, outgoing = values
     rates = RATES.get(model)
     if rates is None or (cached and rates[1] is None):
         return Estimate(None, False, incoming, cached, outgoing)
-    cost = ((incoming - cached) * rates[0] + cached * (rates[1] or 0) + outgoing * rates[2])
-    return Estimate(round(cost * multiplier / 1_000_000, 8), True, incoming, cached, outgoing)
+    cost = (
+        (incoming - cached) * rates[0] + cached * (rates[1] or 0) + outgoing * rates[2]
+    )
+    return Estimate(
+        round(cost * multiplier / 1_000_000, 8), True, incoming, cached, outgoing
+    )

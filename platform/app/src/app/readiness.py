@@ -1,6 +1,7 @@
 """Live readiness observations for the supported single-container workload."""
-from datetime import datetime, timezone
+
 import re
+from datetime import UTC, datetime
 from typing import Any
 
 from kubernetes.client.exceptions import ApiException
@@ -12,10 +13,18 @@ def _field(value: Any, name: str, default=None):
     return getattr(value, name, default)
 
 
-def _snapshot(state: str, desired_image: str, *, desired_replicas: int = 1,
-              ready_replicas: int = 0, deployment_image: str | None = None,
-              active_images: list[str] | None = None, active_image_ids: list[str] | None = None,
-              reason: str | None = None, pod_diagnostics=None) -> dict[str, Any]:
+def _snapshot(
+    state: str,
+    desired_image: str,
+    *,
+    desired_replicas: int = 1,
+    ready_replicas: int = 0,
+    deployment_image: str | None = None,
+    active_images: list[str] | None = None,
+    active_image_ids: list[str] | None = None,
+    reason: str | None = None,
+    pod_diagnostics=None,
+) -> dict[str, Any]:
     result = {
         "state": state,
         "desired_replicas": desired_replicas,
@@ -25,7 +34,7 @@ def _snapshot(state: str, desired_image: str, *, desired_replicas: int = 1,
         "active_images": active_images or [],
         "active_image_ids": active_image_ids or [],
         "reason": reason,
-        "observed_at": datetime.now(timezone.utc).isoformat(),
+        "observed_at": datetime.now(UTC).isoformat(),
     }
     if pod_diagnostics is not None:
         result["pod_diagnostics"] = pod_diagnostics
@@ -34,17 +43,32 @@ def _snapshot(state: str, desired_image: str, *, desired_replicas: int = 1,
 
 def _safe_pod_diagnostics(pods, container_name):
     """Fixed codes and numeric status only; exclude messages, names and sidecars."""
-    codes = {"CrashLoopBackOff", "OOMKilled", "Error", "Completed", "ImagePullBackOff",
-             "ErrImagePull", "CreateContainerConfigError", "ContainerCreating", "RunContainerError"}
+    codes = {
+        "CrashLoopBackOff",
+        "OOMKilled",
+        "Error",
+        "Completed",
+        "ImagePullBackOff",
+        "ErrImagePull",
+        "CreateContainerConfigError",
+        "ContainerCreating",
+        "RunContainerError",
+    }
     summaries = []
     for pod in pods:
-        for container in _field(_field(pod, "status", {}), "containerStatuses", []) or []:
+        for container in (
+            _field(_field(pod, "status", {}), "containerStatuses", []) or []
+        ):
             if _field(container, "name") != container_name:
                 continue
             annotations = _field(_field(pod, "metadata", {}), "annotations", {}) or {}
             revision = annotations.get("platform.example/revision", "")
-            item = {"ready": _field(container, "ready") is True,
-                    "revision": int(revision) if isinstance(revision, str) and re.fullmatch(r"[0-9]{1,10}", revision) else None}
+            item = {
+                "ready": _field(container, "ready") is True,
+                "revision": int(revision)
+                if isinstance(revision, str) and re.fullmatch(r"[0-9]{1,10}", revision)
+                else None,
+            }
             restarts = _field(container, "restartCount", 0)
             if type(restarts) is int and restarts >= 0:
                 item["restart_count"] = min(restarts, 1000000)
@@ -55,7 +79,9 @@ def _safe_pod_diagnostics(pods, container_name):
                 if waiting is not None or terminated is not None:
                     status = waiting if waiting is not None else terminated
                     reason = _field(status, "reason")
-                    item[label + "_reason"] = reason if reason in codes else "OtherContainerReason"
+                    item[label + "_reason"] = (
+                        reason if reason in codes else "OtherContainerReason"
+                    )
                     exit_code = _field(terminated, "exitCode")
                     if type(exit_code) is int and 0 <= exit_code <= 255:
                         item[label + "_exit_code"] = exit_code
@@ -67,8 +93,10 @@ def _pod_diagnostic(pods: list[Any]) -> str | None:
     for pod in pods:
         status = _field(pod, "status", {})
         for condition in _field(status, "conditions", []) or []:
-            if (_field(condition, "type") == "PodScheduled"
-                    and _field(condition, "status") == "False"):
+            if (
+                _field(condition, "type") == "PodScheduled"
+                and _field(condition, "status") == "False"
+            ):
                 return _field(condition, "reason") or "PodNotScheduled"
     for pod in pods:
         status = _field(pod, "status", {})
@@ -79,7 +107,10 @@ def _pod_diagnostic(pods: list[Any]) -> str | None:
     for pod in pods:
         status = _field(pod, "status", {})
         for condition in _field(status, "conditions", []) or []:
-            if _field(condition, "type") == "Ready" and _field(condition, "status") == "False":
+            if (
+                _field(condition, "type") == "Ready"
+                and _field(condition, "status") == "False"
+            ):
                 return _field(condition, "reason") or "ContainersNotReady"
     return None
 
@@ -99,8 +130,15 @@ def _active_images(pods: list[Any]) -> tuple[list[str], list[str]]:
     return sorted(images), sorted(image_ids)
 
 
-def observe_deployment(runtime: Any, project: str, desired_image: str, log,
-                       deployment_name: str | None = None, *, include_pod_diagnostics=False) -> dict[str, Any]:
+def observe_deployment(
+    runtime: Any,
+    project: str,
+    desired_image: str,
+    log,
+    deployment_name: str | None = None,
+    *,
+    include_pod_diagnostics=False,
+) -> dict[str, Any]:
     namespace = "project-" + project
     if runtime is None:
         log.error("Deployment readiness observer unavailable project=%s", project)
@@ -113,12 +151,18 @@ def observe_deployment(runtime: Any, project: str, desired_image: str, log,
     except ApiException as exc:
         if exc.status == 404:
             return _snapshot("not_found", desired_image, reason="DeploymentNotFound")
-        log.error("Deployment readiness query failed project=%s error_type=%s",
-                  project, type(exc).__name__)
+        log.error(
+            "Deployment readiness query failed project=%s error_type=%s",
+            project,
+            type(exc).__name__,
+        )
         return _snapshot("unknown", desired_image, reason="ObserverUnavailable")
     except Exception as exc:
-        log.error("Deployment readiness query failed project=%s error_type=%s",
-                  project, type(exc).__name__)
+        log.error(
+            "Deployment readiness query failed project=%s error_type=%s",
+            project,
+            type(exc).__name__,
+        )
         return _snapshot("unknown", desired_image, reason="ObserverUnavailable")
 
     spec = _field(deployment, "spec", {})
@@ -139,45 +183,78 @@ def observe_deployment(runtime: Any, project: str, desired_image: str, log,
     try:
         response = runtime.resources.get(api_version="v1", kind="Pod").get(
             namespace=namespace,
-            label_selector=("app.kubernetes.io/name=" + project if deployment_name is None
-                            else "platform.example/component=" + deployment_name),
+            label_selector=(
+                "app.kubernetes.io/name=" + project
+                if deployment_name is None
+                else "platform.example/component=" + deployment_name
+            ),
         )
         pods = _field(response, "items", []) or []
     except Exception as exc:
-        log.error("Deployment pod observation failed project=%s error_type=%s",
-                  project, type(exc).__name__)
+        log.error(
+            "Deployment pod observation failed project=%s error_type=%s",
+            project,
+            type(exc).__name__,
+        )
         return _snapshot("unknown", desired_image, **base, reason="ObserverUnavailable")
 
     if include_pod_diagnostics:
-        base["pod_diagnostics"] = _safe_pod_diagnostics(pods, _field(containers[0], "name") if containers else None)
+        base["pod_diagnostics"] = _safe_pod_diagnostics(
+            pods, _field(containers[0], "name") if containers else None
+        )
     images, image_ids = _active_images(pods)
     if deployment_image != desired_image:
-        return _snapshot("progressing", desired_image, **base, active_images=images,
-                         active_image_ids=image_ids, reason="DeploymentImageMismatch")
+        return _snapshot(
+            "progressing",
+            desired_image,
+            **base,
+            active_images=images,
+            active_image_ids=image_ids,
+            reason="DeploymentImageMismatch",
+        )
 
     conditions = _field(status, "conditions", []) or []
     for condition in conditions:
         condition_type = _field(condition, "type")
         condition_status = _field(condition, "status")
         condition_reason = _field(condition, "reason")
-        if condition_type == "Progressing" and condition_status == "False":
-            if condition_reason == "ProgressDeadlineExceeded":
-                return _snapshot("failed", desired_image, **base, reason=condition_reason)
+        if (condition_type == "Progressing" and condition_status == "False") and (
+            condition_reason == "ProgressDeadlineExceeded"
+        ):
+            return _snapshot("failed", desired_image, **base, reason=condition_reason)
         if condition_type == "ReplicaFailure" and condition_status == "True":
-            return _snapshot("failed", desired_image, **base,
-                             reason=condition_reason or "ReplicaFailure")
+            return _snapshot(
+                "failed",
+                desired_image,
+                **base,
+                reason=condition_reason or "ReplicaFailure",
+            )
 
     generation = _field(metadata, "generation", 0) or 0
     observed_generation = _field(status, "observedGeneration", 0) or 0
     updated_replicas = _field(status, "updatedReplicas", 0) or 0
     total_replicas = _field(status, "replicas", 0) or 0
-    if (desired_replicas > 0 and ready_replicas >= desired_replicas
-            and updated_replicas >= desired_replicas
-            and total_replicas <= updated_replicas
-            and observed_generation >= generation
-            and deployment_image == desired_image):
-        return _snapshot("ready", desired_image, **base, active_images=images,
-                         active_image_ids=image_ids)
+    if (
+        desired_replicas > 0
+        and ready_replicas >= desired_replicas
+        and updated_replicas >= desired_replicas
+        and total_replicas <= updated_replicas
+        and observed_generation >= generation
+        and deployment_image == desired_image
+    ):
+        return _snapshot(
+            "ready",
+            desired_image,
+            **base,
+            active_images=images,
+            active_image_ids=image_ids,
+        )
 
-    return _snapshot("progressing", desired_image, **base, active_images=images,
-                     active_image_ids=image_ids, reason=_pod_diagnostic(pods) or "RolloutInProgress")
+    return _snapshot(
+        "progressing",
+        desired_image,
+        **base,
+        active_images=images,
+        active_image_ids=image_ids,
+        reason=_pod_diagnostic(pods) or "RolloutInProgress",
+    )

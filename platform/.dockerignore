@@ -5,3 +5,10 @@ app/tests
 app/.venv
 ui/node_modules
 ui/dist
+
+# Browser test output and local caches are not runtime assets.
+ui/test-results
+ui/playwright-report
+ui/.tmp
+cli/.venv
+cli/.pytest_cache

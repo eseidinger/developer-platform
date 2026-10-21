@@ -11,14 +11,15 @@ from contextlib import asynccontextmanager
 import psycopg
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import Response
+from google.protobuf.message import DecodeError
 from kubernetes import client, config
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
-    ExportTraceServiceRequest, ExportTraceServiceResponse,
+    ExportTraceServiceRequest,
+    ExportTraceServiceResponse,
 )
-from google.protobuf.message import DecodeError
 
-from .manifests import validate_name
 from . import workload_trace
+from .manifests import validate_name
 
 MAX_BODY = 262144
 MAX_SPANS = 200
@@ -43,12 +44,12 @@ def _rate_ok(size):
 def _disk_ok():
     global _disk_full
     stats = os.statvfs("/run/tempo")
-    if not 3 * 1024 ** 3 <= stats.f_blocks * stats.f_frsize <= 4 * 1024 ** 3:
+    if not 3 * 1024**3 <= stats.f_blocks * stats.f_frsize <= 4 * 1024**3:
         return False
     used = (stats.f_blocks - stats.f_bfree) * stats.f_frsize
-    if used >= 3 * 1024 ** 3:
+    if used >= 3 * 1024**3:
         _disk_full = True
-    elif used < 2 * 1024 ** 3:
+    elif used < 2 * 1024**3:
         _disk_full = False
     return not _disk_full
 
@@ -58,7 +59,9 @@ def _identity(review, pod, catalog):
     if not status.authenticated or "platform-telemetry" not in (status.audiences or []):
         raise HTTPException(403, "Telemetry identity denied")
     username = status.user.username or ""
-    match = re.fullmatch(r"system:serviceaccount:(project-[a-z0-9-]+):(telemetry-[a-z0-9-]+)", username)
+    match = re.fullmatch(
+        r"system:serviceaccount:(project-[a-z0-9-]+):(telemetry-[a-z0-9-]+)", username
+    )
     if not match:
         raise HTTPException(403, "Telemetry identity denied")
     namespace, account = match.groups()
@@ -74,10 +77,14 @@ def _identity(review, pod, catalog):
     pod_uids = extra.get("authentication.kubernetes.io/pod-uid") or []
     if len(pod_names) != 1 or len(pod_uids) != 1:
         raise HTTPException(403, "Pod-bound token required")
-    if (str(pod.metadata.uid) != pod_uids[0] or pod.metadata.namespace != namespace
-            or pod.metadata.name != pod_names[0] or pod.spec.service_account_name != account
-            or pod.metadata.labels.get("app.kubernetes.io/name") != project
-            or pod.metadata.labels.get("platform.example/component") != component):
+    if (
+        str(pod.metadata.uid) != pod_uids[0]
+        or pod.metadata.namespace != namespace
+        or pod.metadata.name != pod_names[0]
+        or pod.spec.service_account_name != account
+        or pod.metadata.labels.get("app.kubernetes.io/name") != project
+        or pod.metadata.labels.get("platform.example/component") != component
+    ):
         raise HTTPException(403, "Telemetry Pod mismatch")
     if not catalog(project, component):
         raise HTTPException(403, "Tracing is not active for this component")
@@ -89,9 +96,12 @@ def sanitize(payload: bytes, project: str, component: str, now_ns=None) -> bytes
     incoming.ParseFromString(payload)
     safe = ExportTraceServiceRequest()
     output = safe.resource_spans.add()
-    for key, value in (("service.name", project + "." + component),
-                       ("platform.project", project), ("platform.application", project),
-                       ("platform.component", component)):
+    for key, value in (
+        ("service.name", project + "." + component),
+        ("platform.project", project),
+        ("platform.application", project),
+        ("platform.component", component),
+    ):
         attribute = output.resource.attributes.add()
         attribute.key = key
         attribute.value.string_value = value
@@ -103,18 +113,28 @@ def sanitize(payload: bytes, project: str, component: str, now_ns=None) -> bytes
                 continue
             scope = output.scope_spans.add()
             scope.scope.name, scope.scope.version = workload_trace.instrumentation(
-                scope_spans.scope.name, scope_spans.scope.version)
+                scope_spans.scope.name, scope_spans.scope.version
+            )
             for span in scope_spans.spans:
                 count += 1
                 # Python OTLP encoders may emit only remote-context flags (or zero).
                 # Exported batches cannot be required to repeat the W3C sampled bit.
-                if count > MAX_SPANS or len(span.trace_id) != 16 or len(span.span_id) != 8 \
-                        or not any(span.trace_id) or not any(span.span_id):
+                if (
+                    count > MAX_SPANS
+                    or len(span.trace_id) != 16
+                    or len(span.span_id) != 8
+                    or not any(span.trace_id)
+                    or not any(span.span_id)
+                ):
                     raise ValueError("Invalid or excessive spans")
-                if (span.start_time_unix_nano <= 0 or span.end_time_unix_nano < span.start_time_unix_nano
-                        or span.start_time_unix_nano < now_ns - 24 * 3600 * 10 ** 9
-                        or span.end_time_unix_nano > now_ns + 5 * 60 * 10 ** 9
-                        or span.end_time_unix_nano - span.start_time_unix_nano > 5 * 60 * 10 ** 9):
+                if (
+                    span.start_time_unix_nano <= 0
+                    or span.end_time_unix_nano < span.start_time_unix_nano
+                    or span.start_time_unix_nano < now_ns - 24 * 3600 * 10**9
+                    or span.end_time_unix_nano > now_ns + 5 * 60 * 10**9
+                    or span.end_time_unix_nano - span.start_time_unix_nano
+                    > 5 * 60 * 10**9
+                ):
                     raise ValueError("Span time is outside the accepted window")
                 clean = scope.spans.add()
                 clean.trace_id = span.trace_id
@@ -125,13 +145,27 @@ def sanitize(payload: bytes, project: str, component: str, now_ns=None) -> bytes
                 clean.start_time_unix_nano = span.start_time_unix_nano
                 clean.end_time_unix_nano = span.end_time_unix_nano
                 clean.flags = 1
-                clean.status.code = span.status.code if 0 <= span.status.code <= 2 else 0
-                source = {a.key: workload_trace.protobuf_value(a.value) for a in span.attributes
-                          if a.key in workload_trace.INPUT_KEYS}
-                exception_type = next((workload_trace.protobuf_value(a.value)
-                    for event in span.events if event.name == "exception"
-                    for a in event.attributes if a.key == "exception.type"), None)
-                fields = workload_trace.attributes(source, scope.scope.name, span.name, exception_type)
+                clean.status.code = (
+                    span.status.code if 0 <= span.status.code <= 2 else 0
+                )
+                source = {
+                    a.key: workload_trace.protobuf_value(a.value)
+                    for a in span.attributes
+                    if a.key in workload_trace.INPUT_KEYS
+                }
+                exception_type = next(
+                    (
+                        workload_trace.protobuf_value(a.value)
+                        for event in span.events
+                        if event.name == "exception"
+                        for a in event.attributes
+                        if a.key == "exception.type"
+                    ),
+                    None,
+                )
+                fields = workload_trace.attributes(
+                    source, scope.scope.name, span.name, exception_type
+                )
                 clean.name = workload_trace.span_name(fields, span.name)
                 for key, value in fields.items():
                     item = clean.attributes.add()
@@ -154,15 +188,28 @@ def sanitize(payload: bytes, project: str, component: str, now_ns=None) -> bytes
 
 
 def _catalog(project, component):
-    with psycopg.connect(host=os.environ["POSTGRES_HOST"], dbname="platform", user="telemetry_catalog",
-                         password=os.environ["TELEMETRY_CATALOG_PASSWORD"], connect_timeout=2) as conn:
-        return bool(conn.execute("SELECT 1 FROM telemetry_component_opt_ins WHERE project=%s AND component=%s",
-                                 (project, component)).fetchone())
+    with psycopg.connect(
+        host=os.environ["POSTGRES_HOST"],
+        dbname="platform",
+        user="telemetry_catalog",
+        password=os.environ["TELEMETRY_CATALOG_PASSWORD"],
+        connect_timeout=2,
+    ) as conn:
+        return bool(
+            conn.execute(
+                "SELECT 1 FROM telemetry_component_opt_ins WHERE project=%s AND component=%s",
+                (project, component),
+            ).fetchone()
+        )
 
 
 def _forward(body):
-    request = urllib.request.Request("http://alloy:4318/v1/traces", data=body, method="POST",
-                                     headers={"Content-Type": "application/x-protobuf"})
+    request = urllib.request.Request(
+        "http://alloy:4318/v1/traces",
+        data=body,
+        method="POST",
+        headers={"Content-Type": "application/x-protobuf"},
+    )
     opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
     with opener.open(request, timeout=2) as result:
         if result.status != 200:
@@ -177,7 +224,12 @@ async def lifespan(_app):
     yield
 
 
-app = FastAPI(title="Private workload telemetry gateway", docs_url=None, openapi_url=None, lifespan=lifespan)
+app = FastAPI(
+    title="Private workload telemetry gateway",
+    docs_url=None,
+    openapi_url=None,
+    lifespan=lifespan,
+)
 
 
 @app.get("/healthz")
@@ -190,7 +242,10 @@ async def receive(request: Request):
     authorization = request.headers.get("authorization", "")
     if not authorization.startswith("Bearer ") or len(authorization) > 8192:
         raise HTTPException(401, "Pod-bound bearer token required")
-    if request.headers.get("content-type", "").split(";", 1)[0] != "application/x-protobuf":
+    if (
+        request.headers.get("content-type", "").split(";", 1)[0]
+        != "application/x-protobuf"
+    ):
         raise HTTPException(415, "OTLP protobuf required")
     body = bytearray()
     async for chunk in request.stream():
@@ -201,19 +256,32 @@ async def receive(request: Request):
         raise HTTPException(429, "Trace ingress rate exceeded")
     try:
         token = authorization[7:]
-        review = await asyncio.to_thread(app.state.auth.create_token_review,
-            {"apiVersion": "authentication.k8s.io/v1", "kind": "TokenReview",
-             "spec": {"token": token, "audiences": ["platform-telemetry"]}})
-        if not review.status.authenticated or "platform-telemetry" not in (review.status.audiences or []):
+        review = await asyncio.to_thread(
+            app.state.auth.create_token_review,
+            {
+                "apiVersion": "authentication.k8s.io/v1",
+                "kind": "TokenReview",
+                "spec": {"token": token, "audiences": ["platform-telemetry"]},
+            },
+        )
+        if not review.status.authenticated or "platform-telemetry" not in (
+            review.status.audiences or []
+        ):
             raise HTTPException(403, "Telemetry identity denied")
         extra = review.status.user.extra or {} if review.status.user else {}
         names = extra.get("authentication.kubernetes.io/pod-name") or []
         username = review.status.user.username or "" if review.status.user else ""
         parts = username.split(":")
-        if (len(parts) != 4 or not re.fullmatch(r"project-[a-z0-9-]{1,40}", parts[2])
-                or len(names) != 1 or not re.fullmatch(r"[a-z0-9-]{1,63}", names[0])):
+        if (
+            len(parts) != 4
+            or not re.fullmatch(r"project-[a-z0-9-]{1,40}", parts[2])
+            or len(names) != 1
+            or not re.fullmatch(r"[a-z0-9-]{1,63}", names[0])
+        ):
             raise HTTPException(403, "Pod-bound token required")
-        pod = await asyncio.to_thread(app.state.core.read_namespaced_pod, names[0], parts[2])
+        pod = await asyncio.to_thread(
+            app.state.core.read_namespaced_pod, names[0], parts[2]
+        )
         project, component = await asyncio.to_thread(_identity, review, pod, _catalog)
         if not _disk_ok():
             raise HTTPException(503, "Trace storage admission paused")
@@ -224,5 +292,10 @@ async def receive(request: Request):
     except (ValueError, DecodeError):
         raise HTTPException(422, "Invalid trace batch") from None
     except Exception:
-        raise HTTPException(503, "Telemetry verification or collection unavailable") from None
-    return Response(ExportTraceServiceResponse().SerializeToString(), media_type="application/x-protobuf")
+        raise HTTPException(
+            503, "Telemetry verification or collection unavailable"
+        ) from None
+    return Response(
+        ExportTraceServiceResponse().SerializeToString(),
+        media_type="application/x-protobuf",
+    )

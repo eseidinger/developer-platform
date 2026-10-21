@@ -21,25 +21,41 @@ class TraceBoundaryTests(unittest.TestCase):
             env = {"PLATFORM_OTLP_ENDPOINT": "http://alloy:4318/v1/traces"}
             if override is not None:
                 env["PLATFORM_TRACE_SAMPLE_RATE"] = override
-            with self.subTest(override=override), patch.dict(os.environ, env, clear=True), \
-                    patch.object(tracing, "_provider"), patch.object(tracing, "_tracer"), \
-                    patch.object(tracing, "TracerProvider") as provider, \
-                    patch.object(tracing, "BatchSpanProcessor"), \
-                    patch.object(tracing, "OTLPSpanExporter"), \
-                    patch("app.ai_observability.configure"):
+            with (
+                self.subTest(override=override),
+                patch.dict(os.environ, env, clear=True),
+                patch.object(tracing, "_provider"),
+                patch.object(tracing, "_tracer"),
+                patch.object(tracing, "TracerProvider") as provider,
+                patch.object(tracing, "BatchSpanProcessor"),
+                patch.object(tracing, "OTLPSpanExporter"),
+                patch("app.ai_observability.configure"),
+            ):
                 tracing.configure()
                 sampler = provider.call_args.kwargs["sampler"]
                 for trace_id in (1, 2**64, 2**128 - 1):
-                    self.assertEqual(sampler.should_sample(None, trace_id, "test").decision.is_sampled(),
-                                     expected)
+                    self.assertEqual(
+                        sampler.should_sample(
+                            None, trace_id, "test"
+                        ).decision.is_sampled(),
+                        expected,
+                    )
 
     def test_operation_link_accepts_only_sampled_internal_traceparent(self):
         valid = "00-0123456789abcdef0123456789abcdef-0123456789abcdef-01"
         self.assertEqual(len(tracing.origin_link(valid)), 1)
-        self.assertEqual(tracing.origin_link(valid)[0].context.trace_id,
-                         int("0123456789abcdef0123456789abcdef", 16))
-        for invalid in ("", "00-" + "0" * 32 + "-0123456789abcdef-01",
-                        valid[:-2] + "00", valid + "-baggage", False, None):
+        self.assertEqual(
+            tracing.origin_link(valid)[0].context.trace_id,
+            int("0123456789abcdef0123456789abcdef", 16),
+        )
+        for invalid in (
+            "",
+            "00-" + "0" * 32 + "-0123456789abcdef-01",
+            valid[:-2] + "00",
+            valid + "-baggage",
+            False,
+            None,
+        ):
             with self.subTest(invalid=invalid):
                 self.assertEqual(tracing.origin_link(invalid), [])
 

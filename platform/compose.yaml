@@ -1,4 +1,8 @@
+---
+# Control-plane services; shared services and networks come from the root file.
 services:
+
+  # Read-only host observation; only this collector receives the Docker socket.
   host-capacity:
     build: .
     restart: unless-stopped
@@ -17,17 +21,33 @@ services:
     mem_limit: 128m
     cpus: 0.25
     healthcheck:
-      test: ["CMD", "python", "-c", "import json,time; assert time.time()-json.load(open('/var/lib/platform-capacity/host.json'))['captured_at']<60"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - >-
+          import json,time; assert
+          time.time()-json.load(open('/var/lib/platform-capacity/host.json'))['captured_at']<60
       interval: 15s
       timeout: 3s
       retries: 3
+
+  # Authenticate workload traces with a restricted Kubernetes reviewer identity.
   telemetry-gateway:
     build: .
     restart: unless-stopped
-    command: ["uvicorn", "app.telemetry_gateway:app", "--host", "0.0.0.0", "--port", "4318", "--no-access-log"]
+    command:
+      - "uvicorn"
+      - "app.telemetry_gateway:app"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "4318"
+      - "--no-access-log"
     environment:
       POSTGRES_HOST: postgres
-      TELEMETRY_CATALOG_PASSWORD: ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
+      TELEMETRY_CATALOG_PASSWORD: >-
+        ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
       KUBECONFIG: /run/telemetry/kubeconfig
     volumes:
       - ../.runtime/telemetry-reviewer.kubeconfig:/run/telemetry/kubeconfig:ro
@@ -45,10 +65,18 @@ services:
     mem_limit: 256m
     cpus: 0.5
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4318/healthz')"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:4318/healthz')
       interval: 15s
       timeout: 5s
       retries: 5
+
+  # API and portal runtime with separate controller and store credential mounts.
   platform-api:
     build: .
     restart: unless-stopped
@@ -79,18 +107,28 @@ services:
       OPENSEARCH_CA_FILE: /run/stores/opensearch-ca.pem
       QDRANT_IP: ${QDRANT_IP:-172.30.80.18}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
-      TELEMETRY_CATALOG_PASSWORD: ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
+      TELEMETRY_CATALOG_PASSWORD: >-
+        ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
       DATABASE_BASTION_TOKEN: ${DATABASE_BASTION_TOKEN:?Run scripts/init.py}
-      PLATFORM_AUDIT_PASSWORD: ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example to .env}
-      PLATFORM_AUDIT_READER_PASSWORD: ${PLATFORM_AUDIT_READER_PASSWORD:?Add the generated value from .env.example to .env}
-      OIDC_ISSUER: ${OIDC_ISSUER:-https://${IDENTITY_DOMAIN:-identity.localhost}/realms/platform}
+      PLATFORM_AUDIT_PASSWORD: >-
+        ${PLATFORM_AUDIT_PASSWORD:?Add the generated value from .env.example
+        to .env}
+      PLATFORM_AUDIT_READER_PASSWORD: >-
+        ${PLATFORM_AUDIT_READER_PASSWORD:?Add the generated value from
+        .env.example to .env}
+      OIDC_ISSUER: >-
+        ${OIDC_ISSUER:-https://${IDENTITY_DOMAIN:-identity.localhost}/realms/platform}
       OIDC_AUDIENCE: ${OIDC_AUDIENCE:-platform-api}
-      OIDC_JWKS_URL: ${OIDC_JWKS_URL:-http://keycloak:8080/realms/platform/protocol/openid-connect/certs}
-      APPLICATION_ACCESS_JWKS_URL: http://${KEYCLOAK_IP:-172.30.80.12}:8080/realms/platform/protocol/openid-connect/certs
-      APPLICATION_IDENTITY_INTERNAL_URL: http://${KEYCLOAK_IP:-172.30.80.12}:8080
+      OIDC_JWKS_URL: >-
+        ${OIDC_JWKS_URL:-http://keycloak:8080/realms/platform/protocol/openid-connect/certs}
+      APPLICATION_ACCESS_JWKS_URL: >-
+        http://${KEYCLOAK_IP:-172.30.80.12}:8080/realms/platform/protocol/openid-connect/certs
+      APPLICATION_IDENTITY_INTERNAL_URL: >-
+        http://${KEYCLOAK_IP:-172.30.80.12}:8080
       KEYCLOAK_INTERNAL_URL: http://keycloak:8080
       KEYCLOAK_PROVISIONER_CLIENT_ID: platform-credential-provisioner
-      KEYCLOAK_PROVISIONER_SECRET: ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}
+      KEYCLOAK_PROVISIONER_SECRET: >-
+        ${KEYCLOAK_PROVISIONER_SECRET:?Run scripts/init.py}
       PLATFORM_BOOTSTRAP_SUBJECT: ${PLATFORM_BOOTSTRAP_SUBJECT:-}
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
       PROXY_IP: ${PROXY_IP:-172.30.80.20}
@@ -109,10 +147,12 @@ services:
       AI_MODEL_PROVIDER: ${AI_MODEL_PROVIDER:-openai}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_DATA_REGION: ${OPENAI_DATA_REGION:-eu}
-      OPENAI_GLOBAL_PROCESSING_ACCEPTED: ${OPENAI_GLOBAL_PROCESSING_ACCEPTED:-false}
+      OPENAI_GLOBAL_PROCESSING_ACCEPTED: >-
+        ${OPENAI_GLOBAL_PROCESSING_ACCEPTED:-false}
       OPENAI_EU_PROJECT_VERIFIED: ${OPENAI_EU_PROJECT_VERIFIED:-false}
       OPENAI_EU_PROCESSING_VERIFIED: ${OPENAI_EU_PROCESSING_VERIFIED:-false}
-      OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED: ${OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED:-false}
+      OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED: >-
+        ${OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED:-false}
       LANGCHAIN_TRACING_V2: "false"
       ALLOWED_EGRESS_CIDRS: ${ALLOWED_EGRESS_CIDRS:-}
       ALLOWED_EGRESS_PORTS: ${ALLOWED_EGRESS_PORTS:-}
@@ -121,9 +161,12 @@ services:
       CAPACITY_RESERVE_CPU_MILLICORES: ${CAPACITY_RESERVE_CPU_MILLICORES:-2000}
       CAPACITY_RESERVE_MEMORY_MIB: ${CAPACITY_RESERVE_MEMORY_MIB:-8192}
       CAPACITY_HOST_SNAPSHOT: /run/capacity/host.json
-      CAPACITY_HOST_OVERHEAD_CPU_MILLICORES: ${CAPACITY_HOST_OVERHEAD_CPU_MILLICORES:-2000}
-      CAPACITY_HOST_OVERHEAD_MEMORY_MIB: ${CAPACITY_HOST_OVERHEAD_MEMORY_MIB:-1024}
-      CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB: ${CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB:-4096}
+      CAPACITY_HOST_OVERHEAD_CPU_MILLICORES: >-
+        ${CAPACITY_HOST_OVERHEAD_CPU_MILLICORES:-2000}
+      CAPACITY_HOST_OVERHEAD_MEMORY_MIB: >-
+        ${CAPACITY_HOST_OVERHEAD_MEMORY_MIB:-1024}
+      CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB: >-
+        ${CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB:-4096}
       KUBECONFIG: /run/platform/kubeconfig
     volumes:
       - monitoring_discovery:/var/lib/platform-monitoring
@@ -150,11 +193,19 @@ services:
     mem_limit: 512m
     cpus: 1
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:8000/healthz')
       interval: 15s
       timeout: 5s
       retries: 5
 
+
+  # Private data relay; the API controls reachability and leases.
   store-access:
     build: .
     restart: unless-stopped
@@ -185,7 +236,14 @@ services:
     cpus: 0.25
 
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:19999/healthz', timeout=2)"]
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - >-
+          import urllib.request;
+          urllib.request.urlopen('http://localhost:19999/healthz',
+          timeout=2)
       interval: 10s
       timeout: 3s
       start_period: 20s

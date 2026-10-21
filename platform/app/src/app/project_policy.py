@@ -1,16 +1,24 @@
 """Operator-controlled project quota policy shared by admission and manifests."""
+
 import json
 import os
 import re
 
-
 DEFAULT_QUOTA = {
-    "requests.cpu": "2", "requests.memory": "2Gi", "limits.cpu": "4", "limits.memory": "4Gi",
-    "pods": "10", "services": "5", "services.loadbalancers": "0", "services.nodeports": "0",
+    "requests.cpu": "2",
+    "requests.memory": "2Gi",
+    "limits.cpu": "4",
+    "limits.memory": "4Gi",
+    "pods": "10",
+    "services": "5",
+    "services.loadbalancers": "0",
+    "services.nodeports": "0",
     "persistentvolumeclaims": "0",
 }
-TELEMETRY_FORWARDER_RESOURCES = {"requests": {"cpu": "25m", "memory": "64Mi"},
-                                 "limits": {"cpu": "100m", "memory": "128Mi"}}
+TELEMETRY_FORWARDER_RESOURCES = {
+    "requests": {"cpu": "25m", "memory": "64Mi"},
+    "limits": {"cpu": "100m", "memory": "128Mi"},
+}
 OVERRIDABLE = {"requests.cpu", "requests.memory", "limits.cpu", "limits.memory", "pods"}
 
 
@@ -51,7 +59,9 @@ def quota_for(project: str) -> dict:
         configured = json.loads(os.environ.get("PROJECT_QUOTAS_JSON", "{}"))
     except json.JSONDecodeError as exc:
         raise ValueError("operator project quota policy is invalid") from exc
-    if not isinstance(configured, dict) or any(not isinstance(name, str) for name in configured):
+    if not isinstance(configured, dict) or any(
+        not isinstance(name, str) for name in configured
+    ):
         raise ValueError("operator project quota policy is invalid")
     default = configured.get("default", {})
     selected = configured.get(project, {})
@@ -69,28 +79,47 @@ def validate_component_capacity(project: str, components: list[dict]) -> None:
     for component in components:
         replicas = component.get("replicas", 1) if component["type"] == "service" else 1
         steady_pods += replicas
-        largest_service = max(largest_service, replicas if component["type"] == "service" else 0)
-        requested = component.get("resources") or {"requests": {"cpu": "100m", "memory": "128Mi"},
-                                                     "limits": {"cpu": "500m", "memory": "256Mi"}}
+        largest_service = max(
+            largest_service, replicas if component["type"] == "service" else 0
+        )
+        requested = component.get("resources") or {
+            "requests": {"cpu": "100m", "memory": "128Mi"},
+            "limits": {"cpu": "500m", "memory": "256Mi"},
+        }
         if component.get("tracing", {}).get("enabled"):
             sidecar = TELEMETRY_FORWARDER_RESOURCES
         else:
             sidecar = None
-        for section in totals:
-            cpu, memory = _cpu(requested[section]["cpu"]), _memory(requested[section]["memory"])
+        for section, section_totals in totals.items():
+            cpu, memory = (
+                _cpu(requested[section]["cpu"]),
+                _memory(requested[section]["memory"]),
+            )
             if sidecar:
                 cpu += _cpu(sidecar[section]["cpu"])
                 memory += _memory(sidecar[section]["memory"])
-            totals[section]["cpu"] += cpu * replicas
-            totals[section]["memory"] += memory * replicas
+            section_totals["cpu"] += cpu * replicas
+            section_totals["memory"] += memory * replicas
             if component["type"] == "service":
                 surge[section]["cpu"] = max(surge[section]["cpu"], cpu * replicas)
-                surge[section]["memory"] = max(surge[section]["memory"], memory * replicas)
+                surge[section]["memory"] = max(
+                    surge[section]["memory"], memory * replicas
+                )
     if steady_pods + largest_service > int(quota["pods"]):
         raise ValueError("components exceed the namespace pod quota during rollout")
-    limits = {"requests": {"cpu": _cpu(quota["requests.cpu"]), "memory": _memory(quota["requests.memory"])},
-              "limits": {"cpu": _cpu(quota["limits.cpu"]), "memory": _memory(quota["limits.memory"])}}
-    for section in totals:
-        for resource in totals[section]:
-            if totals[section][resource] + surge[section][resource] > limits[section][resource]:
-                raise ValueError("components exceed the namespace resource quota during rollout")
+    limits = {
+        "requests": {
+            "cpu": _cpu(quota["requests.cpu"]),
+            "memory": _memory(quota["requests.memory"]),
+        },
+        "limits": {
+            "cpu": _cpu(quota["limits.cpu"]),
+            "memory": _memory(quota["limits.memory"]),
+        },
+    }
+    for section, section_totals in totals.items():
+        for resource, total in section_totals.items():
+            if total + surge[section][resource] > limits[section][resource]:
+                raise ValueError(
+                    "components exceed the namespace resource quota during rollout"
+                )

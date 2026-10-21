@@ -1,4 +1,5 @@
 """Conservative operator-controlled outbound CIDR/port policy."""
+
 import ipaddress
 import os
 import re
@@ -7,15 +8,22 @@ import socket
 
 def _cidrs():
     try:
-        return [ipaddress.ip_network(value.strip())
-                for value in os.environ.get("ALLOWED_EGRESS_CIDRS", "").split(",") if value.strip()]
+        return [
+            ipaddress.ip_network(value.strip())
+            for value in os.environ.get("ALLOWED_EGRESS_CIDRS", "").split(",")
+            if value.strip()
+        ]
     except ValueError as exc:
         raise ValueError("operator egress policy is invalid") from exc
 
 
 def _ports():
     try:
-        ports = {int(value) for value in os.environ.get("ALLOWED_EGRESS_PORTS", "").split(",") if value.strip()}
+        ports = {
+            int(value)
+            for value in os.environ.get("ALLOWED_EGRESS_PORTS", "").split(",")
+            if value.strip()
+        }
     except ValueError as exc:
         raise ValueError("operator egress policy is invalid") from exc
     if any(port < 1 or port > 65535 for port in ports):
@@ -29,10 +37,20 @@ def validate(destination: dict) -> dict:
     except ValueError as exc:
         raise ValueError("outbound cidr must be a valid CIDR") from exc
     port = destination["port"]
-    platform_network = ipaddress.ip_network(os.environ.get("PLATFORM_SUBNET", "172.30.80.0/24"))
-    if network.version == platform_network.version and network.overlaps(platform_network):
+    platform_network = ipaddress.ip_network(
+        os.environ.get("PLATFORM_SUBNET", "172.30.80.0/24")
+    )
+    if network.version == platform_network.version and network.overlaps(
+        platform_network
+    ):
         raise ValueError("outbound destination overlaps the private platform network")
-    if not any(network.version == allowed.version and network.subnet_of(allowed) for allowed in _cidrs()) or port not in _ports():
+    if (
+        not any(
+            network.version == allowed.version and network.subnet_of(allowed)
+            for allowed in _cidrs()
+        )
+        or port not in _ports()
+    ):
         raise ValueError("outbound destination is not allowed by operator policy")
     return {"cidr": str(network), "port": port}
 
@@ -45,10 +63,15 @@ def resolve(destination: dict) -> dict:
     deployment rather than silently widening egress.
     """
     hostname = destination["dns"].lower().rstrip(".")
-    if not re.fullmatch(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*", hostname):
+    if not re.fullmatch(
+        r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*",
+        hostname,
+    ):
         raise ValueError("outbound dns must be a valid hostname")
     try:
-        answers = socket.getaddrinfo(hostname, destination["port"], type=socket.SOCK_STREAM)
+        answers = socket.getaddrinfo(
+            hostname, destination["port"], type=socket.SOCK_STREAM
+        )
     except OSError as exc:
         raise ValueError("outbound dns could not be resolved") from exc
     addresses = sorted({answer[4][0] for answer in answers})

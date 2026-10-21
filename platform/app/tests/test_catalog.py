@@ -22,23 +22,45 @@ class RecordingConnection:
 
 class CatalogMigrationTests(unittest.TestCase):
     def test_legacy_revision_has_a_lossless_named_service_view(self):
-        legacy = {"name": "shop", "image": "example:v1", "resolved_image": "example@sha256:one", "port": 8080}
+        legacy = {
+            "name": "shop",
+            "image": "example:v1",
+            "resolved_image": "example@sha256:one",
+            "port": 8080,
+        }
         view = component_view(legacy)
-        self.assertEqual(view, [{"name": "app", "type": "service", "image": "example@sha256:one",
-                                 "legacy": True, "ports": [{"name": "http", "port": 8080}]}])
+        self.assertEqual(
+            view,
+            [
+                {
+                    "name": "app",
+                    "type": "service",
+                    "image": "example@sha256:one",
+                    "legacy": True,
+                    "ports": [{"name": "http", "port": 8080}],
+                }
+            ],
+        )
         self.assertNotIn("components", legacy)
 
-    def test_migration_adds_stable_identity_and_versioned_lifecycle_tables_atomically(self):
+    def test_migration_adds_stable_identity_and_versioned_lifecycle_tables_atomically(
+        self,
+    ):
         conn = RecordingConnection()
         initialize(conn)
 
         self.assertTrue(conn.transaction_started)
         statements = [statement for statement, _ in conn.statements]
         joined = "\n".join(statements)
-        self.assertIn("UPDATE projects SET project_id=gen_random_uuid() WHERE project_id IS NULL", joined)
+        self.assertIn(
+            "UPDATE projects SET project_id=gen_random_uuid() WHERE project_id IS NULL",
+            joined,
+        )
         self.assertIn("UNIQUE(project_id, name)", joined)
         self.assertIn("PRIMARY KEY(application_id, revision)", joined)
-        self.assertIn("envelope_version SMALLINT NOT NULL CHECK (envelope_version > 0)", joined)
+        self.assertIn(
+            "envelope_version SMALLINT NOT NULL CHECK (envelope_version > 0)", joined
+        )
         self.assertIn("result_version SMALLINT CHECK (result_version > 0)", joined)
         self.assertIn("actor_issuer TEXT NOT NULL", joined)
         self.assertIn("actor_subject TEXT NOT NULL", joined)

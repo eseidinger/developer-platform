@@ -19,15 +19,17 @@ in the CI system's protected environment and disable shell tracing around this s
 
 ```bash
 export PLATFORM_API_URL=https://platform.example
-export PLATFORM_TOKEN_ENDPOINT=https://identity.example/realms/platform/protocol/openid-connect/token
+export PLATFORM_TOKEN_ENDPOINT=\
+https://identity.example/realms/platform/protocol/openid-connect/token
 export PLATFORM_CLIENT_ID='...'
 export PLATFORM_CLIENT_SECRET='...'
 devplat deploy apply --project hello --file examples/project.json --wait
 ```
 
 `PLATFORM_ACCESS_TOKEN` may be used instead of the deployment-credential variables
-for a short-lived, externally obtained token. The CLI never persists either form of
-authentication material. Deployment credentials authorize deployment and observation
-only; access administration requires a human project-administrator login or an
-externally supplied administrator token. See the [CLI guide](../../docs/developers/cli.md)
-for profiles, login, access commands, and versioned updates.
+for a short-lived, externally obtained token. The CLI never persists either
+form of authentication material. Deployment credentials authorize deployment
+and observation only; access administration requires a human
+project-administrator login or an externally supplied administrator token.
+See the [CLI guide](../../docs/developers/cli.md) for profiles, login, access
+commands, and versioned updates.

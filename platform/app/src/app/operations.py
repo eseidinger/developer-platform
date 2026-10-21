@@ -1,18 +1,19 @@
 """Durable deployment-operation execution with restart recovery."""
+
 import copy
 import logging
 import os
 import threading
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from psycopg.types.json import Jsonb
 
+from . import tracing
 from .audit import Actor, record_event
 from .authorization import is_allowed
 from .identity import Principal
 from .manifests import component_resources
-from . import tracing
-
 
 LIFECYCLE_LOCK_ID = 731904
 OPERATION_LOCK_SQL = "SELECT pg_try_advisory_lock(hashtextextended(%s, 0))"
@@ -42,70 +43,177 @@ def _with_telemetry(manifest, revision, operation_id):
     spec = marked["spec"]
     if manifest["kind"] == "CronJob":
         spec = spec["jobTemplate"]["spec"]
-    annotations = spec["template"].setdefault("metadata", {}).setdefault("annotations", {})
-    annotations.update({"platform.example/revision": str(revision),
-                        "platform.example/operation-id": str(operation_id)})
+    annotations = (
+        spec["template"].setdefault("metadata", {}).setdefault("annotations", {})
+    )
+    annotations.update(
+        {
+            "platform.example/revision": str(revision),
+            "platform.example/operation-id": str(operation_id),
+        }
+    )
     return marked
 
 
-def _finish_failed(conn, operation_id, actor: Actor, project: str, revision: int,
-                   error_code: str, audit_result: str, mark_project_failed: bool,
-                   log: logging.Logger, trace: dict[str, Any] | None = None) -> None:
+def _finish_failed(
+    conn,
+    operation_id,
+    actor: Actor,
+    project: str,
+    revision: int,
+    error_code: str,
+    audit_result: str,
+    mark_project_failed: bool,
+    log: logging.Logger,
+    trace: dict[str, Any] | None = None,
+) -> None:
     tracing.annotate("platform.outcome", "failed")
     tracing.annotate("platform.error_type", error_code)
-    record_event(actor, "operation.execute", "operation", str(operation_id), audit_result,
-                 {"project": project}, {"error_code": error_code, **(trace or {})},
-                 revision=str(revision), operation_id=str(operation_id))
+    record_event(
+        actor,
+        "operation.execute",
+        "operation",
+        str(operation_id),
+        audit_result,
+        {"project": project},
+        {"error_code": error_code, **(trace or {})},
+        revision=str(revision),
+        operation_id=str(operation_id),
+    )
     with conn.transaction():
         if mark_project_failed:
-            conn.execute("UPDATE projects SET status='failed',updated_at=now() WHERE name=%s", (project,))
-        conn.execute("""UPDATE application_operations SET state='failed', result_version=1,
+            conn.execute(
+                "UPDATE projects SET status='failed',updated_at=now() WHERE name=%s",
+                (project,),
+            )
+        conn.execute(
+            """UPDATE application_operations SET state='failed', result_version=1,
             result=%s, error_code=%s, updated_at=now(), completed_at=now()
             WHERE operation_id=%s""",
-            (Jsonb({"error_code": error_code, **(trace or {})}), error_code, operation_id))
-    log.error("Deployment operation failed operation_id=%s error_code=%s trace=%s",
-              operation_id, error_code, trace or {})
+            (
+                Jsonb({"error_code": error_code, **(trace or {})}),
+                error_code,
+                operation_id,
+            ),
+        )
+    log.error(
+        "Deployment operation failed operation_id=%s error_code=%s trace=%s",
+        operation_id,
+        error_code,
+        trace or {},
+    )
 
 
-def _execute_locked(conn, operation_id, password_for: Callable, provision_database: Callable,
-                    apply: Callable, resources: Callable, publish_catalog: Callable,
-                    log: logging.Logger, remove: Callable | None = None, prepare_resources: Callable | None = None) -> None:
-    row = conn.execute("""SELECT o.operation_id, o.application_id, o.revision, o.operation_kind,
+def _execute_locked(
+    conn,
+    operation_id,
+    password_for: Callable,
+    provision_database: Callable,
+    apply: Callable,
+    resources: Callable,
+    publish_catalog: Callable,
+    log: logging.Logger,
+    remove: Callable | None = None,
+    prepare_resources: Callable | None = None,
+) -> None:
+    row = conn.execute(
+        """SELECT o.operation_id, o.application_id, o.revision, o.operation_kind,
             o.state, o.envelope_version, o.envelope, o.actor_issuer, o.actor_subject,
             p.project_id, p.name, p.status
         FROM application_operations o
         JOIN project_applications a ON a.application_id=o.application_id
         JOIN project_environments e ON e.environment_id=a.environment_id
         JOIN projects p ON p.project_id=e.project_id
-        WHERE o.operation_id=%s""", (operation_id,)).fetchone()
+        WHERE o.operation_id=%s""",
+        (operation_id,),
+    ).fetchone()
     if row is None or row[4] not in {"queued", "running"}:
         return
 
-    (_, application_id, revision, operation_kind, _, envelope_version, envelope,
-     actor_issuer, actor_subject, project_id, project, project_status) = row
+    (
+        _,
+        application_id,
+        revision,
+        operation_kind,
+        _,
+        envelope_version,
+        envelope,
+        actor_issuer,
+        actor_subject,
+        project_id,
+        project,
+        project_status,
+    ) = row
     actor = _audit_actor(actor_issuer, actor_subject)
-    conn.execute("""UPDATE application_operations SET state='running',
+    conn.execute(
+        """UPDATE application_operations SET state='running',
         attempt_count=attempt_count+1, started_at=COALESCE(started_at, now()), updated_at=now()
-        WHERE operation_id=%s""", (operation_id,))
+        WHERE operation_id=%s""",
+        (operation_id,),
+    )
 
-    desired = conn.execute("""SELECT revision, spec FROM application_revisions
-        WHERE application_id=%s ORDER BY revision DESC LIMIT 1""", (application_id,)).fetchone()
+    desired = conn.execute(
+        """SELECT revision, spec FROM application_revisions
+        WHERE application_id=%s ORDER BY revision DESC LIMIT 1""",
+        (application_id,),
+    ).fetchone()
     if desired is None or desired[0] != revision:
-        _finish_failed(conn, operation_id, actor, project, revision,
-                       "stale_revision", "rejected", False, log)
+        _finish_failed(
+            conn,
+            operation_id,
+            actor,
+            project,
+            revision,
+            "stale_revision",
+            "rejected",
+            False,
+            log,
+        )
         return
-    if not actor_issuer or not actor_subject or not is_allowed(
-            conn, Principal(actor_issuer, actor_subject), "deploy", project):
-        _finish_failed(conn, operation_id, actor, project, revision,
-                       "authorization_revoked", "denied", True, log)
+    if (
+        not actor_issuer
+        or not actor_subject
+        or not is_allowed(
+            conn, Principal(actor_issuer, actor_subject), "deploy", project
+        )
+    ):
+        _finish_failed(
+            conn,
+            operation_id,
+            actor,
+            project,
+            revision,
+            "authorization_revoked",
+            "denied",
+            True,
+            log,
+        )
         return
     if project_status == "retired":
-        _finish_failed(conn, operation_id, actor, project, revision,
-                       "project_retired", "rejected", False, log)
+        _finish_failed(
+            conn,
+            operation_id,
+            actor,
+            project,
+            revision,
+            "project_retired",
+            "rejected",
+            False,
+            log,
+        )
         return
     if operation_kind == "restart" and project_status != "applied":
-        _finish_failed(conn, operation_id, actor, project, revision,
-                       "not_deployed", "rejected", False, log)
+        _finish_failed(
+            conn,
+            operation_id,
+            actor,
+            project,
+            revision,
+            "not_deployed",
+            "rejected",
+            False,
+            log,
+        )
         return
     expected_identity = {
         "project_id": str(project_id),
@@ -114,9 +222,22 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         "revision": revision,
         "spec": desired[1],
     }
-    if operation_kind not in {"deploy", "restart"} or envelope_version != 1 or envelope != expected_identity:
-        _finish_failed(conn, operation_id, actor, project, revision,
-                       "invalid_operation_envelope", "rejected", True, log)
+    if (
+        operation_kind not in {"deploy", "restart"}
+        or envelope_version != 1
+        or envelope != expected_identity
+    ):
+        _finish_failed(
+            conn,
+            operation_id,
+            actor,
+            project,
+            revision,
+            "invalid_operation_envelope",
+            "rejected",
+            True,
+            log,
+        )
         return
 
     step = "password"
@@ -131,57 +252,124 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
                 for component in spec["components"]:
                     if component.get("exposure") == "public":
                         try:
-                            remove({"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
-                                    "metadata": {"name": component["name"] + "-public", "namespace": "project-" + project}})
+                            remove(
+                                {
+                                    "apiVersion": "networking.k8s.io/v1",
+                                    "kind": "Ingress",
+                                    "metadata": {
+                                        "name": component["name"] + "-public",
+                                        "namespace": "project-" + project,
+                                    },
+                                }
+                            )
                         except Exception as exc:
                             if getattr(exc, "status", None) != 404:
                                 raise
-            manifests = component_resources(project, spec["components"], os.environ["POSTGRES_IP"], password,
-                                            spec.get("configuration"), os.environ["APPS_DOMAIN"])
+            manifests = component_resources(
+                project,
+                spec["components"],
+                os.environ["POSTGRES_IP"],
+                password,
+                spec.get("configuration"),
+                os.environ["APPS_DOMAIN"],
+            )
         else:
-            manifests = resources(project, spec.get("resolved_image", spec["image"]), spec["port"],
-                                  os.environ["APPS_DOMAIN"], os.environ["POSTGRES_IP"], password,
-                                  spec.get("resources"), spec.get("configuration"),
-                                  readiness_path=spec.get("readiness_path"),
-                                  readiness_port=spec.get("readiness_port"))
+            manifests = resources(
+                project,
+                spec.get("resolved_image", spec["image"]),
+                spec["port"],
+                os.environ["APPS_DOMAIN"],
+                os.environ["POSTGRES_IP"],
+                password,
+                spec.get("resources"),
+                spec.get("configuration"),
+                readiness_path=spec.get("readiness_path"),
+                readiness_port=spec.get("readiness_port"),
+            )
         if prepare_resources is not None:
             manifests = prepare_resources(conn, project, spec, manifests)
-        previous = conn.execute("""SELECT spec FROM application_revisions
+        previous = conn.execute(
+            """SELECT spec FROM application_revisions
             WHERE application_id=%s AND revision<%s ORDER BY revision DESC LIMIT 1""",
-                                (application_id, revision)).fetchone()
+            (application_id, revision),
+        ).fetchone()
         if remove and previous and previous[0].get("components") is not None:
-            old_manifests = component_resources(project, previous[0]["components"], os.environ["POSTGRES_IP"],
-                                                password, previous[0].get("configuration"), os.environ["APPS_DOMAIN"])
-            desired_ids = {(m["apiVersion"], m["kind"], m["metadata"]["name"]) for m in manifests}
+            old_manifests = component_resources(
+                project,
+                previous[0]["components"],
+                os.environ["POSTGRES_IP"],
+                password,
+                previous[0].get("configuration"),
+                os.environ["APPS_DOMAIN"],
+            )
+            desired_ids = {
+                (m["apiVersion"], m["kind"], m["metadata"]["name"]) for m in manifests
+            }
             for manifest in old_manifests:
-                identity = (manifest["apiVersion"], manifest["kind"], manifest["metadata"]["name"])
-                if manifest["kind"] in {"Deployment", "Service", "ServiceAccount", "CronJob", "Ingress", "NetworkPolicy", "Role", "RoleBinding"} and identity not in desired_ids:
+                identity = (
+                    manifest["apiVersion"],
+                    manifest["kind"],
+                    manifest["metadata"]["name"],
+                )
+                if (
+                    manifest["kind"]
+                    in {
+                        "Deployment",
+                        "Service",
+                        "ServiceAccount",
+                        "CronJob",
+                        "Ingress",
+                        "NetworkPolicy",
+                        "Role",
+                        "RoleBinding",
+                    }
+                    and identity not in desired_ids
+                ):
                     step = f"delete:{manifest['kind']}"
                     remove(manifest)
         if operation_kind == "restart":
             # The marker is this operation's ID, so a reclaimed retry cannot restart twice.
             marker = str(operation_id)
-            manifests = [_with_restart_marker(m, marker) for m in manifests if m["kind"] == "Deployment"]
+            manifests = [
+                _with_restart_marker(m, marker)
+                for m in manifests
+                if m["kind"] == "Deployment"
+            ]
         else:
             step = "catalog"
             publish_catalog(conn)
             step = "database"
-            with tracing.span("platform.operation.step", **{"platform.step": "database"}):
+            with tracing.span(
+                "platform.operation.step", **{"platform.step": "database"}
+            ):
                 if prepare_resources is None:
                     provision_database(conn, project, password)
             # Keep the last restart marker so server-side apply does not roll the pods again.
-            latest = conn.execute("""SELECT latest_restart.operation_id
+            latest = conn.execute(
+                """SELECT latest_restart.operation_id
                 FROM application_operations latest_restart
                 WHERE latest_restart.application_id=%s AND latest_restart.operation_kind='restart'
                 AND latest_restart.state='succeeded'
-                ORDER BY latest_restart.completed_at DESC LIMIT 1""", (application_id,)).fetchone()
+                ORDER BY latest_restart.completed_at DESC LIMIT 1""",
+                (application_id,),
+            ).fetchone()
             if latest:
-                manifests = [_with_restart_marker(m, str(latest[0])) if m["kind"] == "Deployment" else m
-                             for m in manifests]
+                manifests = [
+                    _with_restart_marker(m, str(latest[0]))
+                    if m["kind"] == "Deployment"
+                    else m
+                    for m in manifests
+                ]
         for manifest in manifests:
             manifest = _with_telemetry(manifest, revision, operation_id)
             step = f"apply:{manifest['kind']}"
-            with tracing.span("platform.operation.step", **{"platform.step": "apply", "platform.resource_kind": manifest["kind"]}):
+            with tracing.span(
+                "platform.operation.step",
+                **{
+                    "platform.step": "apply",
+                    "platform.resource_kind": manifest["kind"],
+                },
+            ):
                 apply(manifest)
     except Exception as exc:
         # Only the step, exception class and numeric HTTP status are kept; the message may hold secrets.
@@ -189,8 +377,18 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         status = getattr(exc, "status", None)
         if isinstance(status, int):
             trace["http_status"] = status
-        _finish_failed(conn, operation_id, actor, project, revision,
-                       "provider_error", "failed", True, log, trace)
+        _finish_failed(
+            conn,
+            operation_id,
+            actor,
+            project,
+            revision,
+            "provider_error",
+            "failed",
+            True,
+            log,
+            trace,
+        )
         return
 
     result: dict[str, Any] = {
@@ -199,23 +397,49 @@ def _execute_locked(conn, operation_id, password_for: Callable, provision_databa
         "namespace": "project-" + project,
         "host": project + "." + os.environ["APPS_DOMAIN"],
     }
-    record_event(actor, "operation.execute", "operation", str(operation_id), "succeeded",
-                 {"project": project}, {"status": result["status"]},
-                 revision=str(revision), operation_id=str(operation_id))
+    record_event(
+        actor,
+        "operation.execute",
+        "operation",
+        str(operation_id),
+        "succeeded",
+        {"project": project},
+        {"status": result["status"]},
+        revision=str(revision),
+        operation_id=str(operation_id),
+    )
     with conn.transaction():
         if operation_kind == "deploy":
-            conn.execute("UPDATE projects SET status='applied',updated_at=now() WHERE name=%s", (project,))
-        conn.execute("""UPDATE application_operations SET state='succeeded', result_version=1,
+            conn.execute(
+                "UPDATE projects SET status='applied',updated_at=now() WHERE name=%s",
+                (project,),
+            )
+        conn.execute(
+            """UPDATE application_operations SET state='succeeded', result_version=1,
             result=%s, error_code=NULL, updated_at=now(), completed_at=now()
-            WHERE operation_id=%s""", (Jsonb(result), operation_id))
-    log.info("Deployment operation applied operation_id=%s project=%s revision=%s",
-             operation_id, project, revision)
+            WHERE operation_id=%s""",
+            (Jsonb(result), operation_id),
+        )
+    log.info(
+        "Deployment operation applied operation_id=%s project=%s revision=%s",
+        operation_id,
+        project,
+        revision,
+    )
     tracing.annotate("platform.outcome", "succeeded")
 
 
-def process_one(connect: Callable, password_for: Callable, provision_database: Callable,
-                apply: Callable, resources: Callable, publish_catalog: Callable,
-                log: logging.Logger, remove: Callable | None = None, prepare_resources: Callable | None = None) -> bool:
+def process_one(
+    connect: Callable,
+    password_for: Callable,
+    provision_database: Callable,
+    apply: Callable,
+    resources: Callable,
+    publish_catalog: Callable,
+    log: logging.Logger,
+    remove: Callable | None = None,
+    prepare_resources: Callable | None = None,
+) -> bool:
     with connect() as conn:
         candidates = conn.execute("""SELECT operation_id FROM application_operations
             WHERE state IN ('queued', 'running') ORDER BY created_at LIMIT 100""").fetchall()
@@ -227,30 +451,67 @@ def process_one(connect: Callable, password_for: Callable, provision_database: C
             try:
                 conn.execute("SELECT pg_advisory_lock(%s)", (LIFECYCLE_LOCK_ID,))
                 lifecycle_locked = True
-                origin = conn.execute("SELECT origin_traceparent FROM application_operations WHERE operation_id=%s",
-                                      (operation_id,)).fetchone()
-                with tracing.span("platform.operation.execute", links=tracing.origin_link(origin[0] if origin else None),
-                                  **{"platform.operation.id": str(operation_id)}):
-                    _execute_locked(conn, operation_id, password_for, provision_database,
-                                    apply, resources, publish_catalog, log, remove, prepare_resources)
+                origin = conn.execute(
+                    "SELECT origin_traceparent FROM application_operations WHERE operation_id=%s",
+                    (operation_id,),
+                ).fetchone()
+                with tracing.span(
+                    "platform.operation.execute",
+                    links=tracing.origin_link(origin[0] if origin else None),
+                    **{"platform.operation.id": str(operation_id)},
+                ):
+                    _execute_locked(
+                        conn,
+                        operation_id,
+                        password_for,
+                        provision_database,
+                        apply,
+                        resources,
+                        publish_catalog,
+                        log,
+                        remove,
+                        prepare_resources,
+                    )
                 return True
             finally:
                 if lifecycle_locked:
                     conn.execute("SELECT pg_advisory_unlock(%s)", (LIFECYCLE_LOCK_ID,))
-                conn.execute("SELECT pg_advisory_unlock(hashtextextended(%s, 0))",
-                             (str(operation_id),))
+                conn.execute(
+                    "SELECT pg_advisory_unlock(hashtextextended(%s, 0))",
+                    (str(operation_id),),
+                )
     return False
 
 
-def operation_loop(stop: threading.Event, connect: Callable, password_for: Callable,
-                   provision_database: Callable, apply: Callable, resources: Callable,
-                   publish_catalog: Callable, log: logging.Logger, remove: Callable | None = None, prepare_resources: Callable | None = None) -> None:
+def operation_loop(
+    stop: threading.Event,
+    connect: Callable,
+    password_for: Callable,
+    provision_database: Callable,
+    apply: Callable,
+    resources: Callable,
+    publish_catalog: Callable,
+    log: logging.Logger,
+    remove: Callable | None = None,
+    prepare_resources: Callable | None = None,
+) -> None:
     while not stop.is_set():
         try:
-            processed = process_one(connect, password_for, provision_database,
-                                    apply, resources, publish_catalog, log, remove, prepare_resources)
+            processed = process_one(
+                connect,
+                password_for,
+                provision_database,
+                apply,
+                resources,
+                publish_catalog,
+                log,
+                remove,
+                prepare_resources,
+            )
         except Exception as exc:
-            log.error("Operation worker iteration failed error_type=%s", type(exc).__name__)
+            log.error(
+                "Operation worker iteration failed error_type=%s", type(exc).__name__
+            )
             processed = False
         if not processed:
             stop.wait(2)

@@ -40,6 +40,8 @@ def safe_error_body(value: Any) -> tuple[str, str | None]:
     detail = value.get("detail")
     code = value.get("code")
     return (
-        detail if isinstance(detail, str) else "The platform returned an error without a safe detail.",
+        detail
+        if isinstance(detail, str)
+        else "The platform returned an error without a safe detail.",
         code if isinstance(code, str) else None,
     )

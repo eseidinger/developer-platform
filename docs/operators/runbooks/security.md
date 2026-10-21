@@ -17,7 +17,7 @@ platform authorization does not wait for a token to expire after a grant is
 removed. The one-time `PLATFORM_BOOTSTRAP_SUBJECT` is host configuration, not an
 API credential; remove it after first startup.
 
-Preserve `DATABASE_KEY` during recovery. Changing it changes derived Secrets but does not update existing PostgreSQL role passwords; rotation requires coordinated role-password and workload-Secret changes. Follow the [platform configuration notes](../../../platform/README.md#configuration). The [controller rotation procedure](../lifecycle.md#rotate-the-controller-credential) describes the infrastructure credential separately. Never include secret values in incident records.
+Preserve `DATABASE_KEY` during recovery. Changing it changes derived Secrets but does not update existing PostgreSQL role passwords; rotation requires coordinated role-password and workload-Secret changes. Follow the [platform configuration notes](../../../platform/README.md#source-ownership). The [controller rotation procedure](../lifecycle.md#rotate-the-controller-credential) describes the infrastructure credential separately. Never include secret values in incident records.
 
 ## Hosted application revocation and rotation
 

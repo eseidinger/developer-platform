@@ -25,8 +25,12 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def do_POST(self):
-        if (self.path != "/v1/traces" or self.headers.get("Content-Type", "").split(";", 1)[0]
-                != "application/x-protobuf" or self.headers.get("Transfer-Encoding")):
+        if (
+            self.path != "/v1/traces"
+            or self.headers.get("Content-Type", "").split(";", 1)[0]
+            != "application/x-protobuf"
+            or self.headers.get("Transfer-Encoding")
+        ):
             self._reply(415)
             return
         try:
@@ -50,8 +54,15 @@ class Handler(BaseHTTPRequestHandler):
             if not 0 < len(token) <= 8192 or any(byte in token for byte in b"\r\n\t "):
                 self._reply(503)
                 return
-            request = urllib.request.Request(GATEWAY, data=body, method="POST", headers={
-                "Content-Type": "application/x-protobuf", "Authorization": "Bearer " + token.decode("ascii")})
+            request = urllib.request.Request(
+                GATEWAY,
+                data=body,
+                method="POST",
+                headers={
+                    "Content-Type": "application/x-protobuf",
+                    "Authorization": "Bearer " + token.decode("ascii"),
+                },
+            )
             with _opener.open(request, timeout=2) as response:
                 result = response.read(4096)
             self._reply(200, result)

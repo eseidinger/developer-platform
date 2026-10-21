@@ -5,10 +5,10 @@ from contextlib import ExitStack
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+from app.identity import Principal
 from fastapi import HTTPException
 
 from app import main
-from app.identity import Principal
 
 
 class ApprovalEndpointGuardTests(unittest.TestCase):
@@ -21,11 +21,19 @@ class ApprovalEndpointGuardTests(unittest.TestCase):
         self.conn = MagicMock()
         self.conn.__enter__.return_value = self.conn
         self.stack.enter_context(patch.object(main, "connect", return_value=self.conn))
-        self.permission = self.stack.enter_context(patch.object(main, "require_permission"))
-        self.scope = self.stack.enter_context(patch.object(main, "access_scope", return_value=None))
-        self.allowed = self.stack.enter_context(patch.object(main, "is_allowed", return_value=True))
+        self.permission = self.stack.enter_context(
+            patch.object(main, "require_permission")
+        )
+        self.scope = self.stack.enter_context(
+            patch.object(main, "access_scope", return_value=None)
+        )
+        self.allowed = self.stack.enter_context(
+            patch.object(main, "is_allowed", return_value=True)
+        )
         self.queue = self.stack.enter_context(patch.object(main, "queue_deploy"))
-        self.consume = self.stack.enter_context(patch.object(main.ai_changes, "consume"))
+        self.consume = self.stack.enter_context(
+            patch.object(main.ai_changes, "consume")
+        )
         self.audit = self.stack.enter_context(patch.object(main, "required_audit"))
 
     def execute(self):
@@ -48,7 +56,9 @@ class ApprovalEndpointGuardTests(unittest.TestCase):
         self.assert_rejected_without_write(403)
         with patch.object(main.ai_changes, "approve") as approve:
             with self.assertRaises(HTTPException) as error:
-                main.approve_ai_proposal("lab", self.proposal, self.body, self.principal)
+                main.approve_ai_proposal(
+                    "lab", self.proposal, self.body, self.principal
+                )
             self.assertEqual(error.exception.status_code, 403)
             approve.assert_not_called()
 
@@ -59,8 +69,11 @@ class ApprovalEndpointGuardTests(unittest.TestCase):
         self.allowed.assert_called_once_with(self.conn, self.principal, "manage", "lab")
 
     def test_unavailable_approval_rejected_and_audited_before_queue(self):
-        with patch.object(main.ai_changes, "approved_for_execution",
-                          side_effect=main.ai_changes.ProposalUnavailable("Unavailable")):
+        with patch.object(
+            main.ai_changes,
+            "approved_for_execution",
+            side_effect=main.ai_changes.ProposalUnavailable("Unavailable"),
+        ):
             self.assert_rejected_without_write(409)
         self.assertEqual(self.audit.call_args.args[4], "rejected")
 
@@ -71,7 +84,9 @@ class ApprovalEndpointGuardTests(unittest.TestCase):
             with self.assertRaises(HTTPException) as error:
                 self.execute()
         self.assertEqual(error.exception.status_code, 409)
-        self.queue.assert_called_once_with(self.conn, self.principal, "lab", None, 2, target=1)
+        self.queue.assert_called_once_with(
+            self.conn, self.principal, "lab", None, 2, target=1
+        )
         self.consume.assert_not_called()
         self.assertEqual(self.audit.call_args.args[4], "rejected")
 
@@ -83,15 +98,25 @@ class ApprovalEndpointGuardTests(unittest.TestCase):
         with self.assertRaises(main.RevisionConflict):
             main.queue_deploy(connection, self.principal, "lab", None, 2, target=1)
         statements = [call.args[0] for call in connection.execute.call_args_list]
-        self.assertFalse(any(word in statement for statement in statements
-                             for word in ("INSERT ", "UPDATE ", "DELETE ")))
+        self.assertFalse(
+            any(
+                word in statement
+                for statement in statements
+                for word in ("INSERT ", "UPDATE ", "DELETE ")
+            )
+        )
         self.assertIn("pg_advisory_unlock", statements[-1])
 
     def test_approval_changed_hash_rejection_is_audited(self):
-        with patch.object(main.ai_changes, "approve",
-                          side_effect=main.ai_changes.ProposalUnavailable("Diff changed")):
-            with self.assertRaises(HTTPException) as error:
-                main.approve_ai_proposal("lab", self.proposal, self.body, self.principal)
+        with (
+            patch.object(
+                main.ai_changes,
+                "approve",
+                side_effect=main.ai_changes.ProposalUnavailable("Diff changed"),
+            ),
+            self.assertRaises(HTTPException) as error,
+        ):
+            main.approve_ai_proposal("lab", self.proposal, self.body, self.principal)
         self.assertEqual(error.exception.status_code, 409)
         self.assertEqual(self.audit.call_args.args[4], "rejected")
         self.queue.assert_not_called()

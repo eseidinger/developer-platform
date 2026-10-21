@@ -1,4 +1,5 @@
 """Resolve public image tags to immutable digests before a revision is accepted."""
+
 import json
 import os
 import re
@@ -8,12 +9,7 @@ import urllib.request
 
 DEFAULT_REGISTRIES = "docker.io,ghcr.io,quay.io"
 TIMEOUT_SECONDS = 10
-MANIFEST_TYPES = ", ".join([
-    "application/vnd.oci.image.index.v1+json",
-    "application/vnd.oci.image.manifest.v1+json",
-    "application/vnd.docker.distribution.manifest.list.v2+json",
-    "application/vnd.docker.distribution.manifest.v2+json",
-])
+MANIFEST_TYPES = "application/vnd.oci.image.index.v1+json, application/vnd.oci.image.manifest.v1+json, application/vnd.docker.distribution.manifest.list.v2+json, application/vnd.docker.distribution.manifest.v2+json"
 DIGEST = re.compile(r"^sha256:[0-9a-f]{64}$")
 # Docker Hub serves the registry and its anonymous token service from different hosts.
 API_HOSTS = {"docker.io": ("registry-1.docker.io", "auth.docker.io")}
@@ -55,12 +51,20 @@ class _NoRedirects(urllib.request.HTTPRedirectHandler):
         return None
 
 
-def _request(url: str, headers: dict[str, str], method: str = "GET") -> tuple[int, dict[str, str], bytes]:
+def _request(
+    url: str, headers: dict[str, str], method: str = "GET"
+) -> tuple[int, dict[str, str], bytes]:
     opener = urllib.request.build_opener(_NoRedirects)
     try:
-        with opener.open(urllib.request.Request(url, headers=headers, method=method),
-                         timeout=TIMEOUT_SECONDS) as response:
-            return response.status, {k.lower(): v for k, v in response.headers.items()}, response.read(65536)
+        with opener.open(
+            urllib.request.Request(url, headers=headers, method=method),
+            timeout=TIMEOUT_SECONDS,
+        ) as response:
+            return (
+                response.status,
+                {k.lower(): v for k, v in response.headers.items()},
+                response.read(65536),
+            )
     except urllib.error.HTTPError as exc:
         return exc.code, {k.lower(): v for k, v in exc.headers.items()}, b""
     except (urllib.error.URLError, OSError, ValueError) as exc:
@@ -70,7 +74,11 @@ def _request(url: str, headers: dict[str, str], method: str = "GET") -> tuple[in
 def _anonymous_token(challenge: str, hosts: tuple[str, ...], path: str) -> str:
     params = dict(re.findall(r'(\w+)="([^"]*)"', challenge))
     realm = urllib.parse.urlsplit(params.get("realm", ""))
-    if not challenge.lower().startswith("bearer") or realm.scheme != "https" or realm.hostname not in hosts:
+    if (
+        not challenge.lower().startswith("bearer")
+        or realm.scheme != "https"
+        or realm.hostname not in hosts
+    ):
         raise ImageResolutionError("unavailable")
     query = {"scope": f"repository:{path}:pull"}
     if "service" in params:
@@ -102,8 +110,12 @@ def resolve_image(image: str) -> str:
     headers = {"Accept": MANIFEST_TYPES}
     status, response, _ = _request(url, headers, "HEAD")
     if status == 401:
-        token = _anonymous_token(response.get("www-authenticate", ""), (api_host, token_host), path)
-        status, response, _ = _request(url, {**headers, "Authorization": "Bearer " + token}, "HEAD")
+        token = _anonymous_token(
+            response.get("www-authenticate", ""), (api_host, token_host), path
+        )
+        status, response, _ = _request(
+            url, {**headers, "Authorization": "Bearer " + token}, "HEAD"
+        )
     if status in (401, 403, 404):
         raise ImageResolutionError("not_found")
     resolved = response.get("docker-content-digest", "")
@@ -112,5 +124,5 @@ def resolve_image(image: str) -> str:
     repository = image.partition("@")[0]
     last = repository.rpartition("/")[2]
     if ":" in last:
-        repository = repository[:len(repository) - len(last)] + last.partition(":")[0]
+        repository = repository[: len(repository) - len(last)] + last.partition(":")[0]
     return f"{repository}@{resolved}"

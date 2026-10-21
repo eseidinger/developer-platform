@@ -1,4 +1,6 @@
+# Pod-local bridge: a standard-library-only process with no API dependencies.
 FROM python:3.14.7-slim-trixie
 COPY telemetry_forwarder.py /forwarder.py
+# Match the unprivileged application workload identity.
 USER 10001:10001
 CMD ["python", "/forwarder.py"]

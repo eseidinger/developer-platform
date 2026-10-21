@@ -1,9 +1,9 @@
 """Provider-neutral model boundary; the initial OpenAI path fails closed."""
 
 import os
+from typing import Any, Protocol
 
 from . import ai_pricing
-from typing import Protocol, Any
 
 
 class ModelUnavailable(Exception):
@@ -32,10 +32,15 @@ class OpenAIModelAdapter:
             base_url = "https://api.openai.com/v1"
             self.regional_cost_multiplier = 1.0
         elif region == "eu":
-            checks = ("OPENAI_EU_PROJECT_VERIFIED", "OPENAI_EU_PROCESSING_VERIFIED",
-                      "OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED")
+            checks = (
+                "OPENAI_EU_PROJECT_VERIFIED",
+                "OPENAI_EU_PROCESSING_VERIFIED",
+                "OPENAI_MODIFIED_RETENTION_AMENDMENT_VERIFIED",
+            )
             if any(os.environ.get(key) != "true" for key in checks):
-                raise ModelUnavailable("EU model eligibility and retention terms are not verified")
+                raise ModelUnavailable(
+                    "EU model eligibility and retention terms are not verified"
+                )
             base_url = "https://eu.api.openai.com/v1"
             self.regional_cost_multiplier = 1.1
         else:
@@ -44,13 +49,19 @@ class OpenAIModelAdapter:
         if not key:
             raise ModelUnavailable("OpenAI API key is not configured")
         from langchain_openai import ChatOpenAI
+
         self.model = ChatOpenAI(
-            model="gpt-6.1-sol", api_key=key,
-            base_url=base_url, use_responses_api=True,
-            store=False, use_previous_response_id=False,
-            reasoning_effort="low", max_tokens=1024,
+            model="gpt-6.1-sol",
+            api_key=key,
+            base_url=base_url,
+            use_responses_api=True,
+            store=False,
+            use_previous_response_id=False,
+            reasoning_effort="low",
+            max_tokens=1024,
             service_tier="default",
-            timeout=30, max_retries=0,
+            timeout=30,
+            max_retries=0,
         )
 
     def bind_tools(self, tools, *, allow_tools=True):
@@ -58,8 +69,11 @@ class OpenAIModelAdapter:
         return self.model.bind_tools(tools, parallel_tool_calls=False, **options)
 
     def estimate_cost_usd(self, input_tokens: int, output_tokens: int) -> float:
-        return ai_pricing.estimate(self.name, {"input_tokens": input_tokens,
-            "output_tokens": output_tokens}, self.regional_cost_multiplier).usd
+        return ai_pricing.estimate(
+            self.name,
+            {"input_tokens": input_tokens, "output_tokens": output_tokens},
+            self.regional_cost_multiplier,
+        ).usd
 
     def estimate_usage(self, usage):
         return ai_pricing.estimate(self.name, usage, self.regional_cost_multiplier)

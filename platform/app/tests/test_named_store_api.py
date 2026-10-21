@@ -1,13 +1,15 @@
 """Authorization boundaries for resource administration and personal credentials."""
+
 from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest import TestCase, main
 from unittest.mock import Mock, patch
 from uuid import uuid4
-from fastapi import FastAPI, HTTPException
-from fastapi.testclient import TestClient
+
 from app.identity import Principal
 from app.stores import api, catalog
+from fastapi import FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
 
 class StoreApiTests(TestCase):
@@ -15,97 +17,185 @@ class StoreApiTests(TestCase):
         guard = patch("app.stores.recovery.required", return_value=False)
         guard.start()
         self.addCleanup(guard.stop)
-        self.principal = Principal("https://fixture.invalid", "admin", authorized_party="platform-cli")
+        self.principal = Principal(
+            "https://fixture.invalid", "admin", authorized_party="platform-cli"
+        )
         self.conn = Mock()
         self.conn.transaction.return_value = nullcontext()
-        self.control = SimpleNamespace(connect=lambda: nullcontext(self.conn),
-            current_principal=lambda: self.principal, access_scope=Mock(return_value=None),
-            require_permission=Mock(), require_platform_admin=Mock(), required_audit=Mock(),
-            actor_for=Mock(), is_allowed=Mock(return_value=True))
+        self.control = SimpleNamespace(
+            connect=lambda: nullcontext(self.conn),
+            current_principal=lambda: self.principal,
+            access_scope=Mock(return_value=None),
+            require_permission=Mock(),
+            require_platform_admin=Mock(),
+            required_audit=Mock(),
+            actor_for=Mock(),
+            is_allowed=Mock(return_value=True),
+        )
         app = FastAPI()
         api.install(app, self.control)
         self.client = TestClient(app)
         self.resource_id = uuid4()
         self.grant_id = uuid4()
 
-    def test_recovery_quarantine_blocks_reveal_and_issuance_before_provider_access(self):
-        with patch("app.stores.recovery.required", return_value=True), \
-                patch.object(catalog, "issue") as issue, patch.object(catalog, "_object") as credential:
+    def test_recovery_quarantine_blocks_reveal_and_issuance_before_provider_access(
+        self,
+    ):
+        with (
+            patch("app.stores.recovery.required", return_value=True),
+            patch.object(catalog, "issue") as issue,
+            patch.object(catalog, "_object") as credential,
+        ):
             issued = self.client.post(f"/v1/store-access/{self.grant_id}/credentials")
             revealed = self.client.get(f"/v1/store-access/credentials/{uuid4()}")
         self.assertEqual(issued.status_code, 503)
         self.assertEqual(revealed.status_code, 503)
-        issue.assert_not_called(); credential.assert_not_called()
+        issue.assert_not_called()
+        credential.assert_not_called()
 
     def test_foreign_resource_administration_checks_owning_project(self):
         self.control.require_permission.side_effect = HTTPException(403, "Denied")
         with patch.object(catalog, "resource", return_value={"owner_project": "alpha"}):
             response = self.client.get(f"/v1/resources/{self.resource_id}")
         self.assertEqual(response.status_code, 403)
-        self.control.require_permission.assert_called_once_with(self.principal, "manage", "alpha")
+        self.control.require_permission.assert_called_once_with(
+            self.principal, "manage", "alpha"
+        )
 
     def test_resource_detail_reports_each_provider_quota_mode(self):
-        modes = {'s3': 'hard', 'qdrant': 'advisory', 'opensearch': 'advisory',
-                 'neo4j': 'advisory', 'postgresql': 'advisory: PostgreSQL has no hard per-database byte quota'}
+        modes = {
+            "s3": "hard",
+            "qdrant": "advisory",
+            "opensearch": "advisory",
+            "neo4j": "advisory",
+            "postgresql": "advisory: PostgreSQL has no hard per-database byte quota",
+        }
         for provider, expected in modes.items():
-            with self.subTest(provider=provider), patch.object(catalog, 'resource', return_value={
-                    'resource_id': str(self.resource_id), 'owner_project': 'alpha', 'provider': provider}), \
-                    patch.object(api.providers, 'get') as selected:
+            with (
+                self.subTest(provider=provider),
+                patch.object(
+                    catalog,
+                    "resource",
+                    return_value={
+                        "resource_id": str(self.resource_id),
+                        "owner_project": "alpha",
+                        "provider": provider,
+                    },
+                ),
+                patch.object(api.providers, "get") as selected,
+            ):
                 selected.return_value.quota_enforcement = expected
-                response = self.client.get(f'/v1/resources/{self.resource_id}')
+                response = self.client.get(f"/v1/resources/{self.resource_id}")
                 self.assertEqual(response.status_code, 200)
-                self.assertEqual(response.json()['quota_enforcement'], expected)
+                self.assertEqual(response.json()["quota_enforcement"], expected)
 
     def test_platform_admin_does_not_implicitly_receive_another_humans_credential(self):
         credential_id = uuid4()
-        with patch.object(catalog, "_object", return_value={"grant_id": str(self.grant_id)}), \
-                patch.object(catalog, "grant", return_value={"kind": "human", "issuer": self.principal.issuer,
-                    "subject": "someone-else"}), patch.object(api.providers, "get") as provider:
+        with (
+            patch.object(
+                catalog, "_object", return_value={"grant_id": str(self.grant_id)}
+            ),
+            patch.object(
+                catalog,
+                "grant",
+                return_value={
+                    "kind": "human",
+                    "issuer": self.principal.issuer,
+                    "subject": "someone-else",
+                },
+            ),
+            patch.object(api.providers, "get") as provider,
+        ):
             response = self.client.get(f"/v1/store-access/credentials/{credential_id}")
         self.assertEqual(response.status_code, 404)
         provider.assert_not_called()
 
-    def test_machine_data_access_requires_human_and_resource_admin_checks_current_role(self):
+    def test_machine_data_access_requires_human_and_resource_admin_checks_current_role(
+        self,
+    ):
         self.control.access_scope.return_value = {"kind": "deployment"}
         self.control.require_permission.side_effect = HTTPException(403, "Denied")
-        with patch.object(catalog, "create_resource") as create, patch.object(catalog, "issue") as issue:
-            response = self.client.post("/v1/projects/alpha/resources", json={"name": "db", "provider": "postgresql"})
-            credential = self.client.post(f"/v1/store-access/{self.grant_id}/credentials")
+        with (
+            patch.object(catalog, "create_resource") as create,
+            patch.object(catalog, "issue") as issue,
+        ):
+            response = self.client.post(
+                "/v1/projects/alpha/resources",
+                json={"name": "db", "provider": "postgresql"},
+            )
+            credential = self.client.post(
+                f"/v1/store-access/{self.grant_id}/credentials"
+            )
         self.assertEqual(response.status_code, 403)
         self.assertEqual(credential.status_code, 403)
-        create.assert_not_called(); issue.assert_not_called()
+        create.assert_not_called()
+        issue.assert_not_called()
 
     def test_unregistered_service_client_is_not_treated_as_human(self):
-        self.principal = Principal("https://fixture.invalid", "service", authorized_party="custom-service")
+        self.principal = Principal(
+            "https://fixture.invalid", "service", authorized_party="custom-service"
+        )
         self.control.access_scope.return_value = None
-        with patch.object(catalog, "issue") as issue, patch.object(catalog, "grant") as grant:
+        with (
+            patch.object(catalog, "issue") as issue,
+            patch.object(catalog, "grant") as grant,
+        ):
             response = self.client.post(f"/v1/store-access/{self.grant_id}/credentials")
         self.assertEqual(response.status_code, 403)
-        issue.assert_not_called(); grant.assert_not_called()
+        issue.assert_not_called()
+        grant.assert_not_called()
 
     def test_purge_requires_exact_version_resource_and_owner(self):
-        row = {"resource_id": str(self.resource_id), "owner_project": "alpha", "state": "retired",
-               "observed_state": "retired", "version": 3}
+        row = {
+            "resource_id": str(self.resource_id),
+            "owner_project": "alpha",
+            "state": "retired",
+            "observed_state": "retired",
+            "version": 3,
+        }
         from app.stores.contract import Purge
-        for body in (Purge(version=2, confirm_resource_id=self.resource_id, confirm_owner_project="alpha"),
-                     Purge(version=3, confirm_resource_id=uuid4(), confirm_owner_project="alpha"),
-                     Purge(version=3, confirm_resource_id=self.resource_id, confirm_owner_project="beta")):
+
+        for body in (
+            Purge(
+                version=2,
+                confirm_resource_id=self.resource_id,
+                confirm_owner_project="alpha",
+            ),
+            Purge(
+                version=3, confirm_resource_id=uuid4(), confirm_owner_project="alpha"
+            ),
+            Purge(
+                version=3,
+                confirm_resource_id=self.resource_id,
+                confirm_owner_project="beta",
+            ),
+        ):
             with self.assertRaises(catalog.Conflict):
                 catalog.request_purge(self.conn, row, body)
         self.conn.execute.assert_not_called()
 
     def test_cross_project_scope_increase_requires_fresh_request(self):
-        row = {"resource_id": str(self.resource_id), "kind": "binding", "consumer_project": "beta",
-               "mode": "read-only"}
-        with patch.object(catalog, "grant", return_value=row), \
-                patch.object(catalog, "resource", return_value={"owner_project": "alpha"}), \
-                patch.object(catalog, "change_mode") as change:
-            response = self.client.put(f"/v1/resource-grants/{self.grant_id}/mode", json={"version": 1, "mode": "read-write"})
+        row = {
+            "resource_id": str(self.resource_id),
+            "kind": "binding",
+            "consumer_project": "beta",
+            "mode": "read-only",
+        }
+        with (
+            patch.object(catalog, "grant", return_value=row),
+            patch.object(catalog, "resource", return_value={"owner_project": "alpha"}),
+            patch.object(catalog, "change_mode") as change,
+        ):
+            response = self.client.put(
+                f"/v1/resource-grants/{self.grant_id}/mode",
+                json={"version": 1, "mode": "read-write"},
+            )
         self.assertEqual(response.status_code, 409)
         change.assert_not_called()
 
     def test_resource_id_and_secret_material_are_independent_of_display_name(self):
         import os
+
         with patch.dict(os.environ, {"DATABASE_KEY": "x" * 32}):
             first = catalog.secret_for(self.resource_id)
             self.assertEqual(first, catalog.secret_for(str(self.resource_id)))
@@ -114,21 +204,53 @@ class StoreApiTests(TestCase):
 
     def test_console_launch_requires_the_callers_human_grant_even_for_admin(self):
         credential_id = uuid4()
-        with patch.object(catalog, '_object', return_value={'grant_id': self.grant_id}), \
-                patch.object(catalog, 'grant', return_value={'kind': 'human', 'issuer': self.principal.issuer, 'subject': 'someone-else'}), \
-                patch('app.stores.console.lease') as lookup:
-            response = self.client.post(f'/v1/store-access/credentials/{credential_id}/console')
+        with (
+            patch.object(catalog, "_object", return_value={"grant_id": self.grant_id}),
+            patch.object(
+                catalog,
+                "grant",
+                return_value={
+                    "kind": "human",
+                    "issuer": self.principal.issuer,
+                    "subject": "someone-else",
+                },
+            ),
+            patch("app.stores.console.lease") as lookup,
+        ):
+            response = self.client.post(
+                f"/v1/store-access/credentials/{credential_id}/console"
+            )
         self.assertEqual(response.status_code, 404)
         lookup.assert_not_called()
 
     def test_console_launch_fails_in_quarantine_and_for_inactive_native_lease(self):
         credential_id = uuid4()
-        with patch('app.stores.recovery.required', return_value=True):
-            self.assertEqual(self.client.post(f'/v1/store-access/credentials/{credential_id}/console').status_code, 503)
-        with patch.object(catalog, '_object', return_value={'grant_id': self.grant_id}), \
-                patch.object(catalog, 'grant', return_value={'kind': 'human', 'issuer': self.principal.issuer, 'subject': self.principal.subject}), \
-                patch('app.stores.console.lease', return_value=None):
-            self.assertEqual(self.client.post(f'/v1/store-access/credentials/{credential_id}/console').status_code, 409)
+        with patch("app.stores.recovery.required", return_value=True):
+            self.assertEqual(
+                self.client.post(
+                    f"/v1/store-access/credentials/{credential_id}/console"
+                ).status_code,
+                503,
+            )
+        with (
+            patch.object(catalog, "_object", return_value={"grant_id": self.grant_id}),
+            patch.object(
+                catalog,
+                "grant",
+                return_value={
+                    "kind": "human",
+                    "issuer": self.principal.issuer,
+                    "subject": self.principal.subject,
+                },
+            ),
+            patch("app.stores.console.lease", return_value=None),
+        ):
+            self.assertEqual(
+                self.client.post(
+                    f"/v1/store-access/credentials/{credential_id}/console"
+                ).status_code,
+                409,
+            )
 
 
 if __name__ == "__main__":

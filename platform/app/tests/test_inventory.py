@@ -5,9 +5,10 @@ from pathlib import Path
 from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from app import main
 from app.identity import Principal
 from app.inventory import observe_cluster_capacity, observe_inventory
+
+from app import main
 
 
 def item(name, spec=None, status=None):

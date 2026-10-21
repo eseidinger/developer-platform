@@ -1,9 +1,16 @@
+# The hosted-application boundary shares API code and locked dependencies.
+# Its image excludes browser assets and starts the separate authorization service.
 FROM python:3.14.7-slim-trixie
 WORKDIR /app
 COPY --from=ghcr.io/astral-sh/uv:0.12.17 /uv /uvx /bin/
 COPY app/pyproject.toml app/uv.lock app/README.md ./
 COPY app/src ./src
-RUN uv sync --frozen --no-dev && useradd --uid 10001 --create-home platform
+# UID 10001 matches the workload security context; dependencies stay locked.
+RUN uv sync --frozen --no-dev \
+    && useradd --uid 10001 --create-home platform
 USER 10001
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1 PATH="/app/.venv/bin:$PATH"
-CMD ["uvicorn", "app.access_gateway:app", "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PATH="/app/.venv/bin:$PATH"
+CMD ["uvicorn", "app.access_gateway:app", \
+    "--host", "0.0.0.0", "--port", "8080", "--no-access-log"]

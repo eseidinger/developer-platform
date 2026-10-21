@@ -1,19 +1,21 @@
 """Append-only, secret-redacted audit records for the platform API."""
-from dataclasses import dataclass
+
 import os
 import re
+from dataclasses import dataclass
 from typing import Any
 
 import psycopg
 from psycopg import sql
 from psycopg.types.json import Jsonb
 
-
 AUDIT_OWNER = "platform_audit_owner"
 AUDIT_WRITER = "platform_audit_writer"
 AUDIT_READER = "platform_audit_reader"
 REDACTED = "[REDACTED]"
-SENSITIVE_KEY = re.compile(r"(?:password|secret|token|authorization|credential|cookie|key)$", re.IGNORECASE)
+SENSITIVE_KEY = re.compile(
+    r"(?:password|secret|token|authorization|credential|cookie|key)$", re.IGNORECASE
+)
 BEARER_VALUE = re.compile(r"(?i)\b(bearer|basic)\s+[^\s,;]+")
 KEY_VALUE = re.compile(
     r"(?i)\b(password|secret|token|authorization|credential|cookie|api[_-]?key)\s*[:=]\s*[^,\s]+"
@@ -33,7 +35,10 @@ def redact(value: Any, key: str | None = None) -> Any:
     if key and SENSITIVE_KEY.search(key):
         return REDACTED
     if isinstance(value, dict):
-        return {str(item_key): redact(item_value, str(item_key)) for item_key, item_value in value.items()}
+        return {
+            str(item_key): redact(item_value, str(item_key))
+            for item_key, item_value in value.items()
+        }
     if isinstance(value, (list, tuple)):
         return [redact(item) for item in value]
     if isinstance(value, str):
@@ -59,25 +64,51 @@ def audit_connect():
 def audit_reader_connect():
     """Connect with the role limited to reading redacted audit events."""
     return psycopg.connect(
-        host=os.environ["POSTGRES_HOST"], dbname="platform", user=AUDIT_READER,
-        password=os.environ["PLATFORM_AUDIT_READER_PASSWORD"], connect_timeout=5, autocommit=True,
+        host=os.environ["POSTGRES_HOST"],
+        dbname="platform",
+        user=AUDIT_READER,
+        password=os.environ["PLATFORM_AUDIT_READER_PASSWORD"],
+        connect_timeout=5,
+        autocommit=True,
     )
 
 
 def initialize(conn) -> None:
     """Create the audit boundary from the privileged bootstrap connection."""
     for role in (AUDIT_OWNER, AUDIT_WRITER, AUDIT_READER):
-        if not conn.execute("SELECT 1 FROM pg_roles WHERE rolname=%s", (role,)).fetchone():
-            conn.execute(sql.SQL("CREATE ROLE {} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-                                 "NOREPLICATION NOBYPASSRLS").format(sql.Identifier(role)))
-    conn.execute(sql.SQL("ALTER ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-                         "NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD {}")
-                 .format(sql.Identifier(AUDIT_WRITER), sql.Literal(os.environ["PLATFORM_AUDIT_PASSWORD"])))
-    conn.execute(sql.SQL("ALTER ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
-                         "NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD {}")
-                 .format(sql.Identifier(AUDIT_READER), sql.Literal(os.environ["PLATFORM_AUDIT_READER_PASSWORD"])))
+        if not conn.execute(
+            "SELECT 1 FROM pg_roles WHERE rolname=%s", (role,)
+        ).fetchone():
+            conn.execute(
+                sql.SQL(
+                    "CREATE ROLE {} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+                    "NOREPLICATION NOBYPASSRLS"
+                ).format(sql.Identifier(role))
+            )
+    conn.execute(
+        sql.SQL(
+            "ALTER ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+            "NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD {}"
+        ).format(
+            sql.Identifier(AUDIT_WRITER),
+            sql.Literal(os.environ["PLATFORM_AUDIT_PASSWORD"]),
+        )
+    )
+    conn.execute(
+        sql.SQL(
+            "ALTER ROLE {} LOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE "
+            "NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 4 PASSWORD {}"
+        ).format(
+            sql.Identifier(AUDIT_READER),
+            sql.Literal(os.environ["PLATFORM_AUDIT_READER_PASSWORD"]),
+        )
+    )
     conn.execute("CREATE SCHEMA IF NOT EXISTS platform_audit")
-    conn.execute(sql.SQL("ALTER SCHEMA platform_audit OWNER TO {}").format(sql.Identifier(AUDIT_OWNER)))
+    conn.execute(
+        sql.SQL("ALTER SCHEMA platform_audit OWNER TO {}").format(
+            sql.Identifier(AUDIT_OWNER)
+        )
+    )
     conn.execute("""CREATE TABLE IF NOT EXISTS platform_audit.events (
         id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
         occurred_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -92,23 +123,37 @@ def initialize(conn) -> None:
         operation_id TEXT,
         detail JSONB NOT NULL DEFAULT '{}'::jsonb
     )""")
-    conn.execute(sql.SQL("ALTER TABLE platform_audit.events OWNER TO {}").format(sql.Identifier(AUDIT_OWNER)))
+    conn.execute(
+        sql.SQL("ALTER TABLE platform_audit.events OWNER TO {}").format(
+            sql.Identifier(AUDIT_OWNER)
+        )
+    )
     conn.execute("ALTER TABLE platform_audit.events ENABLE ROW LEVEL SECURITY")
     # The owner is NOLOGIN. Do not force RLS so the SECURITY DEFINER append
     # function can insert as that owner; callers still lack table privileges.
     conn.execute("ALTER TABLE platform_audit.events NO FORCE ROW LEVEL SECURITY")
     conn.execute("DROP POLICY IF EXISTS audit_owner_append ON platform_audit.events")
     conn.execute("DROP POLICY IF EXISTS audit_writer_append ON platform_audit.events")
-    conn.execute("DROP POLICY IF EXISTS audit_append_via_owner ON platform_audit.events")
-    conn.execute("DROP POLICY IF EXISTS audit_append_via_function ON platform_audit.events")
+    conn.execute(
+        "DROP POLICY IF EXISTS audit_append_via_owner ON platform_audit.events"
+    )
+    conn.execute(
+        "DROP POLICY IF EXISTS audit_append_via_function ON platform_audit.events"
+    )
     # RLS uses the invoking role for SECURITY DEFINER calls. This policy permits
     # the function's insert path; table privileges remain the write boundary,
     # and the writer receives no direct INSERT privilege.
-    conn.execute("CREATE POLICY audit_append_via_function ON platform_audit.events "
-                 "FOR INSERT TO PUBLIC WITH CHECK (true)")
+    conn.execute(
+        "CREATE POLICY audit_append_via_function ON platform_audit.events "
+        "FOR INSERT TO PUBLIC WITH CHECK (true)"
+    )
     conn.execute("DROP POLICY IF EXISTS audit_reader_select ON platform_audit.events")
-    conn.execute(sql.SQL("CREATE POLICY audit_reader_select ON platform_audit.events FOR SELECT TO {} "
-                         "USING (true)").format(sql.Identifier(AUDIT_READER)))
+    conn.execute(
+        sql.SQL(
+            "CREATE POLICY audit_reader_select ON platform_audit.events FOR SELECT TO {} "
+            "USING (true)"
+        ).format(sql.Identifier(AUDIT_READER))
+    )
     conn.execute("""CREATE OR REPLACE FUNCTION platform_audit.reject_change()
         RETURNS trigger LANGUAGE plpgsql AS $$
         BEGIN
@@ -134,53 +179,118 @@ def initialize(conn) -> None:
             RETURN event_id;
         END;
         $$""")
-    conn.execute(sql.SQL("ALTER FUNCTION platform_audit.reject_change() OWNER TO {}")
-                 .format(sql.Identifier(AUDIT_OWNER)))
-    conn.execute(sql.SQL("ALTER FUNCTION platform_audit.append_event(TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, "
-                         "TEXT, TEXT, TEXT, JSONB) OWNER TO {}").format(sql.Identifier(AUDIT_OWNER)))
+    conn.execute(
+        sql.SQL("ALTER FUNCTION platform_audit.reject_change() OWNER TO {}").format(
+            sql.Identifier(AUDIT_OWNER)
+        )
+    )
+    conn.execute(
+        sql.SQL(
+            "ALTER FUNCTION platform_audit.append_event(TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, "
+            "TEXT, TEXT, TEXT, JSONB) OWNER TO {}"
+        ).format(sql.Identifier(AUDIT_OWNER))
+    )
     conn.execute("REVOKE ALL ON DATABASE platform FROM PUBLIC")
-    conn.execute(sql.SQL("GRANT CONNECT ON DATABASE platform TO {}").format(sql.Identifier(AUDIT_WRITER)))
-    conn.execute(sql.SQL("GRANT CONNECT ON DATABASE platform TO {}").format(sql.Identifier(AUDIT_READER)))
+    conn.execute(
+        sql.SQL("GRANT CONNECT ON DATABASE platform TO {}").format(
+            sql.Identifier(AUDIT_WRITER)
+        )
+    )
+    conn.execute(
+        sql.SQL("GRANT CONNECT ON DATABASE platform TO {}").format(
+            sql.Identifier(AUDIT_READER)
+        )
+    )
     conn.execute("REVOKE ALL ON SCHEMA platform_audit FROM PUBLIC")
-    conn.execute(sql.SQL("GRANT USAGE ON SCHEMA platform_audit TO {}").format(sql.Identifier(AUDIT_WRITER)))
-    conn.execute(sql.SQL("GRANT USAGE ON SCHEMA platform_audit TO {}").format(sql.Identifier(AUDIT_READER)))
+    conn.execute(
+        sql.SQL("GRANT USAGE ON SCHEMA platform_audit TO {}").format(
+            sql.Identifier(AUDIT_WRITER)
+        )
+    )
+    conn.execute(
+        sql.SQL("GRANT USAGE ON SCHEMA platform_audit TO {}").format(
+            sql.Identifier(AUDIT_READER)
+        )
+    )
     conn.execute("REVOKE ALL ON TABLE platform_audit.events FROM PUBLIC")
-    conn.execute(sql.SQL("GRANT SELECT ON TABLE platform_audit.events TO {}").format(sql.Identifier(AUDIT_READER)))
+    conn.execute(
+        sql.SQL("GRANT SELECT ON TABLE platform_audit.events TO {}").format(
+            sql.Identifier(AUDIT_READER)
+        )
+    )
     conn.execute("REVOKE ALL ON FUNCTION platform_audit.reject_change() FROM PUBLIC")
-    conn.execute("REVOKE ALL ON FUNCTION platform_audit.append_event(TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, "
-                 "TEXT, TEXT, TEXT, JSONB) FROM PUBLIC")
-    conn.execute(sql.SQL("GRANT EXECUTE ON FUNCTION platform_audit.append_event(TEXT, TEXT, TEXT, TEXT, TEXT, "
-                         "JSONB, TEXT, TEXT, TEXT, JSONB) TO {}").format(sql.Identifier(AUDIT_WRITER)))
+    conn.execute(
+        "REVOKE ALL ON FUNCTION platform_audit.append_event(TEXT, TEXT, TEXT, TEXT, TEXT, JSONB, "
+        "TEXT, TEXT, TEXT, JSONB) FROM PUBLIC"
+    )
+    conn.execute(
+        sql.SQL(
+            "GRANT EXECUTE ON FUNCTION platform_audit.append_event(TEXT, TEXT, TEXT, TEXT, TEXT, "
+            "JSONB, TEXT, TEXT, TEXT, JSONB) TO {}"
+        ).format(sql.Identifier(AUDIT_WRITER))
+    )
 
 
-def record_event(actor: Actor, action: str, target_kind: str, target_id: str | None, result: str,
-                 scope: dict[str, Any] | None = None, detail: dict[str, Any] | None = None,
-                 revision: str | None = None, operation_id: str | None = None) -> int:
+def record_event(
+    actor: Actor,
+    action: str,
+    target_kind: str,
+    target_id: str | None,
+    result: str,
+    scope: dict[str, Any] | None = None,
+    detail: dict[str, Any] | None = None,
+    revision: str | None = None,
+    operation_id: str | None = None,
+) -> int:
     """Durably append one event through the limited audit-writer role."""
     with audit_connect() as conn:
-        row = conn.execute("""SELECT platform_audit.append_event(
-            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""", (
-            actor.kind, actor.identifier, action, target_kind, target_id,
-            Jsonb(redact(scope or {})), result, revision, operation_id, Jsonb(redact(detail or {})),
-        )).fetchone()
+        row = conn.execute(
+            """SELECT platform_audit.append_event(
+            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)""",
+            (
+                actor.kind,
+                actor.identifier,
+                action,
+                target_kind,
+                target_id,
+                Jsonb(redact(scope or {})),
+                result,
+                revision,
+                operation_id,
+                Jsonb(redact(detail or {})),
+            ),
+        ).fetchone()
     return row[0]
 
 
 AUDIT_EXPORT_COLUMNS = (
-    "id", "occurred_at", "actor_kind", "actor_id", "action", "target_kind", "target_id",
-    "scope", "result", "revision", "operation_id", "detail",
+    "id",
+    "occurred_at",
+    "actor_kind",
+    "actor_id",
+    "action",
+    "target_kind",
+    "target_id",
+    "scope",
+    "result",
+    "revision",
+    "operation_id",
+    "detail",
 )
 
 
 def read_events(start, end, limit: int) -> list[dict[str, Any]]:
     """Read a bounded, redacted audit window through the audit-reader role."""
     with audit_reader_connect() as conn:
-        rows = conn.execute("""SELECT id, occurred_at, actor_kind, actor_id, action, target_kind, target_id,
+        rows = conn.execute(
+            """SELECT id, occurred_at, actor_kind, actor_id, action, target_kind, target_id,
                                      scope, result, revision, operation_id, detail
             FROM platform_audit.events
             WHERE occurred_at >= %s AND occurred_at < %s
             ORDER BY occurred_at, id
-            LIMIT %s""", (start, end, limit)).fetchall()
+            LIMIT %s""",
+            (start, end, limit),
+        ).fetchall()
     events = []
     for row in rows:
         event = dict(zip(AUDIT_EXPORT_COLUMNS, row))

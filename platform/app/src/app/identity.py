@@ -1,6 +1,7 @@
 """Provider-neutral OpenID Connect access-token validation."""
-from dataclasses import dataclass
+
 import os
+from dataclasses import dataclass
 from typing import Any
 
 import jwt
@@ -27,7 +28,13 @@ class Principal:
 class OIDCVerifier:
     """Validate an access token without taking authorization facts from its claims."""
 
-    def __init__(self, issuer: str, audience: str, jwks_url: str, algorithms: tuple[str, ...] = ("RS256",)):
+    def __init__(
+        self,
+        issuer: str,
+        audience: str,
+        jwks_url: str,
+        algorithms: tuple[str, ...] = ("RS256",),
+    ):
         self.issuer = issuer.rstrip("/")
         self.audience = audience
         self.algorithms = algorithms
@@ -36,19 +43,34 @@ class OIDCVerifier:
     def verify(self, token: str) -> Principal:
         try:
             key = self.jwks.get_signing_key_from_jwt(token)
-            claims: dict[str, Any] = jwt.decode(token, key.key, algorithms=list(self.algorithms),
-                                                 audience=self.audience, issuer=self.issuer,
-                                                 options={"require": ["exp", "iat", "iss", "sub"]})
+            claims: dict[str, Any] = jwt.decode(
+                token,
+                key.key,
+                algorithms=list(self.algorithms),
+                audience=self.audience,
+                issuer=self.issuer,
+                options={"require": ["exp", "iat", "iss", "sub"]},
+            )
         except (PyJWTError, ValueError, TypeError) as exc:
             raise AuthenticationError("Invalid OIDC access token") from exc
         subject = claims.get("sub")
         if not isinstance(subject, str) or not subject:
             raise AuthenticationError("OIDC access token has no subject")
-        display_name = next((claims.get(name) for name in ("preferred_username", "name", "email")
-                             if isinstance(claims.get(name), str) and claims.get(name)), None)
+        display_name = next(
+            (
+                claims.get(name)
+                for name in ("preferred_username", "name", "email")
+                if isinstance(claims.get(name), str) and claims.get(name)
+            ),
+            None,
+        )
         party = claims.get("azp")
-        return Principal(self.issuer, subject, display_name,
-                         party if isinstance(party, str) and 0 < len(party) <= 128 else None)
+        return Principal(
+            self.issuer,
+            subject,
+            display_name,
+            party if isinstance(party, str) and 0 < len(party) <= 128 else None,
+        )
 
 
 def configured_verifier() -> OIDCVerifier:
@@ -56,5 +78,7 @@ def configured_verifier() -> OIDCVerifier:
     audience = os.environ["OIDC_AUDIENCE"]
     jwks_url = os.environ["OIDC_JWKS_URL"]
     if not issuer or not audience or not jwks_url:
-        raise RuntimeError("OIDC_ISSUER, OIDC_AUDIENCE, and OIDC_JWKS_URL must be configured")
+        raise RuntimeError(
+            "OIDC_ISSUER, OIDC_AUDIENCE, and OIDC_JWKS_URL must be configured"
+        )
     return OIDCVerifier(issuer, audience, jwks_url)

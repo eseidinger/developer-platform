@@ -1,0 +1,9 @@
+# Framework parameter markers are immutable declarations, not per-call state.
+# Keep B008 enabled for other function calls in argument defaults.
+[lint.flake8-bugbear]
+extend-immutable-calls = [
+  "fastapi.Body",
+  "fastapi.Depends",
+  "fastapi.Header",
+  "fastapi.Query",
+]

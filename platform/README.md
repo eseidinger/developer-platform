@@ -33,25 +33,22 @@ See the [named-store reference](../docs/operators/data-stores.md).
 
 After [bootstrap](../docs/operators/install-local.md):
 
-| Endpoint | Purpose |
-| --- | --- |
-| `http://localhost:8000/` | React control-plane portal |
-| `http://localhost:8000/docs` | Interactive API documentation |
-| `http://localhost:8000/openapi.json` | Live generated OpenAPI contract |
-| `http://localhost:8000/healthz` | API process health |
-| `http://localhost:8000/readyz` | PostgreSQL and Kubernetes connectivity |
-| `http://identity.localhost` | Keycloak reference identity provider |
-| `http://localhost:3000` | Operator Grafana |
-| `http://localhost:9090` | Operator Prometheus |
+| Endpoint                             | Purpose                                |
+| ------------------------------------ | -------------------------------------- |
+| `http://localhost:8000/`             | React control-plane portal             |
+| `http://localhost:8000/docs`         | Interactive API documentation          |
+| `http://localhost:8000/openapi.json` | Live generated OpenAPI contract        |
+| `http://localhost:8000/healthz`      | API process health                     |
+| `http://localhost:8000/readyz`       | PostgreSQL and Kubernetes connectivity |
+| `http://identity.localhost`          | Keycloak reference identity provider   |
+| `http://localhost:3000`              | Operator Grafana                       |
+| `http://localhost:9090`              | Operator Prometheus                    |
 
 API and monitoring host ports bind to loopback. Caddy serves the configured
 platform and identity domains; public deployments use HTTPS. Protected
 `v1alpha2` application traffic follows Caddy → k3d/Traefik → hosted-access
 boundary → application Service. Separate store console routes expose only
 authorized human leases. Local `.localhost` HTTP routes are development paths.
-
-<a id="access-validation-portal"></a>
-<a id="api-reference"></a>
 
 ## Identity and API contracts
 
@@ -127,20 +124,24 @@ platform administration and use a separate reader role. Records are append-only
 with no automatic pruning. Host/root and PostgreSQL superusers remain trusted
 administrators. See [security and authorization](../docs/architecture/security-and-authorization.md).
 
-<a id="configuration"></a>
-
 ## Source ownership
 
-| Source | Responsibility |
-| --- | --- |
-| `app/src/app/main.py` | Core HTTP endpoints, identity bootstrap and worker lifecycle |
-| `app/src/app/spec.py`, `manifests.py`, `operations.py` | Declaration validation, Kubernetes resources and durable deployment execution |
-| `app/src/app/access_*.py` | Hosted policy, identity projection, authorizer and access reconciliation |
-| `app/src/app/stores/` | Named providers, grants, leases, private relay, consoles, monitoring and recovery |
-| `app/src/app/ai_*.py` | AI evidence, bounded model calls, durable runs and approved proposals |
-| `app/src/app/telemetry_*.py`, `tracing.py`, `trace_read.py` | Authenticated telemetry collection and bounded reads |
-| `cli/`, `ui/` | Public API clients and their tests |
-| `compose.yaml`, `../scripts/up.sh` | Runtime wiring and cluster bootstrap |
+- `app/src/app/main.py`: HTTP endpoint wiring, identity bootstrap, and worker
+  lifecycle. `api_models.py` owns validated request bodies and domain validation.
+- `app/src/app/spec.py`, `manifests.py`, and `operations.py`: declarations,
+  Kubernetes resources, and durable deployment execution.
+- `app/src/app/access_*.py`: hosted policy, identity projection, authorization,
+  and access reconciliation.
+- `app/src/app/stores/`: providers, grants, leases, private relays, consoles,
+  monitoring, and recovery.
+- `app/src/app/ai_*.py`: AI evidence, bounded model calls, durable runs, and
+  approved proposals.
+- `app/src/app/telemetry_*.py`, `tracing.py`, and `trace_read.py`: authenticated
+  telemetry collection and bounded reads.
+- `cli/` and `ui/`: public API clients and their tests.
+- `compose.yaml` and `../scripts/up.sh`: runtime wiring and cluster bootstrap.
+- `Dockerfile`: API and portal image; `Dockerfile.access`: hosted-access boundary;
+  `Dockerfile.telemetry-forwarder`: pod-local trace forwarding.
 
 `app/pyproject.toml` and `app/uv.lock` define API dependencies (Python 3.12+);
 `Dockerfile` pins the container runtime. `../.env.example` is the documented
@@ -154,6 +155,11 @@ From the repository root:
 
 ```bash
 uv sync --project platform/app --locked
+ruff check platform
+ruff format --check platform
+hadolint platform/Dockerfile platform/Dockerfile.access \
+  platform/Dockerfile.telemetry-forwarder
+yamllint platform/compose.yaml
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
 uv run --project platform/app python scripts/generate/export_openapi.py --check
 python3 scripts/generate/generate-cli-contract.py --check
@@ -162,6 +168,10 @@ uv run --project platform/app python -m compileall -q platform/app/src/app scrip
 bash -n scripts/up.sh scripts/down.sh
 docker compose config --quiet
 ```
+
+From `platform/ui/`, run `npm run check`; browser scenarios run separately with
+`npm run test:e2e`. Markdown checks should target the four tracked platform
+READMEs, excluding local virtual environments and `node_modules`.
 
 Some tests require explicitly configured disposable dependencies and otherwise
 skip. See [test boundaries](../docs/maintainers/testing-requirements.md),

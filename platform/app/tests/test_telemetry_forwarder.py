@@ -4,7 +4,6 @@ import tempfile
 import unittest
 from pathlib import Path
 
-
 SOURCE = Path(__file__).resolve().parents[2] / "telemetry_forwarder.py"
 spec = importlib.util.spec_from_file_location("telemetry_forwarder", SOURCE)
 forwarder = importlib.util.module_from_spec(spec)
@@ -33,13 +32,20 @@ class TelemetryForwarderTests(unittest.TestCase):
                     token_file.write_text(token)
                     handler = object.__new__(forwarder.Handler)
                     handler.path = "/v1/traces"
-                    handler.headers = {"Content-Type": "application/x-protobuf", "Content-Length": "1"}
+                    handler.headers = {
+                        "Content-Type": "application/x-protobuf",
+                        "Content-Length": "1",
+                    }
                     handler.rfile = io.BytesIO(b"\x00")
                     replies = []
-                    handler._reply = lambda status, body=b"": replies.append(status)
+                    handler._reply = lambda status, body=b"", replies=replies: (
+                        replies.append(status)
+                    )
                     handler.do_POST()
                     self.assertEqual(replies, [200])
-                self.assertEqual(gateway.headers, ["Bearer first-token", "Bearer rotated-token"])
+                self.assertEqual(
+                    gateway.headers, ["Bearer first-token", "Bearer rotated-token"]
+                )
             finally:
                 forwarder.TOKEN_FILE, forwarder._opener = original_file, original_opener
 

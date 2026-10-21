@@ -2,167 +2,377 @@ import sys
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
-from app.manifests import component_resources, normalize_resources, resources, validate_name
+from app.manifests import (
+    component_resources,
+    normalize_resources,
+    resources,
+    validate_name,
+)
+
 
 class WorkloadContract(unittest.TestCase):
     def test_rejects_namespace_and_identifier_injection(self):
-        for name in ("kube-system/", "../admin", "UPPER", "a_b", "a" * 33, "ends-", "1abc", ""):
+        for name in (
+            "kube-system/",
+            "../admin",
+            "UPPER",
+            "a_b",
+            "a" * 33,
+            "ends-",
+            "1abc",
+            "",
+        ):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 validate_name(name)
 
     def test_namespace_isolation(self):
-        docs = resources("hello", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
+        docs = resources(
+            "hello", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret"
+        )
         self.assertEqual(docs[0]["metadata"]["name"], "project-hello")
-        self.assertTrue(all(d["metadata"]["namespace"] == "project-hello" for d in docs[1:]))
+        self.assertTrue(
+            all(d["metadata"]["namespace"] == "project-hello" for d in docs[1:])
+        )
         policy = next(d for d in docs if d["kind"] == "NetworkPolicy")["spec"]
         self.assertEqual(policy["policyTypes"], ["Ingress", "Egress"])
-        self.assertEqual(policy["egress"][-1]["to"], [{"ipBlock": {"cidr": "172.30.80.10/32"}}])
+        self.assertEqual(
+            policy["egress"][-1]["to"], [{"ipBlock": {"cidr": "172.30.80.10/32"}}]
+        )
         ingress = policy["ingress"][1]["from"][0]
         self.assertIn("namespaceSelector", ingress)
         self.assertIn("podSelector", ingress)
 
     def test_configuration_becomes_plain_env_alongside_database_secret(self):
-        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret",
-                         None, {"B": "2", "A": "1"})
-        container = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
-        self.assertEqual(container["env"], [{"name": "A", "value": "1"}, {"name": "B", "value": "2"}])
-        self.assertEqual(container["envFrom"], [{"secretRef": {"name": "database"}},
-                                                {"secretRef": {"name": "app-secrets", "optional": True}}])
-        plain = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
-        self.assertNotIn("env", next(d for d in plain if d["kind"] == "Deployment")
-                         ["spec"]["template"]["spec"]["containers"][0])
+        docs = resources(
+            "a",
+            "example:v1",
+            8080,
+            "apps.localhost",
+            "172.30.80.10",
+            "secret",
+            None,
+            {"B": "2", "A": "1"},
+        )
+        container = next(d for d in docs if d["kind"] == "Deployment")["spec"][
+            "template"
+        ]["spec"]["containers"][0]
+        self.assertEqual(
+            container["env"], [{"name": "A", "value": "1"}, {"name": "B", "value": "2"}]
+        )
+        self.assertEqual(
+            container["envFrom"],
+            [
+                {"secretRef": {"name": "database"}},
+                {"secretRef": {"name": "app-secrets", "optional": True}},
+            ],
+        )
+        plain = resources(
+            "a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret"
+        )
+        self.assertNotIn(
+            "env",
+            next(d for d in plain if d["kind"] == "Deployment")["spec"]["template"][
+                "spec"
+            ]["containers"][0],
+        )
 
     def test_restricted_workload_and_no_api_credentials(self):
-        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
-        spec = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]
+        docs = resources(
+            "a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret"
+        )
+        spec = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"][
+            "spec"
+        ]
         self.assertFalse(spec["automountServiceAccountToken"])
         self.assertTrue(spec["securityContext"]["runAsNonRoot"])
-        self.assertEqual(spec["containers"][0]["securityContext"]["capabilities"]["drop"], ["ALL"])
+        self.assertEqual(
+            spec["containers"][0]["securityContext"]["capabilities"]["drop"], ["ALL"]
+        )
         quota = next(d for d in docs if d["kind"] == "ResourceQuota")["spec"]["hard"]
         self.assertEqual(quota["services.nodeports"], "0")
         self.assertEqual(quota["services.loadbalancers"], "0")
 
     def test_rollout_fails_visibly_within_smoke_timeout(self):
-        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
+        docs = resources(
+            "a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret"
+        )
         deployment = next(d for d in docs if d["kind"] == "Deployment")["spec"]
         self.assertEqual(deployment["progressDeadlineSeconds"], 120)
 
     def test_default_resources_are_unchanged(self):
-        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret")
-        container = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
-        self.assertEqual(container["resources"], {"requests": {"cpu": "100m", "memory": "128Mi"},
-                                                  "limits": {"cpu": "500m", "memory": "256Mi"}})
+        docs = resources(
+            "a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret"
+        )
+        container = next(d for d in docs if d["kind"] == "Deployment")["spec"][
+            "template"
+        ]["spec"]["containers"][0]
+        self.assertEqual(
+            container["resources"],
+            {
+                "requests": {"cpu": "100m", "memory": "128Mi"},
+                "limits": {"cpu": "500m", "memory": "256Mi"},
+            },
+        )
 
     def test_requested_resources_reach_the_container(self):
-        wanted = normalize_resources({"requests": {"cpu": "0.25"}, "limits": {"cpu": "1", "memory": "1Gi"}})
-        self.assertEqual(wanted, {"requests": {"cpu": "250m", "memory": "128Mi"},
-                                  "limits": {"cpu": "1000m", "memory": "1024Mi"}})
-        docs = resources("a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret", wanted)
-        container = next(d for d in docs if d["kind"] == "Deployment")["spec"]["template"]["spec"]["containers"][0]
+        wanted = normalize_resources(
+            {"requests": {"cpu": "0.25"}, "limits": {"cpu": "1", "memory": "1Gi"}}
+        )
+        self.assertEqual(
+            wanted,
+            {
+                "requests": {"cpu": "250m", "memory": "128Mi"},
+                "limits": {"cpu": "1000m", "memory": "1024Mi"},
+            },
+        )
+        docs = resources(
+            "a", "example:v1", 8080, "apps.localhost", "172.30.80.10", "secret", wanted
+        )
+        container = next(d for d in docs if d["kind"] == "Deployment")["spec"][
+            "template"
+        ]["spec"]["containers"][0]
         self.assertEqual(container["resources"], wanted)
 
     def test_invalid_resources_are_rejected(self):
-        bad = [{"requests": {"cpu": "600m"}, "limits": {"cpu": "500m"}},
-               {"requests": {"memory": "512Mi"}},
-               {"requests": {"cpu": "0"}},
-               {"requests": {"cpu": "1100m"}, "limits": {"cpu": "1500m"}},
-               {"limits": {"cpu": "2100m"}},
-               {"limits": {"memory": "3Gi"}},
-               {"limits": {"memory": "256MB"}},
-               {"limits": {"cpu": "fast"}},
-               {"limits": {"gpu": "1"}},
-               {"surprise": {}}]
+        bad = [
+            {"requests": {"cpu": "600m"}, "limits": {"cpu": "500m"}},
+            {"requests": {"memory": "512Mi"}},
+            {"requests": {"cpu": "0"}},
+            {"requests": {"cpu": "1100m"}, "limits": {"cpu": "1500m"}},
+            {"limits": {"cpu": "2100m"}},
+            {"limits": {"memory": "3Gi"}},
+            {"limits": {"memory": "256MB"}},
+            {"limits": {"cpu": "fast"}},
+            {"limits": {"gpu": "1"}},
+            {"surprise": {}},
+        ]
         for value in bad:
             with self.subTest(value=value), self.assertRaises(ValueError):
                 normalize_resources(value)
 
-    def test_component_resources_create_internal_services_and_a_non_overlapping_cronjob(self):
-        docs = component_resources("shop", [
-            {"name": "api", "type": "service", "resolved_image": "registry/api@sha256:one", "replicas": 2,
-             "ports": [{"name": "http", "port": 8080}]},
-            {"name": "worker", "type": "scheduled", "resolved_image": "registry/worker@sha256:two",
-             "schedule": "*/15 * * * *", "time_zone": "UTC", "concurrency_policy": "Forbid"},
-        ], "172.30.80.10", "secret", {"MODE": "batch"})
+    def test_component_resources_create_internal_services_and_a_non_overlapping_cronjob(
+        self,
+    ):
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "registry/api@sha256:one",
+                    "replicas": 2,
+                    "ports": [{"name": "http", "port": 8080}],
+                },
+                {
+                    "name": "worker",
+                    "type": "scheduled",
+                    "resolved_image": "registry/worker@sha256:two",
+                    "schedule": "*/15 * * * *",
+                    "time_zone": "UTC",
+                    "concurrency_policy": "Forbid",
+                },
+            ],
+            "172.30.80.10",
+            "secret",
+            {"MODE": "batch"},
+        )
         self.assertEqual([d["kind"] for d in docs].count("Deployment"), 1)
         self.assertEqual([d["kind"] for d in docs].count("Service"), 1)
         self.assertFalse(any(d["kind"] == "Ingress" for d in docs))
         service = next(d for d in docs if d["kind"] == "Service")
         self.assertEqual(service["metadata"]["name"], "api")
-        self.assertEqual(service["spec"]["selector"]["platform.example/component"], "api")
+        self.assertEqual(
+            service["spec"]["selector"]["platform.example/component"], "api"
+        )
         cronjob_document = next(d for d in docs if d["kind"] == "CronJob")
         cronjob = cronjob_document["spec"]
         self.assertEqual(cronjob["schedule"], "*/15 * * * *")
         self.assertEqual(cronjob["timeZone"], "UTC")
         self.assertEqual(cronjob["concurrencyPolicy"], "Forbid")
-        self.assertEqual(cronjob["jobTemplate"]["metadata"]["labels"]["platform.example/component"], "worker")
+        self.assertEqual(
+            cronjob["jobTemplate"]["metadata"]["labels"]["platform.example/component"],
+            "worker",
+        )
         pod = cronjob["jobTemplate"]["spec"]["template"]["spec"]
         self.assertEqual(pod["restartPolicy"], "Never")
-        self.assertEqual(pod["containers"][0]["env"], [{"name": "MODE", "value": "batch"}])
+        self.assertEqual(
+            pod["containers"][0]["env"], [{"name": "MODE", "value": "batch"}]
+        )
         self.assertEqual(cronjob["jobTemplate"]["spec"]["backoffLimit"], 6)
 
     def test_metrics_proxy_rbac_is_scoped_to_opted_in_services(self):
-        docs = component_resources("shop", [
-            {"name": "api", "type": "service", "resolved_image": "example/api:1",
-             "ports": [{"name": "http", "port": 8080}],
-             "metrics": {"port": "http", "path": "/metrics"}},
-            {"name": "other", "type": "service", "resolved_image": "example/other:1",
-             "ports": [{"name": "http", "port": 8081}]},
-        ], "172.30.80.10", "secret")
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "example/api:1",
+                    "ports": [{"name": "http", "port": 8080}],
+                    "metrics": {"port": "http", "path": "/metrics"},
+                },
+                {
+                    "name": "other",
+                    "type": "service",
+                    "resolved_image": "example/other:1",
+                    "ports": [{"name": "http", "port": 8081}],
+                },
+            ],
+            "172.30.80.10",
+            "secret",
+        )
         role = next(doc for doc in docs if doc["kind"] == "Role")
-        self.assertEqual(role["rules"], [{"apiGroups": [""], "resources": ["services/proxy"],
-                                          "resourceNames": ["http:api:http"], "verbs": ["get"]}])
+        self.assertEqual(
+            role["rules"],
+            [
+                {
+                    "apiGroups": [""],
+                    "resources": ["services/proxy"],
+                    "resourceNames": ["http:api:http"],
+                    "verbs": ["get"],
+                }
+            ],
+        )
         binding = next(doc for doc in docs if doc["kind"] == "RoleBinding")
         self.assertEqual(binding["subjects"][0]["name"], "workload-metrics-reader")
 
     @patch.dict("os.environ", {"PLATFORM_METRICS_PROXY_CIDRS": "10.42.2.0/32"})
     def test_metrics_ingress_allows_only_proxy_host_on_declared_port(self):
-        components = [{"name": "api", "type": "service", "resolved_image": "example/api:1",
-                       "exposure": "public", "ports": [{"name": "http", "port": 8080},
-                                                         {"name": "management", "port": 9000}],
-                       "metrics": {"port": "management", "path": "/metrics"}},
-                      {"name": "other", "type": "service", "resolved_image": "example/other:1",
-                       "ports": [{"name": "http", "port": 8080}]}]
-        docs = component_resources("shop", components, "172.30.80.10", "secret", domain="apps.localhost")
-        policies = [d for d in docs if d["kind"] == "NetworkPolicy" and d["metadata"]["name"].endswith("-metrics")]
+        components = [
+            {
+                "name": "api",
+                "type": "service",
+                "resolved_image": "example/api:1",
+                "exposure": "public",
+                "ports": [
+                    {"name": "http", "port": 8080},
+                    {"name": "management", "port": 9000},
+                ],
+                "metrics": {"port": "management", "path": "/metrics"},
+            },
+            {
+                "name": "other",
+                "type": "service",
+                "resolved_image": "example/other:1",
+                "ports": [{"name": "http", "port": 8080}],
+            },
+        ]
+        docs = component_resources(
+            "shop", components, "172.30.80.10", "secret", domain="apps.localhost"
+        )
+        policies = [
+            d
+            for d in docs
+            if d["kind"] == "NetworkPolicy"
+            and d["metadata"]["name"].endswith("-metrics")
+        ]
         self.assertEqual(len(policies), 1)
-        self.assertEqual(policies[0]["spec"], {
-            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "shop", "platform.example/component": "api"}},
-            "policyTypes": ["Ingress"], "ingress": [{"from": [{"ipBlock": {"cidr": "10.42.2.0/32"}}],
-                                                       "ports": [{"protocol": "TCP", "port": 9000}]}]})
-        with patch.dict("os.environ", {"PLATFORM_METRICS_PROXY_CIDRS": "10.42.2.0/24"}):
-            with self.assertRaisesRegex(ValueError, "individual host"):
-                component_resources("shop", components, "172.30.80.10", "secret", domain="apps.localhost")
+        self.assertEqual(
+            policies[0]["spec"],
+            {
+                "podSelector": {
+                    "matchLabels": {
+                        "app.kubernetes.io/name": "shop",
+                        "platform.example/component": "api",
+                    }
+                },
+                "policyTypes": ["Ingress"],
+                "ingress": [
+                    {
+                        "from": [{"ipBlock": {"cidr": "10.42.2.0/32"}}],
+                        "ports": [{"protocol": "TCP", "port": 9000}],
+                    }
+                ],
+            },
+        )
+        with (
+            patch.dict("os.environ", {"PLATFORM_METRICS_PROXY_CIDRS": "10.42.2.0/24"}),
+            self.assertRaisesRegex(ValueError, "individual host"),
+        ):
+            component_resources(
+                "shop",
+                components,
+                "172.30.80.10",
+                "secret",
+                domain="apps.localhost",
+            )
 
     def test_tracing_opt_in_projects_pod_bound_token_without_automatic_mount(self):
-        docs = component_resources("shop", [{"name": "api", "type": "service",
-            "resolved_image": "example/api:1", "ports": [{"name": "http", "port": 8080}],
-            "tracing": {"enabled": True}}], "172.30.80.10", "secret")
-        pod = next(doc for doc in docs if doc["kind"] == "Deployment")["spec"]["template"]["spec"]
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "example/api:1",
+                    "ports": [{"name": "http", "port": 8080}],
+                    "tracing": {"enabled": True},
+                }
+            ],
+            "172.30.80.10",
+            "secret",
+        )
+        pod = next(doc for doc in docs if doc["kind"] == "Deployment")["spec"][
+            "template"
+        ]["spec"]
         self.assertFalse(pod["automountServiceAccountToken"])
         self.assertEqual(pod["serviceAccountName"], "telemetry-api")
         token = next(v for v in pod["volumes"] if v["name"] == "telemetry-token")
-        self.assertEqual(token["projected"]["sources"][0]["serviceAccountToken"]["audience"],
-                         "platform-telemetry")
-        self.assertEqual(token["projected"]["sources"][0]["serviceAccountToken"]["expirationSeconds"], 600)
+        self.assertEqual(
+            token["projected"]["sources"][0]["serviceAccountToken"]["audience"],
+            "platform-telemetry",
+        )
+        self.assertEqual(
+            token["projected"]["sources"][0]["serviceAccountToken"][
+                "expirationSeconds"
+            ],
+            600,
+        )
         application, forwarder = pod["containers"]
-        self.assertNotIn("telemetry-token", [mount["name"] for mount in application["volumeMounts"]])
-        self.assertIn({"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://127.0.0.1:4318"},
-                      application["env"])
+        self.assertNotIn(
+            "telemetry-token", [mount["name"] for mount in application["volumeMounts"]]
+        )
+        self.assertIn(
+            {"name": "OTEL_EXPORTER_OTLP_ENDPOINT", "value": "http://127.0.0.1:4318"},
+            application["env"],
+        )
         self.assertEqual(forwarder["name"], "telemetry-forwarder")
-        self.assertIn("telemetry-token", [mount["name"] for mount in forwarder["volumeMounts"]])
+        self.assertIn(
+            "telemetry-token", [mount["name"] for mount in forwarder["volumeMounts"]]
+        )
         self.assertEqual(forwarder["resources"]["requests"]["memory"], "64Mi")
-        policy = next(doc for doc in docs if doc["kind"] == "NetworkPolicy" and
-                      doc["metadata"]["name"] == "api-telemetry")
+        policy = next(
+            doc
+            for doc in docs
+            if doc["kind"] == "NetworkPolicy"
+            and doc["metadata"]["name"] == "api-telemetry"
+        )
         self.assertEqual(policy["spec"]["egress"][0]["ports"][0]["port"], 4318)
 
     def test_scheduled_tracing_forwarder_does_not_keep_jobs_alive(self):
-        docs = component_resources("shop", [{"name": "worker", "type": "scheduled",
-            "resolved_image": "example/worker:1", "schedule": "* * * * *",
-            "tracing": {"enabled": True}}], "172.30.80.10", "secret")
-        pod = next(doc for doc in docs if doc["kind"] == "CronJob")["spec"]["jobTemplate"]["spec"]["template"]["spec"]
-        self.assertEqual([container["name"] for container in pod["containers"]], ["worker"])
-        forwarder, = pod["initContainers"]
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": "worker",
+                    "type": "scheduled",
+                    "resolved_image": "example/worker:1",
+                    "schedule": "* * * * *",
+                    "tracing": {"enabled": True},
+                }
+            ],
+            "172.30.80.10",
+            "secret",
+        )
+        pod = next(doc for doc in docs if doc["kind"] == "CronJob")["spec"][
+            "jobTemplate"
+        ]["spec"]["template"]["spec"]
+        self.assertEqual(
+            [container["name"] for container in pod["containers"]], ["worker"]
+        )
+        (forwarder,) = pod["initContainers"]
         self.assertEqual(forwarder["name"], "telemetry-forwarder")
         self.assertEqual(forwarder["restartPolicy"], "Always")
         # A running native sidecar is not proof that its loopback listener exists.
@@ -174,91 +384,229 @@ class WorkloadContract(unittest.TestCase):
         self.assertGreaterEqual(probe["failureThreshold"] * probe["periodSeconds"], 30)
         self.assertEqual(pod["restartPolicy"], "Never")
         self.assertEqual(forwarder["resources"]["requests"]["memory"], "64Mi")
-        self.assertIn("telemetry-token", [mount["name"] for mount in forwarder["volumeMounts"]])
-        self.assertNotIn("telemetry-token", [mount["name"] for mount in pod["containers"][0]["volumeMounts"]])
+        self.assertIn(
+            "telemetry-token", [mount["name"] for mount in forwarder["volumeMounts"]]
+        )
+        self.assertNotIn(
+            "telemetry-token",
+            [mount["name"] for mount in pod["containers"][0]["volumeMounts"]],
+        )
 
     def test_component_http_readiness_and_job_deadline(self):
-        docs = component_resources("shop", [
-            {"name": "web", "type": "service", "resolved_image": "registry/web@sha256:one",
-             "ports": [{"name": "http", "port": 8080}],
-             "readiness_path": "/actuator/health/readiness"},
-            {"name": "worker", "type": "scheduled", "resolved_image": "registry/worker@sha256:two",
-             "schedule": "* * * * *", "retry_limit": 8, "max_run_seconds": 600},
-        ], "172.30.80.10", "secret")
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": "web",
+                    "type": "service",
+                    "resolved_image": "registry/web@sha256:one",
+                    "ports": [{"name": "http", "port": 8080}],
+                    "readiness_path": "/actuator/health/readiness",
+                },
+                {
+                    "name": "worker",
+                    "type": "scheduled",
+                    "resolved_image": "registry/worker@sha256:two",
+                    "schedule": "* * * * *",
+                    "retry_limit": 8,
+                    "max_run_seconds": 600,
+                },
+            ],
+            "172.30.80.10",
+            "secret",
+        )
         deployment = next(d for d in docs if d["kind"] == "Deployment")
-        probe = deployment["spec"]["template"]["spec"]["containers"][0]["readinessProbe"]
-        self.assertEqual(probe["httpGet"], {"path": "/actuator/health/readiness", "port": 8080})
-        startup = deployment["spec"]["template"]["spec"]["containers"][0]["startupProbe"]
-        self.assertEqual(startup, {"tcpSocket": {"port": 8080}, "periodSeconds": 5, "failureThreshold": 36})
+        probe = deployment["spec"]["template"]["spec"]["containers"][0][
+            "readinessProbe"
+        ]
+        self.assertEqual(
+            probe["httpGet"], {"path": "/actuator/health/readiness", "port": 8080}
+        )
+        startup = deployment["spec"]["template"]["spec"]["containers"][0][
+            "startupProbe"
+        ]
+        self.assertEqual(
+            startup,
+            {"tcpSocket": {"port": 8080}, "periodSeconds": 5, "failureThreshold": 36},
+        )
         job = next(d for d in docs if d["kind"] == "CronJob")
         self.assertEqual(job["spec"]["jobTemplate"]["spec"]["backoffLimit"], 8)
-        self.assertEqual(job["spec"]["jobTemplate"]["spec"]["activeDeadlineSeconds"], 600)
+        self.assertEqual(
+            job["spec"]["jobTemplate"]["spec"]["activeDeadlineSeconds"], 600
+        )
 
     def test_service_deployments_have_component_labels_for_credential_rollout(self):
-        docs = component_resources("shop", [
-            {"name": name, "type": "service", "resolved_image": "registry/test@sha256:one"}
-            for name in ("api", "worker")
-        ], "172.30.80.10", "secret")
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": name,
+                    "type": "service",
+                    "resolved_image": "registry/test@sha256:one",
+                }
+                for name in ("api", "worker")
+            ],
+            "172.30.80.10",
+            "secret",
+        )
         for deployment in (d for d in docs if d["kind"] == "Deployment"):
             with self.subTest(component=deployment["metadata"]["name"]):
                 labels = deployment["metadata"]["labels"]
-                self.assertEqual(labels["platform.example/component"], deployment["metadata"]["name"])
+                self.assertEqual(
+                    labels["platform.example/component"], deployment["metadata"]["name"]
+                )
                 self.assertEqual(labels["platform.example/managed"], "true")
                 self.assertEqual(labels["app.kubernetes.io/name"], "shop")
                 for key, value in deployment["spec"]["selector"]["matchLabels"].items():
                     self.assertEqual(labels[key], value)
-                    self.assertEqual(deployment["spec"]["template"]["metadata"]["labels"][key], value)
+                    self.assertEqual(
+                        deployment["spec"]["template"]["metadata"]["labels"][key], value
+                    )
                 container = deployment["spec"]["template"]["spec"]["containers"][0]
-                self.assertIn({"secretRef": {"name": "app-secrets", "optional": True}}, container["envFrom"])
+                self.assertIn(
+                    {"secretRef": {"name": "app-secrets", "optional": True}},
+                    container["envFrom"],
+                )
 
     def test_legacy_service_gets_startup_probe(self):
-        docs = resources("shop", "registry/web@sha256:one", 8080, "apps.test", "172.30.80.10", "secret")
+        docs = resources(
+            "shop",
+            "registry/web@sha256:one",
+            8080,
+            "apps.test",
+            "172.30.80.10",
+            "secret",
+        )
         deployment = next(d for d in docs if d["kind"] == "Deployment")
         container = deployment["spec"]["template"]["spec"]["containers"][0]
-        self.assertEqual(container["startupProbe"],
-                         {"tcpSocket": {"port": 8080}, "periodSeconds": 5, "failureThreshold": 36})
+        self.assertEqual(
+            container["startupProbe"],
+            {"tcpSocket": {"port": 8080}, "periodSeconds": 5, "failureThreshold": 36},
+        )
 
     def test_updating_one_component_leaves_other_service_pod_template_unchanged(self):
-        shared = [{"name": "api", "type": "service", "resolved_image": "registry/api@sha256:one",
-                   "ports": [{"name": "http", "port": 8080}]},
-                  {"name": "web", "type": "service", "resolved_image": "registry/web@sha256:one",
-                   "ports": [{"name": "http", "port": 8081}]}]
+        shared = [
+            {
+                "name": "api",
+                "type": "service",
+                "resolved_image": "registry/api@sha256:one",
+                "ports": [{"name": "http", "port": 8080}],
+            },
+            {
+                "name": "web",
+                "type": "service",
+                "resolved_image": "registry/web@sha256:one",
+                "ports": [{"name": "http", "port": 8081}],
+            },
+        ]
         before = component_resources("shop", shared, "172.30.80.10", "secret")
-        changed = [{**component, **({"resolved_image": "registry/api@sha256:two"} if component["name"] == "api" else {})}
-                   for component in shared]
+        changed = [
+            {
+                **component,
+                **(
+                    {"resolved_image": "registry/api@sha256:two"}
+                    if component["name"] == "api"
+                    else {}
+                ),
+            }
+            for component in shared
+        ]
         after = component_resources("shop", changed, "172.30.80.10", "secret")
-        template = lambda docs, component: next(d for d in docs if d["kind"] == "Deployment" and
-                                                 d["metadata"]["name"] == component)["spec"]["template"]
+        template = lambda docs, component: next(
+            d
+            for d in docs
+            if d["kind"] == "Deployment" and d["metadata"]["name"] == component
+        )["spec"]["template"]
         self.assertEqual(template(before, "web"), template(after, "web"))
         self.assertNotEqual(template(before, "api"), template(after, "api"))
 
     def test_public_component_routes_through_authorizer_and_has_private_backend(self):
-        docs = component_resources("shop", [{"name": "api", "type": "service", "resolved_image": "x@sha256:a",
-            "ports": [{"name": "http", "port": 8080}], "exposure": "public"}], "172.30.80.10", "secret", domain="apps.test")
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "x@sha256:a",
+                    "ports": [{"name": "http", "port": 8080}],
+                    "exposure": "public",
+                }
+            ],
+            "172.30.80.10",
+            "secret",
+            domain="apps.test",
+        )
         ingress = next(d for d in docs if d["kind"] == "Ingress")
         self.assertEqual(ingress["spec"]["rules"][0]["host"], "api-shop.apps.test")
         policy = next(d for d in docs if d["kind"] == "NetworkPolicy")
         self.assertEqual(ingress["metadata"]["namespace"], "platform-access")
-        self.assertEqual(ingress["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"]["name"], "authorizer")
-        self.assertEqual(policy["spec"]["podSelector"]["matchExpressions"][0]["values"], ["api"])
-        protected = next(d for d in docs if d["kind"] == "NetworkPolicy" and d["metadata"]["name"] == "api-access")
+        self.assertEqual(
+            ingress["spec"]["rules"][0]["http"]["paths"][0]["backend"]["service"][
+                "name"
+            ],
+            "authorizer",
+        )
+        self.assertEqual(
+            policy["spec"]["podSelector"]["matchExpressions"][0]["values"], ["api"]
+        )
+        protected = next(
+            d
+            for d in docs
+            if d["kind"] == "NetworkPolicy" and d["metadata"]["name"] == "api-access"
+        )
         self.assertEqual(protected["spec"]["ingress"][0]["ports"][0]["port"], 8080)
 
     def test_approved_component_egress_is_scoped_to_its_pods(self):
-        docs = component_resources("shop", [{"name": "api", "type": "service", "resolved_image": "x@sha256:a",
-            "outbound": [{"cidr": "203.0.113.10/32", "port": 443}]}], "172.30.80.10", "secret")
+        docs = component_resources(
+            "shop",
+            [
+                {
+                    "name": "api",
+                    "type": "service",
+                    "resolved_image": "x@sha256:a",
+                    "outbound": [{"cidr": "203.0.113.10/32", "port": 443}],
+                }
+            ],
+            "172.30.80.10",
+            "secret",
+        )
         policy = next(d for d in docs if d["metadata"]["name"] == "api-egress")
-        self.assertEqual(policy["spec"]["podSelector"]["matchLabels"]["platform.example/component"], "api")
-        self.assertEqual(policy["spec"]["egress"][0]["to"][0]["ipBlock"]["cidr"], "203.0.113.10/32")
+        self.assertEqual(
+            policy["spec"]["podSelector"]["matchLabels"]["platform.example/component"],
+            "api",
+        )
+        self.assertEqual(
+            policy["spec"]["egress"][0]["to"][0]["ipBlock"]["cidr"], "203.0.113.10/32"
+        )
 
     def test_scheduled_component_dns_egress_is_scoped_to_its_pods(self):
-        with patch("app.manifests.resolve_egress_dns", return_value={"resolved_cidrs": ["203.0.113.8/32"]}):
-            docs = component_resources("shop", [{"name": "worker", "type": "scheduled",
-                "resolved_image": "x@sha256:a", "schedule": "* * * * *",
-                "outbound": [{"dns": "api.example.test", "port": 443}]}], "172.30.80.10", "secret")
+        with patch(
+            "app.manifests.resolve_egress_dns",
+            return_value={"resolved_cidrs": ["203.0.113.8/32"]},
+        ):
+            docs = component_resources(
+                "shop",
+                [
+                    {
+                        "name": "worker",
+                        "type": "scheduled",
+                        "resolved_image": "x@sha256:a",
+                        "schedule": "* * * * *",
+                        "outbound": [{"dns": "api.example.test", "port": 443}],
+                    }
+                ],
+                "172.30.80.10",
+                "secret",
+            )
         policy = next(d for d in docs if d["metadata"]["name"] == "worker-egress")
-        self.assertEqual(policy["spec"]["podSelector"]["matchLabels"]["platform.example/component"], "worker")
-        self.assertEqual(policy["spec"]["egress"][0]["to"][0]["ipBlock"]["cidr"], "203.0.113.8/32")
+        self.assertEqual(
+            policy["spec"]["podSelector"]["matchLabels"]["platform.example/component"],
+            "worker",
+        )
+        self.assertEqual(
+            policy["spec"]["egress"][0]["to"][0]["ipBlock"]["cidr"], "203.0.113.8/32"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
