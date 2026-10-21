@@ -16,7 +16,8 @@ jobs:
       - run: uv sync --project platform/app --locked
       - run: uv pip install --system 'ansible-core>=2.16,<2.22'
       - run: >-
-          uv run --project platform/app python -m unittest discover
+          uv run --project platform/app
+          --with 'ansible-core>=2.16,<2.22' python -m unittest discover
           -s scripts/tests/unit -v
       - run: >-
           uv run --project platform/app
