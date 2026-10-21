@@ -21,21 +21,25 @@ sudo bash scripts/setup/prepare-tempo-storage.sh
 docker compose up -d postgres keycloak-db-init keycloak proxy
 ```
 
-`init.py` creates missing secrets in the git-ignored `.env` and preserves existing
-values. The k3d installer verifies its download. Bootstrap later writes the admin
-kubeconfig to `.runtime/admin.kubeconfig` without changing the default context.
-Tempo preparation mounts a dedicated 4 GiB filesystem at
+`init.py` creates missing secrets in the git-ignored `.env` and preserves
+existing values. The k3d installer verifies its download. Bootstrap later writes
+the admin kubeconfig to `.runtime/admin.kubeconfig` without changing the default
+context. Tempo preparation mounts a dedicated 4 GiB filesystem at
 `/var/lib/developer-platform/tempo`. Run the preparation command after each host
 reboot before bootstrap; there is no persistent mount entry installed by this
 script. `scripts/up.sh` refuses to start without that mount.
+
+Local `.env` validation and controlled redeployment use the same
+[configuration and deployment commands](configuration-and-deployment.md) as
+Ansible. Routine startup remains `bash scripts/up.sh`.
 
 ## Bootstrap identity
 
 Open `http://identity.localhost`, sign in as Keycloak `admin` with the password
 from `.env`, and create the initial individual user in the `platform` realm. Put
 that user's immutable ID in `PLATFORM_BOOTSTRAP_SUBJECT`, then run
-`bash scripts/up.sh` to start the API and remaining services. Remove
-the setting after the first platform-admin grant exists. Follow
+`bash scripts/up.sh` to start the API and remaining services. Remove the setting
+after the first platform-admin grant exists. Follow
 [Identity and access](identity-and-access.md) for the complete procedure.
 
 ## Verify
@@ -49,7 +53,8 @@ kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 python3 scripts/acceptance/smoke.py
 ```
 
-The smoke test retains its project. `/healthz` proves only API process health and
-`/readyz` checks PostgreSQL plus Kubernetes connectivity; neither proves every
-workload. Use [platform acceptance](validation/acceptance.md) for the broader
-suite and [lifecycle](lifecycle.md) for stop, restart, recreation, and cleanup.
+The smoke test retains its project. `/healthz` proves only API process health
+and `/readyz` checks PostgreSQL plus Kubernetes connectivity; neither proves
+every workload. Use [platform acceptance](validation/acceptance.md) for the
+broader suite and [lifecycle](lifecycle.md) for stop, restart, recreation, and
+cleanup.

@@ -12,16 +12,22 @@
     'Added generated values for new required secrets:' in
     platform_environment_init.stdout
 
-- name: Configure deployment endpoints while preserving secrets
-  ansible.builtin.lineinfile:
-    path: "{{ platform_install_dir }}/.env"
-    regexp: "^{{ item.key }}="
-    line: "{{ item.key }}={{ item.value }}"
-    owner: root
-    group: root
-    mode: '0600'
-  loop: >-
-    {{ (platform_settings | combine(platform_managed_settings)) | dict2items }}
+- name: Apply shared platform configuration while preserving secrets
+  ansible.builtin.command:
+    argv:
+      - python3
+      - scripts/setup/configure-platform.py
+      - --stdin
+    stdin: "{{ configuration | to_json }}"
+    chdir: "{{ platform_install_dir }}"
+  vars:
+    configuration:
+      environment: "{{ platform_validated_environment }}"
+      options: "{{ platform_deployment_options }}"
+      tracing: "{{ platform_tracing_settings }}"
+  register: platform_configuration
+  changed_when: >-
+    'Platform configuration updated.' in platform_configuration.stdout
   no_log: true
   diff: false
 

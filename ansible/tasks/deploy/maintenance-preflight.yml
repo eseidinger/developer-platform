@@ -1,37 +1,13 @@
 ---
-- name: >-
-    Check for maintenance jobs that must not overlap deployment
-  ansible.builtin.command:
-    argv:
-      - systemctl
-      - list-units
-      - --type=service
-      - --state=activating,active,running
-      - --no-legend
-      - platform-backup.service
-      - platform-backup-freshness-drill.service
-      - backup-drill-*
-      - platform-availability-*
-  register: platform_maintenance_units
-  changed_when: false
-
-- name: >-
-    Validate fixed Docker addresses before stopping services
+- name: Check shared deployment prerequisites before host maintenance
   ansible.builtin.command:
     argv:
       - python3
-      - scripts/checks/check-network-addresses.py
-      - --validate-networks
+      - scripts/operations/deploy-platform.py
+      - --check
     chdir: "{{ platform_install_dir }}"
   changed_when: false
-
-- name: >-
-    Refuse deployment during backup or availability maintenance
-  ansible.builtin.assert:
-    that: platform_maintenance_units.stdout | trim == ''
-    fail_msg: >-
-      Deployment cannot overlap an active backup or availability drill: {{
-      platform_maintenance_units.stdout | trim }}
+  no_log: true
 
 - name: Inspect an existing backup runner
   ansible.builtin.stat:
@@ -58,13 +34,3 @@
     group: root
     mode: '0700'
   when: platform_installed_backup_runner.stat.exists
-
-- name: >-
-    Prepare selected data-store configuration before the service outage
-  ansible.builtin.command:
-    argv:
-      - python3
-      - scripts/setup/prepare-stores.py
-    chdir: "{{ platform_install_dir }}"
-  changed_when: false
-  no_log: true

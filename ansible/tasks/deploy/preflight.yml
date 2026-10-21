@@ -1,4 +1,11 @@
 ---
+- name: Load shared platform defaults from the checkout
+  ansible.builtin.set_fact:
+    platform_environment_defaults: >-
+      {{ lookup('ansible.builtin.file',
+      (platform_source_dir | default(playbook_dir ~ '/..')) ~ '/.env.example') |
+      platform_environment_defaults }}
+
 - name: >-
     Apply defaults only when inventory has not configured them
   ansible.builtin.set_fact:
@@ -6,36 +13,58 @@
       {{ platform_install_dir | default('/opt/developer-platform') }}
     platform_source_dir: >-
       {{ platform_source_dir | default(playbook_dir ~ '/..') }}
-    platform_domain: "{{ platform_domain | default('platform.localhost') }}"
+    platform_domain: >-
+      {{ platform_domain |
+      default(platform_environment_defaults.PLATFORM_DOMAIN) }}
     platform_apps_domain: >-
-      {{ platform_apps_domain | default('apps.localhost') }}
+      {{ platform_apps_domain |
+      default(platform_environment_defaults.APPS_DOMAIN) }}
     platform_identity_domain: >-
-      {{ platform_identity_domain | default('identity.localhost') }}
+      {{ platform_identity_domain |
+      default(platform_environment_defaults.IDENTITY_DOMAIN) }}
     platform_tls_email: >-
-      {{ platform_tls_email | default('admin@example.com') }}
-    platform_edge_bind_ip: "{{ platform_edge_bind_ip | default('127.0.0.1') }}"
+      {{ platform_tls_email |
+      default(platform_environment_defaults.TLS_EMAIL) }}
+    platform_edge_bind_ip: >-
+      {{ platform_edge_bind_ip |
+      default(platform_environment_defaults.EDGE_BIND_IP) }}
     platform_image_registries: >-
-      {{ platform_image_registries | default('docker.io,ghcr.io,quay.io') }}
+      {{ platform_image_registries |
+      default(platform_environment_defaults.IMAGE_REGISTRIES) }}
     platform_drift_scan_interval_seconds: >-
-      {{ platform_drift_scan_interval_seconds | default(300) }}
+      {{ platform_drift_scan_interval_seconds |
+      default(platform_environment_defaults.DRIFT_SCAN_INTERVAL_SECONDS) }}
     platform_revision_retention: >-
-      {{ platform_revision_retention | default(25) }}
+      {{ platform_revision_retention |
+      default(platform_environment_defaults.REVISION_RETENTION) }}
     platform_capacity_admission_enabled: >-
-      {{ platform_capacity_admission_enabled | default(false) }}
+      {{ platform_capacity_admission_enabled |
+      default(platform_environment_defaults.CAPACITY_ADMISSION_ENABLED) }}
     platform_capacity_reserve_cpu_millicores: >-
-      {{ platform_capacity_reserve_cpu_millicores | default(2000) }}
+      {{ platform_capacity_reserve_cpu_millicores |
+      default(platform_environment_defaults.CAPACITY_RESERVE_CPU_MILLICORES)
+      }}
     platform_capacity_reserve_memory_mib: >-
-      {{ platform_capacity_reserve_memory_mib | default(8192) }}
+      {{ platform_capacity_reserve_memory_mib |
+      default(platform_environment_defaults.CAPACITY_RESERVE_MEMORY_MIB) }}
     platform_capacity_host_overhead_cpu_millicores: >-
-      {{ platform_capacity_host_overhead_cpu_millicores | default(2000) }}
+      {{ platform_capacity_host_overhead_cpu_millicores |
+      default(platform_environment_defaults.CAPACITY_HOST_OVERHEAD_CPU_MILLICORES)
+      }}
     platform_capacity_host_overhead_memory_mib: >-
-      {{ platform_capacity_host_overhead_memory_mib | default(1024) }}
+      {{ platform_capacity_host_overhead_memory_mib |
+      default(platform_environment_defaults.CAPACITY_HOST_OVERHEAD_MEMORY_MIB)
+      }}
     platform_capacity_kubernetes_overhead_memory_mib: >-
-      {{ platform_capacity_kubernetes_overhead_memory_mib | default(4096) }}
+      {{ platform_capacity_kubernetes_overhead_memory_mib |
+      default(platform_environment_defaults.CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB)
+      }}
     platform_allowed_egress_cidrs: >-
-      {{ platform_allowed_egress_cidrs | default('') }}
+      {{ platform_allowed_egress_cidrs |
+      default(platform_environment_defaults.ALLOWED_EGRESS_CIDRS) }}
     platform_allowed_egress_ports: >-
-      {{ platform_allowed_egress_ports | default('') }}
+      {{ platform_allowed_egress_ports |
+      default(platform_environment_defaults.ALLOWED_EGRESS_PORTS) }}
     platform_install_docker: "{{ platform_install_docker | default(true) }}"
     platform_kubectl_version: >-
       {{ platform_kubectl_version | default('v1.36.4') }}
@@ -51,28 +80,6 @@
       - platform_install_dir != '/'
       - >-
         platform_kubectl_version is match('^v1\.(35|36|37)\.[0-9]+$')
-      - >-
-          (platform_capacity_admission_enabled | string | lower) in ['true',
-          'false']
-      - >-
-        (platform_capacity_reserve_cpu_millicores | string) is match('^[0-9]+$')
-      - >-
-        (platform_capacity_reserve_memory_mib | string) is match('^[0-9]+$')
-      - >-
-          (platform_capacity_host_overhead_cpu_millicores | string) is
-          match('^[0-9]+$')
-      - >-
-          (platform_capacity_host_overhead_memory_mib | string) is
-          match('^[0-9]+$')
-      - >-
-          (platform_capacity_kubernetes_overhead_memory_mib | string) is
-          match('^[0-9]+$')
-      - >-
-          (platform_allowed_egress_cidrs | string) is
-          match('^$|^[0-9A-Fa-f:.]+/[0-9]{1,3}(?:,[0-9A-Fa-f:.]+/[0-9]{1,3})*$')
-      - >-
-          (platform_allowed_egress_ports | string) is
-          match('^$|^[0-9]+(?:,[0-9]+)*$')
     fail_msg: >-
       Use Ubuntu 22.04 or newer on amd64/arm64 and kubectl compatible with
       Kubernetes 1.36.
@@ -80,6 +87,7 @@
 - name: >-
     Validate and render explicitly managed deployment options
   ansible.builtin.set_fact:
+    platform_deployment_options: "{{ platform_inventory_options }}"
     platform_managed_settings: >-
       {{ platform_inventory_options | platform_inventory_settings }}
   vars:
@@ -105,7 +113,9 @@
       {{ platform_trace_options | platform_trace_settings }}
   vars:
     platform_trace_options:
-      sample_rate: "{{ platform_trace_sample_rate | default(1.0) }}"
+      sample_rate: >-
+        {{ platform_trace_sample_rate |
+        default(platform_environment_defaults.PLATFORM_TRACE_SAMPLE_RATE) }}
       retention: "{{ platform_trace_retention | default('24h') }}"
 
 - name: >-
@@ -113,21 +123,11 @@
   ansible.builtin.set_fact:
     platform_tempo_configuration: >-
       {{ (lookup('ansible.builtin.file', platform_source_dir ~
-      '/infrastructure/monitoring/tempo.yaml') | from_yaml) |
-      combine(platform_tempo_retention, recursive=true) }}
-  vars:
-    platform_tempo_retention:
-      backend_worker:
-        compaction:
-          block_retention: "{{ platform_tracing_settings.retention }}"
+      '/infrastructure/monitoring/tempo.yaml')) |
+      platform_tempo_configuration(platform_tracing_settings.retention) |
+      from_yaml }}
 
-- name: Validate environment values
-  ansible.builtin.assert:
-    that:
-      - >-
-          item.key in ['ALLOWED_EGRESS_CIDRS', 'ALLOWED_EGRESS_PORTS'] or
-          item.value | string is match('^[A-Za-z0-9.@:,_-]+$')
-    fail_msg: >-
-      Platform settings must be nonempty single-line domain, email, or IP
-      values.
-  loop: "{{ platform_settings | dict2items }}"
+- name: Validate environment values with shared configuration rules
+  ansible.builtin.set_fact:
+    platform_validated_environment: >-
+      {{ platform_settings | platform_environment_settings }}

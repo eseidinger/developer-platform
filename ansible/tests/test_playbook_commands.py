@@ -22,14 +22,27 @@ class PlaybookCommandTests(unittest.TestCase):
         tasks = list(mappings(load_playbook(ANSIBLE_DIR / "deploy.yml")))
         names = [task.get("name") for task in tasks]
         validate = names.index(
-            "Validate fixed Docker addresses before stopping services"
+            "Check shared deployment prerequisites before host maintenance"
         )
-        stop = names.index("Stop existing Compose services cleanly")
         reconcile = names.index("Reconcile Compose services and Kubernetes cluster")
-        self.assertLess(validate, stop)
-        self.assertLess(stop, reconcile)
+        self.assertLess(validate, reconcile)
+        self.assertEqual(
+            tasks[validate]["ansible.builtin.command"]["argv"],
+            ["python3", "scripts/operations/deploy-platform.py", "--check"],
+        )
         self.assertIn(
-            "--validate-networks", tasks[validate]["ansible.builtin.command"]["argv"]
+            "scripts/operations/deploy-platform.py",
+            tasks[reconcile]["ansible.builtin.command"]["argv"],
+        )
+        self.assertTrue(tasks[reconcile]["no_log"])
+        # Stop/remove/bootstrap ordering is exercised by the shared command tests.
+        self.assertFalse(
+            any(
+                task.get("ansible.builtin.command", {}).get("argv", [])[:3]
+                in (["docker", "compose", "stop"], ["docker", "compose", "rm"])
+                for task in tasks
+                if isinstance(task.get("ansible.builtin.command"), dict)
+            )
         )
 
     def test_command_argv_never_contains_yaml_null(self):

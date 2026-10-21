@@ -1,32 +1,11 @@
 ---
-- name: Stop existing Compose services cleanly
-  ansible.builtin.command:
-    argv:
-      - docker
-      - compose
-      - stop
-      - --timeout
-      - '60'
-    chdir: "{{ platform_install_dir }}"
-  changed_when: true
-
-- name: >-
-    Remove stopped Compose containers while preserving data and the shared
-    network
-  ansible.builtin.command:
-    argv:
-      - docker
-      - compose
-      - rm
-      - --force
-    chdir: "{{ platform_install_dir }}"
-  changed_when: true
-
 - name: Reconcile Compose services and Kubernetes cluster
   ansible.builtin.command:
     argv:
-      - bash
-      - scripts/up.sh
+      - python3
+      - scripts/operations/deploy-platform.py
+      - --readiness-timeout
+      - "{{ platform_readiness_timeout_seconds | default(300) | string }}"
     chdir: "{{ platform_install_dir }}"
   changed_when: true
   async: >-
@@ -34,15 +13,3 @@
   poll: 10
   # Bootstrap can emit Kubernetes token diagnostics on failure.
   no_log: true
-
-- name: Wait for the platform API
-  ansible.builtin.uri:
-    url: http://127.0.0.1:8000/readyz
-    timeout: 5
-    status_code: 200
-  register: platform_health
-  until: platform_health.status | default(0) == 200
-  retries: >-
-    {{ ((platform_readiness_timeout_seconds | default(300) | int) / 5) |
-    round(0, 'ceil') | int }}
-  delay: 5

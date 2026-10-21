@@ -32,13 +32,18 @@ firewall.
 The playbook installs Docker from its official APT repository, verifies
 downloaded kubectl and k3d checksums, copies deployment sources to
 `/opt/developer-platform`, generates secrets on the target, prepares the bounded
-Tempo filesystem, and runs `scripts/up.sh`. The Tempo script is transferred with
-the new source, so it does not need to exist on the host before deployment. The
-playbook then waits for the API dependency-readiness endpoint. Bootstrap also
-waits for Alloy's internal readiness health check; a restarting/unhealthy
-collector fails deployment rather than being masked by API/Prometheus readiness.
-This does not attest log ingestion or seven-day retention. The controller's
-`.env` and `.runtime` are not transferred. Each successful deployment writes
+Tempo filesystem, and invokes `scripts/operations/deploy-platform.py`. That
+shared command performs the deployment checks and controlled stop/remove
+sequence, calls `scripts/up.sh`, and waits for API readiness. Local operators
+can invoke the same deployment command on a prepared host. See the
+[shared configuration and deployment guide](../../docs/operators/configuration-and-deployment.md).
+The Tempo script is transferred with the new source, so it does not need to
+exist on the host before deployment. The playbook then waits for the API
+dependency-readiness endpoint. Bootstrap also waits for Alloy's internal
+readiness health check; a restarting/unhealthy collector fails deployment rather
+than being masked by API/Prometheus readiness. This does not attest log
+ingestion or seven-day retention. The controller's `.env` and `.runtime` are not
+transferred. Each successful deployment writes
 `.runtime/installation-record.json` (root-only, no secrets) with the source
 revision (`+dirty` if the controller checkout has uncommitted changes), host OS,
 Docker/Compose/k3d/kubectl versions, running Compose image references with IDs,
@@ -55,28 +60,32 @@ sudo kubectl --kubeconfig /opt/developer-platform/.runtime/admin.kubeconfig \
 ## Reapplying an installation
 
 Rerunning the playbook reapplies sources and endpoints and reconciles the
-running platform. It writes the selected `platform_trace_sample_rate` to
-`PLATFORM_TRACE_SAMPLE_RATE`, defaulting to `1.0` even when a previous `.env`
-selected 10% sampling. Existing tracing-enabled application declarations must be
-reapplied so their sampler environment changes too; an API restart alone cannot
-change a running application's sampler. An already installed
-`/usr/local/sbin/platform-backup` is refreshed from the matching transferred
-source before the API starts. Its configuration, credentials, schedule and
-verified history are retained; this does not install or enable a new backup
-service. Fresh backup setup still uses the operations playbook. After validating
-the transferred Compose configuration and confirming that no backup or
-availability drill is active, deployment performs a controlled full outage of
-the Compose services. It stops and removes their containers, but preserves named
-volumes, `.env`, the k3d cluster, and the shared Docker network. PostgreSQL
-starts and becomes healthy first. Bootstrap then starts Keycloak and the
-Platform API (and their identity initializers) before recreating the remaining
-dynamically addressed services, so monitoring and edge containers cannot claim
-their fixed addresses. Address settings are validated before the outage, and
-bootstrap checks live ownership before starting services and after starting k3d.
-An unexpected owner is reported without secrets and is never disconnected
-automatically. This is intentionally not `docker compose down`: k3d remains
-attached to the shared network, so that network must not be removed. The
-external watchdog can alert if the deployment exceeds its heartbeat window.
+running platform. Endpoint/policy defaults come from `.env.example`; the Ansible
+filter plugin and local configuration command use the same validators and Tempo
+renderer. Ansible passes non-secret settings to the configuration command on
+stdin and preserves the existing inventory interface. It writes the selected
+`platform_trace_sample_rate` to `PLATFORM_TRACE_SAMPLE_RATE`, defaulting to
+`1.0` even when a previous `.env` selected 10% sampling. Existing
+tracing-enabled application declarations must be reapplied so their sampler
+environment changes too; an API restart alone cannot change a running
+application's sampler. An already installed `/usr/local/sbin/platform-backup` is
+refreshed from the matching transferred source before the API starts. Its
+configuration, credentials, schedule and verified history are retained; this
+does not install or enable a new backup service. Fresh backup setup still uses
+the operations playbook. After validating the transferred Compose configuration
+and confirming that no backup or availability drill is active, deployment
+performs a controlled full outage of the Compose services. It stops and removes
+their containers, but preserves named volumes, `.env`, the k3d cluster, and the
+shared Docker network. PostgreSQL starts and becomes healthy first. Bootstrap
+then starts Keycloak and the Platform API (and their identity initializers)
+before recreating the remaining dynamically addressed services, so monitoring
+and edge containers cannot claim their fixed addresses. Address settings are
+validated before the outage, and bootstrap checks live ownership before starting
+services and after starting k3d. An unexpected owner is reported without secrets
+and is never disconnected automatically. This is intentionally not
+`docker compose down`: k3d remains attached to the shared network, so that
+network must not be removed. The external watchdog can alert if the deployment
+exceeds its heartbeat window.
 
 k3d installation and bootstrap run on every deployment and report changes, even
 if configuration is unchanged. Bootstrap refreshes the k3d load balancer when

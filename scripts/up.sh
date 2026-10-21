@@ -19,6 +19,9 @@ test -f .env || {
   exit 1
 }
 
+# Validate shared settings and synchronize tracing before starting services.
+python3 scripts/setup/configure-platform.py --runtime
+
 # Prepare store keys and configuration, then check the trace storage mount.
 python3 scripts/setup/prepare-stores.py
 

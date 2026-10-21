@@ -1,24 +1,4 @@
 ---
-- name: Configure Tempo trace retention
-  ansible.builtin.copy:
-    dest: >-
-      {{ platform_install_dir }}/infrastructure/monitoring/tempo.yaml
-    content: >-
-      {{ platform_tempo_configuration | to_nice_yaml(indent=2) }}
-    owner: root
-    group: root
-    mode: '0644'
-
-- name: Validate Compose configuration
-  ansible.builtin.command:
-    argv:
-      - docker
-      - compose
-      - config
-      - --quiet
-    chdir: "{{ platform_install_dir }}"
-  changed_when: false
-
 - name: Check bounded Tempo trace storage mount
   ansible.builtin.command:
     argv:

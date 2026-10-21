@@ -230,6 +230,30 @@ class InventorySettingsTests(unittest.TestCase):
         }
         with tempfile.TemporaryDirectory(prefix="inventory-offline-") as directory:
             path = Path(directory) / "play.yml"
+            installation = Path(directory) / "installation"
+            for relative in (
+                ".env.example",
+                "infrastructure/monitoring/tempo.yaml",
+                "scripts/setup/configure-platform.py",
+                "scripts/internal/__init__.py",
+                "scripts/internal/env.py",
+                "scripts/internal/deployment_options.py",
+                "scripts/internal/platform_configuration.py",
+            ):
+                destination = installation / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copyfile(ROOT / relative, destination)
+            environment_tasks = yaml.safe_load(
+                (ROOT / "ansible/tasks/deploy/environment.yml").read_text()
+            )
+            apply_configuration = next(
+                task
+                for task in environment_tasks
+                if task["name"]
+                == "Apply shared platform configuration while preserving secrets"
+            )
+            # Exercise the real stdin/JSON boundary against a temporary checkout.
+            apply_configuration["ansible.builtin.command"]["chdir"] = str(installation)
             env = {
                 **os.environ,
                 "ANSIBLE_LOCAL_TEMP": directory,
@@ -237,6 +261,11 @@ class InventorySettingsTests(unittest.TestCase):
                 "ANSIBLE_NOCOLOR": "1",
             }
             for mode in ["default", "all", "omitted", "tracing", "invalid"]:
+                (installation / ".env").write_text(
+                    (ROOT / ".env.example")
+                    .read_text()
+                    .replace("DATABASE_KEY=\n", "DATABASE_KEY=fixture-secret\n")
+                )
                 configured = copy.deepcopy(variables)
                 expected = copy.deepcopy(assertions)
                 if mode == "invalid":
@@ -290,7 +319,8 @@ class InventorySettingsTests(unittest.TestCase):
                         "connection": "local",
                         "gather_facts": False,
                         "vars": {**deployment["vars"], **configured},
-                        "tasks": deployment["pre_tasks"] + [expected],
+                        "tasks": deployment["pre_tasks"]
+                        + [expected, apply_configuration],
                     }
                 ]
                 path.write_text(yaml.safe_dump(play, sort_keys=False))

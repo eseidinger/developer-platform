@@ -2,7 +2,12 @@
 
 Use the [remote installation guide](../docs/operators/install-remote.md) for the
 canonical deployment sequence. This directory owns the platform playbooks,
-validation filters, configuration templates, and offline contract tests.
+inventory adapters, host configuration templates, and offline contract tests.
+Configuration rules live in `scripts/internal/deployment_options.py` and
+`scripts/internal/platform_configuration.py`. Both local operators and Ansible
+use `scripts/setup/configure-platform.py` and
+`scripts/operations/deploy-platform.py`; see the
+[shared configuration and deployment guide](../docs/operators/configuration-and-deployment.md).
 
 ## Structure
 
@@ -15,9 +20,9 @@ validation filters, configuration templates, and offline contract tests.
 - `tasks/drills/` groups capacity, failure-signal, and data-rollback phases.
 - `templates/` contains installed SSH/systemd/Docker configuration and the shell
   fragments used to record installation evidence.
-- `filter_plugins/platform_inventory.py` validates and renders non-secret
-  inventory settings. Keep the plugin beside the public playbooks so automatic
-  Ansible discovery continues to work.
+- `filter_plugins/platform_inventory.py` adapts shared validation and rendering
+  to non-secret inventory settings. Keep it beside the public playbooks so
+  automatic Ansible discovery continues to work.
 - `tests/` checks inventory rendering, task ordering, command arguments, and
   cleanup contracts without deploying the platform.
 - `docs/` contains the detailed variable, credential, and operational
