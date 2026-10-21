@@ -15,11 +15,12 @@ from psycopg import sql
 from psycopg.types.json import Jsonb
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from app import main, access_store as store, authorization, access_worker
 from app.access_gateway import admitted_identity
 from app.access_provider import derived_secret
 from app.identity import Principal
-from test_application_access import POLICY
+from tests.support.application_access import POLICY
 
 
 @unittest.skipUnless(os.environ.get("ACCESS_TEST_DSN"), "Set ACCESS_TEST_DSN to an isolated PostgreSQL database")

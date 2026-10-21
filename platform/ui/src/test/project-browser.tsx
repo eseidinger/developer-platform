@@ -8,7 +8,14 @@ import { HomePage } from '@/features/home/home-page'
 import { ProjectWorkspace } from '@/features/projects/project-workspace'
 import '../index.css'
 
-const auth: AuthContextValue = { status: 'authenticated', user: null, error: null, signIn: () => Promise.resolve(), completeSignIn: () => Promise.resolve(false), signOut: () => Promise.resolve() }
+const auth: AuthContextValue = {
+  status: 'authenticated',
+  user: null,
+  error: null,
+  signIn: () => Promise.resolve(),
+  completeSignIn: () => Promise.resolve(false),
+  signOut: () => Promise.resolve(),
+}
 const target = document.getElementById('root')
 if (!target) throw new Error('Missing browser fixture root')
 createRoot(target).render(

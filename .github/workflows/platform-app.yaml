@@ -25,9 +25,13 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --locked
       - run: uv run --project platform/app python -m unittest discover -s platform/app/tests -v
+      - name: Test platform runners without deploying the platform
+        run: >-
+          uv run --project platform/app python -m unittest discover
+          -s tests/platform/unit -v
       - run: >-
           uv run --project platform/app python -m compileall -q
-          platform/app/src/app platform/acceptance
+          platform/app/src/app tests/platform tests/fixtures tests/support
           scripts/tests/platform/check-hosted-access.py
       - name: Verify offline acceptance plan
         run: >-
@@ -45,7 +49,9 @@ jobs:
           uv run --project platform/app --with sqlalchemy==2.0.46 python
           scripts/tests/components/ai/verify-ai-database-diagnostics.py
       - name: Build neutral acceptance fixture
-        run: docker build -f platform/acceptance/Dockerfile.fixture -t acceptance-fixture:test platform/acceptance
+        run: >-
+          docker build -f tests/fixtures/hosted-application/Dockerfile
+          -t acceptance-fixture:test tests/fixtures/hosted-application
       - name: Start isolated identity provider
         run: >-
           docker run --rm -d --name access-test-keycloak

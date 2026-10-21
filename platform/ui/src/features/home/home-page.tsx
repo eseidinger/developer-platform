@@ -11,7 +11,8 @@ const foundationItems = [
 
 function HomePage() {
   const { error, signIn, signOut, status, user } = useAuth()
-  const subject = typeof user?.profile.sub === 'string' ? user.profile.sub : null
+  const subject =
+    typeof user?.profile.sub === 'string' ? user.profile.sub : null
 
   return (
     <section aria-labelledby="page-title" className="max-w-3xl space-y-8">
@@ -35,7 +36,8 @@ function HomePage() {
         {status === 'authenticated' && (
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm text-muted-foreground">
-              Signed in{subject ? ` as ${subject}` : ''}. Access is determined by platform-owned grants.
+              Signed in{subject ? ` as ${subject}` : ''}. Access is determined
+              by platform-owned grants.
             </p>
             <Button variant="outline" onClick={() => void signOut()}>
               Clear portal session
@@ -48,7 +50,10 @@ function HomePage() {
           </p>
         )}
       </div>
-      <section aria-labelledby="foundation-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
+      <section
+        aria-labelledby="foundation-title"
+        className="rounded-xl border border-border bg-card p-6 shadow-sm"
+      >
         <h2 id="foundation-title" className="text-lg font-medium">
           Current foundation
         </h2>

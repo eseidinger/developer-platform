@@ -9,10 +9,9 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app/src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 
-from acceptance import human_database as drill
+from tests.platform import human_database as drill
 
 
 IMAGE = "docker.io/example/neutral-fixture@sha256:" + "a" * 64

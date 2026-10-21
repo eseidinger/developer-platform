@@ -68,7 +68,7 @@ all functional assertions passed.
   Retained databases are reported explicitly; host disposal or a separate
   authorized purge handles their final removal.
 
-Use the established `platform/acceptance` conventions for origin validation,
+Use the established `tests/platform` conventions for origin validation,
 private files, fixed safe error codes, bounded waits, and redacted reports.
 Extract small shared helpers if useful; keep this runner independent of the
 hosted-access fixture's policy-specific flow. Unit tests for the runner's

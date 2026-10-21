@@ -22,7 +22,7 @@ const loginPortal = async (context, person) => {
   const page = await context.newPage()
   activePage = page
   let token
-  page.on('request', request => {
+  page.on('request', (request) => {
     const value = request.headers().authorization
     if (value?.startsWith('Bearer ')) token = value.slice(7)
   })
@@ -36,7 +36,9 @@ const loginPortal = async (context, person) => {
   stage = 'identity-submit'
   await page.locator('#kc-login').click()
   stage = 'portal-return'
-  await page.waitForURL(url => url.origin === new URL(base).origin, { timeout: 30000 })
+  await page.waitForURL((url) => url.origin === new URL(base).origin, {
+    timeout: 30000,
+  })
   stage = 'portal-auth-complete'
   await page.getByText(/Signed in/).waitFor({ timeout: 30000 })
   stage = 'portal-bearer-capture'
@@ -50,14 +52,26 @@ try {
   stage = 'portal-interactive-login'
   const owner = await loginPortal(context, config.owner)
   stage = 'human-credential-issue'
-  const issued = await requestJson(context, `/v1/store-access/${config.grantId}/credentials`, owner.token, 'POST')
+  const issued = await requestJson(
+    context,
+    `/v1/store-access/${config.grantId}/credentials`,
+    owner.token,
+    'POST',
+  )
   if (issued.status !== 202 || !issued.body.credential_id) throw Error()
   const credentialId = issued.body.credential_id
   let lease
   for (let i = 0; i < 30; i++) {
-    const result = await requestJson(context, `/v1/store-access/credentials/${credentialId}`, owner.token)
-    if (result.status === 200) { lease = result.body; break }
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    const result = await requestJson(
+      context,
+      `/v1/store-access/credentials/${credentialId}`,
+      owner.token,
+    )
+    if (result.status === 200) {
+      lease = result.body
+      break
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000))
   }
   if (!lease?.connection?.PGPASSWORD) throw Error()
   stage = 'pgadmin-sso'
@@ -71,47 +85,76 @@ try {
   await page.getByRole('button', { name: /Platform sign-in/ }).click()
   lastPath = new URL(page.url()).pathname
   stage = 'pgadmin-sso-return'
-  await page.waitForURL(url => url.pathname.endsWith('/browser/'), { timeout: 30000 })
+  await page.waitForURL((url) => url.pathname.endsWith('/browser/'), {
+    timeout: 30000,
+  })
   stage = 'pgadmin-csrf'
   const utils = await context.request.get(consoleBase + '/browser/js/utils.js')
   const script = await utils.text()
   const match = script.match(/pgAdmin\['csrf_token'\]\s*=\s*'([^']+)'/)
   if (!match) throw Error()
-  const headers = { 'X-pgA-CSRFToken': match[1], Referer: consoleBase + '/browser/' }
+  const headers = {
+    'X-pgA-CSRFToken': match[1],
+    Referer: consoleBase + '/browser/',
+  }
   const call = async (method, path, data) => {
-    const response = await context.request.fetch(consoleBase + path, { method, headers, data })
+    const response = await context.request.fetch(consoleBase + path, {
+      method,
+      headers,
+      data,
+    })
     return { status: response.status(), body: await response.json() }
   }
   stage = 'pgadmin-scoped-register'
   const c = lease.connection
   const created = await call('POST', '/browser/server/obj/1/', {
-    name: 'Phase 7 deployed acceptance', db: c.PGDATABASE,
-    host: 'store-access', port: Number(c.PGPORT), username: c.PGUSER,
-    role: '', service: '', connection_params: { sslmode: 'disable' }, connect_now: false,
+    name: 'Phase 7 deployed acceptance',
+    db: c.PGDATABASE,
+    host: 'store-access',
+    port: Number(c.PGPORT),
+    username: c.PGUSER,
+    role: '',
+    service: '',
+    connection_params: { sslmode: 'disable' },
+    connect_now: false,
   })
   const sid = created.body.node?._id
   if (!sid) throw Error()
   const connectionPath = `/browser/server/connect/1/${sid}`
   stage = 'pgadmin-scoped-connect'
-  const connected = await call('POST', connectionPath, { password: c.PGPASSWORD, save_password: true })
-  if (connected.body.data?.connected !== true || connected.body.data?.is_password_saved !== false) throw Error()
+  const connected = await call('POST', connectionPath, {
+    password: c.PGPASSWORD,
+    save_password: true,
+  })
+  if (
+    connected.body.data?.connected !== true ||
+    connected.body.data?.is_password_saved !== false
+  )
+    throw Error()
   stage = 'pgadmin-scoped-query'
   const stats = await call('GET', `/browser/server/stats/1/${sid}`)
   if (stats.status !== 200 || stats.body.success === 0) throw Error()
   stage = 'pgadmin-query-tool-initialize'
   const transaction = Date.now()
-  const initialized = await call('POST', `/sqleditor/initialize/sqleditor/${transaction}/1/${sid}/0`,
-    { dbname: c.PGDATABASE, password: c.PGPASSWORD })
-  if (initialized.status !== 200 || initialized.body.success !== 1) throw Error()
-  const query = async sql => {
-    const started = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
-      { sql, explain_plan: null })
+  const initialized = await call(
+    'POST',
+    `/sqleditor/initialize/sqleditor/${transaction}/1/${sid}/0`,
+    { dbname: c.PGDATABASE, password: c.PGPASSWORD },
+  )
+  if (initialized.status !== 200 || initialized.body.success !== 1)
+    throw Error()
+  const query = async (sql) => {
+    const started = await call(
+      'POST',
+      `/sqleditor/query_tool/start/${transaction}`,
+      { sql, explain_plan: null },
+    )
     if (started.status !== 200 || started.body.success !== 1) throw Error()
     for (let attempt = 0; attempt < 50; attempt++) {
       const polled = await call('GET', `/sqleditor/poll/${transaction}`)
       if (polled.body.data?.status === 'Success') return polled.body.data
       if (polled.body.data?.status !== 'Busy') throw Error()
-      await new Promise(resolve => setTimeout(resolve, 100))
+      await new Promise((resolve) => setTimeout(resolve, 100))
     }
     throw Error()
   }
@@ -121,20 +164,36 @@ try {
     if (!/^phase7_[a-z0-9_]{1,50}$/.test(marker)) throw Error()
     await query(`CREATE TABLE public.${marker}(value text PRIMARY KEY)`)
     await query(`INSERT INTO public.${marker} VALUES ('query-tool-write')`)
-    if (!JSON.stringify((await query(`SELECT value FROM public.${marker}`)).result).includes('query-tool-write')) throw Error()
+    if (
+      !JSON.stringify(
+        (await query(`SELECT value FROM public.${marker}`)).result,
+      ).includes('query-tool-write')
+    )
+      throw Error()
     await query(`DROP TABLE public.${marker}`)
   } else {
     stage = 'pgadmin-query-tool-read'
-    if (!JSON.stringify((await query('SELECT 1 AS fixture_value')).result).includes('1')) throw Error()
+    if (
+      !JSON.stringify(
+        (await query('SELECT 1 AS fixture_value')).result,
+      ).includes('1')
+    )
+      throw Error()
     stage = 'pgadmin-query-tool-read-only-denial'
-    const attempted = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
-      { sql: 'CREATE TABLE public.phase7_forbidden(id integer)', explain_plan: null })
+    const attempted = await call(
+      'POST',
+      `/sqleditor/query_tool/start/${transaction}`,
+      {
+        sql: 'CREATE TABLE public.phase7_forbidden(id integer)',
+        explain_plan: null,
+      },
+    )
     if (attempted.status !== 200 || attempted.body.success !== 1) throw Error()
     let deniedWrite = false
     for (let attempt = 0; attempt < 50; attempt++) {
       const polled = await call('GET', `/sqleditor/poll/${transaction}`)
       if (polled.body.data?.status === 'Busy') {
-        await new Promise(resolve => setTimeout(resolve, 100))
+        await new Promise((resolve) => setTimeout(resolve, 100))
         continue
       }
       deniedWrite = polled.status >= 400 || polled.body.success === 0
@@ -146,42 +205,79 @@ try {
     stage = 'other-human-isolation'
     const otherContext = await browser.newContext()
     await loginPortal(otherContext, config.other)
-    const foreign = await otherContext.request.get(consoleBase + `/browser/server/obj/1/${sid}`)
+    const foreign = await otherContext.request.get(
+      consoleBase + `/browser/server/obj/1/${sid}`,
+    )
     const foreignBody = await foreign.json()
-    if ((!([400, 403, 404, 410].includes(foreign.status())) && foreignBody.success !== 0)
-        || JSON.stringify(foreignBody).includes(c.PGUSER)) throw Error()
+    if (
+      (![400, 403, 404, 410].includes(foreign.status()) &&
+        foreignBody.success !== 0) ||
+      JSON.stringify(foreignBody).includes(c.PGUSER)
+    )
+      throw Error()
     await otherContext.close()
   }
   stage = 'anonymous-denial'
   const anonymous = await browser.newContext()
-  const denied = await anonymous.request.get(consoleBase + `/browser/server/obj/1/${sid}`, { maxRedirects: 0 })
+  const denied = await anonymous.request.get(
+    consoleBase + `/browser/server/obj/1/${sid}`,
+    { maxRedirects: 0 },
+  )
   if (![302, 401, 403].includes(denied.status())) throw Error()
   await anonymous.close()
   const transition = config.transition || 'revoke'
   if (!['revoke', 'downgrade', 'retire'].includes(transition)) throw Error()
   stage = 'active-query-start'
-  const held = await call('POST', `/sqleditor/query_tool/start/${transaction}`,
-    { sql: 'SELECT pg_sleep(30)', explain_plan: null })
+  const held = await call(
+    'POST',
+    `/sqleditor/query_tool/start/${transaction}`,
+    { sql: 'SELECT pg_sleep(30)', explain_plan: null },
+  )
   if (held.status !== 200 || held.body.success !== 1) throw Error()
   stage = 'active-query-busy'
   const busy = await call('GET', `/sqleditor/poll/${transaction}`)
   if (busy.body.data?.status !== 'Busy') throw Error()
   stage = 'grant-transition'
-  const grant = await requestJson(context, `/v1/resources/${config.resourceId}/grants`, config.runnerToken)
-  const row = grant.body.grants?.find(item => item.grant_id === config.grantId)
+  const grant = await requestJson(
+    context,
+    `/v1/resources/${config.resourceId}/grants`,
+    config.runnerToken,
+  )
+  const row = grant.body.grants?.find(
+    (item) => item.grant_id === config.grantId,
+  )
   if (!row) throw Error()
   let changed
   if (transition === 'retire') {
-    const resource = await requestJson(context, `/v1/resources/${config.resourceId}`, config.runnerToken)
+    const resource = await requestJson(
+      context,
+      `/v1/resources/${config.resourceId}`,
+      config.runnerToken,
+    )
     if (resource.status !== 200) throw Error()
-    changed = await requestJson(context, `/v1/resources/${config.resourceId}/retirement`,
-      config.runnerToken, 'POST', { version: resource.body.version })
+    changed = await requestJson(
+      context,
+      `/v1/resources/${config.resourceId}/retirement`,
+      config.runnerToken,
+      'POST',
+      { version: resource.body.version },
+    )
   } else if (transition === 'downgrade') {
-    changed = await requestJson(context, `/v1/resource-grants/${config.grantId}/mode`,
-      config.runnerToken, 'PUT', { version: row.version, mode: 'read-only' })
+    changed = await requestJson(
+      context,
+      `/v1/resource-grants/${config.grantId}/mode`,
+      config.runnerToken,
+      'PUT',
+      { version: row.version, mode: 'read-only' },
+    )
   } else {
-    changed = await requestJson(context, `/v1/resource-grants/${config.grantId}/revocation`,
-      config.runnerToken, 'POST', { version: row.version })
+    changed = await requestJson(
+      context,
+      `/v1/resource-grants/${config.grantId}/revocation`,
+      config.runnerToken,
+      'POST',
+      { version: row.version },
+    )
   }
   if (changed.status !== 202) throw Error()
   stage = 'active-query-terminated'
@@ -189,31 +285,54 @@ try {
   for (let attempt = 0; attempt < 100; attempt++) {
     const polled = await call('GET', `/sqleditor/poll/${transaction}`)
     if (polled.body.data?.status === 'Success') throw Error()
-    if (polled.status >= 400 || polled.body.success === 0 ||
-        (polled.body.data?.status && polled.body.data.status !== 'Busy')) {
+    if (
+      polled.status >= 400 ||
+      polled.body.success === 0 ||
+      (polled.body.data?.status && polled.body.data.status !== 'Busy')
+    ) {
       terminated = true
       break
     }
-    await new Promise(resolve => setTimeout(resolve, 200))
+    await new Promise((resolve) => setTimeout(resolve, 200))
   }
   if (!terminated) throw Error()
   stage = 'transitioned-reconnect-denial'
   await call('DELETE', connectionPath)
-  const reconnect = await call('POST', connectionPath, { password: c.PGPASSWORD })
-  if (reconnect.body.data?.connected === true || (reconnect.status === 200 && reconnect.body.success === 1)) throw Error()
+  const reconnect = await call('POST', connectionPath, {
+    password: c.PGPASSWORD,
+  })
+  if (
+    reconnect.body.data?.connected === true ||
+    (reconnect.status === 200 && reconnect.body.success === 1)
+  )
+    throw Error()
   if (transition === 'downgrade') {
     stage = 'downgraded-grant-cleanup'
-    const revoked = await requestJson(context, `/v1/resource-grants/${config.grantId}/revocation`,
-      config.runnerToken, 'POST', { version: changed.body.version })
+    const revoked = await requestJson(
+      context,
+      `/v1/resource-grants/${config.grantId}/revocation`,
+      config.runnerToken,
+      'POST',
+      { version: changed.body.version },
+    )
     if (revoked.status !== 202) throw Error()
   }
-  console.log('PASS deployed pgAdmin: interactive portal and console SSO; scoped Query Tool ' +
-    (config.mode === 'read-write' ? 'DDL/write/read' : 'read and read-only DDL denial') +
-    '; password save denied; anonymous isolation; active query terminated and reconnect denied after ' + transition +
-    (config.other ? '; other-human isolation' : ''))
+  console.log(
+    'PASS deployed pgAdmin: interactive portal and console SSO; scoped Query Tool ' +
+      (config.mode === 'read-write'
+        ? 'DDL/write/read'
+        : 'read and read-only DDL denial') +
+      '; password save denied; anonymous isolation; active query terminated and reconnect denied after ' +
+      transition +
+      (config.other ? '; other-human isolation' : ''),
+  )
 } catch {
   if (activePage) lastPath = new URL(activePage.url()).pathname
-  console.log('FAIL deployed pgAdmin stage=' + stage + (lastPath ? ' path=' + lastPath : ''))
+  console.log(
+    'FAIL deployed pgAdmin stage=' +
+      stage +
+      (lastPath ? ' path=' + lastPath : ''),
+  )
   process.exitCode = 1
 } finally {
   await browser.close()

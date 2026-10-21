@@ -2,11 +2,7 @@ export class ApiError extends Error {
   readonly status: number
   readonly code: string | undefined
 
-  constructor(
-    message: string,
-    status: number,
-    code?: string,
-  ) {
+  constructor(message: string, status: number, code?: string) {
     super(message)
     this.name = 'ApiError'
     this.status = status
@@ -16,8 +12,7 @@ export class ApiError extends Error {
 
 export function isTransientApiError(error: unknown) {
   return (
-    error instanceof ApiError &&
-    (error.status === 429 || error.status >= 500)
+    error instanceof ApiError && (error.status === 429 || error.status >= 500)
   )
 }
 
@@ -50,7 +45,8 @@ function errorCode(body: unknown) {
 
 export function apiErrorFromResponse(response: Response, body: unknown) {
   return new ApiError(
-    errorMessage(body) ?? `The platform request failed with status ${response.status}.`,
+    errorMessage(body) ??
+      `The platform request failed with status ${response.status}.`,
     response.status,
     errorCode(body),
   )

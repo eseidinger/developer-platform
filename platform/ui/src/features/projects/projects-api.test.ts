@@ -12,6 +12,8 @@ describe('parseProjectList', () => {
   })
 
   it('rejects malformed platform responses', () => {
-    expect(() => parseProjectList({ projects: [] })).toThrow('invalid project list')
+    expect(() => parseProjectList({ projects: [] })).toThrow(
+      'invalid project list',
+    )
   })
 })

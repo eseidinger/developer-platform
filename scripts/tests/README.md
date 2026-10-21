@@ -19,11 +19,10 @@ execution-environment distinction under [`ansible/tests/`](../../ansible/tests/R
 ## Offline regression tests
 
 ```bash
-python3 -m unittest discover -s scripts/tests/unit -v
 uv run --project platform/app python -m unittest discover \
-  -s platform/app/tests -p test_lifecycle_acceptance.py -v
+  -s scripts/tests/unit -v
 uv run --project platform/app python -m unittest discover \
-  -s platform/app/tests -p test_script_fixtures.py -v
+  -s tests/platform/unit -v
 ```
 
 These use mocks and temporary files. They never deploy the platform.
@@ -68,7 +67,7 @@ The smoke runner checks the legacy flat deployment compatibility contract:
 unauthenticated denial, repeat provisioning, readiness, and public HTTP routing.
 Use a digest-pinned `hashicorp/http-echo` image listening on port 5678. The full
 lifecycle runner uses the digest-pinned neutral image built from
-[`platform/acceptance/Dockerfile.fixture`](../../platform/acceptance/Dockerfile.fixture)
+[`tests/fixtures/hosted-application/Dockerfile`](../../tests/fixtures/hosted-application/Dockerfile)
 and listening on port 8080. Protected `v1alpha2` application behavior remains in
 the [hosted-access harness](../../docs/operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness).
 

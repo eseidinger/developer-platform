@@ -21,7 +21,10 @@ const projectSchema = z.object({
   name: z
     .string()
     .trim()
-    .regex(/^[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?$/, 'Use 1–32 lowercase letters, digits, or hyphens; start with a letter.'),
+    .regex(
+      /^[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?$/,
+      'Use 1–32 lowercase letters, digits, or hyphens; start with a letter.',
+    ),
 })
 
 type ProjectFormValues = z.infer<typeof projectSchema>
@@ -62,12 +65,17 @@ function CreateProjectDialog() {
           <DialogHeader>
             <DialogTitle>Create project</DialogTitle>
             <DialogDescription>
-              Creates an empty project and its authorization scope. You can deploy an application in the next step.
+              Creates an empty project and its authorization scope. You can
+              deploy an application in the next step.
             </DialogDescription>
           </DialogHeader>
           <form
             className="space-y-4"
-            onSubmit={(event) => void form.handleSubmit((values) => createProject.mutate(values))(event)}
+            onSubmit={(event) =>
+              void form.handleSubmit((values) => createProject.mutate(values))(
+                event,
+              )
+            }
           >
             <div className="space-y-2">
               <Label htmlFor="project-name">Project name</Label>
@@ -78,8 +86,12 @@ function CreateProjectDialog() {
                 aria-invalid={Boolean(form.formState.errors.name)}
                 {...form.register('name')}
               />
-              <p id="project-name-help" className="text-xs text-muted-foreground">
-                1–32 lowercase letters, digits, or hyphens. Names start with a letter.
+              <p
+                id="project-name-help"
+                className="text-xs text-muted-foreground"
+              >
+                1–32 lowercase letters, digits, or hyphens. Names start with a
+                letter.
               </p>
               {form.formState.errors.name && (
                 <p role="alert" className="text-sm text-destructive">
@@ -93,7 +105,11 @@ function CreateProjectDialog() {
               </p>
             )}
             <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => handleOpenChange(false)}
+              >
                 Cancel
               </Button>
               <Button type="submit" disabled={createProject.isPending}>

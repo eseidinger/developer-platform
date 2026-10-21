@@ -19,7 +19,10 @@ function ProjectList() {
   }
 
   return (
-    <section aria-labelledby="projects-title" className="rounded-xl border border-border bg-card p-6 shadow-sm">
+    <section
+      aria-labelledby="projects-title"
+      className="rounded-xl border border-border bg-card p-6 shadow-sm"
+    >
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 id="projects-title" className="text-lg font-medium">
@@ -62,11 +65,19 @@ function ProjectList() {
       {projectsQuery.data && projectsQuery.data.length > 0 && (
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
           {projectsQuery.data.map((project) => (
-            <li key={project.name} className="flex items-center justify-between gap-4 px-4 py-3">
-              <Link className="font-medium underline-offset-4 hover:underline" to={`/projects/${project.name}`}>
+            <li
+              key={project.name}
+              className="flex items-center justify-between gap-4 px-4 py-3"
+            >
+              <Link
+                className="font-medium underline-offset-4 hover:underline"
+                to={`/projects/${project.name}`}
+              >
                 {project.name}
               </Link>
-              <span className="text-sm text-muted-foreground">{project.status}</span>
+              <span className="text-sm text-muted-foreground">
+                {project.status}
+              </span>
             </li>
           ))}
         </ul>

@@ -1,0 +1,13 @@
+# Generated files and build/test output have their own producers.
+src/api/generated/
+dist/
+dist-ssr/
+playwright-report/
+test-results/
+package-lock.json
+
+# Repository documentation and YAML use their existing format and lint tools.
+*.md
+*.mdx
+*.yml
+*.yaml

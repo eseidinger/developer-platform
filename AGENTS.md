@@ -37,6 +37,10 @@ These guidelines apply throughout the repository.
 - When moving files or changing module boundaries, update imports, callers,
   workflows, tests, documentation, and paths derived from file locations. Verify
   the supported invocation methods after the change.
+- Reusable platform test runners live in `tests/platform/`, their offline tests
+  in `tests/platform/unit/`, and deployable test applications in `tests/fixtures/`.
+  Keep operator entry points under `scripts/tests/platform/` and application
+  unit tests beside the application.
 - Keep structural refactoring scoped to the task and preserve behavior unless a
   functional change is requested.
 
@@ -60,6 +64,10 @@ These guidelines apply throughout the repository.
     `requirements.txt` to provide the `hadolint` command.
   - Docker Compose: `docker compose config --quiet` with the relevant files,
     profiles, and environment configuration.
+  - UI (`platform/ui/`): `npm run lint`, `npm run format:check`, and
+    `npm run typecheck`. Run `npm run check` for the API contract check, lint,
+    formatting, type checking, unit tests, and production build. Browser tests
+    run separately with `npm run test:e2e`.
   - Other languages and components: use their existing lint and format commands.
 - Fix issues introduced by your changes. Keep unrelated cleanup separate; report
   existing failures, missing tools, or checks that could not run and explain why.
@@ -67,3 +75,29 @@ These guidelines apply throughout the repository.
 - Run tests appropriate to the change in addition to linting. For script changes,
   verify affected callers, imports, and paths. Validate operational scripts
   without starting a deployment or live drill unless the task authorizes it.
+
+## UI code quality
+
+- Install UI development tools with npm in `platform/ui/` and commit changes to
+  `package.json` and `package-lock.json` together. Use `npm ci` for reproducible
+  installs; these tools do not belong in the Python requirements.
+- Use the existing type-aware ESLint rules, React Hooks rules, and recommended
+  JSX accessibility rules (`eslint-plugin-jsx-a11y-x` for ESLint 10). Treat lint
+  warnings as failures. Give controls accessible names, associate labels with
+  inputs, and use semantic elements.
+  Static accessibility checks complement browser and keyboard testing.
+- Use Prettier for UI source and configuration formatting, with the committed
+  settings. Run `npm run format` to apply formatting. Keep formatting rules out
+  of ESLint; apply `eslint-config-prettier` after the other ESLint presets.
+- Use the Tailwind Prettier plugin with `src/index.css` as the stylesheet entry
+  point. Sort classes in JSX and in `cn()` and `cva()` calls automatically.
+- Exclude generated API types and build/test output from lint and formatting;
+  regenerate API types with `npm run api:generate` and verify with
+  `npm run api:check`. Markdown continues to use the repository's Markdown
+  tools, and YAML continues to use its existing checks.
+- Group UI code by feature under `src/features/`, reusable visual primitives
+  under `src/components/ui/`, and application composition under `src/app/`.
+  Keep API adapters, authentication, and shared test setup in their respective
+  modules. Co-locate component and feature unit tests; keep browser scenarios
+  under `e2e/`. Split complex components along clear responsibilities and add
+  comments for intent or non-obvious behavior.

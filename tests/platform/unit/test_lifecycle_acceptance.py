@@ -9,9 +9,9 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from acceptance.harness import DrillError
-from acceptance.lifecycle import logs, runner
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from tests.platform.harness import DrillError
+from tests.platform.lifecycle import logs, runner
 
 RUN = "0123456789ab"
 IMAGE = "ghcr.io/example/fixture@sha256:" + "a" * 64

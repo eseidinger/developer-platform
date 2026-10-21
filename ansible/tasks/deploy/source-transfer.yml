@@ -28,6 +28,7 @@
           - infrastructure
           - platform
           - scripts
+          - tests
           - operations/backup/scripts
       delegate_to: localhost
       become: false

@@ -6,8 +6,8 @@ maintenance guidance belongs in the [UI maintainer guide](../../docs/maintainers
 
 This directory contains the React and TypeScript workspace for the Platform Control
 Plane portal. The technology selection is recorded in
-[ADR-019](../../docs/architecture/decisions/ADR-019-react-ui-technology-stack.md), and delivery
-is sequenced in the
+[ADR-019](../../docs/architecture/decisions/ADR-019-react-ui-technology-stack.md).
+Delivery is sequenced in the
 [UI implementation plan](../../docs/maintainers/delivery/plans/ui.md).
 
 ## Status
@@ -36,7 +36,8 @@ These fixture tests do not prove a complete deployed Keycloak/lifecycle journey.
 - Tailwind CSS 4, Class Variance Authority, `cn`, and `tw-animate-css`
 - Lucide icons and the locally bundled Geist Variable font
 - Vitest, jsdom, Testing Library, and Playwright
-- ESLint and npm with the committed lockfile
+- Type-aware ESLint, JSX accessibility checks, and strict TypeScript
+- Prettier with Tailwind class sorting, and npm with the committed lockfile
 
 Authentication uses the installed `oidc-client-ts` client. Portal tokens stay
 in memory; protocol transaction state uses session storage across the redirect.
@@ -49,6 +50,8 @@ Run these from `platform/ui`:
 npm ci
 npm run dev
 npm run lint
+npm run format:check
+npm run format
 npm run typecheck
 npm test
 npm run test:e2e
@@ -59,6 +62,16 @@ npm run build
 npm run preview
 ```
 
+`check` verifies the generated API contract, lint (including accessibility),
+formatting, types, unit tests, and production build. CI runs this same command.
+Accessibility lint uses `eslint-plugin-jsx-a11y-x`, whose declared peer range
+supports the project's ESLint 10; the original plugin currently supports up to
+ESLint 9.
+
+`format` applies Prettier formatting and Tailwind class ordering; `format:check`
+checks without writing. Generated API types, build output, and browser-test
+artifacts are excluded. Markdown uses the repository's Markdown tools.
+
 `test:e2e` requires Playwright's browser binaries. Install them with
 `npx playwright install` when preparing a local browser-test environment.
 
@@ -66,9 +79,10 @@ npm run preview
 
 The backend-generated contract is
 [`docs/api/openapi.json`](../../docs/api/openapi.json). The UI generates types
-from that file and calls the API through shared client adapters. FastAPI remains authoritative
-for authorization, validation, lifecycle, audit, and redaction. Client-side role
-checks only explain or hide unavailable actions; they never grant them.
+from that file and calls the API through shared client adapters. FastAPI remains
+authoritative for authorization, validation, lifecycle, audit, and redaction.
+Client-side role checks only explain or hide unavailable actions; they never
+grant them.
 
 Bearer tokens and one-time secrets must not enter persistent browser storage, URLs,
 logs, query-cache keys, screenshots, or test artifacts. One-time secret responses

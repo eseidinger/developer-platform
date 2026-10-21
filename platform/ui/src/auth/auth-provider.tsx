@@ -11,7 +11,9 @@ import { loadPortalAuthConfig } from '@/auth/config'
 import { createUserManager } from '@/auth/oidc-client'
 
 function messageFor(error: unknown) {
-  return error instanceof Error ? error.message : 'Authentication could not be completed.'
+  return error instanceof Error
+    ? error.message
+    : 'Authentication could not be completed.'
 }
 
 function AuthProvider({ children }: React.PropsWithChildren) {

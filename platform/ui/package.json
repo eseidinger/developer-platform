@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint .",
+    "lint": "eslint . --max-warnings 0",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
@@ -14,7 +14,9 @@
     "test:e2e": "playwright test",
     "api:generate": "openapi-typescript ../../docs/api/openapi.json -o src/api/generated/schema.ts",
     "api:check": "node scripts/check-api.mjs",
-    "check": "npm run api:check && npm run lint && npm run typecheck && npm run test && npm run build"
+    "check": "npm run api:check && npm run lint && npm run format:check && npm run typecheck && npm run test && npm run build",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",
@@ -52,11 +54,15 @@
     "@vitejs/plugin-react": "^6.1.1",
     "babel-plugin-react-compiler": "^1.0.0",
     "eslint": "^10.10.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-jsx-a11y-x": "^0.2.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.6",
     "globals": "^17.12.0",
     "jsdom": "^29.1.1",
     "openapi-typescript": "^7.13.0",
+    "prettier": "^3.9.10",
+    "prettier-plugin-tailwindcss": "^0.8.1",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.69.0",
     "vite": "^8.3.0",

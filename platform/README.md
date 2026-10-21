@@ -175,3 +175,7 @@ drills have source-level checks but still need live runs; see the
 [current review disposition](../docs/maintainers/documentation-review.md#current-disposition-october-19-2026).
 The backlog distinguishes source tests from deployed
 acceptance; a local pass does not close outstanding operational criteria.
+
+Reusable acceptance runners and hosted test fixtures live in
+[`tests/`](../tests/README.md). Operator entry points remain under
+`scripts/tests/platform/`; API unit tests remain beside the API.

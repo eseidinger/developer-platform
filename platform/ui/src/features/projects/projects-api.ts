@@ -30,22 +30,134 @@ type ProjectDeployment = {
   probe_profile: 'status' | 'hello-world'
 }
 
-type OperationAccepted = { operationId: string; state: string; revision: number }
-type OperationStatus = { state: string; revision: number; errorCode: string | null; readinessState: string; readinessReason: string | null }
-type ResourceUsagePod = { name: string; cpuMillicores: number; memoryBytes: number; sampledAt: string }
-type ResourceUsage = { state: string; reason: string | null; observedAt: string; totals: { cpuMillicores: number; memoryBytes: number } | null; pods: ResourceUsagePod[] }
-type ResourceInventory = { state: string; reason: string | null; deployments: { name: string; replicas: number | null; readyReplicas: number | null }[] }
-type ProjectLogs = { state: string; reason: string | null; lines: { timestamp: string; pod: string; message: string }[]; truncated: boolean; nextCursor: string | null }
-type ProjectConfiguration = { revision: number; values: Record<string, string>; activationState: string; activationReason: string | null }
-type ProjectSecrets = { secrets: { name: string; version: number; state: string; changedAt: string | null }[]; activationState: string; activationReason: string | null }
-type RetirementPreview = { removes: { kind: string; name: string }[]; retains: Record<string, string | boolean | null>; blockers: string[]; scopeToken: string }
-type PurgePreview = { database: string; role: string; catalog: string[]; auditRecordsRetained: boolean; credentialCleanup: Record<string, number>; scopeToken: string }
-type DataServices = { services: { resourceId: string; ownerProject: string; type: string; name: string; state: string; observedState: string; reason: string | null }[]; bindings: { bindingId: string; resourceId: string; component: string; state: string; observedState: string; credentialActive: boolean; reason: string | null }[]; latestRecoveryRequest: { reason: string; status: string; requestedAt: string; reviewedAt: string | null } | null }
-type DeploymentCredentials = { credentials: { id: string; name: string; status: string; createdAt: string; expiresAt: string; lastUsedAt: string | null; rotatedFrom: string | null }[] }
-type OneTimeDeploymentCredential = { clientId: string; clientSecret: string; tokenEndpoint: string }
-type ProjectGrant = { issuer: string; subject: string; displayName: string | null; role: 'viewer' | 'developer' | 'project-admin'; grantedAt: string }
+type OperationAccepted = {
+  operationId: string
+  state: string
+  revision: number
+}
+type OperationStatus = {
+  state: string
+  revision: number
+  errorCode: string | null
+  readinessState: string
+  readinessReason: string | null
+}
+type ResourceUsagePod = {
+  name: string
+  cpuMillicores: number
+  memoryBytes: number
+  sampledAt: string
+}
+type ResourceUsage = {
+  state: string
+  reason: string | null
+  observedAt: string
+  totals: { cpuMillicores: number; memoryBytes: number } | null
+  pods: ResourceUsagePod[]
+}
+type ResourceInventory = {
+  state: string
+  reason: string | null
+  deployments: {
+    name: string
+    replicas: number | null
+    readyReplicas: number | null
+  }[]
+}
+type ProjectLogs = {
+  state: string
+  reason: string | null
+  lines: { timestamp: string; pod: string; message: string }[]
+  truncated: boolean
+  nextCursor: string | null
+}
+type ProjectConfiguration = {
+  revision: number
+  values: Record<string, string>
+  activationState: string
+  activationReason: string | null
+}
+type ProjectSecrets = {
+  secrets: {
+    name: string
+    version: number
+    state: string
+    changedAt: string | null
+  }[]
+  activationState: string
+  activationReason: string | null
+}
+type RetirementPreview = {
+  removes: { kind: string; name: string }[]
+  retains: Record<string, string | boolean | null>
+  blockers: string[]
+  scopeToken: string
+}
+type PurgePreview = {
+  database: string
+  role: string
+  catalog: string[]
+  auditRecordsRetained: boolean
+  credentialCleanup: Record<string, number>
+  scopeToken: string
+}
+type DataServices = {
+  services: {
+    resourceId: string
+    ownerProject: string
+    type: string
+    name: string
+    state: string
+    observedState: string
+    reason: string | null
+  }[]
+  bindings: {
+    bindingId: string
+    resourceId: string
+    component: string
+    state: string
+    observedState: string
+    credentialActive: boolean
+    reason: string | null
+  }[]
+  latestRecoveryRequest: {
+    reason: string
+    status: string
+    requestedAt: string
+    reviewedAt: string | null
+  } | null
+}
+type DeploymentCredentials = {
+  credentials: {
+    id: string
+    name: string
+    status: string
+    createdAt: string
+    expiresAt: string
+    lastUsedAt: string | null
+    rotatedFrom: string | null
+  }[]
+}
+type OneTimeDeploymentCredential = {
+  clientId: string
+  clientSecret: string
+  tokenEndpoint: string
+}
+type ProjectGrant = {
+  issuer: string
+  subject: string
+  displayName: string | null
+  role: 'viewer' | 'developer' | 'project-admin'
+  grantedAt: string
+}
 type ProjectGrants = { project: string; grants: ProjectGrant[] }
-type PlatformGrant = { issuer: string; subject: string; displayName: string | null; role: 'platform-admin'; grantedAt: string }
+type PlatformGrant = {
+  issuer: string
+  subject: string
+  displayName: string | null
+  role: 'platform-admin'
+  grantedAt: string
+}
 
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -62,7 +174,11 @@ function parseProjectList(value: unknown): ProjectSummary[] {
 
   return value.map((project) => {
     const record = asRecord(project)
-    if (!record || typeof record.name !== 'string' || typeof record.status !== 'string') {
+    if (
+      !record ||
+      typeof record.name !== 'string' ||
+      typeof record.status !== 'string'
+    ) {
       throw new Error('The platform returned an invalid project list.')
     }
 
@@ -72,7 +188,11 @@ function parseProjectList(value: unknown): ProjectSummary[] {
 
 function parseProjectRevisions(value: unknown): ProjectRevisions {
   const record = asRecord(value)
-  if (!record || typeof record.project !== 'string' || !Array.isArray(record.revisions)) {
+  if (
+    !record ||
+    typeof record.project !== 'string' ||
+    !Array.isArray(record.revisions)
+  ) {
     throw new Error('The platform returned invalid project revisions.')
   }
 
@@ -123,9 +243,12 @@ async function createEmptyProject(body: EmptyProjectCreate) {
 }
 
 async function getProjectRevisions(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/revisions', {
-    params: { path: { name } },
-  })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/revisions',
+    {
+      params: { path: { name } },
+    },
+  )
   if (error) {
     throw apiErrorFromResponse(response, error)
   }
@@ -142,73 +265,184 @@ async function deployProject(name: string, body: ProjectDeployment) {
     throw apiErrorFromResponse(response, error)
   }
   const record = asRecord(data)
-  if (!record || typeof record.operation_id !== 'string' || typeof record.state !== 'string' || typeof record.revision !== 'number') {
+  if (
+    !record ||
+    typeof record.operation_id !== 'string' ||
+    typeof record.state !== 'string' ||
+    typeof record.revision !== 'number'
+  ) {
     throw new Error('The platform returned an invalid deployment operation.')
   }
-  return { operationId: record.operation_id, state: record.state, revision: record.revision }
+  return {
+    operationId: record.operation_id,
+    state: record.state,
+    revision: record.revision,
+  }
 }
 
-async function rollbackProject(name: string, revision: number, expectedRevision: number) {
-  const { data, error, response } = await apiClient.POST('/projects/{name}/rollback', {
-    params: { path: { name }, header: { 'if-match': String(expectedRevision) } },
-    body: { revision },
-  })
+async function rollbackProject(
+  name: string,
+  revision: number,
+  expectedRevision: number,
+) {
+  const { data, error, response } = await apiClient.POST(
+    '/projects/{name}/rollback',
+    {
+      params: {
+        path: { name },
+        header: { 'if-match': String(expectedRevision) },
+      },
+      body: { revision },
+    },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.operation_id !== 'string' || typeof record.state !== 'string' || typeof record.revision !== 'number') {
+  if (
+    !record ||
+    typeof record.operation_id !== 'string' ||
+    typeof record.state !== 'string' ||
+    typeof record.revision !== 'number'
+  ) {
     throw new Error('The platform returned an invalid rollback operation.')
   }
-  return { operationId: record.operation_id, state: record.state, revision: record.revision }
+  return {
+    operationId: record.operation_id,
+    state: record.state,
+    revision: record.revision,
+  }
 }
 
 async function restartProject(name: string) {
-  const { data, error, response } = await apiClient.POST('/projects/{name}/restart', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.POST(
+    '/projects/{name}/restart',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.operation_id !== 'string' || typeof record.state !== 'string' || typeof record.revision !== 'number') {
+  if (
+    !record ||
+    typeof record.operation_id !== 'string' ||
+    typeof record.state !== 'string' ||
+    typeof record.revision !== 'number'
+  ) {
     throw new Error('The platform returned an invalid restart operation.')
   }
-  return { operationId: record.operation_id, state: record.state, revision: record.revision }
+  return {
+    operationId: record.operation_id,
+    state: record.state,
+    revision: record.revision,
+  }
 }
 
 async function getOperation(operationId: string) {
-  const { data, error, response } = await apiClient.GET('/v1/operations/{operation_id}', { params: { path: { operation_id: operationId } } })
+  const { data, error, response } = await apiClient.GET(
+    '/v1/operations/{operation_id}',
+    { params: { path: { operation_id: operationId } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
   const readiness = record && asRecord(record.readiness)
-  if (!record || !readiness || typeof record.state !== 'string' || typeof record.revision !== 'number' || (record.error_code !== null && typeof record.error_code !== 'string') || typeof readiness.state !== 'string' || (readiness.reason !== null && typeof readiness.reason !== 'string')) {
+  if (
+    !record ||
+    !readiness ||
+    typeof record.state !== 'string' ||
+    typeof record.revision !== 'number' ||
+    (record.error_code !== null && typeof record.error_code !== 'string') ||
+    typeof readiness.state !== 'string' ||
+    (readiness.reason !== null && typeof readiness.reason !== 'string')
+  ) {
     throw new Error('The platform returned an invalid operation status.')
   }
-  return { state: record.state, revision: record.revision, errorCode: record.error_code, readinessState: readiness.state, readinessReason: readiness.reason }
+  return {
+    state: record.state,
+    revision: record.revision,
+    errorCode: record.error_code,
+    readinessState: readiness.state,
+    readinessReason: readiness.reason,
+  }
 }
 
 async function getResourceUsage(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/resource-usage', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/resource-usage',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
   const totals = record && asRecord(record.totals)
-  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || typeof record.observed_at !== 'string' || !Array.isArray(record.pods) || (record.totals !== null && (!totals || typeof totals.cpu_millicores !== 'number' || typeof totals.memory_bytes !== 'number'))) {
+  if (
+    !record ||
+    typeof record.state !== 'string' ||
+    (record.reason !== null && typeof record.reason !== 'string') ||
+    typeof record.observed_at !== 'string' ||
+    !Array.isArray(record.pods) ||
+    (record.totals !== null &&
+      (!totals ||
+        typeof totals.cpu_millicores !== 'number' ||
+        typeof totals.memory_bytes !== 'number'))
+  ) {
     throw new Error('The platform returned invalid resource usage.')
   }
   const pods = record.pods.map((pod) => {
     const item = asRecord(pod)
-    if (!item || typeof item.name !== 'string' || typeof item.cpu_millicores !== 'number' || typeof item.memory_bytes !== 'number' || typeof item.sampled_at !== 'string') {
+    if (
+      !item ||
+      typeof item.name !== 'string' ||
+      typeof item.cpu_millicores !== 'number' ||
+      typeof item.memory_bytes !== 'number' ||
+      typeof item.sampled_at !== 'string'
+    ) {
       throw new Error('The platform returned invalid resource usage.')
     }
-    return { name: item.name, cpuMillicores: item.cpu_millicores, memoryBytes: item.memory_bytes, sampledAt: item.sampled_at }
+    return {
+      name: item.name,
+      cpuMillicores: item.cpu_millicores,
+      memoryBytes: item.memory_bytes,
+      sampledAt: item.sampled_at,
+    }
   })
-  return { state: record.state, reason: record.reason, observedAt: record.observed_at, totals: totals ? { cpuMillicores: totals.cpu_millicores as number, memoryBytes: totals.memory_bytes as number } : null, pods }
+  return {
+    state: record.state,
+    reason: record.reason,
+    observedAt: record.observed_at,
+    totals: totals
+      ? {
+          cpuMillicores: totals.cpu_millicores as number,
+          memoryBytes: totals.memory_bytes as number,
+        }
+      : null,
+    pods,
+  }
 }
 
 async function getResourceInventory(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/resources', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/resources',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.deployments)) throw new Error('The platform returned invalid resource inventory.')
+  if (
+    !record ||
+    typeof record.state !== 'string' ||
+    (record.reason !== null && typeof record.reason !== 'string') ||
+    !Array.isArray(record.deployments)
+  )
+    throw new Error('The platform returned invalid resource inventory.')
   const deployments = record.deployments.map((deployment) => {
     const item = asRecord(deployment)
-    if (!item || typeof item.name !== 'string' || (item.replicas !== null && typeof item.replicas !== 'number') || (item.ready_replicas !== null && typeof item.ready_replicas !== 'number')) throw new Error('The platform returned invalid resource inventory.')
-    return { name: item.name, replicas: item.replicas, readyReplicas: item.ready_replicas }
+    if (
+      !item ||
+      typeof item.name !== 'string' ||
+      (item.replicas !== null && typeof item.replicas !== 'number') ||
+      (item.ready_replicas !== null && typeof item.ready_replicas !== 'number')
+    )
+      throw new Error('The platform returned invalid resource inventory.')
+    return {
+      name: item.name,
+      replicas: item.replicas,
+      readyReplicas: item.ready_replicas,
+    }
   })
   return { state: record.state, reason: record.reason, deployments }
 }
@@ -223,163 +457,457 @@ type ProjectLogFilters = {
 }
 
 async function getProjectLogs(name: string, filters: ProjectLogFilters) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/logs', {
-    params: {
-      path: { name },
-      query: {
-        tail: filters.tail,
-        ...(filters.search ? { search: filters.search } : {}),
-        ...(filters.component ? { component: filters.component } : {}),
-        ...(filters.instance ? { instance: filters.instance } : {}),
-        ...(filters.sinceSeconds ? { since_seconds: filters.sinceSeconds } : {}),
-        ...(filters.after ? { after: filters.after } : {}),
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/logs',
+    {
+      params: {
+        path: { name },
+        query: {
+          tail: filters.tail,
+          ...(filters.search ? { search: filters.search } : {}),
+          ...(filters.component ? { component: filters.component } : {}),
+          ...(filters.instance ? { instance: filters.instance } : {}),
+          ...(filters.sinceSeconds
+            ? { since_seconds: filters.sinceSeconds }
+            : {}),
+          ...(filters.after ? { after: filters.after } : {}),
+        },
       },
     },
-  })
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.state !== 'string' || (record.reason !== null && typeof record.reason !== 'string') || !Array.isArray(record.lines) || typeof record.truncated !== 'boolean' || (record.next_cursor !== null && typeof record.next_cursor !== 'string')) throw new Error('The platform returned invalid project logs.')
-  const lines = record.lines.map((line) => { const item = asRecord(line); if (!item || typeof item.timestamp !== 'string' || typeof item.pod !== 'string' || typeof item.message !== 'string') throw new Error('The platform returned invalid project logs.'); return { timestamp: item.timestamp, pod: item.pod, message: item.message } })
-  return { state: record.state, reason: record.reason, lines, truncated: record.truncated, nextCursor: record.next_cursor }
+  if (
+    !record ||
+    typeof record.state !== 'string' ||
+    (record.reason !== null && typeof record.reason !== 'string') ||
+    !Array.isArray(record.lines) ||
+    typeof record.truncated !== 'boolean' ||
+    (record.next_cursor !== null && typeof record.next_cursor !== 'string')
+  )
+    throw new Error('The platform returned invalid project logs.')
+  const lines = record.lines.map((line) => {
+    const item = asRecord(line)
+    if (
+      !item ||
+      typeof item.timestamp !== 'string' ||
+      typeof item.pod !== 'string' ||
+      typeof item.message !== 'string'
+    )
+      throw new Error('The platform returned invalid project logs.')
+    return { timestamp: item.timestamp, pod: item.pod, message: item.message }
+  })
+  return {
+    state: record.state,
+    reason: record.reason,
+    lines,
+    truncated: record.truncated,
+    nextCursor: record.next_cursor,
+  }
 }
 
 async function getProjectConfiguration(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/configuration', { params: { path: { name } } })
-  if (error) throw apiErrorFromResponse(response, error)
-  const record = asRecord(data); const values = record && asRecord(record.values); const activation = record && asRecord(record.activation)
-  if (!record || !values || !activation || typeof record.revision !== 'number' || typeof activation.state !== 'string' || (activation.reason !== null && typeof activation.reason !== 'string')) throw new Error('The platform returned invalid configuration status.')
-  if (Object.values(values).some((value) => typeof value !== 'string')) throw new Error('The platform returned invalid configuration status.')
-  return { revision: record.revision, values: Object.fromEntries(Object.entries(values).sort(([left], [right]) => left.localeCompare(right))) as Record<string, string>, activationState: activation.state, activationReason: activation.reason }
-}
-
-async function updateProjectConfiguration(name: string, values: Record<string, string>, expectedRevision: number) {
-  const { data, error, response } = await apiClient.PUT('/projects/{name}/configuration', {
-    params: { path: { name }, header: { 'if-match': String(expectedRevision) } },
-    body: { values },
-  })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/configuration',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.operation_id !== 'string' || typeof record.state !== 'string' || typeof record.revision !== 'number') {
+  const values = record && asRecord(record.values)
+  const activation = record && asRecord(record.activation)
+  if (
+    !record ||
+    !values ||
+    !activation ||
+    typeof record.revision !== 'number' ||
+    typeof activation.state !== 'string' ||
+    (activation.reason !== null && typeof activation.reason !== 'string')
+  )
+    throw new Error('The platform returned invalid configuration status.')
+  if (Object.values(values).some((value) => typeof value !== 'string'))
+    throw new Error('The platform returned invalid configuration status.')
+  return {
+    revision: record.revision,
+    values: Object.fromEntries(
+      Object.entries(values).sort(([left], [right]) =>
+        left.localeCompare(right),
+      ),
+    ) as Record<string, string>,
+    activationState: activation.state,
+    activationReason: activation.reason,
+  }
+}
+
+async function updateProjectConfiguration(
+  name: string,
+  values: Record<string, string>,
+  expectedRevision: number,
+) {
+  const { data, error, response } = await apiClient.PUT(
+    '/projects/{name}/configuration',
+    {
+      params: {
+        path: { name },
+        header: { 'if-match': String(expectedRevision) },
+      },
+      body: { values },
+    },
+  )
+  if (error) throw apiErrorFromResponse(response, error)
+  const record = asRecord(data)
+  if (
+    !record ||
+    typeof record.operation_id !== 'string' ||
+    typeof record.state !== 'string' ||
+    typeof record.revision !== 'number'
+  ) {
     throw new Error('The platform returned an invalid configuration operation.')
   }
-  return { operationId: record.operation_id, state: record.state, revision: record.revision }
+  return {
+    operationId: record.operation_id,
+    state: record.state,
+    revision: record.revision,
+  }
 }
 
 async function getProjectSecrets(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/secrets', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/secrets',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
   const activation = record && asRecord(record.activation)
-  if (!record || !activation || !Array.isArray(record.secrets) || typeof activation.state !== 'string' || (activation.reason !== null && typeof activation.reason !== 'string')) {
+  if (
+    !record ||
+    !activation ||
+    !Array.isArray(record.secrets) ||
+    typeof activation.state !== 'string' ||
+    (activation.reason !== null && typeof activation.reason !== 'string')
+  ) {
     throw new Error('The platform returned invalid secret metadata.')
   }
   const secrets = record.secrets.map((secret) => {
     const item = asRecord(secret)
-    if (!item || typeof item.name !== 'string' || typeof item.version !== 'number' || typeof item.state !== 'string' || (item.changed_at !== null && typeof item.changed_at !== 'string')) {
+    if (
+      !item ||
+      typeof item.name !== 'string' ||
+      typeof item.version !== 'number' ||
+      typeof item.state !== 'string' ||
+      (item.changed_at !== null && typeof item.changed_at !== 'string')
+    ) {
       throw new Error('The platform returned invalid secret metadata.')
     }
-    return { name: item.name, version: item.version, state: item.state, changedAt: item.changed_at }
+    return {
+      name: item.name,
+      version: item.version,
+      state: item.state,
+      changedAt: item.changed_at,
+    }
   })
-  return { secrets, activationState: activation.state, activationReason: activation.reason }
+  return {
+    secrets,
+    activationState: activation.state,
+    activationReason: activation.reason,
+  }
 }
 
 async function setProjectSecret(name: string, secret: string, value: string) {
-  const { error, response } = await apiClient.PUT('/projects/{name}/secrets/{secret}', {
-    params: { path: { name, secret } },
-    body: { value },
-  })
+  const { error, response } = await apiClient.PUT(
+    '/projects/{name}/secrets/{secret}',
+    {
+      params: { path: { name, secret } },
+      body: { value },
+    },
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function confirmProjectSecretRotation(name: string, secret: string) {
-  const { error, response } = await apiClient.POST('/projects/{name}/secrets/{secret}/confirm', { params: { path: { name, secret } } })
+  const { error, response } = await apiClient.POST(
+    '/projects/{name}/secrets/{secret}/confirm',
+    { params: { path: { name, secret } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function revertProjectSecretRotation(name: string, secret: string) {
-  const { error, response } = await apiClient.POST('/projects/{name}/secrets/{secret}/revert', { params: { path: { name, secret } } })
+  const { error, response } = await apiClient.POST(
+    '/projects/{name}/secrets/{secret}/revert',
+    { params: { path: { name, secret } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function deleteProjectSecret(name: string, secret: string) {
-  const { error, response } = await apiClient.DELETE('/projects/{name}/secrets/{secret}', { params: { path: { name, secret } } })
+  const { error, response } = await apiClient.DELETE(
+    '/projects/{name}/secrets/{secret}',
+    { params: { path: { name, secret } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function getRetirementPreview(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/retirement-preview', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/retirement-preview',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
-  const record = asRecord(data); const retains = record && asRecord(record.retains)
-  if (!record || !retains || !Array.isArray(record.removes) || !Array.isArray(record.blockers) || typeof record.scope_token !== 'string' || record.blockers.some((blocker) => typeof blocker !== 'string')) throw new Error('The platform returned an invalid retirement preview.')
-  const removes = record.removes.map((resource) => { const item = asRecord(resource); if (!item || typeof item.kind !== 'string' || typeof item.name !== 'string') throw new Error('The platform returned an invalid retirement preview.'); return { kind: item.kind, name: item.name } })
-  if (Object.values(retains).some((value) => value !== null && typeof value !== 'string' && typeof value !== 'boolean')) throw new Error('The platform returned an invalid retirement preview.')
+  const record = asRecord(data)
+  const retains = record && asRecord(record.retains)
+  if (
+    !record ||
+    !retains ||
+    !Array.isArray(record.removes) ||
+    !Array.isArray(record.blockers) ||
+    typeof record.scope_token !== 'string' ||
+    record.blockers.some((blocker) => typeof blocker !== 'string')
+  )
+    throw new Error('The platform returned an invalid retirement preview.')
+  const removes = record.removes.map((resource) => {
+    const item = asRecord(resource)
+    if (!item || typeof item.kind !== 'string' || typeof item.name !== 'string')
+      throw new Error('The platform returned an invalid retirement preview.')
+    return { kind: item.kind, name: item.name }
+  })
+  if (
+    Object.values(retains).some(
+      (value) =>
+        value !== null &&
+        typeof value !== 'string' &&
+        typeof value !== 'boolean',
+    )
+  )
+    throw new Error('The platform returned an invalid retirement preview.')
   const access = asRecord(record.access)
-  const stores = Array.isArray(access?.named_store_resources) ? access.named_store_resources.map((value) => {
-    const item = asRecord(value)
-    if (!item || typeof item.resource_id !== 'string' || typeof item.name !== 'string') throw new Error('The platform returned an invalid retirement preview.')
-    return { id: item.resource_id, name: item.name }
-  }) : []
-  const storeGrantCount = Array.isArray(access?.named_store_grants) ? access.named_store_grants.length : 0
-  return { removes, retains: retains as Record<string, string | boolean | null>, stores, storeGrantCount, blockers: record.blockers as string[], scopeToken: record.scope_token }
+  const stores = Array.isArray(access?.named_store_resources)
+    ? access.named_store_resources.map((value) => {
+        const item = asRecord(value)
+        if (
+          !item ||
+          typeof item.resource_id !== 'string' ||
+          typeof item.name !== 'string'
+        )
+          throw new Error(
+            'The platform returned an invalid retirement preview.',
+          )
+        return { id: item.resource_id, name: item.name }
+      })
+    : []
+  const storeGrantCount = Array.isArray(access?.named_store_grants)
+    ? access.named_store_grants.length
+    : 0
+  return {
+    removes,
+    retains: retains as Record<string, string | boolean | null>,
+    stores,
+    storeGrantCount,
+    blockers: record.blockers as string[],
+    scopeToken: record.scope_token,
+  }
 }
 
 async function getDataServices(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/data-services', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/data-services',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || !Array.isArray(record.services) || !Array.isArray(record.bindings) || (record.latest_recovery_request !== null && !asRecord(record.latest_recovery_request))) throw new Error('The platform returned invalid data-service status.')
-  const services = record.services.map((service) => { const item = asRecord(service); if (!item || typeof item.resource_id !== 'string' || typeof item.owner_project !== 'string' || typeof item.type !== 'string' || typeof item.name !== 'string' || typeof item.state !== 'string' || typeof item.observed_state !== 'string' || (item.reason !== null && typeof item.reason !== 'string')) throw new Error('The platform returned invalid data-service status.'); return { resourceId: item.resource_id, ownerProject: item.owner_project, type: item.type, name: item.name, state: item.state, observedState: item.observed_state, reason: item.reason } })
-  const bindings = record.bindings.map((binding) => { const item = asRecord(binding); if (!item || typeof item.binding_id !== 'string' || typeof item.resource_id !== 'string' || typeof item.component !== 'string' || typeof item.state !== 'string' || typeof item.observed_state !== 'string' || typeof item.credential_active !== 'boolean' || (item.reason !== null && typeof item.reason !== 'string')) throw new Error('The platform returned invalid data-service status.'); return { bindingId: item.binding_id, resourceId: item.resource_id, component: item.component, state: item.state, observedState: item.observed_state, credentialActive: item.credential_active, reason: item.reason } })
-  const recovery = record.latest_recovery_request === null ? null : asRecord(record.latest_recovery_request)
-  if (recovery && (typeof recovery.reason !== 'string' || typeof recovery.status !== 'string' || typeof recovery.requested_at !== 'string' || (recovery.reviewed_at !== null && typeof recovery.reviewed_at !== 'string'))) throw new Error('The platform returned invalid data-service status.')
-  return { services, bindings, latestRecoveryRequest: recovery ? { reason: recovery.reason as string, status: recovery.status as string, requestedAt: recovery.requested_at as string, reviewedAt: recovery.reviewed_at as string | null } : null }
+  if (
+    !record ||
+    !Array.isArray(record.services) ||
+    !Array.isArray(record.bindings) ||
+    (record.latest_recovery_request !== null &&
+      !asRecord(record.latest_recovery_request))
+  )
+    throw new Error('The platform returned invalid data-service status.')
+  const services = record.services.map((service) => {
+    const item = asRecord(service)
+    if (
+      !item ||
+      typeof item.resource_id !== 'string' ||
+      typeof item.owner_project !== 'string' ||
+      typeof item.type !== 'string' ||
+      typeof item.name !== 'string' ||
+      typeof item.state !== 'string' ||
+      typeof item.observed_state !== 'string' ||
+      (item.reason !== null && typeof item.reason !== 'string')
+    )
+      throw new Error('The platform returned invalid data-service status.')
+    return {
+      resourceId: item.resource_id,
+      ownerProject: item.owner_project,
+      type: item.type,
+      name: item.name,
+      state: item.state,
+      observedState: item.observed_state,
+      reason: item.reason,
+    }
+  })
+  const bindings = record.bindings.map((binding) => {
+    const item = asRecord(binding)
+    if (
+      !item ||
+      typeof item.binding_id !== 'string' ||
+      typeof item.resource_id !== 'string' ||
+      typeof item.component !== 'string' ||
+      typeof item.state !== 'string' ||
+      typeof item.observed_state !== 'string' ||
+      typeof item.credential_active !== 'boolean' ||
+      (item.reason !== null && typeof item.reason !== 'string')
+    )
+      throw new Error('The platform returned invalid data-service status.')
+    return {
+      bindingId: item.binding_id,
+      resourceId: item.resource_id,
+      component: item.component,
+      state: item.state,
+      observedState: item.observed_state,
+      credentialActive: item.credential_active,
+      reason: item.reason,
+    }
+  })
+  const recovery =
+    record.latest_recovery_request === null
+      ? null
+      : asRecord(record.latest_recovery_request)
+  if (
+    recovery &&
+    (typeof recovery.reason !== 'string' ||
+      typeof recovery.status !== 'string' ||
+      typeof recovery.requested_at !== 'string' ||
+      (recovery.reviewed_at !== null &&
+        typeof recovery.reviewed_at !== 'string'))
+  )
+    throw new Error('The platform returned invalid data-service status.')
+  return {
+    services,
+    bindings,
+    latestRecoveryRequest: recovery
+      ? {
+          reason: recovery.reason as string,
+          status: recovery.status as string,
+          requestedAt: recovery.requested_at as string,
+          reviewedAt: recovery.reviewed_at as string | null,
+        }
+      : null,
+  }
 }
 
-async function requestDataServiceRecovery(name: string, reason: 'unavailable' | 'access' | 'data_integrity' | 'other') {
-  const { error, response } = await apiClient.POST('/projects/{name}/data-services/recovery-requests', { params: { path: { name } }, body: { reason } })
+async function requestDataServiceRecovery(
+  name: string,
+  reason: 'unavailable' | 'access' | 'data_integrity' | 'other',
+) {
+  const { error, response } = await apiClient.POST(
+    '/projects/{name}/data-services/recovery-requests',
+    { params: { path: { name } }, body: { reason } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function getDeploymentCredentials(name: string) {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/deployment-credentials', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/deployment-credentials',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || !Array.isArray(record.credentials)) throw new Error('The platform returned an invalid deployment credential inventory.')
+  if (!record || !Array.isArray(record.credentials))
+    throw new Error(
+      'The platform returned an invalid deployment credential inventory.',
+    )
   const credentials = record.credentials.map((credential) => {
     const item = asRecord(credential)
-    if (!item || typeof item.credential_id !== 'string' || typeof item.name !== 'string' || typeof item.status !== 'string' || typeof item.created_at !== 'string' || typeof item.expires_at !== 'string' || (item.last_used_at !== null && typeof item.last_used_at !== 'string') || (item.rotated_from !== null && typeof item.rotated_from !== 'string')) throw new Error('The platform returned an invalid deployment credential inventory.')
-    return { id: item.credential_id, name: item.name, status: item.status, createdAt: item.created_at, expiresAt: item.expires_at, lastUsedAt: item.last_used_at, rotatedFrom: item.rotated_from }
+    if (
+      !item ||
+      typeof item.credential_id !== 'string' ||
+      typeof item.name !== 'string' ||
+      typeof item.status !== 'string' ||
+      typeof item.created_at !== 'string' ||
+      typeof item.expires_at !== 'string' ||
+      (item.last_used_at !== null && typeof item.last_used_at !== 'string') ||
+      (item.rotated_from !== null && typeof item.rotated_from !== 'string')
+    )
+      throw new Error(
+        'The platform returned an invalid deployment credential inventory.',
+      )
+    return {
+      id: item.credential_id,
+      name: item.name,
+      status: item.status,
+      createdAt: item.created_at,
+      expiresAt: item.expires_at,
+      lastUsedAt: item.last_used_at,
+      rotatedFrom: item.rotated_from,
+    }
   })
   return { credentials }
 }
 
 async function getProjectGrants(name: string): Promise<ProjectGrants> {
-  const { data, error, response } = await apiClient.GET('/projects/{name}/grants', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/projects/{name}/grants',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.project !== 'string' || !Array.isArray(record.grants)) throw new Error('The platform returned an invalid project grant list.')
+  if (
+    !record ||
+    typeof record.project !== 'string' ||
+    !Array.isArray(record.grants)
+  )
+    throw new Error('The platform returned an invalid project grant list.')
   const grants = record.grants.map((grant) => {
     const item = asRecord(grant)
-    if (!item || typeof item.issuer !== 'string' || typeof item.subject !== 'string' || (item.display_name !== null && typeof item.display_name !== 'string') || !['viewer', 'developer', 'project-admin'].includes(String(item.role)) || typeof item.granted_at !== 'string') {
+    if (
+      !item ||
+      typeof item.issuer !== 'string' ||
+      typeof item.subject !== 'string' ||
+      (item.display_name !== null && typeof item.display_name !== 'string') ||
+      !['viewer', 'developer', 'project-admin'].includes(String(item.role)) ||
+      typeof item.granted_at !== 'string'
+    ) {
       throw new Error('The platform returned an invalid project grant list.')
     }
-    return { issuer: item.issuer, subject: item.subject, displayName: item.display_name, role: item.role as ProjectGrant['role'], grantedAt: item.granted_at }
+    return {
+      issuer: item.issuer,
+      subject: item.subject,
+      displayName: item.display_name,
+      role: item.role as ProjectGrant['role'],
+      grantedAt: item.granted_at,
+    }
   })
   return { project: record.project, grants }
 }
 
-async function putProjectGrant(name: string, grant: Omit<ProjectGrant, 'grantedAt'>) {
+async function putProjectGrant(
+  name: string,
+  grant: Omit<ProjectGrant, 'grantedAt'>,
+) {
   const { error, response } = await apiClient.PUT('/projects/{name}/grants', {
     params: { path: { name } },
-    body: { issuer: grant.issuer, subject: grant.subject, display_name: grant.displayName, role: grant.role },
+    body: {
+      issuer: grant.issuer,
+      subject: grant.subject,
+      display_name: grant.displayName,
+      role: grant.role,
+    },
   })
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-async function deleteProjectGrant(name: string, grant: Pick<ProjectGrant, 'issuer' | 'subject'>) {
-  const { error, response } = await apiClient.DELETE('/projects/{name}/grants', {
-    params: { path: { name } }, body: grant,
-  })
+async function deleteProjectGrant(
+  name: string,
+  grant: Pick<ProjectGrant, 'issuer' | 'subject'>,
+) {
+  const { error, response } = await apiClient.DELETE(
+    '/projects/{name}/grants',
+    {
+      params: { path: { name } },
+      body: grant,
+    },
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
@@ -387,74 +915,237 @@ async function getPlatformGrants(): Promise<PlatformGrant[]> {
   const { data, error, response } = await apiClient.GET('/platform/grants')
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || !Array.isArray(record.grants)) throw new Error('The platform returned an invalid platform grant list.')
+  if (!record || !Array.isArray(record.grants))
+    throw new Error('The platform returned an invalid platform grant list.')
   return record.grants.map((grant) => {
     const item = asRecord(grant)
-    if (!item || typeof item.issuer !== 'string' || typeof item.subject !== 'string' || (item.display_name !== null && typeof item.display_name !== 'string') || item.role !== 'platform-admin' || typeof item.granted_at !== 'string') {
+    if (
+      !item ||
+      typeof item.issuer !== 'string' ||
+      typeof item.subject !== 'string' ||
+      (item.display_name !== null && typeof item.display_name !== 'string') ||
+      item.role !== 'platform-admin' ||
+      typeof item.granted_at !== 'string'
+    ) {
       throw new Error('The platform returned an invalid platform grant list.')
     }
-    return { issuer: item.issuer, subject: item.subject, displayName: item.display_name, role: 'platform-admin', grantedAt: item.granted_at }
+    return {
+      issuer: item.issuer,
+      subject: item.subject,
+      displayName: item.display_name,
+      role: 'platform-admin',
+      grantedAt: item.granted_at,
+    }
   })
 }
 
-async function putPlatformGrant(grant: Omit<PlatformGrant, 'grantedAt' | 'role'>) {
+async function putPlatformGrant(
+  grant: Omit<PlatformGrant, 'grantedAt' | 'role'>,
+) {
   const { error, response } = await apiClient.PUT('/platform/grants', {
-    body: { issuer: grant.issuer, subject: grant.subject, display_name: grant.displayName, role: 'platform-admin' },
+    body: {
+      issuer: grant.issuer,
+      subject: grant.subject,
+      display_name: grant.displayName,
+      role: 'platform-admin',
+    },
   })
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-async function deletePlatformGrant(grant: Pick<PlatformGrant, 'issuer' | 'subject'>) {
-  const { error, response } = await apiClient.DELETE('/platform/grants', { body: grant })
+async function deletePlatformGrant(
+  grant: Pick<PlatformGrant, 'issuer' | 'subject'>,
+) {
+  const { error, response } = await apiClient.DELETE('/platform/grants', {
+    body: grant,
+  })
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-async function createDeploymentCredential(name: string, body: { name: string; expiresInDays: number }): Promise<OneTimeDeploymentCredential> {
-  const { data, error, response } = await apiClient.POST('/projects/{name}/deployment-credentials', { params: { path: { name } }, body: { name: body.name, expires_in_days: body.expiresInDays } })
+async function createDeploymentCredential(
+  name: string,
+  body: { name: string; expiresInDays: number },
+): Promise<OneTimeDeploymentCredential> {
+  const { data, error, response } = await apiClient.POST(
+    '/projects/{name}/deployment-credentials',
+    {
+      params: { path: { name } },
+      body: { name: body.name, expires_in_days: body.expiresInDays },
+    },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.client_id !== 'string' || typeof record.client_secret !== 'string' || typeof record.token_endpoint !== 'string') throw new Error('The platform returned an invalid deployment credential.')
-  return { clientId: record.client_id, clientSecret: record.client_secret, tokenEndpoint: record.token_endpoint }
+  if (
+    !record ||
+    typeof record.client_id !== 'string' ||
+    typeof record.client_secret !== 'string' ||
+    typeof record.token_endpoint !== 'string'
+  )
+    throw new Error('The platform returned an invalid deployment credential.')
+  return {
+    clientId: record.client_id,
+    clientSecret: record.client_secret,
+    tokenEndpoint: record.token_endpoint,
+  }
 }
 
 async function revokeDeploymentCredential(name: string, credentialId: string) {
-  const { error, response } = await apiClient.DELETE('/projects/{name}/deployment-credentials/{credential_id}', { params: { path: { name, credential_id: credentialId } } })
+  const { error, response } = await apiClient.DELETE(
+    '/projects/{name}/deployment-credentials/{credential_id}',
+    { params: { path: { name, credential_id: credentialId } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
-async function rotateDeploymentCredential(name: string, credentialId: string, body: { expiresInDays: number; overlapHours: number }): Promise<OneTimeDeploymentCredential> {
-  const { data, error, response } = await apiClient.POST('/projects/{name}/deployment-credentials/{credential_id}/rotate', { params: { path: { name, credential_id: credentialId } }, body: { expires_in_days: body.expiresInDays, overlap_hours: body.overlapHours } })
+async function rotateDeploymentCredential(
+  name: string,
+  credentialId: string,
+  body: { expiresInDays: number; overlapHours: number },
+): Promise<OneTimeDeploymentCredential> {
+  const { data, error, response } = await apiClient.POST(
+    '/projects/{name}/deployment-credentials/{credential_id}/rotate',
+    {
+      params: { path: { name, credential_id: credentialId } },
+      body: {
+        expires_in_days: body.expiresInDays,
+        overlap_hours: body.overlapHours,
+      },
+    },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.client_id !== 'string' || typeof record.client_secret !== 'string' || typeof record.token_endpoint !== 'string') throw new Error('The platform returned an invalid rotated deployment credential.')
-  return { clientId: record.client_id, clientSecret: record.client_secret, tokenEndpoint: record.token_endpoint }
+  if (
+    !record ||
+    typeof record.client_id !== 'string' ||
+    typeof record.client_secret !== 'string' ||
+    typeof record.token_endpoint !== 'string'
+  )
+    throw new Error(
+      'The platform returned an invalid rotated deployment credential.',
+    )
+  return {
+    clientId: record.client_id,
+    clientSecret: record.client_secret,
+    tokenEndpoint: record.token_endpoint,
+  }
 }
 
 async function retireProject(name: string, scopeToken: string) {
-  const { data, error, response } = await apiClient.POST('/projects/{name}/retire', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
+  const { data, error, response } = await apiClient.POST(
+    '/projects/{name}/retire',
+    {
+      params: { path: { name } },
+      body: { confirm_name: name, scope_token: scopeToken },
+    },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || typeof record.status !== 'string') throw new Error('The platform returned an invalid retirement result.')
+  if (!record || typeof record.status !== 'string')
+    throw new Error('The platform returned an invalid retirement result.')
   return { status: record.status }
 }
 
 async function getPurgePreview(name: string): Promise<PurgePreview> {
-  const { data, error, response } = await apiClient.GET('/operator/projects/{name}/purge-preview', { params: { path: { name } } })
+  const { data, error, response } = await apiClient.GET(
+    '/operator/projects/{name}/purge-preview',
+    { params: { path: { name } } },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
   const credentials = record && asRecord(record.credential_cleanup)
-  if (!record || typeof record.database !== 'string' || typeof record.role !== 'string' || !Array.isArray(record.catalog) || record.catalog.some((item) => typeof item !== 'string') || typeof record.audit_records_retained !== 'boolean' || !credentials || Object.values(credentials).some((count) => typeof count !== 'number') || typeof record.scope_token !== 'string') {
+  if (
+    !record ||
+    typeof record.database !== 'string' ||
+    typeof record.role !== 'string' ||
+    !Array.isArray(record.catalog) ||
+    record.catalog.some((item) => typeof item !== 'string') ||
+    typeof record.audit_records_retained !== 'boolean' ||
+    !credentials ||
+    Object.values(credentials).some((count) => typeof count !== 'number') ||
+    typeof record.scope_token !== 'string'
+  ) {
     throw new Error('The platform returned an invalid purge preview.')
   }
-  return { database: record.database, role: record.role, catalog: record.catalog as string[], auditRecordsRetained: record.audit_records_retained, credentialCleanup: credentials as Record<string, number>, scopeToken: record.scope_token }
+  return {
+    database: record.database,
+    role: record.role,
+    catalog: record.catalog as string[],
+    auditRecordsRetained: record.audit_records_retained,
+    credentialCleanup: credentials as Record<string, number>,
+    scopeToken: record.scope_token,
+  }
 }
 
 async function purgeProject(name: string, scopeToken: string) {
-  const { data, error, response } = await apiClient.POST('/operator/projects/{name}/purge', { params: { path: { name } }, body: { confirm_name: name, scope_token: scopeToken } })
+  const { data, error, response } = await apiClient.POST(
+    '/operator/projects/{name}/purge',
+    {
+      params: { path: { name } },
+      body: { confirm_name: name, scope_token: scopeToken },
+    },
+  )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  if (!record || record.status !== 'purged') throw new Error('The platform returned an invalid purge result.')
+  if (!record || record.status !== 'purged')
+    throw new Error('The platform returned an invalid purge result.')
 }
 
-export { confirmProjectSecretRotation, createDeploymentCredential, createEmptyProject, deletePlatformGrant, deleteProjectGrant, deleteProjectSecret, deployProject, getDataServices, getDeploymentCredentials, getOperation, getPlatformGrants, getProjectConfiguration, getProjectGrants, getProjectLogs, getProjectRevisions, getProjectSecrets, getPurgePreview, getResourceInventory, getResourceUsage, getRetirementPreview, listProjects, parseProjectList, parseProjectRevisions, purgeProject, putPlatformGrant, putProjectGrant, requestDataServiceRecovery, restartProject, retireProject, revertProjectSecretRotation, revokeDeploymentCredential, rollbackProject, rotateDeploymentCredential, setProjectSecret, updateProjectConfiguration }
-export type { DataServices, DeploymentCredentials, EmptyProjectCreate, OneTimeDeploymentCredential, OperationAccepted, OperationStatus, PlatformGrant, ProjectConfiguration, ProjectDeployment, ProjectGrant, ProjectGrants, ProjectLogs, ProjectRevision, ProjectRevisions, ProjectSecrets, ProjectSummary, PurgePreview, ResourceInventory, ResourceUsage, RetirementPreview }
+export {
+  confirmProjectSecretRotation,
+  createDeploymentCredential,
+  createEmptyProject,
+  deletePlatformGrant,
+  deleteProjectGrant,
+  deleteProjectSecret,
+  deployProject,
+  getDataServices,
+  getDeploymentCredentials,
+  getOperation,
+  getPlatformGrants,
+  getProjectConfiguration,
+  getProjectGrants,
+  getProjectLogs,
+  getProjectRevisions,
+  getProjectSecrets,
+  getPurgePreview,
+  getResourceInventory,
+  getResourceUsage,
+  getRetirementPreview,
+  listProjects,
+  parseProjectList,
+  parseProjectRevisions,
+  purgeProject,
+  putPlatformGrant,
+  putProjectGrant,
+  requestDataServiceRecovery,
+  restartProject,
+  retireProject,
+  revertProjectSecretRotation,
+  revokeDeploymentCredential,
+  rollbackProject,
+  rotateDeploymentCredential,
+  setProjectSecret,
+  updateProjectConfiguration,
+}
+export type {
+  DataServices,
+  DeploymentCredentials,
+  EmptyProjectCreate,
+  OneTimeDeploymentCredential,
+  OperationAccepted,
+  OperationStatus,
+  PlatformGrant,
+  ProjectConfiguration,
+  ProjectDeployment,
+  ProjectGrant,
+  ProjectGrants,
+  ProjectLogs,
+  ProjectRevision,
+  ProjectRevisions,
+  ProjectSecrets,
+  ProjectSummary,
+  PurgePreview,
+  ResourceInventory,
+  ResourceUsage,
+  RetirementPreview,
+}

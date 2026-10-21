@@ -9,9 +9,8 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "app/src"))
-from acceptance import interrupted_provisioning as drill
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from tests.platform import interrupted_provisioning as drill
 
 RUN_ID = "0123456789ab"
 IMAGE = "docker.io/example/web-postgres@sha256:" + "a" * 64

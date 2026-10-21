@@ -84,9 +84,9 @@ class HostedAccessWorkflowTests(unittest.TestCase):
         self.assertNotIn("secrets.", str(workflow["jobs"]["test"]))
         steps = publish["steps"]
         build = next(step for step in steps if step.get("id") == "build")
-        self.assertEqual(build["with"]["context"], "platform/acceptance")
+        self.assertEqual(build["with"]["context"], "tests/fixtures/hosted-application")
         self.assertEqual(
-            build["with"]["file"], "platform/acceptance/Dockerfile.fixture"
+            build["with"]["file"], "tests/fixtures/hosted-application/Dockerfile"
         )
         self.assertEqual(build["with"]["platforms"], "linux/amd64,linux/arm64")
         self.assertTrue(build["with"]["push"])

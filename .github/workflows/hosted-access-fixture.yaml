@@ -6,8 +6,9 @@ on:
   pull_request:
     paths:
       - .github/workflows/hosted-access-fixture.yaml
-      - platform/acceptance/**
-      - platform/app/tests/test_hosted_access_acceptance.py
+      - tests/platform/**
+      - tests/fixtures/**
+      - tests/support/**
       - platform/app/pyproject.toml
       - platform/app/uv.lock
       - scripts/tests/platform/check-hosted-access.py
@@ -48,11 +49,13 @@ jobs:
           uv run --project platform/app python -m unittest discover
           -s scripts/tests/unit -p test_hosted_access_workflow.py -v
       - name: Test harness safety and real fixture PostgreSQL persistence
-        run: uv run --project platform/app python -m unittest discover -s platform/app/tests -p test_hosted_access_acceptance.py -v
+        run: >-
+          uv run --project platform/app python -m unittest discover
+          -s tests/platform/unit -p test_hosted_access_acceptance.py -v
       - name: Build fixture for runtime smoke test
         run: >-
-          docker build -f platform/acceptance/Dockerfile.fixture
-          -t hosted-access-fixture:test platform/acceptance
+          docker build -f tests/fixtures/hosted-application/Dockerfile
+          -t hosted-access-fixture:test tests/fixtures/hosted-application
       - name: Start fixture with production filesystem and user restrictions
         run: |
           docker run --detach --name hosted-access-fixture-smoke \
@@ -104,8 +107,8 @@ jobs:
         id: build
         uses: docker/build-push-action@v7
         with:
-          context: platform/acceptance
-          file: platform/acceptance/Dockerfile.fixture
+          context: tests/fixtures/hosted-application
+          file: tests/fixtures/hosted-application/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
           tags: ${{ steps.release.outputs.image }}:${{ steps.release.outputs.version }}

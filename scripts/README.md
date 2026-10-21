@@ -37,7 +37,9 @@ Component checks are grouped by `stores`, `observability`, and `ai`. They may
 start disposable Docker services or need a test database. The AI corpus
 evaluation is an explicitly invoked benchmark that calls the configured model;
 it is not part of the routine regression suite. Cross-store bound application
-checks live under `tests/platform/`. Platform tests can change or
+commands live under `scripts/tests/platform/`. Reusable runner logic lives in
+[`tests/platform/`](../tests/README.md), separate from the platform application.
+Platform tests can change or
 retire resources; the interruption and outage drills also affect shared
 services. Read the specific script and the
 [acceptance guide](../docs/operators/validation/acceptance.md) before execution.

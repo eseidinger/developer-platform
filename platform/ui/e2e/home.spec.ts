@@ -16,5 +16,7 @@ test('renders the portal foundation', async ({ page }) => {
   await expect(
     page.getByRole('heading', { name: 'Developer Platform portal' }),
   ).toBeVisible()
-  await expect(page.getByRole('button', { name: 'Sign in with OIDC' })).toBeVisible()
+  await expect(
+    page.getByRole('button', { name: 'Sign in with OIDC' }),
+  ).toBeVisible()
 })

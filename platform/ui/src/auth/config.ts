@@ -19,7 +19,9 @@ function isHttpUrl(value: string) {
   }
 }
 
-function parsePortalAuthConfig(value: PortalAuthConfigResponse): PortalAuthConfig {
+function parsePortalAuthConfig(
+  value: PortalAuthConfigResponse,
+): PortalAuthConfig {
   if (
     typeof value.issuer !== 'string' ||
     typeof value.client_id !== 'string' ||
@@ -48,7 +50,11 @@ async function loadPortalAuthConfig() {
   }
 
   const payload: unknown = await response.json()
-  if (typeof payload !== 'object' || payload === null || Array.isArray(payload)) {
+  if (
+    typeof payload !== 'object' ||
+    payload === null ||
+    Array.isArray(payload)
+  ) {
     throw new Error('The portal returned an invalid public OIDC configuration.')
   }
 

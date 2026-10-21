@@ -21,7 +21,11 @@ function AuthCallbackPage() {
       try {
         const signedIn = await completeSignIn(window.location.href)
         if (active && signedIn) {
-          window.history.replaceState({}, document.title, window.location.pathname)
+          window.history.replaceState(
+            {},
+            document.title,
+            window.location.pathname,
+          )
           void navigate('/', { replace: true })
         }
       } catch {
@@ -39,7 +43,10 @@ function AuthCallbackPage() {
   if (error) {
     return (
       <section aria-labelledby="callback-title" className="max-w-xl space-y-3">
-        <h1 id="callback-title" className="text-2xl font-semibold tracking-tight">
+        <h1
+          id="callback-title"
+          className="text-2xl font-semibold tracking-tight"
+        >
           Sign-in could not be completed
         </h1>
         <p className="text-muted-foreground">{error}</p>
@@ -52,7 +59,9 @@ function AuthCallbackPage() {
       <h1 id="callback-title" className="text-2xl font-semibold tracking-tight">
         Completing sign-in
       </h1>
-      <p className="text-muted-foreground">Verifying the identity-provider response.</p>
+      <p className="text-muted-foreground">
+        Verifying the identity-provider response.
+      </p>
     </section>
   )
 }

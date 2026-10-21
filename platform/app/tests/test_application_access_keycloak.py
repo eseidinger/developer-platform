@@ -17,10 +17,11 @@ import httpx2 as httpx
 import jwt
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from app.access_provider import KeycloakAccessProvider, audience, derived_secret
 from app.access_runtime import browser_manifests, PROXY_IMAGE
 from app.access_tokens import TokenVerifier
-from test_application_access import GROUP, OTHER_GROUP, POLICY
+from tests.support.application_access import GROUP, OTHER_GROUP, POLICY
 
 
 class LoginForm(HTMLParser):

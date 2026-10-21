@@ -18,8 +18,8 @@ describe('parsePortalAuthConfig', () => {
   })
 
   it('rejects missing or malformed public configuration', () => {
-    expect(() => parsePortalAuthConfig({ client_id: 'platform-portal' })).toThrow(
-      'invalid public OIDC configuration',
-    )
+    expect(() =>
+      parsePortalAuthConfig({ client_id: 'platform-portal' }),
+    ).toThrow('invalid public OIDC configuration')
   })
 })

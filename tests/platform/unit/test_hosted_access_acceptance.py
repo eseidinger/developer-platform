@@ -1,5 +1,6 @@
 """Harness safety and fixture checks. No test contacts or mutates the live lab."""
 import contextlib
+import importlib.util
 import io
 import json
 import os
@@ -18,12 +19,17 @@ import httpx2 as httpx
 import jwt
 import psycopg
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-from acceptance import fixture, harness as h
+sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
+from tests.platform import harness as h
 from app.access_contract import Governance, PolicyCreate
 from app.access_gateway import create_gateway
 from app.spec import ApplicationEnvelopeV1Alpha2
-from test_application_access import POLICY, claims, data
+from tests.support.application_access import POLICY, claims, data
+
+_fixture_spec = importlib.util.spec_from_file_location(
+    "hosted_application_fixture", Path(__file__).resolve().parents[2] / "fixtures/hosted-application/fixture.py")
+fixture = importlib.util.module_from_spec(_fixture_spec)
+_fixture_spec.loader.exec_module(fixture)
 
 
 RUN = "0123456789ab"

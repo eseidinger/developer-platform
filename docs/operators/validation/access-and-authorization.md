@@ -43,9 +43,9 @@ establish acceptance for this replacement. See the [current workflow](../data-st
 First deploy the platform and the restricted bastion using
 [`install-human-database-access.yml`](../../../ansible/operations/install-human-database-access.yml).
 Install or update the host-side runner environment from
-`platform/acceptance/requirements.txt` as in [Prepare the runner and fixture](#prepare-the-runner-and-fixture).
+`tests/platform/requirements.txt` as in [Prepare the runner and fixture](#prepare-the-runner-and-fixture).
 Transfer `scripts/tests/platform/check-human-database-access.py`,
-`platform/acceptance/human_database.py`, and updated requirements to the target
+`tests/platform/human_database.py`, and updated requirements to the target
 through the same reviewed runner-only update process used for hosted access;
 the Ansible acceptance wrapper does not transfer code. Publish the neutral
 fixture to an approved public registry and use its immutable digest, not a tag.
@@ -182,9 +182,10 @@ Create a runner environment on the platform host (Python 3.12 or newer):
 
 ```bash
 python3 -m venv .runtime/acceptance-venv
-.runtime/acceptance-venv/bin/pip install -r platform/acceptance/requirements.txt
-docker build -f platform/acceptance/Dockerfile.fixture \
-  -t <your-public-registry>/hosted-access-fixture:<version> platform/acceptance
+.runtime/acceptance-venv/bin/pip install -r tests/platform/requirements.txt
+docker build -f tests/fixtures/hosted-application/Dockerfile \
+  -t <your-public-registry>/hosted-access-fixture:<version> \
+  tests/fixtures/hosted-application
 ```
 
 Publishing is a separate operator action, not part of the harness. Publish the
@@ -266,18 +267,20 @@ usable. The existing operator account and its grants are not changed.
 ### Update the runner without redeploying platform services
 
 A runner/fixture-only release does not require `ansible/deploy.yml`. From the
-controller checkout of the intended release, transfer the changed runner module
-to the existing installation (substitute the actual host/install directory):
+controller checkout of the intended release, transfer the test package and
+entry points to the existing installation (substitute the actual host/install
+directory). This includes the package initializers needed by the new layout:
 
 ```bash
-scp platform/acceptance/harness.py \
-  root@node-01.eseidinger.de:/opt/developer-platform/platform/acceptance/harness.py
+rsync -aR --exclude=__pycache__ \
+  tests/__init__.py tests/platform/ scripts/tests/platform/ \
+  root@node-01.eseidinger.de:/opt/developer-platform/
 ```
 
-Run `sha256sum platform/acceptance/harness.py` on both sides and confirm they
-match. For a release that also changes runner dependencies, the entry point or
-other runner modules, update those files and the runner environment as well;
-copying this single file is sufficient only when those inputs are unchanged.
+Run `sha256sum tests/platform/harness.py` on both sides and confirm they
+match. If runner dependencies changed, update the runner environment from
+`tests/platform/requirements.txt` as well. The transfer updates test code only;
+it does not start platform services or run a live scenario.
 On the host set `HA_IMAGE` to the new published fixture's immutable registry
 digest before generating a fresh plan/run ID. Copying fixture source onto the
 host does not update its container image. This transfer does not update the
