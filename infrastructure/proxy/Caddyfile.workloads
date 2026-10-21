@@ -1,0 +1,33 @@
+{
+	admin off
+	auto_https disable_redirects
+	servers {
+		strict_sni_host on
+	}
+}
+
+# Workloads can redeem managed credentials and verify issuer metadata. The
+# identity administration, account UI and other realms are not exposed here.
+https://{$IDENTITY_DOMAIN} {
+	tls internal
+	@issuer path /realms/platform/protocol/openid-connect/token /realms/platform/protocol/openid-connect/certs /realms/platform/.well-known/openid-configuration
+	handle @issuer {
+		reverse_proxy keycloak:8080
+	}
+	handle {
+		respond 404
+	}
+}
+
+# Application traffic always traverses the existing protected ingress. Store
+# consoles and the operator portal/API have no route through this gateway.
+https://*.{$APPS_DOMAIN} {
+	tls internal
+	@console expression {host}.startsWith('console-')
+	handle @console {
+		respond 404
+	}
+	handle {
+		reverse_proxy k3d-workloads-serverlb:80
+	}
+}

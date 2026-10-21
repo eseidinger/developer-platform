@@ -1,5 +1,23 @@
 ---
 services:
+  # Private workload entry point. It has no published host ports and exposes
+  # neither the platform API nor identity administration or native consoles.
+  local-application-edge:
+    image: caddy:2.11.4-alpine
+    restart: unless-stopped
+    environment:
+      IDENTITY_DOMAIN: ${IDENTITY_DOMAIN:-identity.localhost}
+      APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
+    volumes:
+      - ./Caddyfile.workloads:/etc/caddy/Caddyfile:ro
+      - local_application_caddy_data:/data
+      - local_application_caddy_config:/config
+    networks:
+      platform:
+        ipv4_address: ${LOCAL_APPLICATION_EDGE_IP:-172.30.80.32}
+    mem_limit: 128m
+    cpus: 0.5
+
   proxy:
     image: caddy:2.11.4-alpine
     restart: unless-stopped

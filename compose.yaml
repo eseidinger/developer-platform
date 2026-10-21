@@ -1,3 +1,4 @@
+---
 name: developer-platform
 include:
   - infrastructure/proxy/compose.yaml
@@ -29,6 +30,8 @@ volumes:
   postgres:
   caddy_data:
   caddy_config:
+  local_application_caddy_data:
+  local_application_caddy_config:
   monitoring_discovery:
   prometheus:
   grafana:

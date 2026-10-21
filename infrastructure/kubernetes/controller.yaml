@@ -18,7 +18,8 @@ metadata:
   name: platform-provisioner
 rules:
   - apiGroups: [""]
-    resources: [namespaces, secrets, services, resourcequotas, limitranges]
+    resources:
+      [namespaces, secrets, configmaps, services, resourcequotas, limitranges]
     verbs: [get, list, create, patch, update]
   - apiGroups: [""]
     resources: [services, secrets]

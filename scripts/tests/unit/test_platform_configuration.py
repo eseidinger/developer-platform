@@ -19,6 +19,35 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 class PlatformConfigurationTests(unittest.TestCase):
+    def test_local_application_https_is_opt_in_and_rejects_nonlocal_domains(self):
+        configure(
+            self.root, {"environment": {"LOCAL_APPLICATION_HTTPS_ENABLED": "true"}}
+        )
+        before = self.environment.read_bytes()
+        with self.assertRaises(ConfigurationError):
+            configure(
+                self.root, {"environment": {"IDENTITY_DOMAIN": "identity.example.com"}}
+            )
+        self.assertEqual(self.environment.read_bytes(), before)
+        with self.assertRaises(ConfigurationError):
+            configure(
+                self.root, {"environment": {"LOCAL_APPLICATION_HTTPS_ENABLED": "yes"}}
+            )
+
+    def test_local_gateway_cannot_share_an_operator_service_address(self):
+        with self.assertRaises(ConfigurationError):
+            configure(
+                self.root,
+                {
+                    "options": {
+                        "network": {
+                            "subnet": "172.30.80.0/24",
+                            "addresses": {"local-application-edge": "172.30.80.10"},
+                        }
+                    }
+                },
+            )
+
     def setUp(self):
         self.temporary = tempfile.TemporaryDirectory()
         self.addCleanup(self.temporary.cleanup)

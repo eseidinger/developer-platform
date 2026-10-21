@@ -5,6 +5,8 @@ import os
 import re
 import socket
 
+from .local_https import destination as local_https_destination
+
 
 def _cidrs():
     try:
@@ -68,6 +70,13 @@ def resolve(destination: dict) -> dict:
         hostname,
     ):
         raise ValueError("outbound dns must be a valid hostname")
+    local_address = local_https_destination(hostname, destination["port"])
+    if local_address:
+        return {
+            "dns": hostname,
+            "port": destination["port"],
+            "resolved_cidrs": [local_address + "/32"],
+        }
     try:
         answers = socket.getaddrinfo(
             hostname, destination["port"], type=socket.SOCK_STREAM

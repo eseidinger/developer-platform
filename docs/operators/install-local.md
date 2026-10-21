@@ -86,6 +86,10 @@ cleanup.
 
 ## Noninteractive functional tests
 
+For managed application calls from inside workloads, enable the opt-in
+[local application HTTPS mode](local-application-https.md). It supplies scoped
+private routing and public CA trust without exposing additional host ports.
+
 Local HTTPS uses Caddy's internal certificate authority, including native store
 consoles under `*.apps.localhost`. Bootstrap starts the proxy and runs
 `scripts/setup/prepare-local-trust.py` before starting pgAdmin. That isolated

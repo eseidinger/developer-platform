@@ -4,6 +4,7 @@ import ipaddress
 import os
 import re
 
+from . import local_https
 from .config import env_list
 from .egress import resolve as resolve_egress_dns
 from .project_policy import TELEMETRY_FORWARDER_RESOURCES, quota_for
@@ -816,6 +817,7 @@ def component_resources(
                 ],
             )
         )
+    manifests = local_https.apply(manifests, components, namespace)
     from .access_runtime import protect_components
 
     return protect_components(manifests, name, components)

@@ -16,6 +16,34 @@ SPEC.loader.exec_module(trust)
 
 
 class LocalTrustTests(unittest.TestCase):
+    def test_workload_bundle_preserves_system_roots_and_contains_only_public_certificates(
+        self,
+    ):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / ".env").write_text(
+                "IDENTITY_DOMAIN=identity.localhost\nLOCAL_APPLICATION_HTTPS_ENABLED=true\n"
+            )
+            roots = ssl.create_default_context().get_ca_certs(binary_form=True)
+            public = [ssl.DER_cert_to_PEM_cert(der) for der in roots[:2]]
+            with patch.object(
+                trust, "public_certificate", side_effect=public
+            ) as export:
+                trust.prepare(root)
+            self.assertEqual(
+                [call.args[1] for call in export.call_args_list],
+                ["proxy", "local-application-edge"],
+            )
+            target = root / ".runtime/trust/application-ca-bundle.pem"
+            bundle = target.read_text()
+            self.assertTrue(all(certificate in bundle for certificate in public))
+            self.assertNotIn("PRIVATE KEY", bundle)
+            self.assertEqual(target.stat().st_mode & 0o777, 0o644)
+            self.assertGreaterEqual(
+                len(ssl.create_default_context(cadata=bundle).get_ca_certs()),
+                len(roots),
+            )
+
     def test_public_identity_uses_system_roots_without_contacting_docker(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

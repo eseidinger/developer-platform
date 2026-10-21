@@ -10,6 +10,8 @@ promise that a command is read-only.
   fixtures; run in CI.
 - **`components/ai/`**: SQL and driver checks in CI; model evaluation is an
   explicitly invoked benchmark.
+- **`components/networking/`**: disposable production gateway TLS and routing
+  boundaries, without a running platform.
 - **`platform/`**: explicit scenarios against a running lab.
 - **`support/`**: importable fixtures called by component tests.
 

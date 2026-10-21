@@ -33,6 +33,7 @@ ADDRESSES = {
     "keycloak-realm-init": ("KEYCLOAK_REALM_INIT_IP", 29),
     "postgres-exporter": ("POSTGRES_EXPORTER_IP", 30),
     "neo4j-controller": ("NEO4J_CONTROLLER_IP", 31),
+    "local-application-edge": ("LOCAL_APPLICATION_EDGE_IP", 32),
 }
 PROFILES = {"s3", "qdrant", "opensearch", "neo4j"}
 

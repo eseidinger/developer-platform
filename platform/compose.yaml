@@ -133,6 +133,9 @@ services:
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
       PROXY_IP: ${PROXY_IP:-172.30.80.20}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
+      IDENTITY_DOMAIN: ${IDENTITY_DOMAIN:-identity.localhost}
+      LOCAL_APPLICATION_HTTPS_ENABLED: ${LOCAL_APPLICATION_HTTPS_ENABLED:-false}
+      LOCAL_APPLICATION_EDGE_IP: ${LOCAL_APPLICATION_EDGE_IP:-172.30.80.32}
       POSTGRES_IP: ${POSTGRES_IP:-172.30.80.10}
       PLATFORM_SUBNET: ${PLATFORM_SUBNET:-172.30.80.0/24}
       IMAGE_REGISTRIES: ${IMAGE_REGISTRIES:-docker.io,ghcr.io,quay.io}
@@ -172,6 +175,7 @@ services:
       - monitoring_discovery:/var/lib/platform-monitoring
       - ../.runtime/controller.kubeconfig:/run/platform/kubeconfig:ro
       - ../.runtime/stores/public:/run/stores:ro
+      - ../.runtime/trust:/run/platform-trust:ro
       - host_capacity:/run/capacity:ro
     networks:
       platform:

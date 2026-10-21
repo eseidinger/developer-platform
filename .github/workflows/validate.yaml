@@ -1,5 +1,6 @@
+---
 name: validate
-on: [push, pull_request]
+"on": [push, pull_request]
 jobs:
   static:
     runs-on: ubuntu-latest
@@ -23,6 +24,7 @@ jobs:
           -m unittest discover -s ansible/tests/unit -v
       - run: python3 -m unittest discover -s operations/backup/tests -v
       - run: python3 -m unittest discover -s operations/heartbeat/tests -v
+      - run: python3 scripts/tests/components/networking/verify-local-https.py
       - run: >-
           uv run --project platform/app python
           scripts/tests/components/observability/check-monitoring.py
@@ -49,4 +51,7 @@ jobs:
           done
       - run: php operations/watchdog/tests/watchdog.php
       - run: php operations/watchdog/tests/backup.php
-      - run: php -d curl.cainfo="$RUNNER_TEMP/watchdog-smtp-cert.pem" -d sendmail_path=/bin/true operations/watchdog/tests/watchdog-mail.php
+      - run: >-
+          php -d curl.cainfo="$RUNNER_TEMP/watchdog-smtp-cert.pem"
+          -d sendmail_path=/bin/true
+          operations/watchdog/tests/watchdog-mail.php

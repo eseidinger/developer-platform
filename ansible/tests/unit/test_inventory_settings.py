@@ -91,8 +91,9 @@ class InventorySettingsTests(unittest.TestCase):
         self.assertEqual(result["POSTGRES_IP"], "10.55.8.90")
         self.assertEqual(result["STORE_RELAY_IP"], "10.55.8.15")
         self.assertEqual(result["NEO4J_CONTROLLER_IP"], "10.55.8.31")
+        self.assertEqual(result["LOCAL_APPLICATION_EDGE_IP"], "10.55.8.32")
         self.assertEqual(result["STORE_SEARCH_API_IP"], "10.55.9.2")
-        self.assertEqual(len([k for k in result if k.endswith("_IP")]), 24)
+        self.assertEqual(len([k for k in result if k.endswith("_IP")]), 25)
 
     def test_inventory_address_defaults_match_the_runtime_validator(self):
         tree = ast.parse(

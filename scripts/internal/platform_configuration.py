@@ -23,6 +23,7 @@ CORE_SETTINGS = {
     "IDENTITY_DOMAIN",
     "TLS_EMAIL",
     "EDGE_BIND_IP",
+    "LOCAL_APPLICATION_HTTPS_ENABLED",
     "IMAGE_REGISTRIES",
     "DRIFT_SCAN_INTERVAL_SECONDS",
     "REVISION_RETENTION",
@@ -60,9 +61,9 @@ def environment_settings(values):
             and not re.fullmatch(r"[0-9]+", value)
         ):
             raise ConfigurationError("Capacity settings must be non-negative integers")
-        if key == "CAPACITY_ADMISSION_ENABLED":
+        if key in {"CAPACITY_ADMISSION_ENABLED", "LOCAL_APPLICATION_HTTPS_ENABLED"}:
             if value.lower() not in {"true", "false"}:
-                raise ConfigurationError("Capacity admission must be true or false")
+                raise ConfigurationError("Boolean settings must be true or false")
             value = value.lower()
         if key in {"ALLOWED_EGRESS_CIDRS", "ALLOWED_EGRESS_PORTS"}:
             pattern = (
@@ -144,6 +145,11 @@ def validate_effective_settings(config, tempo_source):
             "Invalid store, network, capacity or egress settings"
         ) from None
     platform_inventory_settings(options)
+    if config.get("LOCAL_APPLICATION_HTTPS_ENABLED", "false") == "true" and not all(
+        re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)*\.localhost", config[key])
+        for key in ("APPS_DOMAIN", "IDENTITY_DOMAIN")
+    ):
+        raise ConfigurationError("Local application HTTPS requires localhost domains")
     tracing = platform_trace_settings(
         {
             "sample_rate": config["PLATFORM_TRACE_SAMPLE_RATE"],

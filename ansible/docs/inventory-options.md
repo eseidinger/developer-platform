@@ -176,8 +176,8 @@ resource retirement.
 
 Network groups require `subnet` and accept an optional `addresses` mapping keyed
 by Compose service name, such as `postgres`, `store-access` or
-`neo4j-controller`. Unspecified addresses are derived from standard offsets in
-the selected subnet; the full service list is in
+`neo4j-controller`, and `local-application-edge`. Unspecified addresses are derived
+from standard offsets in the selected subnet; the full service list is in
 [the inventory renderer](../filter_plugins/platform_inventory.py). The
 search-console group accepts `platform-api` and `opensearch-dashboards`.
 Addresses must be distinct, inside their subnet, and exclude the network,
