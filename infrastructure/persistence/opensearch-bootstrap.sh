@@ -1,10 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Keep certificate-derived responses and initializer diagnostics private.
 umask 077
 base=/run/store-security
 host=${OPENSEARCH_HOST:-opensearch}
+
+# Wait for either a healthy catalog or a confirmed absent security index.
+# An existing broken catalog requires operator repair, never reinitialization.
 ready=false
-for attempt in $(seq 1 90); do
+for ((attempt = 1; attempt <= 90; attempt++)); do
   code=$(curl --silent --output /tmp/security-status --write-out '%{http_code}' \
     --connect-timeout 2 --max-time 4 --cacert "$base/ca.pem" \
     --cert "$base/admin.pem" --key "$base/admin-key.pem" \
@@ -35,13 +40,21 @@ for attempt in $(seq 1 90); do
   fi
   sleep 2
 done
-[[ "$ready" == true ]] || { echo 'Native store initialization readiness timed out.' >&2; exit 1; }
+
+if [[ "$ready" != true ]]; then
+  echo 'Native store initialization readiness timed out.' >&2
+  exit 1
+fi
+
+# Initialize only the absent catalog verified above.
 # The administrator certificate is mounted only into this operator initializer.
 # No disabled hostname checks and no demo credentials/certificates.
 /usr/share/opensearch/plugins/opensearch-security/tools/securityadmin.sh \
   -h "$host" -p 9200 -icl -cacert "$base/ca.pem" -cert "$base/admin.pem" \
-  -key "$base/admin-key.pem" -cd "$base/bootstrap" > /tmp/security-init.log 2>&1 || {
-    echo 'Native store initialization failed; inspect private initializer diagnostics.' >&2
-    exit 1
-  }
+  -key "$base/admin-key.pem" -cd "$base/bootstrap" \
+  > /tmp/security-init.log 2>&1 || {
+  echo 'Native store initialization failed; inspect private initializer diagnostics.' >&2
+  exit 1
+}
+
 echo 'Native store access catalog initialized.'

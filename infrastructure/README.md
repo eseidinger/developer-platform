@@ -4,9 +4,11 @@ This directory owns the supporting services and cluster configuration used by
 the platform. The root `compose.yaml` includes the service definitions here; run
 Compose commands from the repository root.
 
-- `identity/`: Keycloak services, initialization, and the platform realm.
-- `persistence/`: PostgreSQL and optional store services, console configuration,
-  reviewed image builds, and compatibility evidence.
+- [`identity/`](identity/README.md): Keycloak services, initialization, and the
+  platform realm.
+- [`persistence/`](persistence/README.md): PostgreSQL and optional store
+  services, console configuration, reviewed image builds, and compatibility
+  evidence.
 - `kubernetes/`: cluster service accounts, RBAC, and metrics manifests.
 - `monitoring/`: collectors, backends, rules, and generated dashboards. See the
   [monitoring directory guide](monitoring/README.md).

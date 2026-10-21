@@ -21,6 +21,9 @@ ansible-lint
 # Shell script linting (provides the ShellCheck binary).
 shellcheck-py
 
+# Dockerfile linting (provides the Hadolint binary).
+hadolint-py
+
 # Markdown linting and formatting, including GitHub tables and task lists.
 pymarkdownlnt
 mdformat

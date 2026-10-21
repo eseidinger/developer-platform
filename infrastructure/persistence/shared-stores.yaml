@@ -1,7 +1,10 @@
+---
 services:
   rustfs:
     profiles: [s3]
-    image: rustfs/rustfs:1.0.2@sha256:7e948dad4748bda48f8985fda7195f8cf2e4259427011f6120acc2c9acf51587
+    image:
+      "rustfs/rustfs:1.0.2@sha256:7e948dad4748bda48f8985fda7195f8cf2e4\
+        259427011f6120acc2c9acf51587"
     restart: unless-stopped
     environment:
       RUSTFS_ACCESS_KEY: ${RUSTFS_ACCESS_KEY:-}
@@ -15,7 +18,9 @@ services:
       RUSTFS_OBS_TRACES_EXPORT_ENABLED: "false"
       RUSTFS_OBS_LOGS_EXPORT_ENABLED: "false"
     volumes: [rustfs_data:/data]
-    tmpfs: ["/logs:uid=10001,gid=10001,size=64m", "/tmp:uid=10001,gid=10001,size=32m"]
+    tmpfs:
+      - "/logs:uid=10001,gid=10001,size=64m"
+      - "/tmp:uid=10001,gid=10001,size=32m"
     networks:
       platform:
         ipv4_address: ${RUSTFS_IP:-172.30.80.16}
@@ -32,7 +37,9 @@ services:
 
   qdrant:
     profiles: [qdrant]
-    image: qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
+    image:
+      "qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee42\
+        87c65b44e52b4cb503fa5b2aa927ad"
     restart: unless-stopped
     environment:
       QDRANT__SERVICE__READ_ONLY_API_KEY: ${STORE_MONITOR_PASSWORD:-}
@@ -50,7 +57,15 @@ services:
     mem_limit: 512m
     cpus: 0.5
     healthcheck:
-      test: [CMD, bash, -ec, "exec 3<>/dev/tcp/127.0.0.1/6333; printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3; read -r status <&3; [[ $$status == *'200 OK'* ]]"]
+      test:
+        - "CMD"
+        - "bash"
+        - "-ec"
+        # Escaped YAML line breaks preserve the HTTP request's CRLF bytes.
+        - "exec 3<>/dev/tcp/127.0.0.1/6333; \
+            printf 'GET /readyz HTTP/1.1\r\nHost: localhost\r\n\
+            Connection: close\r\n\r\n' >&3; \
+            read -r status <&3; [[ $$status == *'200 OK'* ]]"
       interval: 15s
       timeout: 3s
       start_period: 30s
@@ -58,7 +73,9 @@ services:
 
   opensearch:
     profiles: [opensearch]
-    image: opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c
+    image:
+      "opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb5\
+        62e7e74fde7e31c437039c93c3862c17e9acebd6c7c"
     restart: unless-stopped
     hostname: opensearch
     environment:
@@ -66,10 +83,14 @@ services:
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
     volumes:
       - opensearch_data:/usr/share/opensearch/data
-      - ../../.runtime/stores/opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
-      - ../../.runtime/stores/opensearch/ca.pem:/usr/share/opensearch/config/ca.pem:ro
-      - ../../.runtime/stores/opensearch/node.pem:/usr/share/opensearch/config/node.pem:ro
-      - ../../.runtime/stores/opensearch/node-key.pem:/usr/share/opensearch/config/node-key.pem:ro
+      - "../../.runtime/stores/opensearch/opensearch.yml:/usr/share/\
+          opensearch/config/opensearch.yml:ro"
+      - "../../.runtime/stores/opensearch/ca.pem:/usr/share/opensearch/\
+          config/ca.pem:ro"
+      - "../../.runtime/stores/opensearch/node.pem:/usr/share/opensearch/\
+          config/node.pem:ro"
+      - "../../.runtime/stores/opensearch/node-key.pem:/usr/share/\
+          opensearch/config/node-key.pem:ro"
     networks:
       platform:
         ipv4_address: ${OPENSEARCH_IP:-172.30.80.17}
@@ -78,7 +99,15 @@ services:
     mem_limit: 1536m
     cpus: 1
     healthcheck:
-      test: [CMD, bash, -euc, "curl --fail --silent --cacert /usr/share/opensearch/config/ca.pem https://opensearch:9200/_plugins/_security/health | grep -Eq '\"status\"[[:space:]]*:[[:space:]]*\"UP\"'"]
+      test:
+        - "CMD"
+        - "bash"
+        - "-euc"
+        - >-
+          curl --fail --silent --cacert
+          /usr/share/opensearch/config/ca.pem
+          https://opensearch:9200/_plugins/_security/health |
+          grep -Eq '"status"[[:space:]]*:[[:space:]]*"UP"'
       interval: 15s
       timeout: 5s
       start_period: 90s
@@ -86,15 +115,20 @@ services:
 
   opensearch-init:
     profiles: [opensearch]
-    image: opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c
+    image:
+      "opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb5\
+        62e7e74fde7e31c437039c93c3862c17e9acebd6c7c"
     user: "1000:1000"
     restart: "no"
     entrypoint: [bash, /bootstrap.sh]
     volumes:
       - ../../.runtime/stores/opensearch/ca.pem:/run/store-security/ca.pem:ro
-      - ../../.runtime/stores/opensearch/admin.pem:/run/store-security/admin.pem:ro
-      - ../../.runtime/stores/opensearch/admin-key.pem:/run/store-security/admin-key.pem:ro
-      - ../../.runtime/stores/opensearch/bootstrap:/run/store-security/bootstrap:ro
+      - "../../.runtime/stores/opensearch/admin.pem:/run/store-security/\
+          admin.pem:ro"
+      - "../../.runtime/stores/opensearch/admin-key.pem:/run/\
+          store-security/admin-key.pem:ro"
+      - "../../.runtime/stores/opensearch/bootstrap:/run/store-security/\
+          bootstrap:ro"
       - ./opensearch-bootstrap.sh:/bootstrap.sh:ro
     networks:
       platform:
@@ -109,14 +143,19 @@ services:
 
   opensearch-dashboards:
     profiles: [opensearch]
-    image: opensearchproject/opensearch-dashboards:3.9.0@sha256:4bdb8ded547ce7f4c379a10261f1b4aad58726900c215be570a7d1fe86f2a7d8
+    image:
+      "opensearchproject/opensearch-dashboards:3.9.0@sha256:4bdb8ded54\
+        7ce7f4c379a10261f1b4aad58726900c215be570a7d1fe86f2a7d8"
     restart: unless-stopped
     environment:
-      STORE_OPENSEARCH_BACKEND_URL: http://${STORE_SEARCH_API_IP:-172.30.81.2}:8000
+      STORE_OPENSEARCH_BACKEND_URL: >-
+        http://${STORE_SEARCH_API_IP:-172.30.81.2}:8000
       OPENSEARCH_DASHBOARDS_PASSWORD: ${OPENSEARCH_DASHBOARDS_PASSWORD:-}
-      STORE_OPENSEARCH_CONSOLE_COOKIE_KEY: ${STORE_OPENSEARCH_CONSOLE_COOKIE_KEY:-}
+      STORE_OPENSEARCH_CONSOLE_COOKIE_KEY: >-
+        ${STORE_OPENSEARCH_CONSOLE_COOKIE_KEY:-}
     volumes:
-      - ./opensearch-dashboards.yaml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
+      - "./opensearch-dashboards.yaml:/usr/share/opensearch-dashboards/\
+          config/opensearch_dashboards.yml:ro"
     networks:
       search-consoles:
         ipv4_address: ${OPENSEARCH_DASHBOARDS_IP:-172.30.81.3}
@@ -139,7 +178,19 @@ services:
     build: ../../platform
     user: "0:0"
     restart: unless-stopped
-    command: [uvicorn, "app.stores.neo4j_controller:create_app", --factory, --host, "0.0.0.0", --port, "8091", --limit-concurrency, "32", --timeout-keep-alive, "2", --no-access-log]
+    command:
+      - "uvicorn"
+      - "app.stores.neo4j_controller:create_app"
+      - "--factory"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8091"
+      - "--limit-concurrency"
+      - "32"
+      - "--timeout-keep-alive"
+      - "2"
+      - "--no-access-log"
     environment:
       STORE_ENABLED_PROVIDERS: postgresql,${COMPOSE_PROFILES:-}
       PLATFORM_API_IP: ${PLATFORM_API_IP:-172.30.80.11}

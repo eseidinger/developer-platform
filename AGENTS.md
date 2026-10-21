@@ -52,6 +52,8 @@ These guidelines apply throughout the repository.
   - Markdown: `pymarkdown scan <files>` (or `pymarkdown scan --recurse <directory>`)
     and `mdformat --check <paths>`. Use `mdformat <paths>` to apply formatting;
     install `mdformat-gfm` to preserve GitHub tables and task lists.
+  - Dockerfiles: `hadolint <paths>`; install `hadolint-py` from the root
+    `requirements.txt` to provide the `hadolint` command.
   - Docker Compose: `docker compose config --quiet` with the relevant files,
     profiles, and environment configuration.
   - Other languages and components: use their existing lint and format commands.

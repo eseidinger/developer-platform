@@ -1,3 +1,4 @@
+---
 server.host: "0.0.0.0"
 server.name: platform-store-console
 opensearch.hosts: ["${STORE_OPENSEARCH_BACKEND_URL}"]
@@ -5,7 +6,10 @@ opensearch.username: kibanaserver
 opensearch.password: "${OPENSEARCH_DASHBOARDS_PASSWORD}"
 opensearch.customHeaders:
   Host: opensearch-store-backend.internal
-opensearch.requestHeadersAllowlist: [authorization, securitytenant, x-platform-store-lease]
+opensearch.requestHeadersAllowlist:
+  - "authorization"
+  - "securitytenant"
+  - "x-platform-store-lease"
 opensearch_security.auth.type: basicauth
 opensearch_security.cookie.name: __Host-store-dashboards-auth
 opensearch_security.cookie.password: "${STORE_OPENSEARCH_CONSOLE_COOKIE_KEY}"
