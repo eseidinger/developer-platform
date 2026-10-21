@@ -1,3 +1,6 @@
+---
+# The API checks workload identity through TokenReview and the current Pod.
+# This account does not grant provisioning or mutation rights on workloads.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

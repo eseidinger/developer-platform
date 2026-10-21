@@ -1,3 +1,4 @@
+---
 # Trusted administrative telemetry reader, never a tenant credential. Filters
 # select managed project workloads; RBAC itself is cluster-wide read-only.
 apiVersion: v1

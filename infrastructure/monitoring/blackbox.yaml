@@ -1,4 +1,6 @@
-# Profiles are deliberately bounded; application specs cannot supply arbitrary URLs.
+---
+# Profiles are deliberately bounded; application specs cannot supply arbitrary
+# URLs.
 modules:
   http_status:
     prober: http

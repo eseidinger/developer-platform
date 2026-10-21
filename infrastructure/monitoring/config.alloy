@@ -1,105 +1,128 @@
 local.file_match "docker" {
-  path_targets = [{"__path__" = "/var/lib/docker/containers/*/*-json.log", "job" = "docker"}]
+	path_targets = [{"__path__" = "/var/lib/docker/containers/*/*-json.log", "job" = "docker"}]
 }
+
 loki.source.file "docker" {
-  targets    = local.file_match.docker.targets
-  forward_to = [loki.process.docker.receiver]
+	targets    = local.file_match.docker.targets
+	forward_to = [loki.process.docker.receiver]
 }
+
 loki.process "docker" {
-  stage.docker {}
-  forward_to = [loki.write.local.receiver]
+	stage.docker { }
+	forward_to = [loki.write.local.receiver]
 }
+
 loki.write "local" {
-  endpoint {
-    url = "http://loki:3100/loki/api/v1/push"
-  }
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
 }
 
 // Dedicated read-only API credential: no admin/provisioner kubeconfig, host
 // pod filesystem, application bearer token, or application network exception.
 discovery.kubernetes "workloads" {
-  role = "pod"
-  kubeconfig_file = "/run/alloy/log-reader.kubeconfig"
-  selectors {
-    role = "pod"
-    label = "app.kubernetes.io/name"
-  }
+	role            = "pod"
+	kubeconfig_file = "/run/alloy/log-reader.kubeconfig"
+
+	selectors {
+		role  = "pod"
+		label = "app.kubernetes.io/name"
+	}
 }
+
 discovery.relabel "workloads" {
-  targets = discovery.kubernetes.workloads.targets
-  rule {
-    source_labels = ["__meta_kubernetes_namespace"]
-    regex = "project-([a-z][a-z0-9-]{0,31})"
-    action = "keep"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_namespace"]
-    regex = "project-(.+)"
-    replacement = "$1"
-    target_label = "project"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_namespace"]
-    target_label = "namespace"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
-    target_label = "application"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_label_platform_example_component"]
-    target_label = "component"
-  }
-  rule {
-    source_labels = ["component"]
-    regex = ""
-    replacement = "app"
-    target_label = "component"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_name"]
-    target_label = "pod"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_container_name"]
-    target_label = "container"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_annotation_platform_example_revision"]
-    target_label = "revision"
-  }
-  rule {
-    source_labels = ["__meta_kubernetes_pod_annotation_platform_example_operation_id"]
-    target_label = "operation_id"
-  }
-  rule {
-    target_label = "job"
-    replacement = "kubernetes-workloads"
-  }
-  rule {
-    target_label = "environment"
-    replacement = "default"
-  }
+	targets = discovery.kubernetes.workloads.targets
+
+	rule {
+		source_labels = ["__meta_kubernetes_namespace"]
+		regex         = "project-([a-z][a-z0-9-]{0,31})"
+		action        = "keep"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_namespace"]
+		regex         = "project-(.+)"
+		replacement   = "$1"
+		target_label  = "project"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_namespace"]
+		target_label  = "namespace"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_label_app_kubernetes_io_name"]
+		target_label  = "application"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_label_platform_example_component"]
+		target_label  = "component"
+	}
+
+	rule {
+		source_labels = ["component"]
+		regex         = ""
+		replacement   = "app"
+		target_label  = "component"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_name"]
+		target_label  = "pod"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_container_name"]
+		target_label  = "container"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_annotation_platform_example_revision"]
+		target_label  = "revision"
+	}
+
+	rule {
+		source_labels = ["__meta_kubernetes_pod_annotation_platform_example_operation_id"]
+		target_label  = "operation_id"
+	}
+
+	rule {
+		target_label = "job"
+		replacement  = "kubernetes-workloads"
+	}
+
+	rule {
+		target_label = "environment"
+		replacement  = "default"
+	}
 }
+
 loki.source.kubernetes "workloads" {
-  targets = discovery.relabel.workloads.output
-  client { kubeconfig_file = "/run/alloy/log-reader.kubeconfig" }
-  forward_to = [loki.process.workloads.receiver]
+	targets = discovery.relabel.workloads.output
+
+	client {
+		kubeconfig_file = "/run/alloy/log-reader.kubeconfig"
+	}
+	forward_to = [loki.process.workloads.receiver]
 }
 // Structured framework messages and the existing operational envelope. Discard
 // arbitrary attributes; keep message/trace identifiers in the body, never labels.
 loki.process "workloads" {
-  stage.drop {
-    longer_than = "4KB"
-    drop_counter_reason = "oversized_workload_envelope"
-  }
-  stage.json {
-    expressions = {record = "@"}
-    drop_malformed = true
-  }
-  stage.template {
-    source = "safe_line"
-    template = `{{- $r := dict -}}
+	stage.drop {
+		longer_than         = "4KB"
+		drop_counter_reason = "oversized_workload_envelope"
+	}
+
+	stage.json {
+		expressions    = {record = "@"}
+		drop_malformed = true
+	}
+
+	stage.template {
+		source   = "safe_line"
+		template = `{{- $r := dict -}}
 {{- if kindIs "string" .record -}}{{- $r = fromJson .record -}}{{- end -}}
 {{- if kindIs "map" $r -}}
   {{- $level := get $r "level" -}}
@@ -146,204 +169,273 @@ loki.process "workloads" {
     {{- end -}}
   {{- end -}}
 {{- end -}}`
-  }
-  stage.drop {
-    source = "safe_line"
-    expression = "^$"
-    drop_counter_reason = "unsafe_workload_envelope"
-  }
-  stage.output { source = "safe_line" }
-  stage.json { expressions = {log_format = "format"} }
-  stage.labels { values = {log_format = ""} }
-  stage.structured_metadata {
-    values = {revision = "", operation_id = ""}
-  }
-  forward_to = [loki.write.local.receiver]
+	}
+
+	stage.drop {
+		source              = "safe_line"
+		expression          = "^$"
+		drop_counter_reason = "unsafe_workload_envelope"
+	}
+
+	stage.output {
+		source = "safe_line"
+	}
+
+	stage.json {
+		expressions = {log_format = "format"}
+	}
+
+	stage.labels {
+		values = {log_format = ""}
+	}
+
+	stage.structured_metadata {
+		values = {revision = "", operation_id = ""}
+	}
+	forward_to = [loki.write.local.receiver]
 }
 
 // Private platform spans and allowlisted AI metrics. No log signal is accepted. A separate
 // authenticated gateway is required before any workload may export spans.
 otelcol.receiver.otlp "platform" {
-  http {
-    endpoint = "0.0.0.0:4318"
-    max_request_body_size = "256KiB"
-  }
-  output {
-    traces = [otelcol.processor.memory_limiter.platform.input]
-    metrics = [otelcol.processor.memory_limiter.ai_metrics.input]
-  }
+	http {
+		endpoint              = "0.0.0.0:4318"
+		max_request_body_size = "256KiB"
+	}
+
+	output {
+		traces  = [otelcol.processor.memory_limiter.platform.input]
+		metrics = [otelcol.processor.memory_limiter.ai_metrics.input]
+	}
 }
 // Limiters observe the entire Alloy process heap, not a per-signal allocation.
 // All pipelines share this budget under the 256 MiB container limit.
 otelcol.processor.memory_limiter "platform" {
-  check_interval = "1s"
-  limit = "192MiB"
-  spike_limit = "48MiB"
-  output {
-    traces = [otelcol.processor.transform.platform_safe.input]
-  }
+	check_interval = "1s"
+	limit          = "192MiB"
+	spike_limit    = "48MiB"
+
+	output {
+		traces = [otelcol.processor.transform.platform_safe.input]
+	}
 }
+
 otelcol.processor.transform "platform_safe" {
-  error_mode = "propagate"
-  trace_statements {
-    context = "resource"
-    statements = [
-      `keep_keys(attributes, ["service.name", "platform.project", "platform.application", "platform.component"])`,
-      `truncate_all(attributes, 128)`,
-    ]
-  }
-  trace_statements {
-    context = "span"
-    statements = [
-      `keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type", "platform.ai.run_id", "platform.ai.kind", "platform.ai.model", "platform.ai.tool", "platform.ai.input_tokens", "platform.ai.output_tokens", "platform.ai.outcome", "platform.ai.tool_error_count", "platform.project", "gen_ai.operation.name", "gen_ai.provider.name", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens", "gen_ai.request.max_tokens", "gen_ai.request.temperature", "gen_ai.request.top_p", "gen_ai.response.finish_reasons", "gen_ai.tool.name", "error.type", "platform.instrumentation.name", "platform.ai.framework"])`,
-      `truncate_all(attributes, 128)`,
-      `set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step" and name != "platform.ai.run" and name != "platform.ai.model" and name != "platform.ai.tool" and name != "application.span" and name != "application.ai.chat" and name != "application.ai.text_completion" and name != "application.ai.generate_content" and name != "application.ai.embeddings" and name != "application.ai.execute_tool" and name != "application.ai.invoke_agent" and name != "application.ai.create_agent" and name != "application.ai.retrieval" and name != "application.ai.service"`,
-      `set(status.message, "")`,
-    ]
-  }
-  output {
-    traces = [otelcol.processor.batch.platform.input]
-  }
+	error_mode = "propagate"
+
+	trace_statements {
+		context    = "resource"
+		statements = [
+			`keep_keys(attributes, ["service.name", "platform.project", "platform.application", "platform.component"])`,
+			`truncate_all(attributes, 128)`,
+		]
+	}
+
+	trace_statements {
+		context    = "span"
+		statements = [
+			`keep_keys(attributes, ["http.route", "http.request.method", "http.response.status_code", "platform.outcome", "platform.operation.id", "platform.operation.kind", "platform.operation.revision", "platform.step", "platform.resource_kind", "platform.error_type", "platform.ai.run_id", "platform.ai.kind", "platform.ai.model", "platform.ai.tool", "platform.ai.input_tokens", "platform.ai.output_tokens", "platform.ai.outcome", "platform.ai.tool_error_count", "platform.project", "gen_ai.operation.name", "gen_ai.provider.name", "gen_ai.request.model", "gen_ai.response.model", "gen_ai.usage.input_tokens", "gen_ai.usage.output_tokens", "gen_ai.request.max_tokens", "gen_ai.request.temperature", "gen_ai.request.top_p", "gen_ai.response.finish_reasons", "gen_ai.tool.name", "error.type", "platform.instrumentation.name", "platform.ai.framework"])`,
+			`truncate_all(attributes, 128)`,
+			`set(name, "platform.span") where name != "platform.http" and name != "platform.operation.execute" and name != "platform.operation.step" and name != "platform.ai.run" and name != "platform.ai.model" and name != "platform.ai.tool" and name != "application.span" and name != "application.ai.chat" and name != "application.ai.text_completion" and name != "application.ai.generate_content" and name != "application.ai.embeddings" and name != "application.ai.execute_tool" and name != "application.ai.invoke_agent" and name != "application.ai.create_agent" and name != "application.ai.retrieval" and name != "application.ai.service"`,
+			`set(status.message, "")`,
+		]
+	}
+
+	output {
+		traces = [otelcol.processor.batch.platform.input]
+	}
 }
+
 otelcol.processor.batch "platform" {
-  send_batch_size = 128
-  timeout = "2s"
-  output {
-    traces = [otelcol.exporter.otlphttp.tempo.input]
-  }
+	send_batch_size = 128
+	timeout         = "2s"
+
+	output {
+		traces = [otelcol.exporter.otlphttp.tempo.input]
+	}
 }
+
 otelcol.exporter.otlphttp "tempo" {
-  client {
-    endpoint = "http://tempo:4318"
-    timeout = "2s"
-  }
-  sending_queue {
-    enabled = true
-    queue_size = 32
-    num_consumers = 2
-    block_on_overflow = false
-  }
-  retry_on_failure {
-    enabled = true
-    max_elapsed_time = "30s"
-  }
+	client {
+		endpoint = "http://tempo:4318"
+		timeout  = "2s"
+	}
+
+	sending_queue {
+		enabled           = true
+		queue_size        = 32
+		num_consumers     = 2
+		block_on_overflow = false
+	}
+
+	retry_on_failure {
+		enabled          = true
+		max_elapsed_time = "30s"
+	}
 }
 
 // Direct metrics are independent of trace sampling/storage. This receiver is
 // private; the authenticated workload gateway continues to forward traces only.
 otelcol.processor.memory_limiter "ai_metrics" {
-  check_interval = "1s"
-  limit = "192MiB"
-  spike_limit = "48MiB"
-  output { metrics = [otelcol.processor.filter.ai_metrics.input] }
+	check_interval = "1s"
+	limit          = "192MiB"
+	spike_limit    = "48MiB"
+
+	output {
+		metrics = [otelcol.processor.filter.ai_metrics.input]
+	}
 }
+
 otelcol.processor.filter "ai_metrics" {
-  error_mode = "propagate"
-  metrics {
-    metric = [`not IsMatch(name, "^platform_ai_(operations|runs|tool_calls|tokens|usage_observations|estimated_cost_usd|in_flight|duration_seconds|cardinality_dropped|changes|spans_exported|heartbeat_timestamp_seconds|configured_root_sample_ratio)$")`]
-  }
-  output { metrics = [otelcol.processor.transform.ai_metrics.input] }
+	error_mode = "propagate"
+
+	metrics {
+		metric = [`not IsMatch(name, "^platform_ai_(operations|runs|tool_calls|tokens|usage_observations|estimated_cost_usd|in_flight|duration_seconds|cardinality_dropped|changes|spans_exported|heartbeat_timestamp_seconds|configured_root_sample_ratio)$")`]
+	}
+
+	output {
+		metrics = [otelcol.processor.transform.ai_metrics.input]
+	}
 }
+
 otelcol.processor.transform "ai_metrics" {
-  error_mode = "propagate"
-  metric_statements {
-    context = "resource"
-    statements = [`keep_keys(attributes, ["service.name"])`]
-  }
-  metric_statements {
-    context = "datapoint"
-    statements = [
-      `keep_keys(attributes, ["project", "action", "operation", "tool", "outcome", "provider", "model", "token_type", "completeness", "pricing_version"])`,
-      `truncate_all(attributes, 64)`,
-    ]
-  }
-  output { metrics = [otelcol.processor.batch.ai_metrics.input] }
+	error_mode = "propagate"
+
+	metric_statements {
+		context    = "resource"
+		statements = [`keep_keys(attributes, ["service.name"])`]
+	}
+
+	metric_statements {
+		context    = "datapoint"
+		statements = [
+			`keep_keys(attributes, ["project", "action", "operation", "tool", "outcome", "provider", "model", "token_type", "completeness", "pricing_version"])`,
+			`truncate_all(attributes, 64)`,
+		]
+	}
+
+	output {
+		metrics = [otelcol.processor.batch.ai_metrics.input]
+	}
 }
+
 otelcol.processor.batch "ai_metrics" {
-  send_batch_size = 128
-  timeout = "2s"
-  output { metrics = [otelcol.exporter.otlphttp.ai_metrics.input] }
+	send_batch_size = 128
+	timeout         = "2s"
+
+	output {
+		metrics = [otelcol.exporter.otlphttp.ai_metrics.input]
+	}
 }
+
 otelcol.exporter.otlphttp "ai_metrics" {
-  client {
-    endpoint = "http://prometheus:9090/api/v1/otlp"
-    timeout = "2s"
-  }
-  sending_queue {
-    enabled = true
-    queue_size = 32
-    num_consumers = 2
-    block_on_overflow = false
-  }
-  retry_on_failure {
-    enabled = true
-    max_elapsed_time = "30s"
-  }
+	client {
+		endpoint = "http://prometheus:9090/api/v1/otlp"
+		timeout  = "2s"
+	}
+
+	sending_queue {
+		enabled           = true
+		queue_size        = 32
+		num_consumers     = 2
+		block_on_overflow = false
+	}
+
+	retry_on_failure {
+		enabled          = true
+		max_elapsed_time = "30s"
+	}
 }
 
 // Pinned RustFS emits OTLP/HTTP metrics, not a native Prometheus scrape route.
 // Separate listener accepts no traces/logs. Never retain object paths or keys.
 otelcol.receiver.otlp "rustfs_metrics" {
-  http {
-    endpoint = "0.0.0.0:4320"
-    max_request_body_size = "2MiB"
-  }
-  output { metrics = [otelcol.processor.memory_limiter.rustfs_metrics.input] }
+	http {
+		endpoint              = "0.0.0.0:4320"
+		max_request_body_size = "2MiB"
+	}
+
+	output {
+		metrics = [otelcol.processor.memory_limiter.rustfs_metrics.input]
+	}
 }
+
 otelcol.processor.memory_limiter "rustfs_metrics" {
-  check_interval = "1s"
-  limit = "192MiB"
-  spike_limit = "48MiB"
-  output { metrics = [otelcol.processor.filter.rustfs_metrics.input] }
+	check_interval = "1s"
+	limit          = "192MiB"
+	spike_limit    = "48MiB"
+
+	output {
+		metrics = [otelcol.processor.filter.rustfs_metrics.input]
+	}
 }
+
 otelcol.processor.filter "rustfs_metrics" {
-  error_mode = "propagate"
-  metrics {
-    metric = [`not IsMatch(name, "^rustfs_(http_server_(requests_total|active_requests|request_duration_seconds|request_body_bytes_total|response_body_bytes_total)|io_(timeout_events_total|get_object_completed_total|get_object_concurrent_requests)|runtime_readiness_ready|start_total|cluster_capacity_(used_bytes|free_bytes|usable_total_bytes)|heal_mrf_queue_depth|scanner_(cycles_total|cycle_duration_seconds)|backpressure_rejections)$")`]
-  }
-  output { metrics = [otelcol.processor.transform.rustfs_metrics.input] }
+	error_mode = "propagate"
+
+	metrics {
+		metric = [`not IsMatch(name, "^rustfs_(http_server_(requests_total|active_requests|request_duration_seconds|request_body_bytes_total|response_body_bytes_total)|io_(timeout_events_total|get_object_completed_total|get_object_concurrent_requests)|runtime_readiness_ready|start_total|cluster_capacity_(used_bytes|free_bytes|usable_total_bytes)|heal_mrf_queue_depth|scanner_(cycles_total|cycle_duration_seconds)|backpressure_rejections)$")`]
+	}
+
+	output {
+		metrics = [otelcol.processor.transform.rustfs_metrics.input]
+	}
 }
+
 otelcol.processor.transform "rustfs_metrics" {
-  error_mode = "propagate"
-  metric_statements {
-    context = "resource"
-    statements = [
-      `keep_keys(attributes, [])`,
-      `set(attributes["service.name"], "rustfs")`,
-    ]
-  }
-  metric_statements {
-    context = "metric"
-    statements = [`aggregate_on_attributes("sum", ["operation", "method", "status", "status_code", "api", "http.request.method", "http.response.status_code"])`]
-  }
-  metric_statements {
-    context = "datapoint"
-    statements = [
-      `truncate_all(attributes, 64)`,
-      `set(attributes["provider"], "s3")`,
-      `set(attributes["scope"], "shared")`,
-    ]
-  }
-  output { metrics = [otelcol.processor.batch.rustfs_metrics.input] }
+	error_mode = "propagate"
+
+	metric_statements {
+		context    = "resource"
+		statements = [
+			`keep_keys(attributes, [])`,
+			`set(attributes["service.name"], "rustfs")`,
+		]
+	}
+
+	metric_statements {
+		context    = "metric"
+		statements = [`aggregate_on_attributes("sum", ["operation", "method", "status", "status_code", "api", "http.request.method", "http.response.status_code"])`]
+	}
+
+	metric_statements {
+		context    = "datapoint"
+		statements = [
+			`truncate_all(attributes, 64)`,
+			`set(attributes["provider"], "s3")`,
+			`set(attributes["scope"], "shared")`,
+		]
+	}
+
+	output {
+		metrics = [otelcol.processor.batch.rustfs_metrics.input]
+	}
 }
+
 otelcol.processor.batch "rustfs_metrics" {
-  send_batch_size = 128
-  timeout = "2s"
-  output { metrics = [otelcol.exporter.otlphttp.rustfs_metrics.input] }
+	send_batch_size = 128
+	timeout         = "2s"
+
+	output {
+		metrics = [otelcol.exporter.otlphttp.rustfs_metrics.input]
+	}
 }
+
 otelcol.exporter.otlphttp "rustfs_metrics" {
-  client {
-    endpoint = "http://prometheus:9090/api/v1/otlp"
-    timeout = "2s"
-  }
-  sending_queue {
-    enabled = true
-    queue_size = 16
-    num_consumers = 1
-    block_on_overflow = false
-  }
-  retry_on_failure {
-    enabled = true
-    max_elapsed_time = "15s"
-  }
+	client {
+		endpoint = "http://prometheus:9090/api/v1/otlp"
+		timeout  = "2s"
+	}
+
+	sending_queue {
+		enabled           = true
+		queue_size        = 16
+		num_consumers     = 1
+		block_on_overflow = false
+	}
+
+	retry_on_failure {
+		enabled          = true
+		max_elapsed_time = "15s"
+	}
 }

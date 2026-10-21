@@ -31,7 +31,7 @@ Project users read fixed API metric/trace views. Application metrics require
 opt-in instrumentation; tracing uses an authenticated Pod-local forwarder.
 See [trace setup](../../infrastructure/monitoring/TRACING.md),
 [AI telemetry](../../infrastructure/monitoring/AI.md), and
-[store performance](../../infrastructure/monitoring/README.md#phase-7-store-performance).
+[store performance](../../infrastructure/monitoring/CAPACITY-AND-STORES.md#phase-7-store-performance).
 Missing data requires checking collection health and freshness before interpreting
 it as zero activity. The known Tempo filesystem metric permission issue and
 unexecuted retention/outage/capacity checks are recorded in the AI evidence.
@@ -48,7 +48,7 @@ For protected component applications, successful `probe_kind=access-boundary`
 means verified routing/TLS with an expected login/denial response, not application
 readiness. Inspect `kube_pod_status_ready` and `ApplicationComponentNotReady`
 separately. There is no monitoring authentication bypass or implicit group grant.
-Use the [central log procedure](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
+Use the [central log procedure](../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#central-workload-logs-and-correlation)
 and authorized `GET /projects/{name}/retained-logs`; ordinary `/logs` stays
 kubelet-only. Investigate `up{job="alloy"}`, Alloy drop/write counters, collector
 logs and Loki storage before interpreting missing entries as absence of activity.

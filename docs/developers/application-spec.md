@@ -182,7 +182,7 @@ can use. Its metric names need an explicit mapping to this platform's supported
 Prometheus series. The injected OTLP endpoint currently accepts traces only.
 
 For LangChain4j and other AI instrumentation, the platform preserves a bounded
-[AI trace metadata contract](../../infrastructure/monitoring/README.md#workload-ai-traces):
+[AI trace metadata contract](../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#workload-ai-traces):
 operation, provider/model, token usage, numeric generation settings, finish reason,
 tool/error type and instrumentation identity. AI span names are normalized to
 `application.ai.<operation>`, with `application.ai.service` for recognized
@@ -234,7 +234,7 @@ the authentication boundary's expected denial/login response, not backend conten
 Kubernetes readiness is the independent semantic health signal. It never creates
 an anonymous health route or implicitly authorizes a monitoring identity.
 Applications may emit normal Quarkus/Spring JSON logs or the domain-neutral
-[operational log envelope](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
+[operational log envelope](../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#central-workload-logs-and-correlation)
 for seven-day configured central retention and authorized retained-log reads.
 No declaration field is required. JSON `message` and `level` are retained with
 optional logger/trace metadata; unknown fields are discarded and known credential

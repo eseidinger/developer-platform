@@ -1,13 +1,17 @@
-# Fixed aggregate SQL only. No query text, user, application_name or table labels.
+---
+# Fixed aggregate SQL only. No query text, user, application_name or table
+# labels.
 pg_platform_activity:
   query: |
     SELECT d.datname, s.state,
            count(a.pid) AS connections,
            count(a.pid) FILTER (WHERE a.wait_event_type = 'Lock') AS lock_waits,
-           coalesce(max(extract(epoch FROM clock_timestamp() - a.xact_start)), 0) AS max_transaction_seconds
+           coalesce(max(extract(epoch FROM clock_timestamp() - a.xact_start)),
+    0) AS max_transaction_seconds
     FROM pg_database d
     CROSS JOIN (VALUES ('active'), ('idle'), ('idle in transaction'),
-                       ('idle in transaction (aborted)'), ('fastpath function call'),
+                       ('idle in transaction (aborted)'),
+    ('fastpath function call'),
                        ('disabled')) s(state)
     LEFT JOIN pg_stat_activity a ON a.datid = d.oid AND a.state = s.state
          AND a.backend_type = 'client backend' AND a.pid <> pg_backend_pid()
@@ -22,21 +26,27 @@ pg_platform_activity:
         description: Fixed PostgreSQL backend state
     - connections:
         usage: GAUGE
-        description: Client connections by database and state, excluding this scrape
+        description: >-
+          Client connections by database and state, excluding this scrape
     - lock_waits:
         usage: GAUGE
-        description: Client connections waiting on a lock by database and state
+        description: >-
+          Client connections waiting on a lock by database and state
     - max_transaction_seconds:
         usage: GAUGE
         description: Age of the oldest open client transaction in this state
 pg_platform_settings:
-  query: SELECT current_setting('max_connections')::float AS max_connections
+  query: >-
+    SELECT current_setting('max_connections')::float AS max_connections
   metrics:
     - max_connections:
         usage: GAUGE
-        description: Shared server max_connections setting, including reserved capacity
+        description: >-
+          Shared server max_connections setting, including reserved capacity
 pg_platform_wal:
-  query: SELECT wal_records, wal_fpi, wal_bytes::float8 AS bytes, wal_buffers_full FROM pg_stat_wal
+  query: >-
+    SELECT wal_records, wal_fpi, wal_bytes::float8 AS bytes, wal_buffers_full
+    FROM pg_stat_wal
   metrics:
     - wal_records:
         usage: COUNTER
@@ -51,7 +61,9 @@ pg_platform_wal:
         usage: COUNTER
         description: WAL buffer full events
 pg_platform_checkpointer:
-  query: SELECT num_timed, num_requested, write_time/1000 AS write_seconds, sync_time/1000 AS sync_seconds, buffers_written FROM pg_stat_checkpointer
+  query: >-
+    SELECT num_timed, num_requested, write_time/1000 AS write_seconds,
+    sync_time/1000 AS sync_seconds, buffers_written FROM pg_stat_checkpointer
   metrics:
     - num_timed:
         usage: COUNTER

@@ -1,13 +1,19 @@
+---
 rule_files:
   - ../alerts.yaml
 evaluation_interval: 1m
 tests:
+
   - name: sustained logical quota warning and recovery
     interval: 1m
     input_series:
-      - series: 'platform_store_used_bytes{project="alpha",resource_id="fixture",provider="postgresql"}'
+      - series: >-
+          platform_store_used_bytes{project="alpha", resource_id="fixture",
+          provider="postgresql"}
         values: '950+0x5 500 500'
-      - series: 'platform_store_quota_bytes{project="alpha",resource_id="fixture",provider="postgresql"}'
+      - series: >-
+          platform_store_quota_bytes{project="alpha", resource_id="fixture",
+          provider="postgresql"}
         values: '1000+0x7'
     alert_rule_test:
       - eval_time: 4m
@@ -23,10 +29,14 @@ tests:
               severity: warning
             exp_annotations:
               summary: Named store fixture is near or above its approved quota
-              description: "Inspect hard-quota support and measurement freshness. PostgreSQL byte quotas are advisory; only an administrator may approve capacity growth."
+              description: >-
+                Inspect hard-quota support and measurement freshness. PostgreSQL
+                byte quotas are advisory; only an administrator may approve
+                capacity growth.
       - eval_time: 6m
         alertname: StoreQuotaWarning
         exp_alerts: []
+
   - name: missing controller is unavailable rather than idle
     interval: 1m
     input_series: []
@@ -37,4 +47,5 @@ tests:
           - exp_labels:
               severity: critical
             exp_annotations:
-              summary: Named-store controller or metrics publication is unavailable
+              summary: >-
+                Named-store controller or metrics publication is unavailable

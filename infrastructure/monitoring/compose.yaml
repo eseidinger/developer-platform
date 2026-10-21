@@ -1,4 +1,6 @@
+---
 services:
+  # Export only aggregate database statistics through a restricted login.
   postgres-exporter:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.20.1
     restart: unless-stopped
@@ -6,14 +8,31 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      DATA_SOURCE_URI: postgres:5432/platform?sslmode=disable&connect_timeout=3
+      DATA_SOURCE_URI: >-
+        postgres:5432/platform?sslmode=disable&connect_timeout=3
       DATA_SOURCE_USER: platform_monitor
       DATA_SOURCE_PASS_FILE: /run/secrets/postgres-monitor.password
       PG_EXPORTER_COLLECTION_TIMEOUT: 5s
     # No per-user, per-table, query-text, query-ID or replication-client labels.
-    command: ["--extend.query-path=/etc/postgres-exporter/queries.yaml", "--no-collector.roles", "--no-collector.settings", "--no-collector.stat_activity", "--no-collector.stat_user_tables", "--no-collector.statio_user_tables", "--no-collector.stat_statements", "--no-collector.replication", "--no-collector.replication_slots", "--no-collector.stat_replication", "--no-collector.stat_progress_vacuum", "--no-collector.stat_archiver", "--no-collector.stat_bgwriter", "--no-collector.wal", "--collector.postmaster"]
+    command:
+      - "--extend.query-path=/etc/postgres-exporter/queries.yaml"
+      - "--no-collector.roles"
+      - "--no-collector.settings"
+      - "--no-collector.stat_activity"
+      - "--no-collector.stat_user_tables"
+      - "--no-collector.statio_user_tables"
+      - "--no-collector.stat_statements"
+      - "--no-collector.replication"
+      - "--no-collector.replication_slots"
+      - "--no-collector.stat_replication"
+      - "--no-collector.stat_progress_vacuum"
+      - "--no-collector.stat_archiver"
+      - "--no-collector.stat_bgwriter"
+      - "--no-collector.wal"
+      - "--collector.postmaster"
     volumes:
-      - ../../.runtime/postgres-monitor.password:/run/secrets/postgres-monitor.password:ro
+      - "../../.runtime/postgres-monitor.password:/run/secrets/\
+        postgres-monitor.password:ro"
       - ./postgres-queries.yaml:/etc/postgres-exporter/queries.yaml:ro
     networks:
       platform:
@@ -23,10 +42,13 @@ services:
     security_opt: ["no-new-privileges:true"]
     mem_limit: 128m
     cpus: 0.25
+
+  # Public-route probes are separate from Kubernetes workload readiness.
   blackbox-exporter:
     image: prom/blackbox-exporter:v0.27.0
     restart: unless-stopped
-    command: ["--config.file=/etc/blackbox/blackbox.yaml"]
+    command:
+      - "--config.file=/etc/blackbox/blackbox.yaml"
     volumes:
       - ./blackbox.yaml:/etc/blackbox/blackbox.yaml:ro
     networks:
@@ -36,26 +58,38 @@ services:
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
     mem_limit: 128m
+
+  # The API initializes discovery-volume ownership before its readers start.
   prometheus:
     depends_on: [platform-api]
     image: prom/prometheus:v3.14.0
     restart: unless-stopped
-    command: ["--config.file=/etc/prometheus/prometheus.yml", "--web.enable-otlp-receiver", "--storage.tsdb.retention.time=7d", "--storage.tsdb.retention.size=4GB"]
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--web.enable-otlp-receiver"
+      - "--storage.tsdb.retention.time=7d"
+      - "--storage.tsdb.retention.size=4GB"
     volumes:
       - ./prometheus.yaml:/etc/prometheus/prometheus.yml:ro
       - ./alerts.yaml:/etc/prometheus/alerts.yml:ro
       - ./capacity-rules.yaml:/etc/prometheus/capacity-rules.yml:ro
-      - ../../.runtime/capacity-reader.token:/run/prometheus/capacity-reader.token:ro
-      - ../../.runtime/capacity-reader-ca.crt:/run/prometheus/capacity-reader-ca.crt:ro
+      - "../../.runtime/capacity-reader.token:/run/prometheus/\
+        capacity-reader.token:ro"
+      - "../../.runtime/capacity-reader-ca.crt:/run/prometheus/\
+        capacity-reader-ca.crt:ro"
       - prometheus:/prometheus
       - monitoring_discovery:/etc/prometheus/discovery:ro
-      - ../../.runtime/metrics-reader.token:/run/prometheus/metrics-reader.token:ro
-      - ../../.runtime/metrics-reader-ca.crt:/run/prometheus/metrics-reader-ca.crt:ro
-    ports: ["127.0.0.1:9090:9090"]
+      - "../../.runtime/metrics-reader.token:/run/prometheus/\
+        metrics-reader.token:ro"
+      - "../../.runtime/metrics-reader-ca.crt:/run/prometheus/\
+        metrics-reader-ca.crt:ro"
+    ports:
+      - "127.0.0.1:9090:9090"
     networks:
       platform:
         ipv4_address: ${PROMETHEUS_IP:-172.30.80.22}
     mem_limit: 512m
+
   grafana:
     image: grafana/grafana:13.2.2
     restart: unless-stopped
@@ -67,15 +101,22 @@ services:
       - ./datasources.yaml:/etc/grafana/provisioning/datasources/default.yaml:ro
       - ./dashboards.yaml:/etc/grafana/provisioning/dashboards/default.yaml:ro
       - ./dashboards:/var/lib/grafana/provisioned-dashboards:ro
-    ports: ["127.0.0.1:3000:3000"]
+    ports:
+      - "127.0.0.1:3000:3000"
     networks:
       platform:
         ipv4_address: ${GRAFANA_IP:-172.30.80.23}
     mem_limit: 512m
+
+  # Keep trace data on the bounded filesystem prepared during host setup.
   tempo:
-    image: grafana/tempo@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd
+    image:
+      "grafana/tempo@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc\
+        17ecb696db5fd"
     restart: unless-stopped
-    command: ["-target=all", "-config.file=/etc/tempo/tempo.yaml"]
+    command:
+      - "-target=all"
+      - "-config.file=/etc/tempo/tempo.yaml"
     volumes:
       - ./tempo.yaml:/etc/tempo/tempo.yaml:ro
       - /var/lib/developer-platform/tempo:/data/tempo
@@ -89,10 +130,12 @@ services:
     read_only: true
     cap_drop: [ALL]
     security_opt: ["no-new-privileges:true"]
+
   loki:
     image: grafana/loki:3.7.8
     restart: unless-stopped
-    command: ["-config.file=/etc/loki/config.yaml"]
+    command:
+      - "-config.file=/etc/loki/config.yaml"
     volumes:
       - ./loki.yaml:/etc/loki/config.yaml:ro
       - loki:/loki
@@ -100,13 +143,19 @@ services:
       platform:
         ipv4_address: ${LOKI_IP:-172.30.80.25}
     mem_limit: 384m
+
+  # Collect host/workload logs and filter private OTLP signals before export.
   alloy:
     image: grafana/alloy:v1.19.2
     restart: unless-stopped
     # UID 0 reads host Docker logs. The pinned image's state directory is
     # 473:473 mode 0770; match its group without restoring DAC capabilities.
     user: "0:473"
-    command: ["run", "--storage.path=/var/lib/alloy", "--server.http.listen-addr=0.0.0.0:12345", "/etc/alloy/config.alloy"]
+    command:
+      - "run"
+      - "--storage.path=/var/lib/alloy"
+      - "--server.http.listen-addr=0.0.0.0:12345"
+      - "/etc/alloy/config.alloy"
     volumes:
       - ./config.alloy:/etc/alloy/config.alloy:ro
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
@@ -126,14 +175,21 @@ services:
         - CMD
         - /usr/bin/bash
         - -ec
-        - 'exec 3<>/dev/tcp/127.0.0.1/12345; printf "GET /-/ready HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3; read -r -t 3 status <&3; [[ "$$status" == *" 200 "* ]]'
+        - >-
+          exec 3<>/dev/tcp/127.0.0.1/12345;
+          printf "GET /-/ready HTTP/1.0\r\nHost: localhost\r\n\r\n" >&3;
+          read -r -t 3 status <&3;
+          [[ "$$status" == *" 200 "* ]]
       interval: 10s
       timeout: 5s
       start_period: 20s
       retries: 3
+
   alertmanager:
     image: prom/alertmanager:v0.34.1
-    command: ["--config.file=/etc/alertmanager/alertmanager.yaml", "--storage.path=/alertmanager"]
+    command:
+      - "--config.file=/etc/alertmanager/alertmanager.yaml"
+      - "--storage.path=/alertmanager"
     restart: unless-stopped
     volumes:
       - ${ALERTMANAGER_CONFIG_DIR:-.}:/etc/alertmanager:ro
@@ -142,13 +198,20 @@ services:
       platform:
         ipv4_address: ${ALERTMANAGER_IP:-172.30.80.26}
     mem_limit: 128m
+
   node-exporter:
     depends_on: [platform-api]
     image: prom/node-exporter:v1.12.1
     restart: unless-stopped
     pid: host
-    command: ["--path.rootfs=/host", "--path.procfs=/host/proc", "--path.sysfs=/host/sys", "--collector.textfile.directory=/discovery"]
-    volumes: ["/:/host:ro", "monitoring_discovery:/discovery:ro"]
+    command:
+      - "--path.rootfs=/host"
+      - "--path.procfs=/host/proc"
+      - "--path.sysfs=/host/sys"
+      - "--collector.textfile.directory=/discovery"
+    volumes:
+      - "/:/host:ro"
+      - "monitoring_discovery:/discovery:ro"
     networks:
       platform:
         ipv4_address: ${NODE_EXPORTER_IP:-172.30.80.27}

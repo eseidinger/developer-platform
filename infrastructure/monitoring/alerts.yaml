@@ -1,3 +1,4 @@
+---
 groups:
   - name: infrastructure
     rules:
@@ -8,30 +9,47 @@ groups:
           severity: critical
         annotations:
           summary: "Monitoring target {{ $labels.job }} unavailable"
+
       - alert: HostDiskAlmostFull
-        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes < 0.1
+        expr: >-
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} /
+          node_filesystem_size_bytes < 0.1
         for: 10m
         labels:
           severity: warning
         annotations:
           summary: "Less than 10% free disk"
+
       - alert: WorkloadUnavailable
-        expr: kube_deployment_status_replicas_unavailable{namespace=~"project-.*"} > 0
+        expr: >-
+          kube_deployment_status_replicas_unavailable{namespace=~"project-.*"} >
+          0
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: "Project deployment has unavailable replicas"
+
   - name: applications
     rules:
       - alert: ApplicationComponentNotReady
-        expr: (kube_pod_status_ready{namespace=~"project-.*",condition="true"} == 0) * on(namespace,pod) group_left(label_platform_example_component,label_app_kubernetes_io_name) kube_pod_labels{namespace=~"project-.*"} unless on(namespace,pod) kube_pod_status_phase{phase=~"Succeeded|Failed"} == 1
+        expr: >-
+          (kube_pod_status_ready{namespace=~"project-.*", condition="true"} ==
+          0) * on(namespace, pod) group_left(label_platform_example_component,
+          label_app_kubernetes_io_name) kube_pod_labels{namespace=~"project-.*"}
+          unless on(namespace, pod)
+          kube_pod_status_phase{phase=~"Succeeded|Failed"} == 1
         for: 3m
         labels:
           severity: warning
         annotations:
-          summary: 'Application component {{ $labels.label_platform_example_component }} is not ready'
-          description: 'Kubernetes readiness is independent of the public authentication-boundary probe.'
+          summary: >-
+            Application component {{ $labels.label_platform_example_component }}
+            is not ready
+          description: >-
+            Kubernetes readiness is independent of the public
+            authentication-boundary probe.
+
       - alert: ApplicationUnavailable
         expr: probe_success{job="applications"} == 0
         for: 3m
@@ -39,115 +57,195 @@ groups:
           severity: warning
         annotations:
           summary: 'Application {{ $labels.application }} probe failed'
-          description: 'Probe {{ $labels.instance }} failed. Check DNS, TLS, ingress, status and expected content.'
+          description: >-
+            Probe {{ $labels.instance }} failed. Check DNS, TLS, ingress, status
+            and expected content.
+
       - alert: ApplicationProbeMissing
-        expr: up{job="applications"} == 1 unless on(job, instance, project, application, namespace) probe_success{job="applications"}
+        expr: >-
+          up{job="applications"} == 1 unless on(job, instance, project,
+          application, namespace) probe_success{job="applications"}
         for: 3m
         labels:
           severity: warning
         annotations:
-          summary: 'Application {{ $labels.application }} probe result missing'
+          summary: >-
+            Application {{ $labels.application }} probe result missing
+
       - alert: ApplicationDiscoveryStale
-        expr: (time() - platform_discovery_last_success_timestamp_seconds > 120) or absent(platform_discovery_last_success_timestamp_seconds) or (node_textfile_scrape_error{job="host"} == 1)
+        expr: >-
+          (time() - platform_discovery_last_success_timestamp_seconds > 120) or
+          absent(platform_discovery_last_success_timestamp_seconds) or
+          (node_textfile_scrape_error{job="host"} == 1)
         for: 3m
         labels:
           severity: warning
         annotations:
-          summary: 'Application monitoring discovery is stale or unavailable'
+          summary: >-
+            Application monitoring discovery is stale or unavailable
+
       - alert: TraceStorageHalfFull
-        expr: node_filesystem_size_bytes{mountpoint="/var/lib/developer-platform/tempo"} - node_filesystem_avail_bytes{mountpoint="/var/lib/developer-platform/tempo"} > 2147483648
+        expr: >-
+          node_filesystem_size_bytes{
+          mountpoint="/var/lib/developer-platform/tempo"} -
+          node_filesystem_avail_bytes{
+          mountpoint="/var/lib/developer-platform/tempo"} > 2147483648
         for: 5m
         labels:
           severity: warning
         annotations:
           summary: 'Trace filesystem is over 2 GiB used'
+
       - alert: TraceStorageMetricsMissing
-        expr: absent(node_filesystem_size_bytes{mountpoint="/var/lib/developer-platform/tempo"})
+        expr: >-
+          absent(node_filesystem_size_bytes{
+          mountpoint="/var/lib/developer-platform/tempo"})
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: 'Trace filesystem metrics are missing; check mount and node exporter'
+          summary: >-
+            Trace filesystem metrics are missing; check mount and node exporter
+
   - name: security-events
     rules:
       - alert: RepeatedAuthenticationFailures
-        expr: platform_security_events_in_window{category="authentication_failure"} >= 5
+        expr: >-
+          platform_security_events_in_window{category="authentication_failure"}
+          >= 5
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: 'Repeated authentication failures at {{ $labels.target_kind }} {{ $labels.target_id }}'
-          description: 'At least {{ $value }} invalid or missing bearer attempts in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+          summary: >-
+            Repeated authentication failures at {{ $labels.target_kind }} {{
+            $labels.target_id }}
+          description: >-
+            At least {{ $value }} invalid or missing bearer attempts in the
+            15-minute audit window. Investigate platform_audit.events by
+            category, resource labels, and alert start time;
+            platform_security_latest_event_id gives the newest supporting event
+            ID.
+
       - alert: RepeatedAccessDenials
-        expr: platform_security_events_in_window{category="access_denial"} >= 5
+        expr: >-
+          platform_security_events_in_window{category="access_denial"} >= 5
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: 'Repeated access denials for {{ $labels.target_kind }} {{ $labels.target_id }}'
-          description: 'At least {{ $value }} denied authorization attempts in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+          summary: >-
+            Repeated access denials for {{ $labels.target_kind }} {{
+            $labels.target_id }}
+          description: >-
+            At least {{ $value }} denied authorization attempts in the 15-minute
+            audit window. Investigate platform_audit.events by category,
+            resource labels, and alert start time;
+            platform_security_latest_event_id gives the newest supporting event
+            ID.
+
       - alert: PrivilegedChange
-        expr: platform_security_events_in_window{category="privileged_change"} > 0
+        expr: >-
+          platform_security_events_in_window{category="privileged_change"} > 0
         for: 0m
         labels:
           severity: info
         annotations:
-          summary: 'Privileged membership change affecting {{ $labels.target_kind }} {{ $labels.target_id }}'
-          description: 'A grant, revocation, or bootstrap was recorded in the 15-minute audit window. Investigate platform_audit.events by category, resource labels, and alert start time; platform_security_latest_event_id gives the newest supporting event ID.'
+          summary: >-
+            Privileged membership change affecting {{ $labels.target_kind }} {{
+            $labels.target_id }}
+          description: >-
+            A grant, revocation, or bootstrap was recorded in the 15-minute
+            audit window. Investigate platform_audit.events by category,
+            resource labels, and alert start time;
+            platform_security_latest_event_id gives the newest supporting event
+            ID.
+
       - alert: SecurityAuditCollectionStale
-        expr: (time() - platform_security_audit_collection_success > 120) or absent(platform_security_audit_collection_success)
+        expr: >-
+          (time() - platform_security_audit_collection_success > 120) or
+          absent(platform_security_audit_collection_success)
         for: 3m
         labels:
           severity: critical
         annotations:
-          summary: 'Security audit metric collection is stale or unavailable'
+          summary: >-
+            Security audit metric collection is stale or unavailable
+
       - alert: AlertmanagerNotificationFailed
-        expr: increase(alertmanager_notifications_failed_total[10m]) > 0
+        expr: >-
+          increase(alertmanager_notifications_failed_total[10m]) > 0
         for: 0m
         labels:
           severity: critical
         annotations:
           summary: 'Alertmanager notification delivery has failed'
-          description: 'Inspect Alertmanager logs and alertmanager_notifications_failed_total; this alert can be affected by the same broken destination.'
+          description: >-
+            Inspect Alertmanager logs and
+            alertmanager_notifications_failed_total; this alert can be affected
+            by the same broken destination.
+
   - name: named-stores
     rules:
       - alert: StoreQuotaWarning
-        expr: platform_store_used_bytes / platform_store_quota_bytes >= 0.9
+        expr: >-
+          platform_store_used_bytes / platform_store_quota_bytes >= 0.9
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Named store {{ $labels.resource_id }} is near or above its approved quota"
-          description: "Inspect hard-quota support and measurement freshness. PostgreSQL byte quotas are advisory; only an administrator may approve capacity growth."
+          summary: >-
+            Named store {{ $labels.resource_id }} is near or above its approved
+            quota
+          description: >-
+            Inspect hard-quota support and measurement freshness. PostgreSQL
+            byte quotas are advisory; only an administrator may approve capacity
+            growth.
+
       - alert: StoreUsageUnavailable
-        expr: (time() - platform_store_usage_measured_timestamp_seconds > 300) or (platform_store_usage_error == 1)
+        expr: >-
+          (time() - platform_store_usage_measured_timestamp_seconds > 300) or
+          (platform_store_usage_error == 1)
         for: 3m
         labels:
           severity: warning
         annotations:
-          summary: "Named store {{ $labels.resource_id }} usage is unknown or stale"
+          summary: >-
+            Named store {{ $labels.resource_id }} usage is unknown or stale
+
       - alert: StoreAccessCleanupPending
         expr: platform_store_credentials_cleanup_pending > 0
         for: 2m
         labels:
           severity: warning
         annotations:
-          summary: "Named store {{ $labels.resource_id }} provider credential cleanup is delayed"
-          description: "The private relay fails closed independently; inspect provider health and retries."
+          summary: >-
+            Named store {{ $labels.resource_id }} provider credential cleanup is
+            delayed
+          description: >-
+            The private relay fails closed independently; inspect provider
+            health and retries.
+
       - alert: StoreReconciliationPending
         expr: platform_store_reconcile_pending > 0
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Named store {{ $labels.resource_id }} has not reached its requested state"
+          summary: >-
+            Named store {{ $labels.resource_id }} has not reached its requested
+            state
+
       - alert: StoreControllerStale
-        expr: (time() - platform_store_worker_last_success_timestamp_seconds > 90) or absent(platform_store_worker_last_success_timestamp_seconds)
+        expr: >-
+          (time() - platform_store_worker_last_success_timestamp_seconds > 90)
+          or absent(platform_store_worker_last_success_timestamp_seconds)
         for: 3m
         labels:
           severity: critical
         annotations:
-          summary: "Named-store controller or metrics publication is unavailable"
+          summary: >-
+            Named-store controller or metrics publication is unavailable
 
       - alert: StoreRecoveryRequired
         expr: platform_store_recovery_required == 1
@@ -156,49 +254,71 @@ groups:
           severity: warning
         annotations:
           summary: "Restored named stores remain quarantined"
-          description: "Review latest verified purge intents, source rebuilds and credential cleanup before enabling fresh grants."
+          description: >-
+            Review latest verified purge intents, source rebuilds and credential
+            cleanup before enabling fresh grants.
+
   - name: native-store-performance
     rules:
       - alert: NativeStoreCollectorStale
-        expr: (time() - platform_native_collector_timestamp_seconds > 120) or absent(platform_native_collector_timestamp_seconds)
+        expr: >-
+          (time() - platform_native_collector_timestamp_seconds > 120) or
+          absent(platform_native_collector_timestamp_seconds)
         for: 3m
         labels:
           severity: warning
         annotations:
           summary: Native store metrics collector is stale or unavailable
+
       - alert: NativeStoreCollectionUnavailable
         expr: platform_native_collection_up == 0
         for: 3m
         labels:
           severity: warning
         annotations:
-          summary: 'Native {{ $labels.provider }} statistics collection failed'
-          description: Retained values may be stale. Inspect private collector configuration, permissions and provider readiness.
+          summary: >-
+            Native {{ $labels.provider }} statistics collection failed
+          description: >-
+            Retained values may be stale. Inspect private collector
+            configuration, permissions and provider readiness.
+
       - alert: RustFSTelemetryUnavailable
-        expr: (platform_native_selected{provider="s3"} == 1) unless on(provider) (rustfs_runtime_readiness_ready{provider="s3"} == 1)
+        expr: >-
+          (platform_native_selected{provider="s3"} == 1) unless on(provider)
+          (rustfs_runtime_readiness_ready{provider="s3"} == 1)
         for: 3m
         labels:
           severity: warning
         annotations:
-          summary: Selected RustFS has no healthy native telemetry observation
+          summary: >-
+            Selected RustFS has no healthy native telemetry observation
+
       - alert: StoreContainerMemoryPressure
-        expr: platform_native_container_memory_bytes / (platform_native_container_memory_limit_bytes > 0) > 0.9
+        expr: >-
+          platform_native_container_memory_bytes /
+          (platform_native_container_memory_limit_bytes > 0) > 0.9
         for: 5m
         labels:
           severity: warning
         annotations:
-          summary: 'Store {{ $labels.provider }} container memory is near its limit'
+          summary: >-
+            Store {{ $labels.provider }} container memory is near its limit
+
       - alert: OpenSearchThreadPoolRejected
-        expr: rate(platform_native_opensearch_thread_pool_rejected_total[5m]) > 0
+        expr: >-
+          rate(platform_native_opensearch_thread_pool_rejected_total[5m]) > 0
         for: 2m
         labels:
           severity: warning
         annotations:
           summary: 'OpenSearch {{ $labels.pool }} work is being rejected'
+
       - alert: OpenSearchCircuitBreakerTripped
-        expr: increase(platform_native_opensearch_breaker_tripped_total[5m]) > 0
+        expr: >-
+          increase(platform_native_opensearch_breaker_tripped_total[5m]) > 0
         for: 1m
         labels:
           severity: warning
         annotations:
-          summary: 'OpenSearch {{ $labels.breaker }} memory circuit breaker tripped'
+          summary: >-
+            OpenSearch {{ $labels.breaker }} memory circuit breaker tripped

@@ -86,7 +86,7 @@ Community JVM/relay metrics have source/local evidence. The application collecto
 and real DuckDB profiling example provide workload histograms/numeric fields;
 external application instrumentation and deployed collection remain open.
 Private collector roles, missing/stale-data handling, alerts and real Prometheus
-query validation are implemented. See the [monitoring guide](../../../../infrastructure/monitoring/README.md#phase-7-store-performance).
+query validation are implemented. See the [monitoring guide](../../../../infrastructure/monitoring/CAPACITY-AND-STORES.md#phase-7-store-performance).
 
 | Dashboard / package | Required panels | Metrics source and implementation constraints |
 |---|---|---|

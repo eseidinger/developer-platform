@@ -17,3 +17,11 @@ pytest-cov
 ansible-core>=2.16,<2.22
 yamllint
 ansible-lint
+
+# Shell script linting (provides the ShellCheck binary).
+shellcheck-py
+
+# Markdown linting and formatting, including GitHub tables and task lists.
+pymarkdownlnt
+mdformat
+mdformat-gfm

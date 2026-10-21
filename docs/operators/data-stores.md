@@ -619,7 +619,7 @@ NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify/stor
 The browser fixture additionally needs the portal's installed Playwright Chromium.
 It verifies native access and schemas, independent admission, held-session fencing,
 empty-volume recovery, network isolation, official Browser login and resource purge.
-The [performance monitoring guide](../../infrastructure/monitoring/README.md#phase-7-store-performance)
+The [performance monitoring guide](../../infrastructure/monitoring/CAPACITY-AND-STORES.md#phase-7-store-performance)
 links all eight dashboards, native pipeline verification and workload instrumentation.
 
 

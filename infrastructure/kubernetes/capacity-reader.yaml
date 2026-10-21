@@ -1,3 +1,6 @@
+---
+# Prometheus uses this separate account for node discovery and kubelet metrics.
+# Keep it independent of the provisioner and workload metrics credentials.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

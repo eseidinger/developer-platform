@@ -1,16 +1,19 @@
 {
 	email {$TLS_EMAIL}
+
+	# Issue certificates only for hosts approved by the platform API.
 	on_demand_tls {
 		ask http://platform-api:8000/internal/tls
 	}
 }
+
+# Keep the PostgreSQL console under its configured application prefix.
 {$PLATFORM_DOMAIN} {
 	redir /store-console/postgresql /store-console/postgresql/ 308
 	handle_path /store-console/postgresql/* {
 		reverse_proxy postgres-console:8080 {
 			header_up X-Script-Name /store-console/postgresql
 			header_up X-Scheme {scheme}
-			header_up X-Forwarded-Host {host}
 			header_up X-Forwarded-Prefix /store-console/postgresql
 		}
 	}
@@ -18,9 +21,13 @@
 		reverse_proxy platform-api:8000
 	}
 }
+
+# Send identity traffic directly to the private identity service.
 {$IDENTITY_DOMAIN} {
 	reverse_proxy keycloak:8080
 }
+
+# Local application domains use HTTP; other domains redirect to HTTPS.
 http://*.{$APPS_DOMAIN} {
 	@local host *.apps.localhost
 	handle @local {
@@ -30,6 +37,9 @@ http://*.{$APPS_DOMAIN} {
 		redir https://{host}{uri} permanent
 	}
 }
+
+# Native store consoles use reserved hostnames and are routed through the API.
+# Other application hosts use the workload cluster's ingress controller.
 https:// {
 	tls {
 		on_demand

@@ -76,7 +76,7 @@ JSON messages and operational envelopes are centrally retained; unknown JSON
 fields are discarded and plain-text logs remain kubelet-only. Known credential
 patterns receive best-effort redaction. Applications must keep secrets out of
 messages and supply appropriately classified opaque correlation identifiers.
-See the [implemented formats and limits](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation).
+See the [implemented formats and limits](../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#central-workload-logs-and-correlation).
 
 ## Status and operational evidence
 

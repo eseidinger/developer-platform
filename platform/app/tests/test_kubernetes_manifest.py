@@ -1,10 +1,11 @@
-import re
 import unittest
 from pathlib import Path
 
+import yaml
 
-CONTROLLER_MANIFEST = (Path(__file__).resolve().parents[3]
-                       / "infrastructure/kubernetes/controller.yaml")
+CONTROLLER_MANIFEST = (
+    Path(__file__).resolve().parents[3] / "infrastructure/kubernetes/controller.yaml"
+)
 
 
 class ProvisionerRbacManifestTests(unittest.TestCase):
@@ -18,22 +19,35 @@ class ProvisionerRbacManifestTests(unittest.TestCase):
         self.assertNotIn("resources: [pods/exec]", manifest)
 
     def test_reconciliation_delete_permissions_cover_obsolete_workload_kinds(self):
-        for resource in ("services", "deployments", "cronjobs", "networkpolicies", "ingresses"):
+        for resource in (
+            "services",
+            "deployments",
+            "cronjobs",
+            "networkpolicies",
+            "ingresses",
+        ):
             with self.subTest(resource=resource):
-                self.assertRegex(CONTROLLER_MANIFEST.read_text(),
-                                 r"resources: \[[^\]]*" + resource + r"[^\]]*\]\s+verbs: \[[^\]]*delete")
+                self.assertRegex(
+                    CONTROLLER_MANIFEST.read_text(),
+                    r"resources: \[[^\]]*"
+                    + resource
+                    + r"[^\]]*\]\s+verbs: \[[^\]]*delete",
+                )
 
     def test_capacity_metrics_access_is_limited_to_pods_and_nodes(self):
         """The capacity API needs NodeMetrics without granting wildcard metrics access."""
-        manifest = CONTROLLER_MANIFEST.read_text()
-        match = re.search(
-            r"- apiGroups: \[metrics\.k8s\.io\]\s+"
-            r"#.*\s+resources: \[([^]]+)\]\s+verbs: \[([^]]+)\]",
-            manifest,
+        # Check permissions independently of YAML layout and comment wrapping.
+        role = next(
+            document
+            for document in yaml.safe_load_all(CONTROLLER_MANIFEST.read_text())
+            if document["kind"] == "ClusterRole"
         )
-        self.assertIsNotNone(match)
-        self.assertEqual({item.strip() for item in match.group(1).split(",")}, {"pods", "nodes"})
-        self.assertEqual({item.strip() for item in match.group(2).split(",")}, {"get", "list"})
+        rules = [
+            rule for rule in role["rules"] if "metrics.k8s.io" in rule["apiGroups"]
+        ]
+        self.assertEqual(len(rules), 1)
+        self.assertEqual(set(rules[0]["resources"]), {"pods", "nodes"})
+        self.assertEqual(set(rules[0]["verbs"]), {"get", "list"})
 
     def test_capacity_admission_can_read_core_node_allocatable_values(self):
         """Request admission reads status.allocatable from core Node objects."""
@@ -41,16 +55,22 @@ class ProvisionerRbacManifestTests(unittest.TestCase):
         self.assertRegex(
             manifest,
             r'- apiGroups: \[""\]\s+'
-            r'resources: \[nodes\]\s+verbs: \[get, list\]',
+            r"resources: \[nodes\]\s+verbs: \[get, list\]",
         )
 
     def test_traced_metrics_workloads_can_be_reconciled(self):
         manifest = CONTROLLER_MANIFEST.read_text()
-        self.assertRegex(manifest, r'resources: \[serviceaccounts\]\s+'
-                         r'verbs: \[create, patch, delete\]')
-        self.assertRegex(manifest, r'resources: \[services/proxy\]\s+verbs: \[get\]')
-        self.assertRegex(manifest, r'resources: \[roles, rolebindings\]\s+'
-                         r'verbs: \[create, patch, delete\]')
+        self.assertRegex(
+            manifest,
+            r"resources: \[serviceaccounts\]\s+"
+            r"verbs: \[create, patch, delete\]",
+        )
+        self.assertRegex(manifest, r"resources: \[services/proxy\]\s+verbs: \[get\]")
+        self.assertRegex(
+            manifest,
+            r"resources: \[roles, rolebindings\]\s+"
+            r"verbs: \[create, patch, delete\]",
+        )
 
 
 if __name__ == "__main__":

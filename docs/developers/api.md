@@ -67,7 +67,7 @@ operational event or a bounded application message with severity and optional
 logger/trace/span/correlation identifiers.
 `retention.source=loki`, `seconds=604800` and `state=configured` describe
 configuration, not a certified retention drill. Supported JSON log formats and the
-[operational envelope](../../infrastructure/monitoring/README.md#central-workload-logs-and-correlation)
+[operational envelope](../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#central-workload-logs-and-correlation)
 are centralized; plain-text logs remain kubelet best effort. `retention.format` is
 `application-json-v1`; legacy operational event records keep their original shape.
 `GET /v1/capabilities` advertises these supported contracts in `observability`;

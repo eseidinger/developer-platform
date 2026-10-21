@@ -1,7 +1,9 @@
+---
 rule_files:
   - ../alerts.yaml
 evaluation_interval: 1m
 tests:
+
   - name: native collector missing is not success
     interval: 1m
     input_series: []
@@ -12,6 +14,7 @@ tests:
           - exp_labels: {severity: warning}
             exp_annotations:
               summary: Native store metrics collector is stale or unavailable
+
   - name: disabled RustFS does not require telemetry
     interval: 1m
     input_series:
@@ -21,6 +24,7 @@ tests:
       - eval_time: 5m
         alertname: RustFSTelemetryUnavailable
         exp_alerts: []
+
   - name: collector failure fires and resolves
     interval: 1m
     input_series:
@@ -33,7 +37,9 @@ tests:
           - exp_labels: {severity: warning, provider: qdrant}
             exp_annotations:
               summary: Native qdrant statistics collection failed
-              description: Retained values may be stale. Inspect private collector configuration, permissions and provider readiness.
+              description: >-
+                Retained values may be stale. Inspect private collector
+                configuration, permissions and provider readiness.
       - eval_time: 5m
         alertname: NativeStoreCollectionUnavailable
         exp_alerts: []

@@ -1,3 +1,4 @@
+---
 route:
   receiver: local-only
   group_by: [alertname, job, category, target_kind, target_id, project]

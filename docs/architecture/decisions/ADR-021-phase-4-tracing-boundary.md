@@ -106,7 +106,7 @@ raw URLs. Use route templates only when they are platform-derived and bounded;
 otherwise omit paths. The gateway and Alloy both enforce the allowlist.
 
 Workload AI spans retain the bounded metadata defined in the
-[AI trace contract](../../../infrastructure/monitoring/README.md#workload-ai-traces).
+[AI trace contract](../../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#workload-ai-traces).
 Normalize operation names to `application.ai.<operation>` and LangChain4j service
 wrappers to `application.ai.service`; do not retain arbitrary original method or
 span names. Library identifiers and versions are workload-reported metadata, not

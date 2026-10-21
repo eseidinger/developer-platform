@@ -1,3 +1,6 @@
+---
+# Project-scoped service-proxy permissions are granted by the provisioner.
+# This manifest creates only the shared account and its external token.
 apiVersion: v1
 kind: ServiceAccount
 metadata:

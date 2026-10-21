@@ -1,3 +1,4 @@
+---
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -9,7 +10,8 @@ metadata:
   name: provisioner
   namespace: platform-system
 ---
-# The controller is a trusted infrastructure administrator, never a tenant account.
+# The controller is a trusted infrastructure administrator, never a tenant
+# account.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
@@ -21,22 +23,26 @@ rules:
   - apiGroups: [""]
     resources: [services, secrets]
     verbs: [delete]
-  # Server-side apply needs create for a new object and patch for later revisions.
+  # Server-side apply needs create for a new object and patch for later
+  # revisions.
   - apiGroups: [""]
     resources: [serviceaccounts]
     verbs: [create, patch, delete]
-  # The provisioner must hold the permission it delegates to each project's metrics-reader Role.
+  # The provisioner must hold the permission it delegates to each project's
+  # metrics-reader Role.
   - apiGroups: [""]
     resources: [services/proxy]
     verbs: [get]
-  # RBAC cannot scope delete by name; the admission policy below limits it to managed project namespaces.
+  # RBAC cannot scope delete by name; the admission policy below limits it to
+  # managed project namespaces.
   - apiGroups: [""]
     resources: [namespaces]
     verbs: [delete]
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list]
-  # Aggregate request admission needs allocatable capacity from core Node objects.
+  # Aggregate request admission needs allocatable capacity from core Node
+  # objects.
   - apiGroups: [""]
     resources: [nodes]
     verbs: [get, list]
@@ -44,7 +50,8 @@ rules:
     resources: [pods/log]
     verbs: [get]
   - apiGroups: [metrics.k8s.io]
-    # Pod metrics support project usage; node metrics support the platform-admin capacity view.
+    # Pod metrics support project usage; node metrics support the platform-admin
+    # capacity view.
     resources: [pods, nodes]
     verbs: [get, list]
   - apiGroups: [apps]
@@ -79,7 +86,8 @@ subjects:
     name: provisioner
     namespace: platform-system
 ---
-# The provisioner may delete only platform-created project namespaces (retirement).
+# The provisioner may delete only platform-created project namespaces
+# (retirement).
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
@@ -94,12 +102,14 @@ spec:
         resources: ["namespaces"]
   validations:
     - expression: >-
-        request.userInfo.username != 'system:serviceaccount:platform-system:provisioner' ||
+        request.userInfo.username !=
+        'system:serviceaccount:platform-system:provisioner' ||
         (oldObject.metadata.name.startsWith('project-') &&
-        has(oldObject.metadata.labels) &&
-        'platform.example/managed' in oldObject.metadata.labels &&
+        has(oldObject.metadata.labels) && 'platform.example/managed' in
+        oldObject.metadata.labels &&
         oldObject.metadata.labels['platform.example/managed'] == 'true')
-      message: The provisioner may only delete managed project-* namespaces.
+      message: >-
+        The provisioner may only delete managed project-* namespaces.
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
@@ -109,7 +119,8 @@ spec:
   policyName: provisioner-namespace-delete
   validationActions: [Deny]
 ---
-# External controller credential; revoke by deleting this secret and re-bootstrap.
+# External controller credential; revoke by deleting this secret and
+# re-bootstrap.
 apiVersion: v1
 kind: Secret
 metadata:
