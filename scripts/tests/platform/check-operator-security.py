@@ -1,27 +1,38 @@
 #!/usr/bin/env python3
-"""Non-mutating Phase 1B operator-inspection and audit-export smoke check.
+"""Non-mutating operator-inspection and audit-export smoke check.
 
-Set PLATFORM_ADMIN_TOKEN and PHASE1B_PROJECT in a trusted shell. Optionally set
+Set PLATFORM_ADMIN_TOKEN and PLATFORM_TEST_PROJECT in a trusted shell. Optionally set
 DEVELOPER_TOKEN to prove that a non-operator cannot read the operator surfaces.
 No token, response body, actor identifier, or audit detail is printed.
 """
+
 import json
 import os
 import sys
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-
 API = os.environ.get("PLATFORM_API", "http://127.0.0.1:8000")
-SENSITIVE = ("password", "secret", "token", "authorization", "credential", "cookie", "key")
+SENSITIVE = (
+    "password",
+    "secret",
+    "token",
+    "authorization",
+    "credential",
+    "cookie",
+    "key",
+)
 REDACTED = "[REDACTED]"
 
 
 def request(path, token):
     try:
-        with urlopen(Request(API + path, headers={"Authorization": "Bearer " + token}), timeout=15) as response:
+        with urlopen(
+            Request(API + path, headers={"Authorization": "Bearer " + token}),
+            timeout=15,
+        ) as response:
             return response.status, response.read()
     except HTTPError as error:
         return error.code, error.read()
@@ -42,17 +53,30 @@ def assert_redacted(value, key=""):
 
 def main():
     admin_token = os.environ.get("PLATFORM_ADMIN_TOKEN")
-    project = os.environ.get("PHASE1B_PROJECT")
+    project = os.environ.get("PLATFORM_TEST_PROJECT")
     if not admin_token or not project:
-        raise SystemExit("Set PLATFORM_ADMIN_TOKEN and PHASE1B_PROJECT; do not pass tokens as command arguments.")
-    start = datetime.now(timezone.utc) - timedelta(minutes=20)
-    end = datetime.now(timezone.utc)
+        raise SystemExit(
+            "Set PLATFORM_ADMIN_TOKEN and PLATFORM_TEST_PROJECT; do not pass tokens as command arguments."
+        )
+    start = datetime.now(UTC) - timedelta(minutes=20)
+    end = datetime.now(UTC)
     checks = [
         ("permissions", f"/operator/projects/{project}/permissions"),
-        ("security configuration", f"/operator/projects/{project}/security-configuration"),
-        ("audit export", "/operator/audit/events?" + urlencode({
-            "start": start.isoformat(), "end": end.isoformat(), "limit": 1000,
-        })),
+        (
+            "security configuration",
+            f"/operator/projects/{project}/security-configuration",
+        ),
+        (
+            "audit export",
+            "/operator/audit/events?"
+            + urlencode(
+                {
+                    "start": start.isoformat(),
+                    "end": end.isoformat(),
+                    "limit": 1000,
+                }
+            ),
+        ),
     ]
     for label, path in checks:
         status, body = request(path, admin_token)
@@ -70,7 +94,9 @@ def main():
     if developer_token:
         for label, path in checks:
             status, _ = request(path, developer_token)
-            assert status == 403, f"developer {label} returned HTTP {status}, expected 403"
+            assert status == 403, (
+                f"developer {label} returned HTTP {status}, expected 403"
+            )
         print("PASS developer operator-surface denial")
     else:
         print("SKIP developer operator-surface denial (DEVELOPER_TOKEN is unset)")

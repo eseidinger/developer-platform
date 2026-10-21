@@ -33,6 +33,17 @@ jobs:
         run: >-
           uv run --project platform/app python scripts/tests/platform/check-hosted-access.py plan --run-id 0123456789ab
           --fixture-image ghcr.io/example/fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+      - name: Verify real AI approval SQL and history pagination
+        env:
+          AI_FIXTURE_TEST_DSN: >-
+            host=127.0.0.1 port=5432 user=postgres dbname=postgres
+        run: >-
+          uv run --project platform/app python
+          scripts/tests/components/ai/verify-ai-sql.py
+      - name: Verify real database driver diagnostics without network access
+        run: >-
+          uv run --project platform/app --with sqlalchemy==2.0.46 python
+          scripts/tests/components/ai/verify-ai-database-diagnostics.py
       - name: Build neutral acceptance fixture
         run: docker build -f platform/acceptance/Dockerfile.fixture -t acceptance-fixture:test platform/acceptance
       - name: Start isolated identity provider

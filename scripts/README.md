@@ -33,9 +33,11 @@ verification, acceptance test, or drill:
 | `tests/platform/`   | A configured, running platform.                  |
 | `tests/support/`    | Shared test helpers; not operator entry points.  |
 
-Component checks are grouped by `stores`, `observability`, `ai`, and
-`applications`. They may start disposable Docker services, need a test database,
-or call an explicitly configured model provider. Platform tests can change or
+Component checks are grouped by `stores`, `observability`, and `ai`. They may
+start disposable Docker services or need a test database. The AI corpus
+evaluation is an explicitly invoked benchmark that calls the configured model;
+it is not part of the routine regression suite. Cross-store bound application
+checks live under `tests/platform/`. Platform tests can change or
 retire resources; the interruption and outage drills also affect shared
 services. Read the specific script and the
 [acceptance guide](../docs/operators/validation/acceptance.md) before execution.

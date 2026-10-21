@@ -49,11 +49,15 @@ docker compose ps
 curl --fail-with-body http://127.0.0.1:8000/healthz
 curl --fail-with-body http://127.0.0.1:8000/readyz
 kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
-# Obtain and export a short-lived administrator PLATFORM_ACCESS_TOKEN first.
-python3 scripts/tests/platform/smoke.py
+# Set SMOKE_FIXTURE_IMAGE to a digest-pinned http-echo image first.
+uv run --project platform/app python scripts/tests/platform/smoke.py plan \
+  --run-id 0123456789ab --fixture-image "$SMOKE_FIXTURE_IMAGE"
 ```
 
-The smoke test retains its project. `/healthz` proves only API process health
+The smoke plan is offline. For the explicit live command and credentials, see
+the [script test guide](../../scripts/tests/README.md). Live runs create a unique
+project and retire it afterward, retaining SQL data. `/healthz` proves only API
+process health
 and `/readyz` checks PostgreSQL plus Kubernetes connectivity; neither proves
 every workload. Use [platform acceptance](validation/acceptance.md) for the
 broader suite and [lifecycle](lifecycle.md) for stop, restart, recreation, and

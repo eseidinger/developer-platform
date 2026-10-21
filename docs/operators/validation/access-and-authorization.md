@@ -961,9 +961,9 @@ already obtained above:
 
 ```bash
 export PLATFORM_ADMIN_TOKEN="$ADMIN_TOKEN"
-export PHASE1B_PROJECT="$A"
+export PLATFORM_TEST_PROJECT="$A"
 export DEVELOPER_TOKEN='…' # optional; enables the 403 assertions
-.venv/bin/python scripts/tests/platform/check-phase-1b-security.py
+.venv/bin/python scripts/tests/platform/check-operator-security.py
 ```
 
 The API allows only platform administrators to use `/operator/*`. The inspection

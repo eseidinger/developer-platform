@@ -14,6 +14,7 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --locked
       - run: uv pip install --system 'ansible-core>=2.16,<2.22'
+      - run: python3 -m unittest discover -s scripts/tests/unit -v
       - run: python3 -m unittest discover -s ansible/tests/unit -v
       - run: python3 -m unittest discover -s operations/backup/tests -v
       - run: python3 -m unittest discover -s operations/heartbeat/tests -v
@@ -34,11 +35,12 @@ jobs:
       - run: bash -n scripts/up.sh scripts/down.sh
       - name: Validate platform Ansible playbooks
         run: |
-          for playbook in ansible/*.yml; do
-            case "$playbook" in
-              *inventory*|*vars*) continue ;;
-            esac
-            ansible-playbook -i ansible/inventory.example.yml "$playbook" --syntax-check
+          for playbook in \
+            ansible/deploy.yml \
+            ansible/operations/*.yml \
+            ansible/tests/platform/*.yml; do
+            ansible-playbook -i ansible/inventory.example.yml \
+              "$playbook" --syntax-check
           done
       - run: php operations/watchdog/tests/watchdog.php
       - run: php operations/watchdog/tests/backup.php

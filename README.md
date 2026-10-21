@@ -50,12 +50,16 @@ docker compose up -d postgres keycloak-db-init keycloak proxy
 # Create the initial Keycloak user and put its immutable ID in
 # PLATFORM_BOOTSTRAP_SUBJECT in .env before starting the API.
 bash scripts/up.sh
-# Obtain and export a short-lived administrator PLATFORM_ACCESS_TOKEN first.
-python3 scripts/tests/platform/smoke.py
+# Set SMOKE_FIXTURE_IMAGE to a digest-pinned http-echo image first.
+uv run --project platform/app python scripts/tests/platform/smoke.py plan \
+  --run-id 0123456789ab --fixture-image "$SMOKE_FIXTURE_IMAGE"
 ```
 
 `init.py` creates a private `.env` without replacing existing values. The smoke
-test intentionally retains its `smoke` project. The Python API and CLI packages
+plan is offline. A live run uses a unique project and retires it afterward;
+SQL data remains retained. See the [test guide](scripts/tests/README.md)
+for execution.
+The Python API and CLI packages
 require Python 3.12 or newer when run outside their containers. AI runs additionally
 require configured provider credentials, processing eligibility, and project
 classification. For prerequisites, identity
