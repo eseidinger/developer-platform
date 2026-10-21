@@ -15,9 +15,9 @@ immutable digest. On the platform host, with a protected `0600` JSON operator
 session (`access_token`, `refresh_token`, `client_id`), run:
 
 ```bash
-python3 scripts/data_preservation.py plan --run-id 0123456789ab \
+python3 scripts/acceptance/data_preservation.py plan --run-id 0123456789ab \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST
-python3 scripts/data_preservation.py run --run-id 0123456789ab \
+python3 scripts/acceptance/data_preservation.py run --run-id 0123456789ab \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
   --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
   --operator-token-file /path/to/protected-operator-session.json
@@ -37,9 +37,9 @@ For named-store and network isolation, use a different fresh run ID with the
 same fixture image and protected operator session:
 
 ```bash
-python3 scripts/isolation.py plan --run-id fedcba987654 \
+python3 scripts/acceptance/isolation.py plan --run-id fedcba987654 \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST
-python3 scripts/isolation.py run --run-id fedcba987654 \
+python3 scripts/acceptance/isolation.py run --run-id fedcba987654 \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
   --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
   --operator-token-file /path/to/protected-operator-session.json
@@ -61,9 +61,9 @@ running Platform API and the protected `.env`; otherwise the paused Kubernetes
 API can prevent the new revision from being queued. Check the offline plan first:
 
 ```bash
-python3 scripts/interrupted_provisioning.py plan --run-id 123456abcdef \
+python3 scripts/acceptance/interrupted_provisioning.py plan --run-id 123456abcdef \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST
-python3 scripts/interrupted_provisioning.py run --run-id 123456abcdef \
+python3 scripts/acceptance/interrupted_provisioning.py run --run-id 123456abcdef \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
   --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
   --confirm-outage pause-k3d-workloads-server-0-and-kill-platform-api \

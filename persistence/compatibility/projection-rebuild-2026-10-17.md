@@ -52,7 +52,7 @@ Run from the root after building the runtime image:
 docker build -t developer-platform-postgres:18.6-vector0.8.7-age1.8.0 persistence
 NAMED_POSTGRES_IMAGE=developer-platform-postgres:18.6-vector0.8.7-age1.8.0 \
 NAMED_POSTGRES_EXTENSIONS=1 RESTIC_TEST_BINARY=/path/to/restic \
-uv run --project platform/app python scripts/verify-named-postgres.py
+uv run --project platform/app python scripts/verify/stores/verify-named-postgres.py
 ```
 
 `NAMED_POSTGRES_CONSOLE=1` additionally exercises disposable real Keycloak/pgAdmin

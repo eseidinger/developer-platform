@@ -13,7 +13,7 @@ Run from the repository root:
 
 ```bash
 python3 -m pip install -e 'platform/cli[dev]'
-python3 scripts/generate-cli-contract.py --check
+python3 scripts/generate/generate-cli-contract.py --check
 devplat contract check --output json
 python3 -m pytest platform/cli/tests
 ```

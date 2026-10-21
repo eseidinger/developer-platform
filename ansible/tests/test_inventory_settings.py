@@ -60,7 +60,7 @@ class InventorySettingsTests(unittest.TestCase):
         self.assertEqual(len([k for k in result if k.endswith('_IP')]), 24)
 
     def test_inventory_address_defaults_match_the_runtime_validator(self):
-        tree = ast.parse((ROOT / 'scripts/check-network-addresses.py').read_text())
+        tree = ast.parse((ROOT / 'scripts/checks/check-network-addresses.py').read_text())
         fixed = next(ast.literal_eval(node.value) for node in tree.body if isinstance(node, ast.Assign)
                      and any(isinstance(target, ast.Name) and target.id == 'FIXED_SERVICES' for target in node.targets))
         result = render({'network': {'subnet': '172.30.80.0/24'}})

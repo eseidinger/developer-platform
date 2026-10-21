@@ -125,7 +125,7 @@ project, with explicit full instance access only. Read-only grants are rejected.
 The `neo4j` selection requires its operator controller/key and capacity budget;
 configuration readiness does not establish deployed acceptance.
 
-`scripts/prepare-stores.py` generates an operator-owned OpenSearch CA, verified
+`scripts/setup/prepare-stores.py` generates an operator-owned OpenSearch CA, verified
 server/client certificates and a non-demo access realm under `.runtime/stores`.
 Only the public CA is mounted into the API/relay. The unprivileged one-shot
 initializer alone receives the administrator client key; it retains an existing
@@ -139,7 +139,7 @@ Legacy profiles are refused before deployment until explicitly renewed:
 
 ```bash
 cd /opt/developer-platform
-sudo python3 scripts/prepare-stores.py --renew-opensearch-certificates
+sudo python3 scripts/setup/prepare-stores.py --renew-opensearch-certificates
 sudo docker compose up -d --no-deps --force-recreate --wait --wait-timeout 240 opensearch
 ```
 
@@ -611,9 +611,9 @@ Neo4j checks run only against disposable services:
 
 ```bash
 docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 persistence/neo4j
-uv run --project platform/app python scripts/verify-neo4j-catalog.py
-uv run --project platform/app python scripts/verify-neo4j-network-recreation.py
-NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify-neo4j.py
+uv run --project platform/app python scripts/verify/stores/verify-neo4j-catalog.py
+uv run --project platform/app python scripts/verify/stores/verify-neo4j-network-recreation.py
+NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify/stores/verify-neo4j.py
 ```
 
 The browser fixture additionally needs the portal's installed Playwright Chromium.
@@ -624,7 +624,7 @@ links all eight dashboards, native pipeline verification and workload instrument
 
 
 `UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python
-scripts/verify-named-postgres.py` runs against a disposable PostgreSQL container.
+scripts/verify/stores/verify-named-postgres.py` runs against a disposable PostgreSQL container.
 It verifies database separation, cross-writer DDL, future-object read rights,
 read-only/foreign-resource denial, no expiry/admin escalation, session revocation,
 30-day rotation/retry/deadline handling, real authentication/query/session expiry

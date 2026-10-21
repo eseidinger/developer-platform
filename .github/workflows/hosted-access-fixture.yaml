@@ -10,8 +10,8 @@ on:
       - platform/app/tests/test_hosted_access_acceptance.py
       - platform/app/pyproject.toml
       - platform/app/uv.lock
-      - scripts/check-hosted-access.py
-      - scripts/hosted-access-release.py
+      - scripts/acceptance/check-hosted-access.py
+      - scripts/release/hosted-access-release.py
       - ansible/tests/test_hosted_access_workflow.py
 
 permissions:
@@ -88,7 +88,7 @@ jobs:
         env:
           DOCKERHUB_USERNAME: ${{ vars.DOCKERHUB_USERNAME }}
           DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
-        run: python3 scripts/hosted-access-release.py
+        run: python3 scripts/release/hosted-access-release.py
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
       - name: Set up Docker Buildx

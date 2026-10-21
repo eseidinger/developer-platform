@@ -29,7 +29,7 @@
     - name: Invoke the harness with paths rather than credential values
       ansible.builtin.command:
         argv: >-
-          {{ [hosted_access_python, 'scripts/check-hosted-access.py', hosted_access_command,
+          {{ [hosted_access_python, 'scripts/acceptance/check-hosted-access.py', hosted_access_command,
               '--api', hosted_access_api, '--run-id', hosted_access_run_id,
               '--apps-domain', hosted_access_apps_domain, '--issuer', hosted_access_issuer]
             + (['--fixture-image', hosted_access_fixture_image] if hosted_access_command != 'cleanup' else [])

@@ -4,7 +4,7 @@ Status: implemented single-host k3d/k3s workload plane. This page documents repo
 
 ## Role and topology
 
-Kubernetes runs developer workloads. Caddy, the Platform API, PostgreSQL, Keycloak, and monitoring run as Docker Compose services on the same Ubuntu host. `scripts/cluster_config.py` configures k3d with one k3s server, two agents, and a load balancer. The load balancer publishes HTTP only on `127.0.0.1:8081`; Caddy is the public edge.
+Kubernetes runs developer workloads. Caddy, the Platform API, PostgreSQL, Keycloak, and monitoring run as Docker Compose services on the same Ubuntu host. `scripts/internal/cluster_config.py` configures k3d with one k3s server, two agents, and a load balancer. The load balancer publishes HTTP only on `127.0.0.1:8081`; Caddy is the public edge.
 
 ```mermaid
 flowchart TB

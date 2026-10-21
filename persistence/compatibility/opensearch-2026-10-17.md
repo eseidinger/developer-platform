@@ -14,7 +14,7 @@ reads are allowed; foreign-index reads remain denied. Credential generations hav
 passwords and resource/mode role mappings. Revocation deletes the native user;
 the outer HTTP relay enforces lease expiry and cuts off outstanding connections.
 
-The real `scripts/verify-opensearch.py` fixture passed:
+The real `scripts/verify/stores/verify-opensearch.py` fixture passed:
 
 - Idempotent provisioning and credential issuance across two resources, writer
   mapping changes and indexing, reader text ranking/filter/facet queries.
@@ -123,7 +123,7 @@ so the session-denial evidence does not depend on native deletion. Afterward,
 isolated repeated purge removes one resource while preserving the other.
 `console.PROVIDERS` includes OpenSearch and the portal advertises its launcher.
 Reproduce with `STORE_DASHBOARDS_FIXTURE=1` and
-`scripts/verify-shared-store-compose.py`; CI runs this separately from the
+`scripts/verify/stores/verify-shared-store-compose.py`; CI runs this separately from the
 RustFS/Qdrant browser fixture because their lease ports overlap.
 
 The full production API image builds with all console assets and imports. These

@@ -14,7 +14,7 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -e 'platform/cli[dev]'
-      - run: python3 scripts/generate-cli-contract.py --check
+      - run: python3 scripts/generate/generate-cli-contract.py --check
       - run: devplat contract check --output json
       - run: python3 -m pytest platform/cli/tests
       - run: python3 -m pip wheel --no-deps --wheel-dir /tmp/devplat-wheel platform/cli

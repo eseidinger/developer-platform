@@ -106,7 +106,7 @@
 
     - name: Install fail-closed authorized-key lookup
       ansible.builtin.copy:
-        src: ../scripts/db_authorized_key.py
+        src: ../scripts/internal/db_authorized_key.py
         dest: /usr/local/libexec/platform-db-authorized-key
         owner: root
         group: root

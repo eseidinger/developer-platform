@@ -44,14 +44,14 @@ capacity is 16 vCPUs and 32 GB RAM.
 
 ```bash
 python3 scripts/init.py
-python3 scripts/install-k3d.py
-sudo bash scripts/prepare-tempo-storage.sh
+python3 scripts/setup/install-k3d.py
+sudo bash scripts/setup/prepare-tempo-storage.sh
 docker compose up -d postgres keycloak-db-init keycloak proxy
 # Create the initial Keycloak user and put its immutable ID in
 # PLATFORM_BOOTSTRAP_SUBJECT in .env before starting the API.
 bash scripts/up.sh
 # Obtain and export a short-lived administrator PLATFORM_ACCESS_TOKEN first.
-python3 scripts/smoke.py
+python3 scripts/acceptance/smoke.py
 ```
 
 `init.py` creates a private `.env` without replacing existing values. The smoke
@@ -80,13 +80,29 @@ implementation references. User and operator workflows are canonical under
 
 ## Repository validation
 
+See the [script directory guide](scripts/README.md) for setup, generation,
+verification, and operational commands.
+
+Install the script dependencies and Python quality tools from the repository root
+with Python 3.12 or newer:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r requirements.txt
+```
+
+This includes editable API and CLI packages, Ruff for linting and formatting, and
+pytest with coverage support. Run `ruff check scripts`, `ruff format --check scripts`,
+or `python3 -m pytest platform/cli/tests --cov=platform_cli` as needed.
+
 ```bash
 docker compose config --quiet
 uv sync --project platform/app
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
 python3 -m unittest discover -s ansible/tests -v
-python3 scripts/check-monitoring.py
-python3 scripts/check-doc-links.py
+python3 scripts/verify/observability/check-monitoring.py
+python3 scripts/checks/check-doc-links.py
 python3 -m unittest discover -s operations/backup/tests -v
 uv run --project platform/app python -m compileall -q platform/app/src/app scripts operations
 bash -n scripts/up.sh scripts/down.sh

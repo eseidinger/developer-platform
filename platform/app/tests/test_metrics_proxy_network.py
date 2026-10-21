@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 
 network_script = runpy.run_path(str(Path(__file__).resolve().parents[3] /
-                                  "scripts/metrics-proxy-network.py"))
+                                  "scripts/internal/metrics-proxy-network.py"))
 proxy_sources = network_script["proxy_sources"]
 
 

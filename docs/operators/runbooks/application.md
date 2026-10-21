@@ -43,7 +43,7 @@ Operation state `succeeded` means Kubernetes resources were applied. Its live `r
 
 ## Minimal API deployment demo
 
-Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [human access and authorization validation](../validation/access-and-authorization.md)). This deliberately uses the legacy flat declaration and its direct sample route, not the hosted-access contract. `scripts/smoke.py` checks this legacy flow; the [neutral hosted-access harness](../validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness) checks protected `v1alpha2` applications.
+Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [human access and authorization validation](../validation/access-and-authorization.md)). This deliberately uses the legacy flat declaration and its direct sample route, not the hosted-access contract. `scripts/acceptance/smoke.py` checks this legacy flow; the [neutral hosted-access harness](../validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness) checks protected `v1alpha2` applications.
 
 ```bash
 OP=$(curl -fsS -X PUT http://127.0.0.1:8000/projects/demo \
@@ -64,7 +64,7 @@ not manually delete the namespace as the normal retirement procedure.
 
 ## Day-2 application flow
 
-Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/projects/demo` and `-H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"` are implied. Each write returns 202 and `rollout_required`; check `activation` on the matching GET before relying on a change. Evidence: EV-30, EV-33 to EV-37 in the [backlog](../../maintainers/delivery/backlog.md); `scripts/config_drill.py`, `secret_drill.py`, `log_drill.py` and `retirement_drill.py` perform these flows end to end.
+Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/projects/demo` and `-H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"` are implied. Each write returns 202 and `rollout_required`; check `activation` on the matching GET before relying on a change. Evidence: EV-30, EV-33 to EV-37 in the [backlog](../../maintainers/delivery/backlog.md); `scripts/drills/config_drill.py`, `secret_drill.py`, `log_drill.py` and `retirement_drill.py` perform these flows end to end.
 
 | Task | Call | Check |
 | --- | --- | --- |

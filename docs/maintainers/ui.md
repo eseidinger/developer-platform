@@ -46,7 +46,7 @@ running record; refreshing is not a cancellation or automatic retry.
 
 Use `npm run test:e2e -- ai-assistance.spec.ts` for the synthetic browser harness.
 It loads an isolated authenticated context and intercepts the API; it is not
-live authentication or model acceptance. Run `scripts/verify-ai-portal-history.py`
+live authentication or model acceptance. Run `scripts/verify/ai/verify-ai-portal-history.py`
 in the API environment for rollback-only PostgreSQL pagination/scope guards.
 The [Phase 5 plan](delivery/plans/phase-5-ai-operations.md#ai-portal-integration)
 records the owner’s deployed UI acceptance on October 16, 2026 (PLAN-025 / Phase 5.6 complete).

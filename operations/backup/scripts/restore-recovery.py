@@ -274,7 +274,7 @@ https://*.apps.localhost {
                     safe.uid, safe.gid = member.uid, member.gid
                 return safe
             archive.extractall(destination, filter=owned, numeric_owner=True)
-    run(['python3', 'scripts/install-k3d.py'], ROOT, timeout=300)
+    run(['python3', 'scripts/setup/install-k3d.py'], ROOT, timeout=300)
     recovered_neo4j=restore_neo4j_volumes(bundle)
     start_recovered_neo4j(compose,recovered_neo4j)
     run(['bash', 'scripts/up.sh'], ROOT, timeout=1200)

@@ -30,7 +30,7 @@
     - name: Invoke the private acceptance runner without passing secret values
       ansible.builtin.command:
         argv: >-
-          {{ [human_database_python, 'scripts/check-human-database-access.py', human_database_command,
+          {{ [human_database_python, 'scripts/acceptance/check-human-database-access.py', human_database_command,
               '--api', human_database_api, '--run-id', human_database_run_id,
               '--fixture-image', human_database_fixture_image,
               '--bastion-host', human_database_bastion_host,

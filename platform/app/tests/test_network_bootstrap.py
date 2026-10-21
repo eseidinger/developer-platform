@@ -10,8 +10,7 @@ from unittest.mock import Mock, patch
 
 
 ROOT = Path(__file__).resolve().parents[3]
-sys.path.insert(0, str(ROOT / "scripts"))
-spec = importlib.util.spec_from_file_location("network_addresses", ROOT / "scripts/check-network-addresses.py")
+spec = importlib.util.spec_from_file_location("network_addresses", ROOT / "scripts/checks/check-network-addresses.py")
 network_addresses = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(network_addresses)
 

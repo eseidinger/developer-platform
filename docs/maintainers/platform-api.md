@@ -24,8 +24,8 @@ Minimum local validation for API changes:
 ```bash
 uv sync --project platform/app
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
-uv run --project platform/app python scripts/export_openapi.py --check
-python3 scripts/generate-cli-contract.py --check
+uv run --project platform/app python scripts/generate/export_openapi.py --check
+python3 scripts/generate/generate-cli-contract.py --check
 uv run --project platform/app python -m compileall -q platform/app/src/app scripts operations
 ```
 

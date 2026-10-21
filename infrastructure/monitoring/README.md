@@ -147,7 +147,7 @@ provider response IDs, exception text and application-reported cost estimates
 are not retained. The change applies to new spans; metadata removed from older
 traces cannot be recovered. The 24-hour trace retention and existing storage,
 sampling and ingress budgets remain unchanged. Validate locally with
-`PYTHONPATH=platform/app/src uv run --project platform/app python scripts/verify-ai-trace-pipeline.py`;
+`PYTHONPATH=platform/app/src uv run --project platform/app python scripts/verify/observability/verify-ai-trace-pipeline.py`;
 its gateway-sanitized workload fixture verifies real Alloy/Tempo model/framework
 searches and project-scoped reads without live model calls.
 
@@ -332,8 +332,8 @@ Install test dependencies in a virtual environment, then run:
 ```bash
 uv sync --project platform/app
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
-python3 scripts/check-monitoring.py
-python3 scripts/check-workload-logs.py
+python3 scripts/verify/observability/check-monitoring.py
+python3 scripts/verify/observability/check-workload-logs.py
 docker compose config --quiet
 ```
 
@@ -434,7 +434,7 @@ collection** panel and existing scrape alerts expose collection failures; missin
 usage is not synthesized as healthy zero. Recording rules in `capacity-rules.yaml`
 combine these metrics with kube-state-metrics resource and ownership data.
 
-`scripts/check-monitoring.py` validates the configuration and executes
+`scripts/verify/observability/check-monitoring.py` validates the configuration and executes
 `tests/capacity.test.yaml`: it covers namespace isolation, rolling ReplicaSets,
 sidecars, ordinary init exclusion, completed jobs, and incomplete limits.
 
@@ -458,7 +458,7 @@ the stock activity collector. It uses the pinned exporter's deprecated custom
 query option; revalidate compatibility before upgrading. The shared exporter has no per-table labels. The Phase 7 collector below adds
 aggregate named-database vacuum/dead-tuple observations.
 
-Bootstrap runs `scripts/setup-postgres-monitoring.py` after PostgreSQL is healthy.
+Bootstrap runs `scripts/setup/setup-postgres-monitoring.py` after PostgreSQL is healthy.
 It reconciles `platform_monitor` with `pg_monitor`, five connections maximum,
 read-only default transactions and a five-second statement timeout. It receives
 no application-table grants, superuser, role/database creation, replication or
@@ -484,7 +484,7 @@ virtual filesystems, and are independent of project selection. Space utilization
 uses capacity minus space available to an unprivileged process, including reserved
 blocks. Filesystems without inode capacity have no inode ratio.
 
-`scripts/check-postgres-monitoring.py` creates disposable PostgreSQL 18, exporter
+`scripts/verify/observability/check-postgres-monitoring.py` creates disposable PostgreSQL 18, exporter
 and Prometheus containers. It verifies repeatable role setup, denied application
 reads/writes, aggregate privacy, database selection, absent/unlimited values and
 dashboard query readback using production collectors, SQL and metric filters.
@@ -495,7 +495,7 @@ It pauses the exporter to verify `up=0`, then resumes it and verifies `pg_up=1`.
 
 The named-resource overview links to PostgreSQL, RustFS S3, OpenSearch, Qdrant,
 Apache AGE, pgvector, DuckDB/Parquet and dedicated Neo4j Community dashboards.
-Regenerate reviewed definitions with `python3 scripts/generate-dashboards.py`.
+Regenerate reviewed definitions with `python3 scripts/generate/generate-dashboards.py`.
 Native collection runs independently of lifecycle reconciliation and publishes
 bounded textfile metrics through the existing node exporter. Last-good readings
 remain visible after failure, with separate collection health/freshness. The
@@ -540,7 +540,7 @@ DuckDB profile fields are exported. Missing application observations are unknown
 not proof of zero traffic or completed external integration. Shared-server
 CPU/I/O is labeled separately from attributable resource/workload signals.
 
-Run `scripts/verify-store-metric-pipeline.py` for real signed RustFS I/O through
+Run `scripts/verify/observability/verify-store-metric-pipeline.py` for real signed RustFS I/O through
 production Alloy into disposable Prometheus, sensitive-dimension exclusion and
 parsing all store-dashboard queries. Native OpenSearch/Qdrant fixtures additionally
 verify collector permissions and release-specific metric schemas. Alert fixtures

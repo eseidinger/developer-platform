@@ -13,7 +13,7 @@ On the lab host, prepare the dedicated four GiB filesystem before running
 `scripts/up.sh`:
 
 ```bash
-sudo bash scripts/prepare-tempo-storage.sh
+sudo bash scripts/setup/prepare-tempo-storage.sh
 bash scripts/up.sh
 ```
 

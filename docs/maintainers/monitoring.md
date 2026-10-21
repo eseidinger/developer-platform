@@ -11,11 +11,11 @@ heartbeat/watchdog boundary.
 Run the local configuration and generator checks from the repository root:
 
 ```bash
-python3 scripts/check-monitoring.py
-python3 scripts/check-workload-logs.py
-python3 scripts/check-application-metrics.py
-python3 scripts/check-postgres-monitoring.py
-python3 scripts/generate-dashboards.py --check
+python3 scripts/verify/observability/check-monitoring.py
+python3 scripts/verify/observability/check-workload-logs.py
+python3 scripts/verify/observability/check-application-metrics.py
+python3 scripts/verify/observability/check-postgres-monitoring.py
+python3 scripts/generate/generate-dashboards.py --check
 ```
 
 The `check-*` scripts above use disposable Docker dependencies; they are fixture

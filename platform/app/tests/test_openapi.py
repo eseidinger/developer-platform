@@ -11,7 +11,7 @@ class OpenApiContract(unittest.TestCase):
     def test_committed_contract_matches_the_application(self):
         committed = json.loads((root / "docs" / "api" / "openapi.json").read_text(encoding="utf-8"))
         self.assertEqual(committed, json.loads(json.dumps(app.openapi())),
-                         "run scripts/export_openapi.py to refresh docs/api/openapi.json")
+                         "run scripts/generate/export_openapi.py to refresh docs/api/openapi.json")
 
     def test_put_accepts_the_envelope_and_the_flat_body(self):
         schema = app.openapi()["paths"]["/projects/{name}"]["put"]["requestBody"]["content"]["application/json"]["schema"]

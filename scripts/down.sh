@@ -23,7 +23,7 @@ for tool in docker k3d python3; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 test -f .env || { echo "Missing .env; restore the platform configuration before teardown." >&2; exit 1; }
-eval "$(python3 scripts/env.py)"
+eval "$(python3 scripts/internal/env.py)"
 # Validate configuration before removing any resources.
 docker compose config --quiet
 clusters=$(k3d cluster list -o json)

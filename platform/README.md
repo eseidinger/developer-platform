@@ -155,9 +155,9 @@ From the repository root:
 ```bash
 uv sync --project platform/app --locked
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
-uv run --project platform/app python scripts/export_openapi.py --check
-python3 scripts/generate-cli-contract.py --check
-python3 scripts/check-doc-links.py
+uv run --project platform/app python scripts/generate/export_openapi.py --check
+python3 scripts/generate/generate-cli-contract.py --check
+python3 scripts/checks/check-doc-links.py
 uv run --project platform/app python -m compileall -q platform/app/src/app scripts
 bash -n scripts/up.sh scripts/down.sh
 docker compose config --quiet

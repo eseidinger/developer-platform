@@ -6,21 +6,21 @@ for tool in docker k3d kubectl python3 setfacl; do
   command -v "$tool" >/dev/null || { echo "Missing prerequisite: $tool" >&2; exit 1; }
 done
 test -f .env || { echo "Run python3 scripts/init.py first" >&2; exit 1; }
-python3 scripts/prepare-stores.py
+python3 scripts/setup/prepare-stores.py
 if ! mountpoint -q /var/lib/developer-platform/tempo; then
-  echo "Prepare the bounded trace filesystem: sudo bash scripts/prepare-tempo-storage.sh" >&2
+  echo "Prepare the bounded trace filesystem: sudo bash scripts/setup/prepare-tempo-storage.sh" >&2
   exit 1
 fi
-python3 scripts/check-network-addresses.py
+python3 scripts/checks/check-network-addresses.py
 # Only generated KEY=value settings are accepted; never source arbitrary shell code.
-eval "$(python3 scripts/env.py)"
+eval "$(python3 scripts/internal/env.py)"
 umask 077
 mkdir -p .runtime
 chmod 700 .runtime
-python3 scripts/generate-dashboards.py
+python3 scripts/generate/generate-dashboards.py
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 docker compose up -d --wait --wait-timeout 120 postgres
-python3 scripts/setup-postgres-monitoring.py
+python3 scripts/setup/setup-postgres-monitoring.py
 # Claim selected stores' fixed addresses before dynamically addressed services.
 # The initializer is a one-shot job; wait for persistent services separately.
 store_services=()
@@ -52,7 +52,7 @@ if [[ ",${COMPOSE_PROFILES:-}," == *,opensearch,* ]]; then
   # Its native backend becomes available when the API starts later in bootstrap.
   docker compose up -d --no-deps opensearch-dashboards
 fi
-python3 scripts/cluster_config.py > .runtime/k3d.yaml
+python3 scripts/internal/cluster_config.py > .runtime/k3d.yaml
 if ! k3d cluster list -o json | python3 -c 'import json,sys; sys.exit(not any(c["name"] == "workloads" for c in json.load(sys.stdin)))'; then
   k3d cluster create --config .runtime/k3d.yaml
 else
@@ -81,10 +81,10 @@ for attempt in $(seq 1 24); do
 done
 echo "Waiting for Kubernetes nodes to become Ready (up to 180 seconds)..."
 kubectl wait --for=condition=Ready nodes --all --timeout=180s
-kubectl get nodes -o json | python3 scripts/metrics-proxy-network.py
+kubectl get nodes -o json | python3 scripts/internal/metrics-proxy-network.py
 # Refresh generated operator settings before Compose creates the API container.
 unset PLATFORM_METRICS_PROXY_CIDRS
-eval "$(python3 scripts/env.py)"
+eval "$(python3 scripts/internal/env.py)"
 kubectl apply -f infrastructure/kubernetes/controller.yaml
 kubectl apply -f infrastructure/kubernetes/metrics.yaml
 kubectl apply -f infrastructure/kubernetes/log-reader.yaml
@@ -93,7 +93,7 @@ kubectl apply -f infrastructure/kubernetes/capacity-reader.yaml
 kubectl apply -f infrastructure/kubernetes/telemetry-reviewer.yaml
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret provisioner-token -o json > .runtime/token.json
-  if python3 scripts/kubeconfig.py; then break; fi
+  if python3 scripts/internal/kubeconfig.py; then break; fi
   sleep 2
 done
 test -s .runtime/controller.kubeconfig
@@ -104,7 +104,7 @@ setfacl -m u:10001:r-- .runtime/controller.kubeconfig
 rm -f .runtime/token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret workload-log-reader-token -o json > .runtime/log-reader-token.json
-  if python3 scripts/kubeconfig.py --log-reader; then break; fi
+  if python3 scripts/internal/kubeconfig.py --log-reader; then break; fi
   sleep 2
 done
 test -s .runtime/log-reader.kubeconfig
@@ -116,7 +116,7 @@ setfacl -m u:0:r-- .runtime/log-reader.kubeconfig
 rm -f .runtime/log-reader-token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret workload-metrics-reader-token -o json > .runtime/metrics-reader-token.json
-  if python3 scripts/metrics-reader-credentials.py; then break; fi
+  if python3 scripts/internal/metrics-reader-credentials.py; then break; fi
   sleep 2
 done
 test -s .runtime/metrics-reader.token
@@ -128,7 +128,7 @@ chmod 644 .runtime/metrics-reader-ca.crt
 rm -f .runtime/metrics-reader-token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret capacity-metrics-reader-token -o json > .runtime/capacity-reader-token.json
-  if python3 scripts/metrics-reader-credentials.py --capacity; then break; fi
+  if python3 scripts/internal/metrics-reader-credentials.py --capacity; then break; fi
   sleep 2
 done
 test -s .runtime/capacity-reader.token
@@ -140,7 +140,7 @@ chmod 644 .runtime/capacity-reader-ca.crt
 rm -f .runtime/capacity-reader-token.json
 for attempt in $(seq 1 30); do
   kubectl -n platform-system get secret telemetry-reviewer-token -o json > .runtime/telemetry-reviewer-token.json
-  if python3 scripts/kubeconfig.py --telemetry-reviewer; then break; fi
+  if python3 scripts/internal/kubeconfig.py --telemetry-reviewer; then break; fi
   sleep 2
 done
 test -s .runtime/telemetry-reviewer.kubeconfig
@@ -153,10 +153,10 @@ k3d image import developer-platform-telemetry-forwarder:local -c workloads
 # Claim the fixed identity/API addresses before monitoring and edge containers
 # can receive them from Docker's dynamic allocator. This starts only the API's
 # required dependencies (PostgreSQL and the two identity initializers).
-python3 scripts/check-network-addresses.py
+python3 scripts/checks/check-network-addresses.py
 echo "Starting fixed-address identity and Platform API services first..."
 docker compose up -d --build --wait --wait-timeout 180 platform-api
-python3 scripts/check-network-addresses.py
+python3 scripts/checks/check-network-addresses.py
 docker compose up -d --build --remove-orphans
 echo "Waiting for Tempo to accept queries (up to 120 seconds)..."
 for attempt in $(seq 1 24); do
@@ -173,5 +173,5 @@ echo "Waiting for the Alloy collector to become ready (up to 120 seconds)..."
 docker compose up -d --no-deps --wait --wait-timeout 120 alloy
 docker build -f platform/Dockerfile.access -t developer-platform-access-authorizer:local platform
 k3d image import developer-platform-access-authorizer:local -c workloads
-python3 scripts/install-application-access.py
+python3 scripts/setup/install-application-access.py
 echo "Platform API: http://127.0.0.1:8000/docs"

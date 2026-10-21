@@ -7,7 +7,7 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[3]
-spec = importlib.util.spec_from_file_location("workload_log_fixture", ROOT / "scripts/check-workload-logs.py")
+spec = importlib.util.spec_from_file_location("workload_log_fixture", ROOT / "scripts/verify/observability/check-workload-logs.py")
 fixture = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(fixture)
 

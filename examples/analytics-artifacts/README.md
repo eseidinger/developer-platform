@@ -65,8 +65,8 @@ denial and empty-volume restore followed by fresh scoped approval.
 
 ```bash
 uv sync --project platform/app --group analytics-fixtures --locked
-STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group analytics-fixtures python scripts/verify-named-postgres.py
-STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group analytics-fixtures python scripts/verify-rustfs.py
+STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group analytics-fixtures python scripts/verify/stores/verify-named-postgres.py
+STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group analytics-fixtures python scripts/verify/stores/verify-rustfs.py
 ```
 
 Run fixture commands from the repository root with Docker available. They create

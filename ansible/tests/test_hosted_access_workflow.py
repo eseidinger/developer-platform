@@ -6,7 +6,7 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[2]
-spec = importlib.util.spec_from_file_location("hosted_access_release", ROOT / "scripts/hosted-access-release.py")
+spec = importlib.util.spec_from_file_location("hosted_access_release", ROOT / "scripts/release/hosted-access-release.py")
 release = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(release)
 

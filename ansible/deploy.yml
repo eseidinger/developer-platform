@@ -259,7 +259,7 @@
 
         - name: Install checksum-verified k3d using the repository installer
           ansible.builtin.command:
-            argv: [python3, scripts/install-k3d.py]
+            argv: [python3, scripts/setup/install-k3d.py]
             chdir: "{{ platform_install_dir }}"
           changed_when: true
 
@@ -310,7 +310,7 @@
 
         - name: Prepare bounded Tempo trace storage
           ansible.builtin.command:
-            argv: [bash, scripts/prepare-tempo-storage.sh]
+            argv: [bash, scripts/setup/prepare-tempo-storage.sh]
             chdir: "{{ platform_install_dir }}"
           changed_when: platform_tempo_mount.rc != 0
 
@@ -331,7 +331,7 @@
 
         - name: Validate fixed Docker addresses before stopping services
           ansible.builtin.command:
-            argv: [python3, scripts/check-network-addresses.py, --validate-networks]
+            argv: [python3, scripts/checks/check-network-addresses.py, --validate-networks]
             chdir: "{{ platform_install_dir }}"
           changed_when: false
 
@@ -364,7 +364,7 @@
 
         - name: Prepare selected data-store configuration before the service outage
           ansible.builtin.command:
-            argv: [python3, scripts/prepare-stores.py]
+            argv: [python3, scripts/setup/prepare-stores.py]
             chdir: "{{ platform_install_dir }}"
           changed_when: false
           no_log: true

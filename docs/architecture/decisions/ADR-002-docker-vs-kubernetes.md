@@ -14,7 +14,7 @@ k3d is the selected workload-compute implementation. The platform services and P
 
 ## Implementation note — September 27, 2026
 
-[Cluster configuration](../../../scripts/cluster_config.py) now implements k3d/k3s with one server and two agents. The earlier “k3d proposed” wording records the original decision scope, not current implementation status. No direct Docker workload adapter exists.
+[Cluster configuration](../../../scripts/internal/cluster_config.py) now implements k3d/k3s with one server and two agents. The earlier “k3d proposed” wording records the original decision scope, not current implementation status. No direct Docker workload adapter exists.
 
 ## Alternatives and evolution
 

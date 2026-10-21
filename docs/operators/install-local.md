@@ -16,8 +16,8 @@ Run from the repository root:
 
 ```bash
 python3 scripts/init.py
-python3 scripts/install-k3d.py
-sudo bash scripts/prepare-tempo-storage.sh
+python3 scripts/setup/install-k3d.py
+sudo bash scripts/setup/prepare-tempo-storage.sh
 docker compose up -d postgres keycloak-db-init keycloak proxy
 ```
 
@@ -46,7 +46,7 @@ curl --fail-with-body http://127.0.0.1:8000/healthz
 curl --fail-with-body http://127.0.0.1:8000/readyz
 kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 # Obtain and export a short-lived administrator PLATFORM_ACCESS_TOKEN first.
-python3 scripts/smoke.py
+python3 scripts/acceptance/smoke.py
 ```
 
 The smoke test retains its project. `/healthz` proves only API process health and

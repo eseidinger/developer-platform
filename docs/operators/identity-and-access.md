@@ -143,7 +143,7 @@ A conflict owned by an old Compose service
 is recovered using `ansible/deploy.yml`, which removes Compose containers without
 removing data volumes or the k3d network; a conflicting k3d or unrelated container
 requires operator review. Validate custom fixed addresses with
-`python3 scripts/check-network-addresses.py --validate-only` before deployment.
+`python3 scripts/checks/check-network-addresses.py --validate-only` before deployment.
 The bootstrap sends derived internal and session keys straight to
 Kubernetes Secret input, never to a manifest file. Keep `DATABASE_KEY` and the
 encrypted backup containing it protected; changing that key changes derived

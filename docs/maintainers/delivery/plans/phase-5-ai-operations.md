@@ -38,7 +38,7 @@ metrics. The controlled live rollback recovery demonstration passed; additional
 fix types and rejection safeguards remain open.
 
 After the selected model/account configuration is verified, run
-`UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python scripts/evaluate-ai.py`
+`UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python scripts/verify/ai/evaluate-ai.py`
 with the deployment's model environment. The synthetic corpus covers an incorrect
 database host, pool exhaustion, resource pressure, missing evidence, untrusted
 document text, and a foreign-project request. It reports diagnosis accuracy,
@@ -173,7 +173,7 @@ suite passed 25 tests, including 14 initial AI cases; the final AI-only suite
 passed 16 cases after adding keyboard-focus and running-record resumption checks.
 Browser evidence uses deterministic intercepted APIs and synthetic model results;
 it does not establish authenticated deployed model calls or workload recovery.
-`scripts/verify-ai-portal-history.py` supplies rollback-only PostgreSQL checks for
+`scripts/verify/ai/verify-ai-portal-history.py` supplies rollback-only PostgreSQL checks for
 pagination, foreign cursors and stale/unsupported/legacy proposal sources.
 
 ### Deployed verification — October 16, 2026
@@ -275,7 +275,7 @@ checked against the installed Psycopg source and upstream
 [SQLAlchemy documentation](https://docs.sqlalchemy.org/en/20/errors.html#queuepool-limit-of-size-x-overflow-y-reached-connection-timed-out-timeout-z),
 [HikariCP](https://github.com/brettwooldridge/HikariCP/blob/dev/src/main/java/com/zaxxer/hikari/pool/HikariPool.java)
 and [Agroal](https://github.com/agroal/agroal/blob/master/agroal-pool/src/main/java/io/agroal/pool/ConnectionPool.java).
-`scripts/verify-ai-database-diagnostics.py` additionally verifies a real
+`scripts/verify/ai/verify-ai-database-diagnostics.py` additionally verifies a real
 SQLAlchemy in-memory pool timeout and Psycopg's error formatting with a
 synthetic resolver failure. It uses no project data or network access;
 SQLAlchemy remains a verification-only dependency.
@@ -349,13 +349,13 @@ Alloy/Tempo readback: one run span, two model spans and one tool span, with
 validated parent links and allowlisted metadata only. It used no external model
 and changed no production sampling settings. The specific live human diagnosis
 was not found under 10% sampling; full trace coverage is not claimed. Use
-`scripts/review-ai-agent-trace.py TRACE_ID` inside the API environment for a
+`scripts/operations/review-ai-agent-trace.py TRACE_ID` inside the API environment for a
 bounded operator-only review with an explicit 24-hour query window. The script
 prints checks/counts rather than trace content.
 
 Automated approval safeguards also passed endpoint regression tests and deployed
 PostgreSQL checks using rollback-only temporary tables; see
-`scripts/verify-ai-approval-guards.py`. Restricted audit-reader review confirmed
+`scripts/verify/ai/verify-ai-approval-guards.py`. Restricted audit-reader review confirmed
 the six expected events for the human diagnosis/development/proposal/approval/
 execution/reuse-rejection journey, including exactly one successful execution.
 These checks preserve the recovered application and do not replace the remaining
@@ -467,7 +467,7 @@ collector-failure/recovery and sustained capacity/retention checks remain open.
 See the [deployed evidence](../../../../infrastructure/monitoring/AI.md#deployed-smoke-check-october-17-2026).
 Accountable role: observability / AI.
 Prerequisites: PLAN-034 signal contract and existing operator Grafana provisioning.
-Generate versioned dashboard JSON through `scripts/generate-dashboards.py`, using
+Generate versioned dashboard JSON through `scripts/generate/generate-dashboards.py`, using
 the existing provisioned Prometheus and Tempo data sources.
 
 | Dashboard | Required panels and navigation |

@@ -44,7 +44,7 @@ First deploy the platform and the restricted bastion using
 [`install-human-database-access.yml`](../../../ansible/install-human-database-access.yml).
 Install or update the host-side runner environment from
 `platform/acceptance/requirements.txt` as in [Prepare the runner and fixture](#prepare-the-runner-and-fixture).
-Transfer `scripts/check-human-database-access.py`,
+Transfer `scripts/acceptance/check-human-database-access.py`,
 `platform/acceptance/human_database.py`, and updated requirements to the target
 through the same reviewed runner-only update process used for hosted access;
 the Ansible acceptance wrapper does not transfer code. Publish the neutral
@@ -170,7 +170,7 @@ records its scope and remaining checks; the full hosted-access gate is still ope
 after the [hosted-access installation](../identity-and-access.md#hosted-application-access-installation-and-recovery)
 is deployed. It does not deploy, upgrade, or reset the platform.
 
-The entry point is `scripts/check-hosted-access.py`. It uses two uniquely named
+The entry point is `scripts/acceptance/check-hosted-access.py`. It uses two uniquely named
 projects, `ha-<12-hex-run-id>-provider` and `ha-<run-id>-consumer`, each with one
 public API, one private worker, and its own PostgreSQL database. The neutral
 fixture deliberately has no application authorization and contains only synthetic
@@ -412,7 +412,7 @@ platform-admin grant, which the harness checks before provisioning.
 An offline plan performs no network calls or writes:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/check-hosted-access.py plan \
+.runtime/acceptance-venv/bin/python scripts/acceptance/check-hosted-access.py plan \
   --run-id 0123456789ab \
   --fixture-image '<public-registry>/hosted-access-fixture@sha256:<digest>' \
   --apps-domain apps.example.org \
@@ -423,7 +423,7 @@ Choose a fresh run ID for each live run. Repeat the API origin exactly as the
 explicit environment confirmation:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/check-hosted-access.py run \
+.runtime/acceptance-venv/bin/python scripts/acceptance/check-hosted-access.py run \
   --api http://127.0.0.1:8000 \
   --confirm-environment http://127.0.0.1:8000 \
   --run-id 0123456789ab \
@@ -485,7 +485,7 @@ removes that grant and account. Abrupt termination or unavailable dependencies
 can leave resources or cleanup pending. Keep the private journal and retry:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/check-hosted-access.py cleanup \
+.runtime/acceptance-venv/bin/python scripts/acceptance/check-hosted-access.py cleanup \
   --api http://127.0.0.1:8000 \
   --confirm-environment http://127.0.0.1:8000 \
   --run-id 0123456789ab \
@@ -962,7 +962,7 @@ already obtained above:
 export PLATFORM_ADMIN_TOKEN="$ADMIN_TOKEN"
 export PHASE1B_PROJECT="$A"
 export DEVELOPER_TOKEN='…' # optional; enables the 403 assertions
-.venv/bin/python scripts/check-phase-1b-security.py
+.venv/bin/python scripts/checks/check-phase-1b-security.py
 ```
 
 The API allows only platform administrators to use `/operator/*`. The inspection

@@ -183,7 +183,7 @@ scheduled ingestion jobs failed during application restart; the next scheduled
 run, `ingestion-worker-29873396`, completed successfully. Failed runs were not
 replayed manually.
 
-`scripts/cluster_config.py` sets memory limits when creating a cluster; changing
+`scripts/internal/cluster_config.py` sets memory limits when creating a cluster; changing
 its output alone does not resize existing nodes. For an existing k3d pool, save
 the original Docker limits and each worker's `/proc/meminfo` bind-mount source,
 increase the Docker memory limit, and update that source's `MemTotal` to the new

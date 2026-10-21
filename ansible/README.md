@@ -221,7 +221,7 @@ ansible-playbook -i ansible/inventory.example.yml ansible/deploy.yml --syntax-ch
 
 `--check` only previews host package/directory changes; source transfer, generated
 configuration, and bootstrap are skipped. It is not a deployment validation on a
-fresh host. After deployment, the optional `scripts/smoke.py` test creates and
+fresh host. After deployment, the optional `scripts/acceptance/smoke.py` test creates and
 retains a project; it is not run automatically.
 
 For a fresh-install sequence covering basic users, revocable CI credentials, and
@@ -335,8 +335,8 @@ The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally disr
 must not run in routine CI. The rollback-data helper now creates a named
 PostgreSQL resource and checks persistence through its bound workload; a live
 rerun is still required.
-`scripts/isolation.py`, `scripts/data_preservation.py`, and
-`scripts/interrupted_provisioning.py` now use run-scoped named PostgreSQL
+`scripts/acceptance/isolation.py`, `scripts/acceptance/data_preservation.py`, and
+`scripts/acceptance/interrupted_provisioning.py` now use run-scoped named PostgreSQL
 resources and the web/PostgreSQL fixture, but await live runs. The interruption
 drill pauses the shared k3d server and kills the Platform API; it requires an
 otherwise idle lab and is not a routine acceptance check.

@@ -68,7 +68,7 @@ routine-suite assertion.
 
 The [platform acceptance guide](../operators/validation/acceptance.md#scheduled-expiry-verification)
 documents a separate one-day test-runner expiry drill. The
-[hosted-access harness](../../scripts/check-hosted-access.py) has an optional
+[hosted-access harness](../../scripts/acceptance/check-hosted-access.py) has an optional
 `--timed` machine-token check and lists longer session, rotation, request,
 and retention checks as deferred. The
 [component playbook](../../ansible/test-platform-components.yml) waits for a

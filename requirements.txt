@@ -1,0 +1,19 @@
+# Local development dependencies. Run from the repository root with Python >=3.12:
+# python3 -m pip install -r requirements.txt
+
+# Scripts import app modules; reuse the API's declared runtime dependencies.
+-e ./platform/app
+# Includes pytest and respx for the CLI tests, plus httpx used by scripts.
+-e ./platform/cli[dev]
+
+# Additional script and fixture dependencies.
+PyYAML>=6,<7
+duckdb==1.5.6
+SQLAlchemy==2.0.46
+
+# Python linting, formatting, test coverage, and existing Ansible checks.
+ruff
+pytest-cov
+ansible-core>=2.16,<2.22
+yamllint
+ansible-lint
