@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/.runtime/bin:$PATH"
 
-for tool in docker k3d kubectl python3 setfacl; do
+for tool in docker k3d kubectl python3 setfacl findmnt; do
   command -v "$tool" >/dev/null || {
     echo "Missing prerequisite: $tool" >&2
     exit 1
@@ -25,7 +25,8 @@ python3 scripts/setup/configure-platform.py --runtime
 # Prepare store keys and configuration, then check the trace storage mount.
 python3 scripts/setup/prepare-stores.py
 
-if ! mountpoint -q /var/lib/developer-platform/tempo; then
+# Inspect the mount table: the private parent directory is intentionally root-only.
+if ! findmnt --mountpoint /var/lib/developer-platform/tempo --noheadings >/dev/null; then
   echo "Prepare the bounded trace filesystem: sudo bash scripts/setup/prepare-tempo-storage.sh" >&2
   exit 1
 fi

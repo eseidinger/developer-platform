@@ -29,6 +29,15 @@ class PlatformDeploymentTests(unittest.TestCase):
         self.preflight_patches(lambda args, **kwargs: calls.append(args) or "")
         deployment.deploy(check=True)
         self.assertTrue(any("--validate-networks" in args for args in calls))
+        self.assertIn(
+            [
+                "findmnt",
+                "--mountpoint",
+                "/var/lib/developer-platform/tempo",
+                "--noheadings",
+            ],
+            calls,
+        )
         self.assertTrue(any(args[0] == "systemctl" for args in calls))
         self.assertFalse(
             any("stop" in args or "rm" in args or "bash" in args for args in calls)
@@ -51,7 +60,7 @@ class PlatformDeploymentTests(unittest.TestCase):
                         and "scripts/setup/configure-platform.py" in args
                     )
                     or (failure == "network" and "--validate-networks" in args)
-                    or (failure == "mount" and args[0] == "mountpoint")
+                    or (failure == "mount" and args[0] == "findmnt")
                 ):
                     raise deployment.DeploymentError("fixture failure")
                 return ""

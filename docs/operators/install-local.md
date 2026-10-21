@@ -35,6 +35,27 @@ Ansible. Routine startup remains `bash scripts/up.sh`.
 
 ## Bootstrap identity
 
+For noninteractive local setup, wait until the `keycloak-realm-init` service has
+finished successfully, then run:
+
+```bash
+python3 scripts/setup/bootstrap-local-admin.py
+```
+
+This creates an account using your local username (override with `--username`),
+writes its temporary password to mode-`0600` `.runtime/initial-admin.json`, and
+sets `PLATFORM_BOOTSTRAP_SUBJECT` to the new account's immutable ID. Keycloak
+requires a password change at first login. The command refuses to reset an
+existing account or overwrite a recovery file. A lost create response leaves
+the private recovery file intact for investigation. Automation uses separate
+test identities and never consumes this initial administrator password.
+
+Run `bash scripts/up.sh` next. After the first administrator grant has been
+persisted, clear `PLATFORM_BOOTSTRAP_SUBJECT` and recreate the API container so
+the one-time setting is removed from its environment.
+
+Alternatively, configure the first account manually:
+
 Open `http://identity.localhost`, sign in as Keycloak `admin` with the password
 from `.env`, and create the initial individual user in the `platform` realm. Put
 that user's immutable ID in `PLATFORM_BOOTSTRAP_SUBJECT`, then run

@@ -71,10 +71,19 @@ def preflight():
             "--validate-networks",
         ]
     )
-    command(["mountpoint", "-q", "/var/lib/developer-platform/tempo"], private=True)
+    # The root-owned parent is private; mount-table inspection needs no traversal.
+    command(
+        [
+            "findmnt",
+            "--mountpoint",
+            "/var/lib/developer-platform/tempo",
+            "--noheadings",
+        ],
+        private=True,
+    )
     # up.sh checks these too. Check early so missing tools cannot cause an outage.
 
-    for tool in ("docker", "k3d", "kubectl", "python3", "setfacl"):
+    for tool in ("docker", "k3d", "kubectl", "python3", "setfacl", "findmnt"):
         if shutil.which(tool) is None:
             raise DeploymentError("Missing deployment prerequisite: " + tool)
 
