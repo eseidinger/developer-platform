@@ -66,10 +66,10 @@ services:
       OPENSEARCH_JAVA_OPTS: -Xms512m -Xmx512m
     volumes:
       - opensearch_data:/usr/share/opensearch/data
-      - ../.runtime/stores/opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
-      - ../.runtime/stores/opensearch/ca.pem:/usr/share/opensearch/config/ca.pem:ro
-      - ../.runtime/stores/opensearch/node.pem:/usr/share/opensearch/config/node.pem:ro
-      - ../.runtime/stores/opensearch/node-key.pem:/usr/share/opensearch/config/node-key.pem:ro
+      - ../../.runtime/stores/opensearch/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+      - ../../.runtime/stores/opensearch/ca.pem:/usr/share/opensearch/config/ca.pem:ro
+      - ../../.runtime/stores/opensearch/node.pem:/usr/share/opensearch/config/node.pem:ro
+      - ../../.runtime/stores/opensearch/node-key.pem:/usr/share/opensearch/config/node-key.pem:ro
     networks:
       platform:
         ipv4_address: ${OPENSEARCH_IP:-172.30.80.17}
@@ -91,10 +91,10 @@ services:
     restart: "no"
     entrypoint: [bash, /bootstrap.sh]
     volumes:
-      - ../.runtime/stores/opensearch/ca.pem:/run/store-security/ca.pem:ro
-      - ../.runtime/stores/opensearch/admin.pem:/run/store-security/admin.pem:ro
-      - ../.runtime/stores/opensearch/admin-key.pem:/run/store-security/admin-key.pem:ro
-      - ../.runtime/stores/opensearch/bootstrap:/run/store-security/bootstrap:ro
+      - ../../.runtime/stores/opensearch/ca.pem:/run/store-security/ca.pem:ro
+      - ../../.runtime/stores/opensearch/admin.pem:/run/store-security/admin.pem:ro
+      - ../../.runtime/stores/opensearch/admin-key.pem:/run/store-security/admin-key.pem:ro
+      - ../../.runtime/stores/opensearch/bootstrap:/run/store-security/bootstrap:ro
       - ./opensearch-bootstrap.sh:/bootstrap.sh:ro
     networks:
       platform:
@@ -136,7 +136,7 @@ services:
       retries: 12
 
   neo4j-controller:
-    build: ../platform
+    build: ../../platform
     user: "0:0"
     restart: unless-stopped
     command: [uvicorn, "app.stores.neo4j_controller:create_app", --factory, --host, "0.0.0.0", --port, "8091", --limit-concurrency, "32", --timeout-keep-alive, "2", --no-access-log]

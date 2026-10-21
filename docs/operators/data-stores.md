@@ -156,7 +156,7 @@ Docker socket. This source wiring does not constitute deployed acceptance.
 ## Dedicated Neo4j Community resources
 
 Selecting `neo4j` builds the reviewed Community image from
-`persistence/neo4j/Dockerfile`. Creating a named resource then provisions its own
+`infrastructure/persistence/neo4j/Dockerfile`. Creating a named resource then provisions its own
 persistent container, volume and internal network. Resource UUIDs determine names;
 renaming the resource does not recreate data. The project limit includes retired
 resources until confirmed purge. Several components, including owner-approved
@@ -227,7 +227,7 @@ reviewed matching image inventory, quarantine, recovered-identity cleanup and fr
 approval. It rebuilds private endpoints rather than reusing old addresses; retired
 resources return to their stopped state. Update the installed backup runner before
 enabling this provider. A tag downgrade is not a validated recovery procedure.
-See the [compatibility evidence](../../persistence/compatibility/neo4j-2026-10-17.md).
+See the [compatibility evidence](../../infrastructure/persistence/compatibility/neo4j-2026-10-17.md).
 
 ## Resource and binding workflow
 
@@ -461,7 +461,7 @@ saved-object mappings in this pinned release. The local browser fixture verifies
 Discover, both data-access modes, cross-resource denial, workspace renewal,
 expiry/revocation and isolated purge. EV-72 later records deployed OIDC/HTTPS console and active-session revocation
 checks. Off-host recovery, natural timers and operator upgrade acceptance remain open. See the
-[compatibility record](../../persistence/compatibility/opensearch-2026-10-17.md).
+[compatibility record](../../infrastructure/persistence/compatibility/opensearch-2026-10-17.md).
 
 ## PostgreSQL browser console
 
@@ -521,7 +521,7 @@ protected sources/definitions to survive recovery. Arbitrary SQL dependencies on
 generated graph objects require separate protected loaders; the generic loader
 refuses to cascade into them. Unregistered retained graphs fail backup preflight.
 
-The real local [dump/restore and rebuild evidence](../../persistence/compatibility/projection-rebuild-2026-10-17.md)
+The real local [dump/restore and rebuild evidence](../../infrastructure/persistence/compatibility/projection-rebuild-2026-10-17.md)
 covers two graphs, multiple labels, a cycle, updated/escaped properties, declared
 indexes, readers and preserved ordinary SQL/pgvector data. It closes the local
 source-rebuild implementation gap; deployed recovery/reconnection and RPO/RTO
@@ -610,7 +610,7 @@ verification before deployed acceptance.
 Neo4j checks run only against disposable services:
 
 ```bash
-docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 persistence/neo4j
+docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 infrastructure/persistence/neo4j
 uv run --project platform/app python scripts/verify/stores/verify-neo4j-catalog.py
 uv run --project platform/app python scripts/verify/stores/verify-neo4j-network-recreation.py
 NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify/stores/verify-neo4j.py

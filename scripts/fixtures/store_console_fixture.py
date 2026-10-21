@@ -81,7 +81,7 @@ def run(connection, expire_url):
         realm_path = directory / 'realm.json'
         realm_path.write_text(json.dumps(realm)); realm_path.chmod(0o644)
         config_path = directory / 'config_local.py'
-        config_path.write_text((ROOT / 'persistence/console/config_local.py').read_text() +
+        config_path.write_text((ROOT / 'infrastructure/persistence/console/config_local.py').read_text() +
             f"\n# Loopback-only disposable fixture overrides; never used by Compose.\nOAUTH2_CONFIG[0]['OAUTH2_SERVER_METADATA_URL'] = {issuer + '/.well-known/openid-configuration'!r}\nSESSION_COOKIE_SECURE = False\n")
         config_path.chmod(0o644)
         directory.chmod(0o755)  # Container identities must traverse; random fixture-only values.

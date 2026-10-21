@@ -26,8 +26,6 @@
           - compose.yaml
           - .env.example
           - infrastructure
-          - identity
-          - persistence
           - platform
           - scripts
           - operations/backup/scripts

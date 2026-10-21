@@ -31,6 +31,6 @@ Changing only `DATABASE_KEY` and repeating PUT rewrites Kubernetes credentials b
 
 ## Evidence and evolution
 
-Source: [password/database provisioning](../../../platform/app/src/app/main.py), [Secret generation](../../../platform/app/src/app/manifests.py), [PostgreSQL placement](../../../persistence/compose.yaml). [Backup and recovery](../../operators/backup-and-recovery.md) covers preservation of the original configuration; [the runbook](../../operators/runbooks/security.md#compromised-credential-or-access-revocation) covers current rotation constraints.
+Source: [password/database provisioning](../../../platform/app/src/app/main.py), [Secret generation](../../../platform/app/src/app/manifests.py), [PostgreSQL placement](../../../infrastructure/persistence/compose.yaml). [Backup and recovery](../../operators/backup-and-recovery.md) covers preservation of the original configuration; [the runbook](../../operators/runbooks/security.md#compromised-credential-or-access-revocation) covers current rotation constraints.
 
 DEV-003-T02 and DEV-010-T01 remain open for versioned workload rotation/adoption and owner separation. PLAN-008 remains open for deployed human-role, tunnel, foreign-project denial, and revocation acceptance. Validate live role/Secret rotation and denied foreign database access before claiming those outcomes.

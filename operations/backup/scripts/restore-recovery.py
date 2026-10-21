@@ -130,7 +130,11 @@ def start_recovered_neo4j(compose, identities):
     if not identities:return
     # Access remains quarantined. Recreate operator-managed instances before the
     # API's recovered-identity cleanup; no recovered human lease is activated.
-    run(['docker','build','-t','developer-platform-neo4j:2026.09.0-community-jmx1.6.0','persistence/neo4j'],ROOT,timeout=600)
+    # Older recovery bundles retain the former top-level persistence directory.
+    build_context = Path('infrastructure/persistence/neo4j')
+    if not (ROOT / build_context).is_dir():
+        build_context = Path('persistence/neo4j')
+    run(['docker','build','-t','developer-platform-neo4j:2026.09.0-community-jmx1.6.0',str(build_context)],ROOT,timeout=600)
     run(compose+['create','platform-api','store-access','neo4j-controller'],ROOT,timeout=900)
     run(compose+['up','-d','--no-deps','neo4j-controller'],ROOT,timeout=120)
     code="""from app.stores.neo4j_controller import Controller

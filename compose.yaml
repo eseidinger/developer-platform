@@ -1,10 +1,10 @@
 name: developer-platform
 include:
   - infrastructure/proxy/compose.yaml
-  - persistence/compose.yaml
-  - persistence/shared-stores.yaml
+  - infrastructure/persistence/compose.yaml
+  - infrastructure/persistence/shared-stores.yaml
   - infrastructure/monitoring/compose.yaml
-  - identity/compose.yaml
+  - infrastructure/identity/compose.yaml
   - platform/compose.yaml
 networks:
   search-consoles:

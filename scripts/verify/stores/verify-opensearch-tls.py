@@ -70,7 +70,7 @@ def main():
                 '-v', f'{private / "admin.pem"}:/run/store-security/admin.pem:ro',
                 '-v', f'{private / "admin-key.pem"}:/run/store-security/admin-key.pem:ro',
                 '-v', f'{private / "bootstrap"}:/run/store-security/bootstrap:ro', '-v',
-                f'{ROOT / "persistence/opensearch-bootstrap.sh"}:/bootstrap.sh:ro', '--entrypoint', 'bash', preparation.IMAGE, '/bootstrap.sh']
+                f'{ROOT / "infrastructure/persistence/opensearch-bootstrap.sh"}:/bootstrap.sh:ro', '--entrypoint', 'bash', preparation.IMAGE, '/bootstrap.sh']
             command(*initializer)
             port = int(command('docker', 'port', name, '9200/tcp').rsplit(':', 1)[1])
             provider = OpenSearch(f'https://127.0.0.1:{port}', password, str(private / 'ca.pem'))

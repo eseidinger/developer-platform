@@ -38,10 +38,10 @@ and are included in usage, backup/recovery and isolated purge. Deterministic
 deployed provider evidence is recorded in EV-68; PostgreSQL is the default
 selection. Neo4j uses the
 recorded full-instance-access exception, initially one retained resource per project.
-See the [RustFS](../../../../persistence/compatibility/rustfs-2026-10-17.md),
-[OpenSearch](../../../../persistence/compatibility/opensearch-2026-10-17.md),
-[Qdrant](../../../../persistence/compatibility/qdrant-2026-10-17.md) and
-[Neo4j](../../../../persistence/compatibility/neo4j-2026-10-17.md) records.
+See the [RustFS](../../../../infrastructure/persistence/compatibility/rustfs-2026-10-17.md),
+[OpenSearch](../../../../infrastructure/persistence/compatibility/opensearch-2026-10-17.md),
+[Qdrant](../../../../infrastructure/persistence/compatibility/qdrant-2026-10-17.md) and
+[Neo4j](../../../../infrastructure/persistence/compatibility/neo4j-2026-10-17.md) records.
 
 ## Deployed deterministic checkpoint — October 18, 2026
 
@@ -112,7 +112,7 @@ The [upgrade runbook](../../../operators/runbooks/store-upgrades.md) covers pinn
 release checks, verified pre-upgrade backups, extension upgrades and recovery limits.
 AGE authoritative rebuild is implemented and passes a real logical-restore
 fixture with two graphs, five labels, a cycle, source-defined indexes and preserved
-SQL/pgvector data. See the [dated evidence](../../../../persistence/compatibility/projection-rebuild-2026-10-17.md).
+SQL/pgvector data. See the [dated evidence](../../../../infrastructure/persistence/compatibility/projection-rebuild-2026-10-17.md).
 Deployed rebuild/reconnection and recovery timing remain open in Phase 10
 package 10.13.
 Retirement previews include named resource/grant versions; access fencing commits before namespace deletion. The PostgreSQL reference covers JSONB, full-text search, recursive CTEs, partitions, materialized views and transactional outbox rollback in the real database fixture.
@@ -341,7 +341,7 @@ domain application integration remains externally owned.
 Deployed Dashboards writer/reader login, scoped data operations and active-session
 revocation pass in EV-72. Deployed rebuild and recovery acceptance are Phase 10 package 10.13; judged
 domain comparisons are Phase 9 work.
-See the [compatibility evidence](../../../../persistence/compatibility/opensearch-2026-10-17.md).
+See the [compatibility evidence](../../../../infrastructure/persistence/compatibility/opensearch-2026-10-17.md).
 
 **Task:** PLAN-028. **Source:** phase 2. **Entry:** package 7.2 analytical foundation.
 
@@ -378,7 +378,7 @@ instance-replacement networking, JVM, expiry and cold-volume recovery fixtures.
 Source explicitly reports full-instance access. Deployed Neo4j Browser login,
 native graph writes, active-session revocation and independent access for a
 second full-access persona pass in EV-72. See the
-[local evidence](../../../../persistence/compatibility/neo4j-2026-10-17.md). See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
+[local evidence](../../../../infrastructure/persistence/compatibility/neo4j-2026-10-17.md). See the [complete decision](data-store-expansion.md#neo4j-community-dedicated-instance-decision).
 
 - Protect authoritative sources, graph definitions and loaders under the
   [rebuildable-projection policy](data-store-expansion.md#apache-age-rebuild-policy).

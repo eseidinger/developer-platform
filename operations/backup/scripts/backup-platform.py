@@ -24,6 +24,18 @@ class BackupError(Exception):
     pass
 
 
+def configuration_sources(root):
+    """Capture either checkout layout without requiring obsolete root folders."""
+    sources = ['compose.yaml', '.env', 'scripts', 'platform', 'infrastructure']
+    for component in ('identity', 'persistence'):
+        # infrastructure/ already captures these services in current checkouts.
+        if not (root / 'infrastructure' / component).is_dir():
+            sources.append(component)
+    if any(not (root / name).exists() for name in sources):
+        raise BackupError('required source missing')
+    return sources
+
+
 def atomic_json(path, data):
     tmp = path.with_suffix('.tmp')
     with tmp.open('w') as stream:
@@ -378,10 +390,8 @@ END $$;
         self.project_secrets(bundle)
         self.stage = 'configuration capture'
         with tarfile.open(bundle / 'platform-files.tar.gz', 'w:gz') as archive:
-            for name in ['compose.yaml', '.env', 'scripts', 'platform', 'infrastructure', 'persistence', 'identity']:
+            for name in configuration_sources(self.root):
                 source = self.root / name
-                if not source.exists():
-                    raise BackupError('required source missing')
                 archive.add(source, arcname=name,
                             filter=lambda item: None if '__pycache__' in Path(item.name).parts else item)
             # Older deployed checkouts retain the manual helper in scripts/.

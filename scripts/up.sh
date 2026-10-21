@@ -59,7 +59,8 @@ for profile in "${store_profiles[@]}"; do
       store_services+=(qdrant)
       ;;
     neo4j)
-      docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 persistence/neo4j
+      docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 \
+        infrastructure/persistence/neo4j
       store_services+=(neo4j-controller)
       ;;
     opensearch)

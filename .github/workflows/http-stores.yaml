@@ -42,7 +42,8 @@ jobs:
         run: |
           uv run --project platform/app python - <<'PY'
           import subprocess, yaml
-          config = yaml.safe_load(open('persistence/shared-stores.yaml'))
+          config = yaml.safe_load(
+              open('infrastructure/persistence/shared-stores.yaml'))
           for name in ('opensearch', 'opensearch-dashboards'):
               subprocess.run(['docker', 'pull', config['services'][name]['image']], check=True)
           PY
@@ -63,7 +64,8 @@ jobs:
         run: |
           uv run --project platform/app python - <<'PY'
           import subprocess, yaml
-          config = yaml.safe_load(open('persistence/shared-stores.yaml'))
+          config = yaml.safe_load(
+              open('infrastructure/persistence/shared-stores.yaml'))
           for name in ('rustfs', 'qdrant', 'opensearch'):
               subprocess.run(['docker', 'pull', config['services'][name]['image']], check=True)
           PY
@@ -125,7 +127,10 @@ jobs:
       - run: npm ci --prefix platform/ui
       - run: npx playwright install --with-deps chromium
         working-directory: platform/ui
-      - run: docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 persistence/neo4j
+      - run: >-
+          docker build
+          -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0
+          infrastructure/persistence/neo4j
       - run: uv run --project platform/app python scripts/verify/stores/verify-neo4j-catalog.py
       - run: uv run --project platform/app python scripts/verify/stores/verify-neo4j-network-recreation.py
       - run: NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify/stores/verify-neo4j.py

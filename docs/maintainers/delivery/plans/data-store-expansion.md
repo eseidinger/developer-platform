@@ -146,7 +146,7 @@ monitoring and stopped-volume recovery are implemented with disposable evidence.
 The prior shared-instance incompatibility remains valid; this resource mapping
 and access exception replace that deployment. Opt-in configuration readiness is
 not deployed operational acceptance. See the
-[compatibility record](../../../../persistence/compatibility/neo4j-2026-10-17.md)
+[compatibility record](../../../../infrastructure/persistence/compatibility/neo4j-2026-10-17.md)
 and [operator workflow](../../../operators/data-stores.md#dedicated-neo4j-community-resources).
 
 ## Shared-store upgrade decision
@@ -498,7 +498,7 @@ continues to describe current behavior until the clean-setup redesign is deliver
 ## PostgreSQL extension compatibility check
 
 **Checked October 17, 2026:** The current server declaration in
-[`persistence/compose.yaml`](../../../../persistence/compose.yaml) is
+[`infrastructure/persistence/compose.yaml`](../../../../infrastructure/persistence/compose.yaml) is
 `postgres:18.6-trixie`. A local disposable, network-disabled fixture built and
 ran the following stack together on PostgreSQL 18.6, Linux x86-64:
 
@@ -553,13 +553,13 @@ fixture repair updated label references and graph IDs together, temporarily
 removing and then restoring the graph foreign-key constraint in one transaction.
 Cypher queries then returned the expected two-node count in both fixtures.
 The exact diagnostic/repair SQL and test sequence are retained in the
-[check script](../../../../persistence/compatibility/check.sh); observed errors,
+[check script](../../../../infrastructure/persistence/compatibility/check.sh); observed errors,
 OID values and repair results are in the
-[fixture output](../../../../persistence/compatibility/results-2026-10-17.txt).
+[fixture output](../../../../infrastructure/persistence/compatibility/results-2026-10-17.txt).
 These observations match the mechanism reported in
 [upstream #2503](https://github.com/apache/age/issues/2503).
 
-A later [source-projection recovery fixture](../../../../persistence/compatibility/projection-rebuild-2026-10-17.md)
+A later [source-projection recovery fixture](../../../../infrastructure/persistence/compatibility/projection-rebuild-2026-10-17.md)
 now reproduces this failure and rebuilds two graphs from protected source snapshots
 using normal AGE graph/label APIs. Ordinary SQL, pgvector data and declared graph
 indexes survive. No manual OID catalog repair is used. This is local implementation
@@ -625,14 +625,14 @@ the deployment edition/license choice remains open. Its source build needed ICU
 headers in addition to the other build dependencies.
 
 Reproduction uses the pinned-base/source
-[Dockerfile](../../../../persistence/compatibility/Dockerfile) and
-[check script](../../../../persistence/compatibility/check.sh):
+[Dockerfile](../../../../infrastructure/persistence/compatibility/Dockerfile) and
+[check script](../../../../infrastructure/persistence/compatibility/check.sh):
 
 ```bash
-docker build -t developer-platform-postgres-compat:20261017 persistence/compatibility
+docker build -t developer-platform-postgres-compat:20261017 infrastructure/persistence/compatibility
 docker run --rm --network none --user postgres --memory 2g --cpus 2 \
   --tmpfs /tmp:rw,size=768m,mode=1777 \
-  --mount "type=bind,src=$PWD/persistence/compatibility,dst=/check,readonly" \
+  --mount "type=bind,src=$PWD/infrastructure/persistence/compatibility,dst=/check,readonly" \
   --entrypoint bash developer-platform-postgres-compat:20261017 /check/check.sh
 ```
 

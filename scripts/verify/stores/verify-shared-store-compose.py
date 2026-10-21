@@ -45,7 +45,7 @@ def main():
     with tempfile.TemporaryDirectory(prefix='shared-store-compose-') as directory:
         path = Path(directory)
         preparation.prepare(path / 'stores', config)
-        data = copy.deepcopy(yaml.safe_load((ROOT / 'persistence/shared-stores.yaml').read_text()))
+        data = copy.deepcopy(yaml.safe_load((ROOT / 'infrastructure/persistence/shared-stores.yaml').read_text()))
         del data['services']['neo4j-controller']  # Dedicated-controller fixtures run separately, without live infrastructure membership.
         del data['services']['opensearch-dashboards']  # Browser fixture supplies its private bridge.
         selected = ('opensearch', 'opensearch-init') if dashboards else (('rustfs', 'qdrant') if consoles else tuple(data['services']))
@@ -56,7 +56,7 @@ def main():
             for mount in value.get('volumes', []):
                 mount = mount.replace('../.runtime/stores/', str(path / 'stores') + '/')
                 if mount.startswith('./opensearch-bootstrap.sh:'):
-                    mount = mount.replace('./opensearch-bootstrap.sh', str(ROOT / 'persistence/opensearch-bootstrap.sh'), 1)
+                    mount = mount.replace('./opensearch-bootstrap.sh', str(ROOT / 'infrastructure/persistence/opensearch-bootstrap.sh'), 1)
                 mounts.append(mount)
             value['volumes'] = mounts
             port = {'rustfs': 9000, 'qdrant': 6333, 'opensearch': 9200}.get(service)

@@ -87,7 +87,7 @@ maintenance. Account for every instance's CPU/memory and clean shutdown time.
 
 Build the reviewed Community/JVM image and run the full native, real-catalog and
 network-recreation fixtures linked in the
-[compatibility record](../../../persistence/compatibility/neo4j-2026-10-17.md).
+[compatibility record](../../../infrastructure/persistence/compatibility/neo4j-2026-10-17.md).
 Keep the standard agent flag in the image configuration; repeated entrypoint JVM
 environment expansion broke restart in the verified release. Check heap/GC/thread
 collection after restart, not just first boot. Never substitute Enterprise metrics.

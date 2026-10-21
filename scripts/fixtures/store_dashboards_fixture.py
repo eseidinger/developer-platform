@@ -29,7 +29,7 @@ async def isolation(image, name):
     native_address = os.environ['STORE_FIXTURE_OPENSEARCH_RAW_IP']
     config = yaml.safe_load((ROOT / 'compose.yaml').read_text())
     assert config['networks']['search-consoles']['internal'] is True
-    service = yaml.safe_load((ROOT / 'persistence/shared-stores.yaml').read_text())['services']['opensearch-dashboards']
+    service = yaml.safe_load((ROOT / 'infrastructure/persistence/shared-stores.yaml').read_text())['services']['opensearch-dashboards']
     assert set(service['networks']) == {'search-consoles'} and not service.get('ports')
     result = await asyncio.to_thread(subprocess.run, ['docker', 'network', 'create', '--internal', name], capture_output=True, timeout=15)
     if result.returncode: raise RuntimeError('Disposable isolated console network did not start')
@@ -86,10 +86,10 @@ async def running(load, provider, resource):
                 assert result.status_code == 403, 'Console server account exceeded its system metadata role'
         print('PASS restricted console server account cannot read resource documents or administer native identities')
         with tempfile.TemporaryDirectory(prefix='store-dashboards-') as directory:
-            source = yaml.safe_load((ROOT / 'persistence/shared-stores.yaml').read_text())
+            source = yaml.safe_load((ROOT / 'infrastructure/persistence/shared-stores.yaml').read_text())
             service = copy.deepcopy(source['services']['opensearch-dashboards'])
             await isolation(service['image'], name + '-isolated')
-            settings = yaml.safe_load((ROOT / 'persistence/opensearch-dashboards.yaml').read_text())
+            settings = yaml.safe_load((ROOT / 'infrastructure/persistence/opensearch-dashboards.yaml').read_text())
             port_socket = socket.socket(); port_socket.bind(('127.0.0.1', 0))
             port = port_socket.getsockname()[1]; port_socket.close()
             settings.update({'server.host': '127.0.0.1', 'server.port': port})
