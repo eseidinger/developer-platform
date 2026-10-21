@@ -6,7 +6,8 @@ repository root.
 ## Hosted access and human database access
 
 Hosted-application acceptance has a separate
-[`test-platform-hosted-access.yml`](../test-platform-hosted-access.yml) wrapper.
+[`test-platform-hosted-access.yml`](../tests/platform/test-platform-hosted-access.yml)
+wrapper.
 It defaults to an offline plan, does not deploy the platform, and requires
 explicit API-origin confirmation for live runs. Prepare the runner environment,
 public digest-pinned neutral fixture, and protected operator session on the
@@ -20,7 +21,7 @@ they do not require the Compose outage described below. EV-45 records a directly
 invoked harness run, not execution of this Ansible wrapper or full gate closure.
 
 Human PostgreSQL access has a separate
-[`test-platform-human-database-access.yml`](../test-platform-human-database-access.yml)
+[`test-platform-human-database-access.yml`](../tests/platform/test-platform-human-database-access.yml)
 acceptance wrapper. Its default `plan` is offline. A live `run` requires an
 explicit API-origin confirmation, a renewable human platform-administrator
 session, a verified bastion host key, and a public digest-pinned neutral
@@ -53,14 +54,14 @@ project token is accepted:
 ```bash
 # Named-store rollback check; supply a published digest-pinned web/PostgreSQL image.
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-rollback-data.yml \
+  ansible/tests/platform/test-platform-rollback-data.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_rollback_drill_host=platform \
   -e platform_rollback_drill_image=REGISTRY/web-postgres@sha256:DIGEST
 
 # Temporarily enable and exercise reserved-capacity admission, then restore policy.
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-capacity-admission.yml \
+  ansible/tests/platform/test-platform-capacity-admission.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_allow_capacity_drill=true \
   -e platform_capacity_drill_acknowledgement=I_ACCEPT_CAPACITY_DRILL
@@ -68,7 +69,7 @@ ansible-playbook -i ansible/inventory.yml \
 # Uses a temporary, exact 1.1.1.1/32:853 allow-list and restores the prior
 # Platform API environment during cleanup.
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-egress-policy.yml \
+  ansible/tests/platform/test-platform-egress-policy.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_allow_egress_drill=true \
   -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL
@@ -76,7 +77,7 @@ ansible-playbook -i ansible/inventory.yml \
 # Optional: override all three defaults with a reachable listener you control.
 # This replacement is also temporary and is restored during cleanup.
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-egress-policy.yml \
+  ansible/tests/platform/test-platform-egress-policy.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_allow_egress_drill=true \
   -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL \
@@ -86,7 +87,7 @@ ansible-playbook -i ansible/inventory.yml \
 
 # Controlled shared Keycloak outage; the always block restores the service.
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-identity-provider-outage.yml \
+  ansible/tests/platform/test-platform-identity-provider-outage.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_identity_drill_host=platform \
   -e platform_allow_identity_outage_drill=true \
@@ -94,7 +95,7 @@ ansible-playbook -i ansible/inventory.yml \
 
 # Disposable application plus shared proxy/Prometheus failure and recovery signals.
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-failure-signals.yml \
+  ansible/tests/platform/test-platform-failure-signals.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_failure_drill_host=platform \
   -e platform_allow_failure_signal_drill=true \
@@ -125,9 +126,9 @@ production allow-list merely to pass the drill.
 The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally
 disrupt shared services and must not run in routine CI. The rollback-data helper
 now creates a named PostgreSQL resource and checks persistence through its bound
-workload; a live rerun is still required. `scripts/acceptance/isolation.py`,
-`scripts/acceptance/data_preservation.py`, and
-`scripts/acceptance/interrupted_provisioning.py` now use run-scoped named
+workload; a live rerun is still required. `scripts/tests/platform/isolation.py`,
+`scripts/tests/platform/data_preservation.py`, and
+`scripts/tests/platform/interrupted_provisioning.py` now use run-scoped named
 PostgreSQL resources and the web/PostgreSQL fixture, but await live runs. The
 interruption drill pauses the shared k3d server and kills the Platform API; it
 requires an otherwise idle lab and is not a routine acceptance check. The

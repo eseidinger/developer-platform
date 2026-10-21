@@ -46,22 +46,22 @@ These playbooks require only **P** for their executable assertions.
 | Type | Playbook | Purpose |
 |---|---|---|
 | Deployment | [`deploy.yml`](../../../ansible/deploy.yml) | Install or update the single-host platform and record its non-secret installation inventory |
-| Credential administration | [`bootstrap-platform-test-runner.yml`](../../../ansible/bootstrap-platform-test-runner.yml) | Create the reusable automation identity from authorized human bootstrap inputs |
-| Credential administration | [`revoke-platform-test-runner.yml`](../../../ansible/revoke-platform-test-runner.yml) | Revoke the selected automation identity and complete provider cleanup |
-| Project administration | [`retire-platform-project.yml`](../../../ansible/retire-platform-project.yml) | Preview and execute explicit project retirement with retained-data evidence |
-| General acceptance | [`test-platform.yml`](../../../ansible/test-platform.yml) | Exercise the core authorized platform lifecycle with short-lived personas |
-| Application contract | [`test-platform-components.yml`](../../../ansible/test-platform-components.yml) | Exercise multi-service, scheduled-component, migration, status, update, rollback, and retirement behavior |
-| Hosted application access | [`test-platform-hosted-access.yml`](../../../ansible/test-platform-hosted-access.yml) | Plan or run the neutral identity/HTTPS/isolation/persistence suite; no platform deployment, explicit live confirmation, and a private target-host human administrator session |
-| Human store access installation | [`install-human-database-access.yml`](../../../ansible/install-human-database-access.yml) | Install the separately configured restricted SSH bastion for private store leases |
-| Human store acceptance | [`test-platform-human-database-access.yml`](../../../ansible/test-platform-human-database-access.yml) | Offline plan or opt-in human named-resource tunnel/SQL checks; current named-resource and historical implicit-database evidence are distinct |
-| CI credentials | [`test-platform-ci-credential.yml`](../../../ansible/test-platform-ci-credential.yml) | Exercise project-scoped machine deployment, denial, revocation, and cleanup |
-| CI credentials | [`verify-platform-test-runner-expiry.yml`](../../../ansible/verify-platform-test-runner-expiry.yml) | Verify the dedicated runner before or after its configured expiry |
-| Capacity | [`test-platform-capacity-admission.yml`](../../../ansible/test-platform-capacity-admission.yml) | Temporarily enable and exercise request-based reserved-capacity admission |
-| Connectivity policy | [`test-platform-egress-policy.yml`](../../../ansible/test-platform-egress-policy.yml) | Exercise deny-by-default and explicitly approved component egress |
-| Failure signals | [`test-platform-failure-signals.yml`](../../../ansible/test-platform-failure-signals.yml) | Exercise application, ingress, proxy, and Prometheus failure/recovery state |
-| Identity failure | [`test-platform-identity-provider-outage.yml`](../../../ansible/test-platform-identity-provider-outage.yml) | Prove local revocation fails closed during a controlled Keycloak outage |
-| Database failure | [`test-platform-postgres-outage.yml`](../../../ansible/test-platform-postgres-outage.yml) | Exercise managed PostgreSQL failure, recovery requests, and restored readiness |
-| Data-aware rollback | [`test-platform-rollback-data.yml`](../../../ansible/test-platform-rollback-data.yml) | Named PostgreSQL resource/binding, bound-workload visit persistence, and current-secret checks; live rerun pending |
+| Credential administration | [`bootstrap-platform-test-runner.yml`](../../../ansible/operations/bootstrap-platform-test-runner.yml) | Create the reusable automation identity from authorized human bootstrap inputs |
+| Credential administration | [`revoke-platform-test-runner.yml`](../../../ansible/operations/revoke-platform-test-runner.yml) | Revoke the selected automation identity and complete provider cleanup |
+| Project administration | [`retire-platform-project.yml`](../../../ansible/operations/retire-platform-project.yml) | Preview and execute explicit project retirement with retained-data evidence |
+| General acceptance | [`test-platform.yml`](../../../ansible/tests/platform/test-platform.yml) | Exercise the core authorized platform lifecycle with short-lived personas |
+| Application contract | [`test-platform-components.yml`](../../../ansible/tests/platform/test-platform-components.yml) | Exercise multi-service, scheduled-component, migration, status, update, rollback, and retirement behavior |
+| Hosted application access | [`test-platform-hosted-access.yml`](../../../ansible/tests/platform/test-platform-hosted-access.yml) | Plan or run the neutral identity/HTTPS/isolation/persistence suite; no platform deployment, explicit live confirmation, and a private target-host human administrator session |
+| Human store access installation | [`install-human-database-access.yml`](../../../ansible/operations/install-human-database-access.yml) | Install the separately configured restricted SSH bastion for private store leases |
+| Human store acceptance | [`test-platform-human-database-access.yml`](../../../ansible/tests/platform/test-platform-human-database-access.yml) | Offline plan or opt-in human named-resource tunnel/SQL checks; current named-resource and historical implicit-database evidence are distinct |
+| CI credentials | [`test-platform-ci-credential.yml`](../../../ansible/tests/platform/test-platform-ci-credential.yml) | Exercise project-scoped machine deployment, denial, revocation, and cleanup |
+| CI credentials | [`verify-platform-test-runner-expiry.yml`](../../../ansible/tests/platform/verify-platform-test-runner-expiry.yml) | Verify the dedicated runner before or after its configured expiry |
+| Capacity | [`test-platform-capacity-admission.yml`](../../../ansible/tests/platform/test-platform-capacity-admission.yml) | Temporarily enable and exercise request-based reserved-capacity admission |
+| Connectivity policy | [`test-platform-egress-policy.yml`](../../../ansible/tests/platform/test-platform-egress-policy.yml) | Exercise deny-by-default and explicitly approved component egress |
+| Failure signals | [`test-platform-failure-signals.yml`](../../../ansible/tests/platform/test-platform-failure-signals.yml) | Exercise application, ingress, proxy, and Prometheus failure/recovery state |
+| Identity failure | [`test-platform-identity-provider-outage.yml`](../../../ansible/tests/platform/test-platform-identity-provider-outage.yml) | Prove local revocation fails closed during a controlled Keycloak outage |
+| Database failure | [`test-platform-postgres-outage.yml`](../../../ansible/tests/platform/test-platform-postgres-outage.yml) | Exercise managed PostgreSQL failure, recovery requests, and restored readiness |
+| Data-aware rollback | [`test-platform-rollback-data.yml`](../../../ansible/tests/platform/test-platform-rollback-data.yml) | Named PostgreSQL resource/binding, bound-workload visit persistence, and current-secret checks; live rerun pending |
 
 `deploy.yml` refuses to overlap active backup or availability drills. That is a
 safety interlock, not a requirement to install **B**, **H**, or **W**.
@@ -157,7 +157,7 @@ cross-host acceptance.
 ## Recommended execution layers
 
 1. Deploy and accept the core platform with `deploy.yml` and the
-   `ansible/test-platform*.yml` suite: **P**.
+   `ansible/tests/platform/test-platform*.yml` suite: **P**.
 2. Configure external alert delivery with `deploy-alertmanager.yml`: **P + A**.
 3. Deploy the independent receiver with `deploy-watchdog.yml`: **W**.
 4. Deploy heartbeat and run the Docker-boundary drill: **P + H + W**.

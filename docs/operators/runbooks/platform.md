@@ -22,7 +22,8 @@ kubectl --kubeconfig .runtime/admin.kubeconfig get pods -A
 
 ## Controlled PostgreSQL outage and recovery
 
-`ansible/test-platform-postgres-outage.yml` is a self-contained protected-lab drill. It creates a disposable project,
+`ansible/tests/platform/test-platform-postgres-outage.yml` is a self-contained
+protected-lab drill. It creates a disposable project,
 developer persona, and legacy unbound `http-echo` workload; stops only the Compose PostgreSQL service; requires the
 safe authenticated `503` response and a failed Platform API readiness check;
 restores PostgreSQL in an `always` block; then
@@ -33,7 +34,7 @@ outcome and absence of an implicit database; passing them does not establish
 named-resource or application data recovery.
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-postgres-outage.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-postgres-outage.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_postgres_drill_host=platform \
   -e platform_allow_postgres_outage_drill=true \
@@ -108,7 +109,8 @@ curl --fail-with-body http://127.0.0.1:8000/operator/capacity \
 `allocatable`; `usage_state: ok` means metrics-server supplied a current sample,
 while `missing` means no sample was returned. `state: unavailable` means the
 platform could not query either node inventory or NodeMetrics; it must not be
-interpreted as zero usage. The deployed `ansible/test-platform.yml` drill
+interpreted as zero usage. The deployed
+`ansible/tests/platform/test-platform.yml` drill
 exercises this endpoint and requires at least one node with capacity,
 allocatable values, and a metrics sample.
 
@@ -207,7 +209,7 @@ within-reserve rollout proceeds and remove the disposable workload.
 Automate the protected admission check with a disposable project:
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-capacity-admission.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-capacity-admission.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_allow_capacity_drill=true \
   -e platform_capacity_drill_acknowledgement=I_ACCEPT_CAPACITY_DRILL
@@ -234,7 +236,7 @@ visit survives application rollback and the current secret remains injected.
 Its source checks pass; a live run is still required:
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-rollback-data.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-rollback-data.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_rollback_drill_host=platform \
   -e platform_rollback_drill_image=REGISTRY/web-postgres@sha256:DIGEST
@@ -246,7 +248,7 @@ The egress drill supplies a temporary default target of
 the test and restores the prior Platform API environment during cleanup:
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-egress-policy.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-egress-policy.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_allow_egress_drill=true \
   -e platform_egress_drill_acknowledgement=I_ACCEPT_EGRESS_DRILL
@@ -266,7 +268,7 @@ credential, stops Keycloak, proves local revocation denies an already-issued tok
 provider cleanup is pending, restores Keycloak in an `always` block, and observes cleanup:
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-identity-provider-outage.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-identity-provider-outage.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_identity_drill_host=platform \
   -e platform_allow_identity_outage_drill=true \
@@ -283,7 +285,7 @@ failure-signal drill. It waits through the Prometheus alert `for` durations, so 
 ten minutes:
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-failure-signals.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-failure-signals.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_failure_drill_host=platform \
   -e platform_allow_failure_signal_drill=true \
@@ -298,7 +300,7 @@ the proxy and Prometheus.
 It creates and retires a public canary, verifies project-labelled application and ingress
 alerts, restores both boundaries, and proves Prometheus unavailability and recovery. Use the
 existing `operations/heartbeat/ansible/drill-cluster-availability.yml` for the Kubernetes
-control plane and `ansible/test-platform-postgres-outage.yml` for the database boundary.
+control plane and `ansible/tests/platform/test-platform-postgres-outage.yml` for the database boundary.
 Actual FIRING/RESOLVED delivery and detection while Prometheus itself is unavailable still
 require evidence from the independent notification/watchdog systems.
 

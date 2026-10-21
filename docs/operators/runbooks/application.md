@@ -43,7 +43,7 @@ Operation state `succeeded` means Kubernetes resources were applied. Its live `r
 
 ## Minimal API deployment demo
 
-Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [human access and authorization validation](../validation/access-and-authorization.md)). This deliberately uses the legacy flat declaration and its direct sample route, not the hosted-access contract. `scripts/acceptance/smoke.py` checks this legacy flow; the [neutral hosted-access harness](../validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness) checks protected `v1alpha2` applications.
+Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see [human access and authorization validation](../validation/access-and-authorization.md)). This deliberately uses the legacy flat declaration and its direct sample route, not the hosted-access contract. `scripts/tests/platform/smoke.py` checks this legacy flow; the [neutral hosted-access harness](../validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness) checks protected `v1alpha2` applications.
 
 ```bash
 OP=$(curl -fsS -X PUT http://127.0.0.1:8000/projects/demo \
@@ -64,7 +64,7 @@ not manually delete the namespace as the normal retirement procedure.
 
 ## Day-2 application flow
 
-Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/projects/demo` and `-H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"` are implied. Each write returns 202 and `rollout_required`; check `activation` on the matching GET before relying on a change. Evidence: EV-30, EV-33 to EV-37 in the [backlog](../../maintainers/delivery/backlog.md); `scripts/drills/config_drill.py`, `secret_drill.py`, `log_drill.py` and `retirement_drill.py` perform these flows end to end.
+Run with a short-lived `PLATFORM_ACCESS_TOKEN`; `P=http://127.0.0.1:8000/projects/demo` and `-H "Authorization: Bearer $PLATFORM_ACCESS_TOKEN"` are implied. Each write returns 202 and `rollout_required`; check `activation` on the matching GET before relying on a change. Evidence: EV-30, EV-33 to EV-37 in the [backlog](../../maintainers/delivery/backlog.md); `scripts/tests/platform/config_drill.py`, `secret_drill.py`, `log_drill.py` and `retirement_drill.py` perform these flows end to end.
 
 | Task | Call | Check |
 | --- | --- | --- |
@@ -87,12 +87,13 @@ the retained application spec only: it neither reverses PostgreSQL contents/migr
 values, because secret values are deliberately excluded from revisions. Restore those dependencies through their
 separate controlled procedures before declaring a rollback recovery complete.
 
-For a protected retirement acceptance, `ansible/retire-platform-project.yml` can create and verify a disposable credential probe when invoked with `-e platform_retire_verify_credential_revocation=true`. After retirement it proves the issued token is denied and polls the platform-administrator retirement view until provider cleanup reaches `revoked`. Do not enable this check for a shared CI credential or a non-disposable project. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active; the drill fails after its bounded wait rather than treating that condition as acceptance.
+For a protected retirement acceptance, `ansible/operations/retire-platform-project.yml` can create and verify a disposable credential probe when invoked with `-e platform_retire_verify_credential_revocation=true`. After retirement it proves the issued token is denied and polls the platform-administrator retirement view until provider cleanup reaches `revoked`. Do not enable this check for a shared CI credential or a non-disposable project. A provider deletion failure leaves the credential in `revocation_pending` for the existing retry worker rather than active; the drill fails after its bounded wait rather than treating that condition as acceptance.
 
 To have the drill create a unique disposable project, deploy a minimal public workload, and retire both workload and project, run:
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/retire-platform-project.yml \
+ansible-playbook -i ansible/inventory.yml \
+ansible/operations/retire-platform-project.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_retire_create_disposable_project=true \
   -e platform_retire_verify_credential_revocation=true
@@ -101,7 +102,8 @@ ansible-playbook -i ansible/inventory.yml ansible/retire-platform-project.yml \
 For an existing purpose-created project, omit `platform_retire_create_disposable_project` and supply an exact repeated confirmation:
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/retire-platform-project.yml \
+ansible-playbook -i ansible/inventory.yml \
+ansible/operations/retire-platform-project.yml \
   -e @~/.local/state/developer-platform/platform-test-runner.json \
   -e platform_retire_project=retirement-drill-1234567890 \
   -e platform_confirm_retire_project=retirement-drill-1234567890 \

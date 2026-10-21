@@ -15,9 +15,9 @@ immutable digest. On the platform host, with a protected `0600` JSON operator
 session (`access_token`, `refresh_token`, `client_id`), run:
 
 ```bash
-python3 scripts/acceptance/data_preservation.py plan --run-id 0123456789ab \
+python3 scripts/tests/platform/data_preservation.py plan --run-id 0123456789ab \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST
-python3 scripts/acceptance/data_preservation.py run --run-id 0123456789ab \
+python3 scripts/tests/platform/data_preservation.py run --run-id 0123456789ab \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
   --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
   --operator-token-file /path/to/protected-operator-session.json
@@ -37,9 +37,9 @@ For named-store and network isolation, use a different fresh run ID with the
 same fixture image and protected operator session:
 
 ```bash
-python3 scripts/acceptance/isolation.py plan --run-id fedcba987654 \
+python3 scripts/tests/platform/isolation.py plan --run-id fedcba987654 \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST
-python3 scripts/acceptance/isolation.py run --run-id fedcba987654 \
+python3 scripts/tests/platform/isolation.py run --run-id fedcba987654 \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
   --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
   --operator-token-file /path/to/protected-operator-session.json
@@ -61,9 +61,9 @@ running Platform API and the protected `.env`; otherwise the paused Kubernetes
 API can prevent the new revision from being queued. Check the offline plan first:
 
 ```bash
-python3 scripts/acceptance/interrupted_provisioning.py plan --run-id 123456abcdef \
+python3 scripts/tests/platform/interrupted_provisioning.py plan --run-id 123456abcdef \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST
-python3 scripts/acceptance/interrupted_provisioning.py run --run-id 123456abcdef \
+python3 scripts/tests/platform/interrupted_provisioning.py run --run-id 123456abcdef \
   --fixture-image REGISTRY/web-postgres@sha256:DIGEST \
   --api http://127.0.0.1:8000 --confirm-environment http://127.0.0.1:8000 \
   --confirm-outage pause-k3d-workloads-server-0-and-kill-platform-api \
@@ -112,7 +112,7 @@ Grant project roles through the Platform API, then run the [human access and aut
 Use a current human platform-administrator token once to create the privileged, expiring test-runner client. Choose an output path outside the repository on encrypted or otherwise protected storage **on the controller running Ansible**, not on the platform host. Create its parent directory first with restrictive permissions; the playbook refuses a missing, unwritable, or existing output path before creating the one-time credential:
 
 ```bash
-ansible-playbook ansible/bootstrap-platform-test-runner.yml \
+ansible-playbook ansible/operations/bootstrap-platform-test-runner.yml \
   -e @/path/to/protected-human-bootstrap-vars.yml
 ```
 
@@ -127,7 +127,7 @@ name and refuses an absent or ambiguous match. The explicit confirmation prevent
 that name from being revoked accidentally:
 
 ```bash
-ansible-playbook ansible/revoke-platform-test-runner.yml \
+ansible-playbook ansible/operations/revoke-platform-test-runner.yml \
   -e @/path/to/protected-human-admin-vars.yml \
   -e platform_confirm_test_runner_revocation=platform-acceptance-suite
 ```
@@ -141,7 +141,7 @@ be bootstrapped with a human token and receives a new one-time secret.
 Run the suite with the protected bootstrap output as its variable file:
 
 ```bash
-ansible-playbook ansible/test-platform.yml \
+ansible-playbook ansible/tests/platform/test-platform.yml \
   -e @/path/to/protected-test-runner.json
 ```
 
@@ -158,7 +158,7 @@ Kubernetes object checks to the platform host:
 
 ```bash
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-components.yml \
+  ansible/tests/platform/test-platform-components.yml \
   -e @/path/to/protected-test-runner.json
 ```
 
@@ -190,7 +190,8 @@ recovery reconciliation on a shared lab.
 
 The harness creates neutral projects and attempts retirement/identity cleanup
 while retaining databases. It does not redeploy the platform or perform a backup
-restore. The Ansible wrapper `ansible/test-platform-hosted-access.yml` defaults
+restore. The Ansible wrapper
+`ansible/tests/platform/test-platform-hosted-access.yml` defaults
 to an offline plan and consumes already prepared host-side inputs.
 [EV-45](access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026)
 records all 39 live core checks passed with timed expiry, but nine checks remain
@@ -238,13 +239,13 @@ Create a separate, one-day test runner; do not reuse the normal acceptance runne
 Use a new protected output path and run its active check immediately:
 
 ```bash
-ansible-playbook ansible/bootstrap-platform-test-runner.yml \
+ansible-playbook ansible/operations/bootstrap-platform-test-runner.yml \
   -e @/path/to/protected-human-bootstrap-vars.yml \
   -e platform_test_runner_name=platform-expiry-drill \
   -e platform_test_runner_expires_in_days=1 \
   -e platform_test_runner_output=/path/to/protected-expiry-drill.json
 
-ansible-playbook ansible/verify-platform-test-runner-expiry.yml \
+ansible-playbook ansible/tests/platform/verify-platform-test-runner-expiry.yml \
   -e @/path/to/protected-expiry-drill.json \
   -e platform_expiry_drill_phase=active
 ```
@@ -253,7 +254,7 @@ Schedule the same verifier after the `platform_test_runner_expires_at` timestamp
 written to that protected file, with a small delay for clock skew:
 
 ```bash
-ansible-playbook ansible/verify-platform-test-runner-expiry.yml \
+ansible-playbook ansible/tests/platform/verify-platform-test-runner-expiry.yml \
   -e @/path/to/protected-expiry-drill.json \
   -e platform_expiry_drill_phase=expired
 ```
@@ -270,7 +271,7 @@ own disposable project, administrator persona and deployment credential:
 
 ```bash
 ansible-playbook -i ansible/inventory.yml \
-  ansible/test-platform-identity-provider-outage.yml \
+  ansible/tests/platform/test-platform-identity-provider-outage.yml \
   -e platform_api_url=https://platform.eseidinger.de \
   -e platform_identity_drill_host=platform \
   -e @/path/to/protected-test-runner.json \

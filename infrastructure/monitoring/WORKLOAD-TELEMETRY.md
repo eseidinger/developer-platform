@@ -72,7 +72,7 @@ provider response IDs, exception text and application-reported cost estimates
 are not retained. The change applies to new spans; metadata removed from older
 traces cannot be recovered. The 24-hour trace retention and existing storage,
 sampling and ingress budgets remain unchanged. Validate locally with
-`PYTHONPATH=platform/app/src uv run --project platform/app python scripts/verify/observability/verify-ai-trace-pipeline.py`;
+`PYTHONPATH=platform/app/src uv run --project platform/app python scripts/tests/components/observability/verify-ai-trace-pipeline.py`;
 its gateway-sanitized workload fixture verifies real Alloy/Tempo model/framework
 searches and project-scoped reads without live model calls.
 

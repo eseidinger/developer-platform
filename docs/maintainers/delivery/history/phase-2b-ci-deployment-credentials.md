@@ -59,9 +59,9 @@ Using a disposable project and repository pipeline:
 For the current lab, items 7 and 8 are accepted as deferred rather than treated
 as routine release checks: expiry requires a real one-day wait, and item 8 causes
 a deliberate identity-service outage. The automated procedures are
-[`verify-platform-test-runner-expiry.yml`](../../../../ansible/verify-platform-test-runner-expiry.yml)
+[`verify-platform-test-runner-expiry.yml`](../../../../ansible/tests/platform/verify-platform-test-runner-expiry.yml)
 and
-[`test-platform-identity-provider-outage.yml`](../../../../ansible/test-platform-identity-provider-outage.yml).
+[`test-platform-identity-provider-outage.yml`](../../../../ansible/tests/platform/test-platform-identity-provider-outage.yml).
 They remain available for a later maintenance-window validation, but this
 acceptance exception must not be interpreted as evidence that either drill ran.
 

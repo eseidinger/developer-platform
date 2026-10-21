@@ -107,8 +107,8 @@ Its host/source preparation and installation record remain remote orchestration.
 From the repository root with development requirements installed:
 
 ```bash
-python3 -m unittest discover -s scripts/tests -v
-python3 -m unittest discover -s ansible/tests -v
+python3 -m unittest discover -s scripts/tests/unit -v
+python3 -m unittest discover -s ansible/tests/unit -v
 ansible-playbook -i ansible/inventory.example.yml \
   ansible/deploy.yml --syntax-check
 ```

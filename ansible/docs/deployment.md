@@ -101,7 +101,8 @@ ansible-playbook -i ansible/inventory.example.yml ansible/deploy.yml --syntax-ch
 `--check` only previews host package/directory changes; source transfer,
 generated configuration, and bootstrap are skipped. It is not a deployment
 validation on a fresh host. After deployment, the optional
-`scripts/acceptance/smoke.py` test creates and retains a project; it is not run
+`scripts/tests/platform/smoke.py` test creates and retains a project; it is not
+run
 automatically.
 
 For a fresh-install sequence covering basic users, revocable CI credentials, and

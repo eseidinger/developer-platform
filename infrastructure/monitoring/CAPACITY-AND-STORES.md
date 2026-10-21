@@ -41,7 +41,8 @@ missing usage is not synthesized as healthy zero. Recording rules in
 `capacity-rules.yaml` combine these metrics with kube-state-metrics resource and
 ownership data.
 
-`scripts/verify/observability/check-monitoring.py` validates the configuration
+`scripts/tests/components/observability/check-monitoring.py` validates the
+configuration
 and executes `tests/capacity.test.yaml`: it covers namespace isolation, rolling
 ReplicaSets, sidecars, ordinary init exclusion, completed jobs, and incomplete
 limits.
@@ -95,7 +96,8 @@ virtual filesystems, and are independent of project selection. Space utilization
 uses capacity minus space available to an unprivileged process, including
 reserved blocks. Filesystems without inode capacity have no inode ratio.
 
-`scripts/verify/observability/check-postgres-monitoring.py` creates disposable
+`scripts/tests/components/observability/check-postgres-monitoring.py` creates
+disposable
 PostgreSQL 18, exporter and Prometheus containers. It verifies repeatable role
 setup, denied application reads/writes, aggregate privacy, database selection,
 absent/unlimited values and dashboard query readback using production
@@ -155,7 +157,8 @@ unknown, not proof of zero traffic or completed external integration.
 Shared-server CPU/I/O is labeled separately from attributable resource/workload
 signals.
 
-Run `scripts/verify/observability/verify-store-metric-pipeline.py` for real
+Run `scripts/tests/components/observability/verify-store-metric-pipeline.py` for
+real
 signed RustFS I/O through production Alloy into disposable Prometheus,
 sensitive-dimension exclusion and parsing all store-dashboard queries. Native
 OpenSearch/Qdrant fixtures additionally verify collector permissions and

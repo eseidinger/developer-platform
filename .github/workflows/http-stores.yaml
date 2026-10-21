@@ -19,7 +19,11 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: platform/ui
       - run: docker build --target store-console-export --output type=local,dest=/tmp/platform-store-consoles platform
-      - run: STORE_CONSOLE_FIXTURE=1 STORE_RUSTFS_CONSOLE_DIR=/tmp/platform-store-consoles/rustfs uv run --project platform/app python scripts/verify/stores/verify-shared-store-compose.py
+      - run: >-
+          STORE_CONSOLE_FIXTURE=1
+          STORE_RUSTFS_CONSOLE_DIR=/tmp/platform-store-consoles/rustfs uv
+          run --project platform/app python
+          scripts/tests/components/stores/verify-shared-store-compose.py
 
   opensearch-console:
     runs-on: ubuntu-latest
@@ -47,7 +51,9 @@ jobs:
           for name in ('opensearch', 'opensearch-dashboards'):
               subprocess.run(['docker', 'pull', config['services'][name]['image']], check=True)
           PY
-      - run: STORE_DASHBOARDS_FIXTURE=1 uv run --project platform/app python scripts/verify/stores/verify-shared-store-compose.py
+      - run: >-
+          STORE_DASHBOARDS_FIXTURE=1 uv run --project platform/app python
+          scripts/tests/components/stores/verify-shared-store-compose.py
 
   installation:
     runs-on: ubuntu-latest
@@ -69,8 +75,12 @@ jobs:
           for name in ('rustfs', 'qdrant', 'opensearch'):
               subprocess.run(['docker', 'pull', config['services'][name]['image']], check=True)
           PY
-      - run: uv run --project platform/app python scripts/verify/stores/verify-shared-store-compose.py
-      - run: uv run --project platform/app python scripts/verify/stores/verify-opensearch-tls.py
+      - run: >-
+          uv run --project platform/app python
+          scripts/tests/components/stores/verify-shared-store-compose.py
+      - run: >-
+          uv run --project platform/app python
+          scripts/tests/components/stores/verify-opensearch-tls.py
 
   rustfs-lifecycle:
     runs-on: ubuntu-latest
@@ -83,7 +93,10 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --group analytics-fixtures --locked
       - run: docker pull rustfs/rustfs:1.0.2@sha256:7e948dad4748bda48f8985fda7195f8cf2e4259427011f6120acc2c9acf51587
-      - run: STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group analytics-fixtures python scripts/verify/stores/verify-rustfs.py
+      - run: >-
+          STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group
+          analytics-fixtures python
+          scripts/tests/components/stores/verify-rustfs.py
 
   qdrant-lifecycle:
     runs-on: ubuntu-latest
@@ -96,7 +109,9 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --locked
       - run: docker pull qdrant/qdrant:v1.19.2@sha256:b7b0444c4c351c970b98e90a6f89c2ee4287c65b44e52b4cb503fa5b2aa927ad
-      - run: uv run --project platform/app python scripts/verify/stores/verify-qdrant.py
+      - run: >-
+          uv run --project platform/app python
+          scripts/tests/components/stores/verify-qdrant.py
 
   opensearch-lifecycle:
     runs-on: ubuntu-latest
@@ -109,7 +124,9 @@ jobs:
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --locked
       - run: docker pull opensearchproject/opensearch:3.9.0@sha256:adfa61f85025d06b4aeb562e7e74fde7e31c437039c93c3862c17e9acebd6c7c
-      - run: uv run --project platform/app python scripts/verify/stores/verify-opensearch.py
+      - run: >-
+          uv run --project platform/app python
+          scripts/tests/components/stores/verify-opensearch.py
 
   neo4j-community:
     runs-on: ubuntu-latest
@@ -131,9 +148,15 @@ jobs:
           docker build
           -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0
           infrastructure/persistence/neo4j
-      - run: uv run --project platform/app python scripts/verify/stores/verify-neo4j-catalog.py
-      - run: uv run --project platform/app python scripts/verify/stores/verify-neo4j-network-recreation.py
-      - run: NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify/stores/verify-neo4j.py
+      - run: >-
+          uv run --project platform/app python
+          scripts/tests/components/stores/verify-neo4j-catalog.py
+      - run: >-
+          uv run --project platform/app python
+          scripts/tests/components/stores/verify-neo4j-network-recreation.py
+      - run: >-
+          NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python
+          scripts/tests/components/stores/verify-neo4j.py
 
   native-performance:
     runs-on: ubuntu-latest
@@ -147,6 +170,8 @@ jobs:
       - run: docker build -t developer-platform-api:phase7-review platform
       - run: python3 scripts/generate/generate-dashboards.py --check
       - run: uv run --project platform/app --group analytics-fixtures python examples/store-observability/verify.py
-      - run: python3 scripts/verify/observability/verify-store-metric-pipeline.py
+      - run: >-
+          python3
+          scripts/tests/components/observability/verify-store-metric-pipeline.py
       - name: Verify native store alert behavior
         run: docker run --rm --network none --entrypoint /bin/promtool -v "$PWD/infrastructure/monitoring:/work:ro" -w /work prom/prometheus:v3.14.0 test rules tests/native-stores.test.yaml tests/stores.test.yaml

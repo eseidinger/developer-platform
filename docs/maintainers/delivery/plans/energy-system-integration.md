@@ -134,7 +134,7 @@ workload-log retention and the external energy end-to-end gate remain open. Oper
 setup is in the [hosted-access runbook](../../../operators/identity-and-access.md#hosted-application-access-installation-and-recovery).
 
 Acceptance automation progress (October 11, 2026): the neutral
-`scripts/acceptance/check-hosted-access.py` harness now provides an offline plan, explicitly
+`scripts/tests/platform/check-hosted-access.py` harness now provides an offline plan, explicitly
 confirmed live core checks, optional held-token expiry and isolated recovery
 reconciliation, safe private evidence, and resumable scope-checked cleanup.
 Provider/consumer fixtures use one public component and a private worker, only

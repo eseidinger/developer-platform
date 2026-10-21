@@ -42,8 +42,8 @@ Install test dependencies in a virtual environment, then run:
 ```bash
 uv sync --project platform/app
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
-python3 scripts/verify/observability/check-monitoring.py
-python3 scripts/verify/observability/check-workload-logs.py
+python3 scripts/tests/components/observability/check-monitoring.py
+python3 scripts/tests/components/observability/check-workload-logs.py
 docker compose config --quiet
 ```
 

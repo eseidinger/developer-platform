@@ -51,7 +51,7 @@ docker compose up -d postgres keycloak-db-init keycloak proxy
 # PLATFORM_BOOTSTRAP_SUBJECT in .env before starting the API.
 bash scripts/up.sh
 # Obtain and export a short-lived administrator PLATFORM_ACCESS_TOKEN first.
-python3 scripts/acceptance/smoke.py
+python3 scripts/tests/platform/smoke.py
 ```
 
 `init.py` creates a private `.env` without replacing existing values. The smoke
@@ -100,8 +100,8 @@ or `python3 -m pytest platform/cli/tests --cov=platform_cli` as needed.
 docker compose config --quiet
 uv sync --project platform/app
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
-python3 -m unittest discover -s ansible/tests -v
-python3 scripts/verify/observability/check-monitoring.py
+python3 -m unittest discover -s ansible/tests/unit -v
+python3 scripts/tests/components/observability/check-monitoring.py
 python3 scripts/checks/check-doc-links.py
 python3 -m unittest discover -s operations/backup/tests -v
 uv run --project platform/app python -m compileall -q platform/app/src/app scripts operations

@@ -611,9 +611,9 @@ Neo4j checks run only against disposable services:
 
 ```bash
 docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 infrastructure/persistence/neo4j
-uv run --project platform/app python scripts/verify/stores/verify-neo4j-catalog.py
-uv run --project platform/app python scripts/verify/stores/verify-neo4j-network-recreation.py
-NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/verify/stores/verify-neo4j.py
+uv run --project platform/app python scripts/tests/components/stores/verify-neo4j-catalog.py
+uv run --project platform/app python scripts/tests/components/stores/verify-neo4j-network-recreation.py
+NEO4J_CONSOLE_FIXTURE=1 uv run --project platform/app python scripts/tests/components/stores/verify-neo4j.py
 ```
 
 The browser fixture additionally needs the portal's installed Playwright Chromium.
@@ -624,7 +624,7 @@ links all eight dashboards, native pipeline verification and workload instrument
 
 
 `UV_CACHE_DIR=/tmp/uvcache uv run --project platform/app python
-scripts/verify/stores/verify-named-postgres.py` runs against a disposable PostgreSQL container.
+scripts/tests/components/stores/verify-named-postgres.py` runs against a disposable PostgreSQL container.
 It verifies database separation, cross-writer DDL, future-object read rights,
 read-only/foreign-resource denial, no expiry/admin escalation, session revocation,
 30-day rotation/retry/deadline handling, real authentication/query/session expiry

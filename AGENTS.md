@@ -28,8 +28,12 @@ These guidelines apply throughout the repository.
   named modules close to the code that uses it, with clear dependency boundaries.
   Avoid generic utility modules that accumulate unrelated behavior.
 - Separate setup, generation, validation, operational commands, and shared
-  fixtures where they have different purposes. Follow `scripts/README.md` when
-  adding repository scripts.
+  test support where they have different purposes. Follow `scripts/README.md`
+  and `ansible/README.md` when adding repository automation.
+- Under `scripts/` and `ansible/`, group tests by execution environment:
+  offline `unit/`, focused integration `components/` where applicable, and
+  running-platform `platform/`. Keep reusable fixtures in test `support/`;
+  avoid parallel acceptance, verification, and drill directory taxonomies.
 - When moving files or changing module boundaries, update imports, callers,
   workflows, tests, documentation, and paths derived from file locations. Verify
   the supported invocation methods after the change.

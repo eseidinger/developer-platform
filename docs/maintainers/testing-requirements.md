@@ -128,10 +128,11 @@ all of it:
    then remove that setting from the runtime environment. Obtain a short-lived
    human token through the documented PKCE flow.
 4. Use the human token once with
-   [`bootstrap-platform-test-runner.yml`](../../ansible/bootstrap-platform-test-runner.yml).
+   [`bootstrap-platform-test-runner.yml`](../../ansible/operations/bootstrap-platform-test-runner.yml).
    Keep its one-time output outside the repository in a protected mode `0600`
    file on the controller. The existing initial API suite is
-   [`test-platform.yml`](../../ansible/test-platform.yml), invoked with that
+   [`test-platform.yml`](../../ansible/tests/platform/test-platform.yml),
+   invoked with that
    protected runner file; additional API modules have their own prerequisites.
 5. Record the API origin, source and installation revisions, enabled
    capabilities, test-run ID, result, and cleanup status. Retire the disposable

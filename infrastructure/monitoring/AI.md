@@ -15,7 +15,8 @@ loggers are suppressed because their exception messages can contain provider
 payloads. Ordinary platform and hosted-application instrumentation remains
 independent.
 
-`scripts/verify/observability/verify-ai-trace-pipeline.py` exercises the actual
+`scripts/tests/components/observability/verify-ai-trace-pipeline.py` exercises
+the actual
 platform HTTP middleware and focused OpenLIT wrapper with synthetic provider
 responses through disposable production-pinned Alloy/Tempo containers. The
 October 17 local fixture reads back 100 of 100 root request traces and exactly
@@ -117,7 +118,8 @@ idle usage. Safe Tempo links contain only a fixed query and bounded time range.
 ## Verification and rollout
 
 Run the AI backend tests and
-`scripts/verify/observability/verify-ai-metric-pipeline.py` (Docker). The former
+`scripts/tests/components/observability/verify-ai-metric-pipeline.py` (Docker).
+The former
 uses the actual LangChain/OpenAI/OpenLIT path with mock HTTP responses,
 including finalization and failure; it checks correlation, cardinality-safe
 metadata and seeded content exclusion. The latter uses disposable

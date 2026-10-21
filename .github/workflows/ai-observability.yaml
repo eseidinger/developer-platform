@@ -18,6 +18,10 @@ jobs:
           docker pull prom/prometheus:v3.14.0
           docker pull grafana/tempo@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd
       - name: Verify direct metrics and every AI dashboard query
-        run: uv run --project platform/app python scripts/verify/observability/verify-ai-metric-pipeline.py
+        run: >-
+          uv run --project platform/app python
+          scripts/tests/components/observability/verify-ai-metric-pipeline.py
       - name: Verify every root trace, focused model spans and private-content removal
-        run: uv run --project platform/app python scripts/verify/observability/verify-ai-trace-pipeline.py
+        run: >-
+          uv run --project platform/app python
+          scripts/tests/components/observability/verify-ai-trace-pipeline.py

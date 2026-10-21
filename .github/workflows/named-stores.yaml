@@ -37,4 +37,6 @@ jobs:
           NAMED_POSTGRES_CONSOLE: "1"
           RESTIC_TEST_BINARY: /usr/bin/restic
           STORE_ANALYTICS_FIXTURE: "1"
-        run: uv run --project platform/app --group analytics-fixtures python scripts/verify/stores/verify-named-postgres.py
+        run: >-
+          uv run --project platform/app --group analytics-fixtures python
+          scripts/tests/components/stores/verify-named-postgres.py

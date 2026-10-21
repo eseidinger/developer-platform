@@ -1,85 +1,79 @@
 # Ansible automation
 
 Use the [remote installation guide](../docs/operators/install-remote.md) for the
-canonical deployment sequence. This directory owns the platform playbooks,
-inventory adapters, host configuration templates, and offline contract tests.
-Configuration rules live in `scripts/internal/deployment_options.py` and
-`scripts/internal/platform_configuration.py`. Both local operators and Ansible
-use `scripts/setup/configure-platform.py` and
-`scripts/operations/deploy-platform.py`; see the
-[shared configuration and deployment guide](../docs/operators/configuration-and-deployment.md).
+canonical deployment sequence. Run Ansible commands from the repository root;
+`ansible.cfg` locates the shared inventory filter plugin for every playbook.
 
-## Structure
+## Deployment and operations
 
-- Top-level playbooks are stable public entry points for operators and
-  workflows.
-- `tasks/deploy/` separates preflight checks, host setup, source transfer,
-  private configuration, tools, monitoring storage, maintenance checks, startup,
-  and installation records.
-- `tasks/acceptance/` groups platform and component acceptance phases.
-- `tasks/drills/` groups capacity, failure-signal, and data-rollback phases.
-- `templates/` contains installed SSH/systemd/Docker configuration and the shell
-  fragments used to record installation evidence.
-- `filter_plugins/platform_inventory.py` adapts shared validation and rendering
-  to non-secret inventory settings. Keep it beside the public playbooks so
-  automatic Ansible discovery continues to work.
-- `tests/` checks inventory rendering, task ordering, command arguments, and
-  cleanup contracts without deploying the platform.
-- `docs/` contains the detailed variable, credential, and operational
-  references.
+- **`deploy.yml`**: the primary installation entry point. Prepare the host,
+  transfer sources, and invoke the shared configuration/deployment scripts.
+- **`operations/install-human-database-access.yml`**: install the optional
+  restricted SSH tunnel.
+- **`operations/bootstrap-platform-test-runner.yml`**: create the expiring
+  credential used by platform tests.
+- **`operations/revoke-platform-test-runner.yml`**: revoke that credential and
+  wait for provider cleanup.
+- **`operations/retire-platform-project.yml`**: explicitly retire a selected
+  project and verify cleanup.
 
-The entry points use static task imports. Registered variables remain available
-across phases, and each original `block`/`always` boundary encloses its imported
-steps. Preserve task order, delegation, `no_log`, privilege settings, and
-cleanup when changing these files.
+Local operators and Ansible use `scripts/setup/configure-platform.py` and
+`scripts/operations/deploy-platform.py`. Shared configuration rules live in
+`scripts/internal`; see the
+[configuration and deployment
+guide](../docs/operators/configuration-and-deployment.md).
 
-## Deployment and access
+## Tests
 
-- `deploy.yml`: prepare the host, transfer the checkout, and reconcile services.
-- `install-human-database-access.yml`: install the optional restricted SSH
-  tunnel.
-- [Deployment reference](docs/deployment.md): prerequisites, source transfer,
-  reapplication, and deployment outage behavior.
-- [Inventory options](docs/inventory-options.md): defaults and explicitly
-  managed non-secret settings, store/network selection, and tracing.
+All tests live under [`tests/`](tests/README.md), divided by their execution
+requirements:
 
-## Credentials and acceptance
+- **`tests/unit/`** contains Python tests for inventory rendering, command
+  arguments, ordering, and cleanup contracts. They use offline fixtures and
+  temporary local playbooks.
+- **`tests/platform/`** contains playbooks against an installed platform: role
+  and CI credentials, application components, hosted/human access, credential
+  expiry, capacity, egress, outages, failure signals, and data-aware rollback.
+  Hosted/human access default to offline plans; other playbooks may change
+  resources immediately or deliberately interrupt shared services.
 
-- `bootstrap-platform-test-runner.yml`, `revoke-platform-test-runner.yml`, and
-  `verify-platform-test-runner-expiry.yml`: manage the scoped acceptance runner.
-  See [test-runner credentials](docs/test-runner.md).
-- `test-platform.yml`, `test-platform-ci-credential.yml`, and
-  `test-platform-components.yml`: exercise platform/component contracts using
-  disposable projects and protected runner credentials.
-- `test-platform-hosted-access.yml` and
-  `test-platform-human-database-access.yml`: default to offline plans; live
-  commands require a separately confirmed scope and protected operator session.
-- `retire-platform-project.yml`: explicitly retire a selected project.
+A `test-` filename does not make a playbook safe to run on an arbitrary host.
+Read the [platform test and drill reference](docs/acceptance-and-drills.md)
+before execution. Credential setup is documented in the
+[test-runner guide](docs/test-runner.md).
 
-## Operational drills
+## Implementation and configuration
 
-Capacity, egress, PostgreSQL outage, identity-provider outage, failure-signal,
-and rollback-data playbooks live beside the entry points for compatibility. Read
-the [acceptance and drill reference](docs/acceptance-and-drills.md) before
-execution. Shared-service outage drills require explicit approval and belong in
-protected operator workflows, outside routine pull-request CI.
+- `tasks/deploy/`: imported deployment phases.
+- `tasks/tests/`: imported platform-test scenarios, grouped by responsibility.
+- `templates/`: installed SSH/systemd/Docker configuration and installation
+  evidence fragments.
+- `filter_plugins/`: the shared configuration rules' Ansible adapter.
+- `docs/`: inventory, deployment, credential, and test procedures.
+- `inventory.example.yml` and `human-bootstrap-vars.example.yml`: configuration
+  examples, not playbooks. Keep their local counterparts private.
 
-## Local checks
+Files under `tasks/` are task fragments, not standalone playbooks. Preserve
+registered variables, task order, `block`/`always` cleanup, `no_log`, and
+privilege boundaries when changing them. Operational and platform-test playbooks
+previously lived at the root; their commands now use the directories above.
 
-Install the root `requirements.txt`, then run these from the repository root:
+## Offline checks
+
+Install the root development requirements, then run from the repository root:
 
 ```bash
 ruff check ansible
 ruff format --check ansible
 pymarkdown scan --recurse ansible
 mdformat --check ansible
-python3 -m unittest discover -s ansible/tests -v
+python3 -m unittest discover -s ansible/tests/unit -v
 ansible-playbook -i ansible/inventory.example.yml \
   ansible/deploy.yml --syntax-check
 ```
 
-Run `yamllint` against the versioned examples, playbooks, and task files, and
-`ansible-lint --offline` against the top-level playbooks. Keep local
-`inventory.yml` and `human-bootstrap-vars.yml` private; use the example
-inventory for syntax checks. Syntax checking does not execute deployment or
-drill tasks.
+Run `yamllint` on versioned YAML and `ansible-lint --offline` on `deploy.yml`,
+`operations/*.yml`, and `tests/platform/*.yml`. Syntax checking does not execute
+any deployment or test. Detailed deployment behavior lives in the
+[deployment reference](docs/deployment.md); optional settings are described in
+[inventory options](docs/inventory-options.md).

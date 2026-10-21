@@ -1,0 +1,216 @@
+---
+- name: >-
+    Exercise application, ingress, and monitoring failure signals
+  hosts: localhost
+  gather_facts: false
+  vars:
+    platform_failure_drill_acknowledgement: ''
+    platform_failure_drill_install_dir: /opt/developer-platform
+    platform_failure_drill_kubeconfig: >-
+      /opt/developer-platform/.runtime/admin.kubeconfig
+    platform_failure_drill_image: hashicorp/http-echo:1.0.0
+  tasks:
+
+    - name: >-
+        Require explicit approval and protected failure-drill inputs
+      ansible.builtin.assert:
+        that:
+          - >-
+            platform_allow_failure_signal_drill | default(false) | bool
+          - >-
+              platform_failure_drill_acknowledgement ==
+              'I_ACCEPT_FAILURE_SIGNAL_DRILL'
+          - platform_api_url is defined
+          - platform_oidc_token_url is defined
+          - platform_test_runner_client_id is defined
+          - platform_test_runner_client_secret is defined
+          - platform_failure_drill_host is defined
+          - platform_failure_drill_host in groups['all']
+          - platform_failure_drill_install_dir | length > 1
+          - platform_failure_drill_kubeconfig | length > 1
+        fail_msg: >-
+          This drill briefly removes a disposable Deployment and stops the
+          shared proxy and Prometheus. Supply protected runner configuration, a
+          reachable platform inventory host, explicit enablement, and
+          I_ACCEPT_FAILURE_SIGNAL_DRILL.
+      no_log: true
+
+    - name: Establish a unique disposable failure-signal project
+      ansible.builtin.set_fact:
+        failure_project: >-
+          {{ platform_failure_project | default('failure-' + lookup('pipe',
+          'date +%s') + '-' + (9999 | random | string)) }}
+
+    - name: Require a valid generated failure-signal project name
+      ansible.builtin.assert:
+        that: >-
+          failure_project is match('^(?:[a-z]|[a-z][a-z0-9-]{0,30}[a-z0-9])$')
+
+
+    - name: >-
+        Read the exact platform environment before temporary failure-drill
+        policy changes
+      ansible.builtin.slurp:
+        src: "{{ platform_failure_drill_install_dir }}/.env"
+      delegate_to: "{{ platform_failure_drill_host }}"
+      become: true
+      register: failure_original_environment
+      no_log: true
+
+    - name: >-
+        Exercise failure signals with a disposable public workload
+      block:
+
+        - name: Prepare temporary policy and a healthy public canary
+          ansible.builtin.import_tasks: >-
+            ../../tasks/tests/failure-signals/canary.yml
+
+        - name: Verify application failure and recovery signals
+          ansible.builtin.import_tasks: >-
+            ../../tasks/tests/failure-signals/application-recovery.yml
+
+        - name: >-
+            Verify ingress and monitoring outages with local cleanup
+          ansible.builtin.import_tasks: >-
+            ../../tasks/tests/failure-signals/shared-outages.yml
+      always:
+
+        - name: Restore the exact original platform environment
+          ansible.builtin.copy:
+            content: "{{ failure_original_environment.content | b64decode }}"
+            dest: "{{ platform_failure_drill_install_dir }}/.env"
+            owner: root
+            group: root
+            mode: '0600'
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          when: failure_original_environment is defined
+          no_log: true
+
+        - name: >-
+            Recreate only the Platform API with its original failure-drill
+            policy
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - up
+              - -d
+              - --force-recreate
+              - --wait
+              - --wait-timeout
+              - '120'
+              - platform-api
+            chdir: "{{ platform_failure_drill_install_dir }}"
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: true
+          when: failure_original_environment is defined
+
+        - name: Ensure the shared edge proxy is running after the drill
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - up
+              - -d
+              - --wait
+              - --wait-timeout
+              - '120'
+              - proxy
+            chdir: "{{ platform_failure_drill_install_dir }}"
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: false
+          failed_when: false
+
+        - name: Ensure Prometheus is running after the drill
+          ansible.builtin.command:
+            argv:
+              - docker
+              - compose
+              - up
+              - -d
+              - --wait
+              - --wait-timeout
+              - '120'
+              - prometheus
+            chdir: "{{ platform_failure_drill_install_dir }}"
+          delegate_to: "{{ platform_failure_drill_host }}"
+          become: true
+          changed_when: false
+          failed_when: false
+
+        - name: Refresh runner token before failure-project cleanup
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: failure_cleanup_response
+          retries: 24
+          delay: 5
+          until: failure_cleanup_response.status | default(0) == 200
+          failed_when: false
+          no_log: true
+
+        - name: Select the failure-project cleanup token
+          ansible.builtin.set_fact:
+            failure_cleanup_token: >-
+              {{ failure_cleanup_response.get('json', {}).get('access_token',
+              '') }}
+          no_log: true
+
+        - name: Read failure-project retirement scope
+          ansible.builtin.uri:
+            url: >-
+              {{ platform_api_url }}/projects/{{ failure_project
+              }}/retirement-preview
+            headers:
+              Authorization: "Bearer {{ failure_cleanup_token }}"
+            status_code:
+              - 200
+              - 404
+          register: failure_cleanup_preview
+          failed_when: false
+          when: failure_cleanup_token | length > 0
+          no_log: true
+
+        - name: Retire the disposable failure-signal project
+          ansible.builtin.uri:
+            url: >-
+              {{ platform_api_url }}/projects/{{ failure_project }}/retire
+            method: POST
+            headers:
+              Authorization: "Bearer {{ failure_cleanup_token }}"
+            body_format: json
+            body:
+              confirm_name: "{{ failure_project }}"
+              scope_token: "{{ failure_cleanup_preview.json.scope_token }}"
+            status_code:
+              - 200
+              - 202
+              - 404
+              - 409
+          register: failure_cleanup
+          until: failure_cleanup.status != 202
+          retries: 60
+          delay: 5
+          failed_when: false
+          when:
+            - failure_cleanup_token | length > 0
+            - >-
+              failure_cleanup_preview.status | default(0) | int == 200
+          no_log: true
+
+    - name: Report non-secret failure-signal evidence
+      ansible.builtin.debug:
+        msg: >-
+          PASS: {{ failure_project }} produced and resolved project-attributed
+          application and ingress alerts, and Prometheus was observed
+          unavailable and recovered. Confirm actual notification receipt and
+          external monitoring detection separately.

@@ -19,7 +19,7 @@ redacted HTTP results as evidence.
 
 ## Human PostgreSQL access acceptance playbook
 
-The opt-in [`test-platform-human-database-access.yml`](../../../ansible/test-platform-human-database-access.yml)
+The opt-in [`test-platform-human-database-access.yml`](../../../ansible/tests/platform/test-platform-human-database-access.yml)
 wrapper automates the Phase 10.7 core tunnel and SQL checks. It does **not**
 deploy the platform, install the bastion, publish the neutral fixture, or close
 the full acceptance gate. Its default `plan` validates the run scope without
@@ -41,10 +41,10 @@ evidence below describes the earlier implicit project-database model and does no
 establish acceptance for this replacement. See the [current workflow](../data-stores.md).
 
 First deploy the platform and the restricted bastion using
-[`install-human-database-access.yml`](../../../ansible/install-human-database-access.yml).
+[`install-human-database-access.yml`](../../../ansible/operations/install-human-database-access.yml).
 Install or update the host-side runner environment from
 `platform/acceptance/requirements.txt` as in [Prepare the runner and fixture](#prepare-the-runner-and-fixture).
-Transfer `scripts/acceptance/check-human-database-access.py`,
+Transfer `scripts/tests/platform/check-human-database-access.py`,
 `platform/acceptance/human_database.py`, and updated requirements to the target
 through the same reviewed runner-only update process used for hosted access;
 the Ansible acceptance wrapper does not transfer code. Publish the neutral
@@ -63,11 +63,11 @@ From the controller checkout, use a fresh 12-character lowercase hexadecimal
 run ID and the exact API origin (normally the host-local loopback API):
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-human-database-access.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-human-database-access.yml \
   -e human_database_run_id=0123456789ab \
   -e human_database_fixture_image=docker.io/example/neutral-fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
-ansible-playbook -i ansible/inventory.yml ansible/test-platform-human-database-access.yml \
+ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-human-database-access.yml \
   -e human_database_command=run \
   -e human_database_run_id=0123456789ab \
   -e human_database_fixture_image=docker.io/example/neutral-fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
@@ -170,7 +170,7 @@ records its scope and remaining checks; the full hosted-access gate is still ope
 after the [hosted-access installation](../identity-and-access.md#hosted-application-access-installation-and-recovery)
 is deployed. It does not deploy, upgrade, or reset the platform.
 
-The entry point is `scripts/acceptance/check-hosted-access.py`. It uses two uniquely named
+The entry point is `scripts/tests/platform/check-hosted-access.py`. It uses two uniquely named
 projects, `ha-<12-hex-run-id>-provider` and `ha-<run-id>-consumer`, each with one
 public API, one private worker, and its own PostgreSQL database. The neutral
 fixture deliberately has no application authorization and contains only synthetic
@@ -412,7 +412,7 @@ platform-admin grant, which the harness checks before provisioning.
 An offline plan performs no network calls or writes:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/acceptance/check-hosted-access.py plan \
+.runtime/acceptance-venv/bin/python scripts/tests/platform/check-hosted-access.py plan \
   --run-id 0123456789ab \
   --fixture-image '<public-registry>/hosted-access-fixture@sha256:<digest>' \
   --apps-domain apps.example.org \
@@ -423,7 +423,7 @@ Choose a fresh run ID for each live run. Repeat the API origin exactly as the
 explicit environment confirmation:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/acceptance/check-hosted-access.py run \
+.runtime/acceptance-venv/bin/python scripts/tests/platform/check-hosted-access.py run \
   --api http://127.0.0.1:8000 \
   --confirm-environment http://127.0.0.1:8000 \
   --run-id 0123456789ab \
@@ -485,7 +485,7 @@ removes that grant and account. Abrupt termination or unavailable dependencies
 can leave resources or cleanup pending. Keep the private journal and retry:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/acceptance/check-hosted-access.py cleanup \
+.runtime/acceptance-venv/bin/python scripts/tests/platform/check-hosted-access.py cleanup \
   --api http://127.0.0.1:8000 \
   --confirm-environment http://127.0.0.1:8000 \
   --run-id 0123456789ab \
@@ -518,7 +518,8 @@ rotation timers, request retention, component monitoring/centralized log
 retention, DNS-address-change/reapply behavior, and the separately owned versioned energy-system suite. Skipped
 optional drills are also recorded as deferred, never as passed.
 
-For remote execution, `ansible/test-platform-hosted-access.yml` defaults to
+For remote execution, `ansible/tests/platform/test-platform-hosted-access.yml`
+defaults to
 `plan` and uses the prepared runner environment above. Supply
 `hosted_access_run_id`, `hosted_access_fixture_image`, and
 `hosted_access_apps_domain`, plus `hosted_access_issuer` for the offline plan;
@@ -962,7 +963,7 @@ already obtained above:
 export PLATFORM_ADMIN_TOKEN="$ADMIN_TOKEN"
 export PHASE1B_PROJECT="$A"
 export DEVELOPER_TOKEN='…' # optional; enables the 403 assertions
-.venv/bin/python scripts/checks/check-phase-1b-security.py
+.venv/bin/python scripts/tests/platform/check-phase-1b-security.py
 ```
 
 The API allows only platform administrators to use `/operator/*`. The inspection

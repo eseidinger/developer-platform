@@ -19,7 +19,7 @@ especially `DATABASE_KEY`, as described in
 
 Human PostgreSQL access is a separate opt-in installation. After the API and
 generated `DATABASE_BASTION_TOKEN` are deployed, run
-`ansible-playbook -i ansible/inventory.yml ansible/install-human-database-access.yml`.
+`ansible-playbook -i ansible/inventory.yml ansible/operations/install-human-database-access.yml`.
 The dedicated SSH daemon binds to loopback by default. Set
 `platform_database_bastion_bind_ip` to a protected management-interface IPv4
 address and firewall port `platform_database_bastion_port` only when remote

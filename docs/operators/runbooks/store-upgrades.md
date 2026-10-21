@@ -20,7 +20,7 @@ NAMED_POSTGRES_IMAGE=REVIEWED_SOURCE_IMAGE \
 NAMED_POSTGRES_RECOVERY_IMAGE=REVIEWED_TARGET_IMAGE \
 NAMED_POSTGRES_EXTENSIONS=1 \
 RESTIC_TEST_BINARY=/path/to/restic \
-uv run --project platform/app python scripts/verify/stores/verify-named-postgres.py
+uv run --project platform/app python scripts/tests/components/stores/verify-named-postgres.py
 ```
 
 The fixture checks actual SQL/catalog restoration into an empty temporary server,
