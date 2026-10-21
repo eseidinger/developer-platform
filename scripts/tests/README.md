@@ -71,6 +71,11 @@ lifecycle runner uses the digest-pinned neutral image built from
 and listening on port 8080. Protected `v1alpha2` application behavior remains in
 the [hosted-access harness](../../docs/operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness).
 
+The lifecycle runner checks the neutral fixture's identity endpoint without a
+database binding. It preserves any historical implicit database and role that
+exist before retirement; new applications do not receive those implicitly.
+Named-store data access is checked separately using explicit component bindings.
+
 ```bash
 # Set this to the appropriate reviewed image reference ending @sha256:<digest>.
 export SMOKE_FIXTURE_IMAGE='hashicorp/http-echo@sha256:<reviewed-digest>'

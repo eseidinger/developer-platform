@@ -11,13 +11,82 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from tests.platform.harness import DrillError
-from tests.platform.lifecycle import logs, runner
+from tests.platform.lifecycle import logs, retirement, runner, security
 
 RUN = "0123456789ab"
 IMAGE = "ghcr.io/example/fixture@sha256:" + "a" * 64
 
 
 class LifecycleTests(unittest.TestCase):
+    def test_retirement_preserves_existing_database_and_does_not_require_implicit_one(
+        self,
+    ):
+        for before, after, succeeds in (
+            ("1|1", "1|1", True),
+            ("0|0", "0|0", True),
+            ("1|1", "0|0", False),
+        ):
+            with self.subTest(before=before, after=after):
+                fixture = Mock()
+                fixture.project = "lc-" + RUN
+                database = "project_lc_" + RUN
+                fixture.kubectl.side_effect = [
+                    Mock(stdout="https://127.0.0.1:6443"),
+                    Mock(stdout="namespace/project-lc-" + RUN),
+                    Mock(stdout=""),
+                ]
+                fixture.command.side_effect = [
+                    Mock(returncode=1, stderr="denied by provisioner-namespace-delete"),
+                    Mock(stdout=before),
+                    Mock(stdout=after),
+                ]
+                fixture.request.side_effect = [
+                    {"blockers": [], "retains": {"database": database}},
+                    {"code": "scope_changed"},
+                ]
+                fixture.api.request.return_value = {
+                    "status": "retired",
+                    "retained": {"database": database},
+                }
+                if succeeds:
+                    retirement.check_retirement(fixture)
+                    fixture.check.assert_called_once()
+                else:
+                    with self.assertRaisesRegex(
+                        DrillError, "retirement_sql_data_not_retained"
+                    ):
+                        retirement.check_retirement(fixture)
+                fixture.retire.assert_called_once()
+
+    def test_edge_check_works_without_an_implicit_database_binding(self):
+        fixture = Mock()
+        fixture.project = "lc-" + RUN
+        fixture.api.url = "http://127.0.0.1:8000"
+        fixture.api.http.get.return_value.status_code = 401
+        connection = Mock()
+        requested = []
+        connection.request.side_effect = lambda method, path, **kw: requested.append(
+            path
+        )
+        # The neutral fixture reports unavailable database readiness without a
+        # binding, while its HTTP identity endpoint remains available.
+        connection.getresponse.side_effect = lambda: Mock(
+            status=200 if requested[-1] == "/api/identity" else 503
+        )
+        with (
+            patch.object(
+                security.http.client, "HTTPConnection", return_value=connection
+            ),
+            patch.object(
+                security,
+                "wait_for",
+                side_effect=lambda ready, code: security.require(ready(), code),
+            ),
+        ):
+            security.check_edge(fixture, {"APPS_DOMAIN": "apps.localhost"}, False)
+        fixture.check.assert_called_once_with("authentication-and-edge-routing")
+        connection.close.assert_called_once()
+
     def arguments(self, *extra):
         return ["plan", "--run-id", RUN, "--fixture-image", IMAGE, *extra]
 

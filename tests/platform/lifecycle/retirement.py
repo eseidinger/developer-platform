@@ -44,6 +44,31 @@ def check_retirement(fixture):
     )
     require(rejected["code"] == "scope_changed", "stale_retirement_scope_accepted")
     fixture.kubectl("get", "namespace", "project-" + fixture.project, namespace=False)
+    # New applications receive database access through explicit named bindings.
+    # Preserve any historical implicit database and role that actually exist;
+    # do not require creating either merely to exercise project retirement.
+    database = "project_" + fixture.project.replace("-", "_")
+    query = (
+        "SELECT (SELECT count(*) FROM pg_database WHERE datname='" + database + "'),"
+        "(SELECT count(*) FROM pg_roles WHERE rolname='" + database + "')"
+    )
+    command = [
+        "docker",
+        "compose",
+        "exec",
+        "-T",
+        "postgres",
+        "psql",
+        "-X",
+        "-U",
+        "postgres",
+        "-d",
+        "postgres",
+        "-tAc",
+        query,
+    ]
+    before = fixture.command(command).stdout.strip()
+    require(before in {"0|0", "1|1"}, "legacy_database_role_inconsistent")
     fixture.retire()
     # A failed kubectl call alone is not evidence of deletion: require a successful
     # get with --ignore-not-found and an empty result.
@@ -67,33 +92,11 @@ def check_retirement(fixture):
         and inventory["retained"]["database"] == preview["retains"]["database"],
         "retirement_inventory_missing",
     )
-    database = "project_" + fixture.project.replace("-", "_")
     require(
         preview["retains"]["database"] == database, "retained_database_scope_mismatch"
     )
-    # Names are derived exclusively from the validated hexadecimal run id.
-    query = (
-        "SELECT (SELECT count(*) FROM pg_database WHERE datname='" + database + "'),"
-        "(SELECT count(*) FROM pg_roles WHERE rolname='" + database + "')"
-    )
-    result = fixture.command(
-        [
-            "docker",
-            "compose",
-            "exec",
-            "-T",
-            "postgres",
-            "psql",
-            "-X",
-            "-U",
-            "postgres",
-            "-d",
-            "postgres",
-            "-tAc",
-            query,
-        ]
-    )
-    require(result.stdout.strip() == "1|1", "retirement_sql_data_not_retained")
+    result = fixture.command(command)
+    require(result.stdout.strip() == before, "retirement_sql_data_not_retained")
     require(
         database in json.dumps(inventory["retained"]), "retained_inventory_mismatch"
     )

@@ -12,7 +12,10 @@ from ..harness import require, wait_for
 
 def check_edge(fixture, config, smoke):
     host = fixture.project + "." + config["APPS_DOMAIN"]
-    path = "/" if smoke else "/health/ready"
+    # This suite tests lifecycle without a named store binding. The fixture's
+    # readiness endpoint requires PostgreSQL; its identity endpoint proves HTTP
+    # routing without restoring the removed implicit database access.
+    path = "/" if smoke else "/api/identity"
 
     def ready():
         connection = None
