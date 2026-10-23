@@ -140,6 +140,8 @@ function AccessWorkspace({ project }: { project: string }) {
   const [timedOut, setTimedOut] = React.useState(false)
   const [writesDenied, setWritesDenied] = React.useState(false)
   const [notice, setNotice] = React.useState<string | null>(null)
+  const [showRevokedMemberships, setShowRevokedMemberships] =
+    React.useState(false)
   const terminalSeen = React.useRef(new Set<string>())
   const polling = (active: boolean, error: Error | null) =>
     active && (!error || isTransientApiError(error)) && Date.now() < deadline
@@ -797,62 +799,82 @@ function AccessWorkspace({ project }: { project: string }) {
                       remain pending.
                     </p>
                     <QueryMessage query={memberships} label="Memberships" />
+                    <label className="flex items-center gap-2 text-sm">
+                      <input
+                        type="checkbox"
+                        checked={showRevokedMemberships}
+                        onChange={(event) =>
+                          setShowRevokedMemberships(event.target.checked)
+                        }
+                      />
+                      Show revoked memberships
+                    </label>
                     {memberships.isSuccess && (
                       <RequestRows
-                        empty="No application memberships."
-                        rows={memberships.data.map((membership) => (
-                          <li
-                            className="space-y-2 rounded-lg border p-3"
-                            key={membership.id}
-                          >
-                            <div className="flex flex-wrap justify-between gap-2">
-                              <span className="break-all">
-                                {membership.spec.displayName ??
-                                  membership.spec.principalId}{' '}
-                                →{' '}
-                                {ownGroups.find(
-                                  (g) => g.id === membership.spec.groupId,
-                                )?.name ?? membership.spec.groupId}
-                              </span>
-                              <State state={membership.state} />
-                            </div>
-                            <p className="text-xs break-all text-muted-foreground">
-                              {membership.id} · {membership.spec.principalId}
-                            </p>
-                            {manage &&
-                              ['active', 'provisioning', 'failed'].includes(
-                                membership.state,
-                              ) && (
-                                <Button
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() =>
-                                    setEditor({
-                                      kind: 'confirmation',
-                                      title: 'Revoke application membership',
-                                      description:
-                                        'Remove this group grant. Existing sessions and tokens lose this authority within five minutes; cleanup retries independently.',
-                                      resource: membership,
-                                      destructive: true,
-                                      reload: () =>
-                                        reloadResource(
-                                          () => getMemberships(project),
-                                          membership.id,
-                                        ),
-                                      submit: (version) =>
-                                        revokeMembership(
-                                          project,
-                                          membership.id,
-                                          requireVersion(version),
-                                        ),
-                                    })
-                                  }
-                                >
-                                  Revoke membership
-                                </Button>
-                              )}
-                          </li>
-                        ))}
+                        empty={
+                          memberships.data.length > 0 && !showRevokedMemberships
+                            ? 'No memberships match this filter. Select “Show revoked memberships” to view revoked grants.'
+                            : 'No application memberships.'
+                        }
+                        rows={memberships.data
+                          .filter(
+                            (membership) =>
+                              showRevokedMemberships ||
+                              membership.state !== 'revoked',
+                          )
+                          .map((membership) => (
+                            <li
+                              className="space-y-2 rounded-lg border p-3"
+                              key={membership.id}
+                            >
+                              <div className="flex flex-wrap justify-between gap-2">
+                                <span className="break-all">
+                                  {membership.spec.displayName ??
+                                    membership.spec.principalId}{' '}
+                                  →{' '}
+                                  {ownGroups.find(
+                                    (g) => g.id === membership.spec.groupId,
+                                  )?.name ?? membership.spec.groupId}
+                                </span>
+                                <State state={membership.state} />
+                              </div>
+                              <p className="text-xs break-all text-muted-foreground">
+                                {membership.id} · {membership.spec.principalId}
+                              </p>
+                              {manage &&
+                                ['active', 'provisioning', 'failed'].includes(
+                                  membership.state,
+                                ) && (
+                                  <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() =>
+                                      setEditor({
+                                        kind: 'confirmation',
+                                        title: 'Revoke application membership',
+                                        description:
+                                          'Remove this group grant. Existing sessions and tokens lose this authority within five minutes; cleanup retries independently.',
+                                        resource: membership,
+                                        destructive: true,
+                                        reload: () =>
+                                          reloadResource(
+                                            () => getMemberships(project),
+                                            membership.id,
+                                          ),
+                                        submit: (version) =>
+                                          revokeMembership(
+                                            project,
+                                            membership.id,
+                                            requireVersion(version),
+                                          ),
+                                      })
+                                    }
+                                  >
+                                    Revoke membership
+                                  </Button>
+                                )}
+                            </li>
+                          ))}
                       />
                     )}
                   </>

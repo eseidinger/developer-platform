@@ -77,6 +77,10 @@ test('approves an enrolled human without default groups, follows memberships and
   await expect(page.getByText(/server state: approved/)).toBeVisible()
   expect(fixture.mutations.at(-1)?.headers['if-match']).toBe('"1"')
   await page.getByRole('link', { name: 'Memberships', exact: true }).click()
+  const revokedFilter = page.getByRole('checkbox', {
+    name: 'Show revoked memberships',
+  })
+  await expect(revokedFilter).not.toBeChecked()
   await expect(page.getByText('active', { exact: true }).first()).toBeVisible({
     timeout: 10_000,
   })
@@ -84,9 +88,14 @@ test('approves an enrolled human without default groups, follows memberships and
   await page
     .getByRole('button', { name: 'Revoke application membership' })
     .click()
-  await expect(page.getByText('revoked', { exact: true }).first()).toBeVisible({
+  await expect(page.getByText(/No memberships match this filter/)).toBeVisible({
     timeout: 10_000,
   })
+  await expect(page.getByText('revoked', { exact: true })).toHaveCount(0)
+  await revokedFilter.check()
+  await expect(page.getByText('revoked', { exact: true }).first()).toBeVisible()
+  await revokedFilter.uncheck()
+  await expect(page.getByText('revoked', { exact: true })).toHaveCount(0)
 })
 
 test('rejects and explicitly reopens a human request', async ({ page }) => {

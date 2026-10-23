@@ -291,6 +291,8 @@ def with_principal_names(conn, resources):
 
     Issuer and subject together identify a person. Names are presentation only;
     they never participate in authorization and may be unavailable until login.
+    Service credentials are project-wide, so their consumer project identifies
+    the calling application, rather than an identity-provider client ID.
     """
     ids = list({row["spec"]["principalId"] for row in resources})
     if not ids:
@@ -300,8 +302,12 @@ def with_principal_names(conn, resources):
             """SELECT h.id, COALESCE(p.display_name, h.display_name)
             FROM hosted_access_principals h
             LEFT JOIN platform_principals p ON p.issuer=h.issuer AND p.subject=h.subject
-            WHERE h.id=ANY(%s)""",
-            (ids,),
+            WHERE h.id=ANY(%s) AND h.kind='user'
+            UNION ALL
+            SELECT s.spec->>'principalId', s.project
+            FROM hosted_access_resources s
+            WHERE s.kind='service-access' AND s.spec->>'principalId'=ANY(%s)""",
+            (ids, ids),
         ).fetchall()
     )
     return [

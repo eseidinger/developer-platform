@@ -34,6 +34,32 @@ class PrincipalNameTests(unittest.TestCase):
         self.assertEqual(access_store.with_principal_names(conn, []), [])
         conn.execute.assert_not_called()
 
+    def test_service_memberships_use_the_consumer_project_name(self):
+        rows = [
+            {
+                "project": "odip-test",
+                "version": 2,
+                "spec": {
+                    "principalId": "prn_service",
+                    "subject": "generated-client-id",
+                    "groupId": "readers",
+                },
+            }
+        ]
+        conn = Mock()
+        conn.execute.return_value.fetchall.return_value = [
+            ("prn_service", "vareng-test")
+        ]
+        result = access_store.with_principal_names(conn, rows)
+        self.assertEqual(result[0]["spec"]["displayName"], "vareng-test")
+        self.assertEqual(result[0]["spec"]["principalId"], "prn_service")
+        self.assertEqual(result[0]["version"], 2)
+        query, parameters = conn.execute.call_args.args
+        self.assertIn("SELECT s.spec->>'principalId', s.project", query)
+        self.assertIn("s.kind='service-access'", query)
+        self.assertIn("h.kind='user'", query)
+        self.assertEqual(parameters, (["prn_service"], ["prn_service"]))
+
     def test_enrollment_updates_names_without_changing_existing_requests(self):
         conn = Mock()
         request = {"state": "approved", "version": 4}
