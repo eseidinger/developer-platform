@@ -637,9 +637,22 @@ def prepare_store_resources(conn, project, spec, manifests):
 
 
 def apply(manifest):
+    from .workload_context import FINGERPRINT, preserve
+
     resource = runtime.resources.get(
         api_version=manifest["apiVersion"], kind=manifest["kind"]
     )
+    if FINGERPRINT in manifest.get("metadata", {}).get("annotations", {}):
+        try:
+            existing = resource.get(
+                name=manifest["metadata"]["name"],
+                namespace=manifest["metadata"]["namespace"],
+            )
+        except ApiException as exc:
+            if exc.status != 404:
+                raise
+        else:
+            manifest = preserve(manifest, existing.to_dict())
     args = {
         "name": manifest["metadata"]["name"],
         "body": manifest,

@@ -14,6 +14,7 @@ from .audit import Actor, record_event
 from .authorization import is_allowed
 from .identity import Principal
 from .manifests import component_resources
+from .workload_context import stamp as _with_telemetry
 
 LIFECYCLE_LOCK_ID = 731904
 OPERATION_LOCK_SQL = "SELECT pg_try_advisory_lock(hashtextextended(%s, 0))"
@@ -32,26 +33,6 @@ def _with_restart_marker(manifest: dict[str, Any], marker: str) -> dict[str, Any
     marked = copy.deepcopy(manifest)
     template = marked["spec"]["template"].setdefault("metadata", {})
     template.setdefault("annotations", {})[RESTART_ANNOTATION] = marker
-    return marked
-
-
-def _with_telemetry(manifest, revision, operation_id):
-    """Derived operation context, not application input or indexed metric labels."""
-    if manifest["kind"] not in {"Deployment", "CronJob"}:
-        return manifest
-    marked = copy.deepcopy(manifest)
-    spec = marked["spec"]
-    if manifest["kind"] == "CronJob":
-        spec = spec["jobTemplate"]["spec"]
-    annotations = (
-        spec["template"].setdefault("metadata", {}).setdefault("annotations", {})
-    )
-    annotations.update(
-        {
-            "platform.example/revision": str(revision),
-            "platform.example/operation-id": str(operation_id),
-        }
-    )
     return marked
 
 
