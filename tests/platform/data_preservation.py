@@ -3,17 +3,17 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import stat
 import subprocess
+from pathlib import Path
 from uuid import UUID
 
 from .harness import (
     API,
+    ROOT,
     DrillError,
     Keycloak,
-    ROOT,
     operator_tokens,
     origin,
     require,
@@ -22,6 +22,7 @@ from .harness import (
     wait_for,
 )
 from .human_database import IMAGE, RUN_ID, wait_deployment
+from .retirement import retire_project
 
 CHECKS = (
     "initial-write",
@@ -234,22 +235,7 @@ def retire(api, report):
             == report.data["runId"],
             "cleanup_project_changed",
         )
-        preview = api.request("GET", "/projects/" + project + "/retirement-preview")
-        require(not preview["blockers"], "cleanup_retirement_blocked")
-        confirmation = {"confirm_name": project, "scope_token": preview["scope_token"]}
-        wait_for(
-            lambda: (
-                api.request(
-                    "POST",
-                    "/projects/" + project + "/retire",
-                    confirmation,
-                    statuses=(200, 202),
-                ).get("status")
-                == "retired"
-            ),
-            "fixture_retirement",
-            180,
-        )
+        retire_project(api, project)
     report.data["cleanup"] = "retired-data-retained"
     report.save()
 
@@ -273,7 +259,7 @@ def run(args, api, report):
     resource = api.request(
         "POST",
         "/v1/projects/" + project + "/resources",
-        {"name": "state", "provider": "postgresql"},
+        {"name": "state", "provider": "postgresql", "quota_bytes": 16 * 1024 * 1024},
         statuses=(202,),
     )
     report.data["resourceId"] = resource["resource_id"]

@@ -90,14 +90,18 @@
                 - '-ec'
               args:
                 - >-
-                    for n in $(seq 1 10); do wget -qO- http://api:5678/ && wget
-                    -qO- http://peer:5678/ && sleep 75 && exit 0; sleep 2; done;
-                    exit 1
+                    for n in $(seq 1 10); do
+                    if wget -T 3 -qO- http://api:5678/ &&
+                    wget -T 3 -qO- http://peer:5678/; then
+                    sleep 75; exit 0; fi; sleep 2; done; exit 1
             schedule: '* * * * *'
             timeZone: UTC
             concurrencyPolicy: Forbid
           - name: failing-probe
             type: scheduled
+            # One deterministic failure must finish within the suite deadline.
+            retryLimit: 0
+            maxRunSeconds: 60
             runtime:
               type: container
               image: "{{ platform_component_job_image }}"

@@ -55,21 +55,24 @@
               command:
                 - '/bin/sh'
                 - '-ec'
-              # A Pod can begin before the node has installed its Service
-              # rules. Retry the
-              # disposable connectivity assertion briefly, then keep the
-              # Job alive long
-              # enough to prove Forbid prevents overlap.
+              # Retry the private peer until Service rules are ready. Public
+              # backends must reject direct calls even from this same project.
+              # Keep the Job alive to observe Forbid across a minute boundary.
               args:
                 - >-
-                    for n in $(seq 1 10); do wget -qO- http://api:5678/ && wget
-                    -qO- http://peer:5678/ && sleep 75 && exit 0; sleep 2; done;
-                    exit 1
+                    for n in $(seq 1 10); do
+                    if wget -T 3 -qO- http://peer:5678/; then
+                    if wget -T 3 -qO- http://api:5678/; then exit 1; fi;
+                    echo public-backend-denied; sleep 75; exit 0; fi;
+                    sleep 2; done; exit 1
             schedule: '* * * * *'
             timeZone: UTC
             concurrencyPolicy: Forbid
           - name: failing-probe
             type: scheduled
+            # One deterministic failure must finish within the suite deadline.
+            retryLimit: 0
+            maxRunSeconds: 60
             runtime:
               type: container
               image: "{{ platform_component_job_image }}"

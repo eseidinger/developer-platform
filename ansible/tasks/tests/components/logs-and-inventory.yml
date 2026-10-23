@@ -20,7 +20,7 @@
   no_log: true
 
 - name: >-
-    Verify scheduled logs show calls through both stable service names
+    Verify scheduled logs show private connectivity and public backend denial
   ansible.builtin.uri:
     url: >-
       {{ platform_api_url }}/projects/{{ component_project
@@ -30,7 +30,7 @@
     status_code: 200
   register: scheduled_logs
   until: >-
-    'component-api' in (scheduled_logs.json.get('lines', []) |
+    'public-backend-denied' in (scheduled_logs.json.get('lines', []) |
     map(attribute='message') | join('\n')) and 'component-peer' in
     (scheduled_logs.json.get('lines', []) | map(attribute='message') |
     join('\n'))
@@ -43,7 +43,7 @@
   ansible.builtin.uri:
     url: >-
       {{ platform_api_url }}/projects/{{ component_project
-      }}/logs?component=probe&search=component-api&tail=100
+      }}/logs?component=probe&search=component-peer&tail=100
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
@@ -52,10 +52,18 @@
     filtered_scheduled_logs.json.next_cursor is string and
     (filtered_scheduled_logs.json.lines | length) > 0 and
     (filtered_scheduled_logs.json.lines | map(attribute='message') | join('\n'))
-    is search('component-api')
+    is search('component-peer')
   retries: 12
   delay: 5
   no_log: true
+
+# Protected ingress lives in platform-access and uses a hostname-derived name.
+- name: Derive the protected public route expected in the scoped inventory
+  ansible.builtin.set_fact:
+    component_public_route: >-
+      {{ 'host-' ~ (('api-' ~ component_project ~ '.' ~
+      hostvars[platform_component_drill_host].platform_apps_domain) |
+      hash('sha256'))[:24] }}
 
 - name: >-
     Verify authorized resource inventory exposes the deployed component topology
@@ -69,7 +77,8 @@
   until: >-
     component_inventory.json.state == 'ok' and 'api' in
     (component_inventory.json.deployments | map(attribute='name') | list) and
-    'peer' in (component_inventory.json.services | list) and 'api-public' in
+    'peer' in (component_inventory.json.services | list) and
+    component_public_route in
     (component_inventory.json.routes | list) and
     (component_inventory.json.deployments | selectattr('name', 'equalto', 'api')
     | first).containers[0].requests.cpu == '200m' and

@@ -22,6 +22,65 @@ def mappings(value):
 
 
 class PlaybookCommandTests(unittest.TestCase):
+    def test_scheduled_probe_requires_private_connectivity_and_public_denial(self):
+        play = load_playbook(
+            ANSIBLE_DIR / "tests/platform/test-platform-components.yml"
+        )[0]
+        declarations = [
+            row["ansible.builtin.uri"]["body"]["spec"]["components"]
+            for row in mappings(play)
+            if "components"
+            in row.get("ansible.builtin.uri", {}).get("body", {}).get("spec", {})
+        ]
+        probes = 0
+        for components in declarations:
+            probe = next((row for row in components if row["name"] == "probe"), None)
+            if probe is None:
+                continue
+            probes += 1
+            api = next(row for row in components if row["name"] == "api")
+            expected_api = 1 if api.get("exposure", "private") == "public" else 0
+            command = probe["runtime"]["args"][0]
+            # Exercise the real shell assertion with controlled connection
+            # outcomes. Merely observing a denied connection is insufficient
+            # when its private positive control is also unavailable.
+            for peer, public in ((0, 1), (0, 0), (1, 1), (1, 0)):
+                expected = 0 if peer == 0 and public == expected_api else 1
+                functions = (
+                    'wget() { case "$*" in '
+                    f"*peer:5678*) return {peer};; "
+                    f"*api:5678*) return {public};; "
+                    "*) return 99;; esac; }; sleep() { :; }; "
+                )
+                with self.subTest(peer=peer, public=public):
+                    result = subprocess.run(
+                        ["sh", "-ec", functions + command],
+                        capture_output=True,
+                        timeout=5,
+                        check=False,
+                    )
+                    self.assertEqual(result.returncode, expected)
+        self.assertGreaterEqual(probes, 3)
+
+    def test_deliberate_scheduled_failure_finishes_within_poll_deadline(self):
+        play = load_playbook(
+            ANSIBLE_DIR / "tests/platform/test-platform-components.yml"
+        )[0]
+        tasks = list(mappings(play))
+        wait = next(
+            row for row in tasks if row.get("register") == "failing_scheduled_status"
+        )
+        budget = wait["retries"] * wait["delay"]
+        failures = [
+            row
+            for row in tasks
+            if row.get("name") == "failing-probe" and row.get("type") == "scheduled"
+        ]
+        self.assertGreaterEqual(len(failures), 3)
+        for failure in failures:
+            self.assertEqual(failure["retryLimit"], 0)
+            self.assertLess(60 + failure["maxRunSeconds"], budget)
+
     def assert_restoration_in_always(self, play):
         scope = next(task for task in play["tasks"] if "always" in task)
         cleanup = scope["always"]

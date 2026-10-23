@@ -338,12 +338,15 @@ const native = async (provider, mode, person, credential, origin) => {
     )
       throw Error('OpenSearch scope ' + JSON.stringify(status))
   } else {
+    stage += '-connect-form'
     await page.getByRole('button', { name: 'Connect', exact: true }).waitFor()
     const inputs = page.locator('input[type="text"]')
     await inputs.nth(1).fill(new URL(origin).host + ':443')
     await inputs.nth(2).fill(c.NEO4J_USERNAME)
     await page.locator('input[type="password"]').fill(c.NEO4J_PASSWORD)
+    stage += '-connect-submit'
     await page.getByRole('button', { name: 'Connect', exact: true }).click()
+    stage += '-connected-status'
     await page.waitForFunction(
       () =>
         /connection status:\s*connected/.test(
@@ -352,6 +355,7 @@ const native = async (provider, mode, person, credential, origin) => {
       null,
       { timeout: 30000 },
     )
+    stage += '-native-query'
     const status = await page.evaluate(
       async ({ c, mode }) => {
         const auth = 'Basic ' + btoa(c.NEO4J_USERNAME + ':' + c.NEO4J_PASSWORD)

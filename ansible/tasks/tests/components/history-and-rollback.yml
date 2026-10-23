@@ -173,8 +173,9 @@
 - name: Report non-secret Phase 2A acceptance evidence
   ansible.builtin.debug:
     msg: >-
-      PASS: {{ component_run_id }} migrated a legacy project to two internal
-      services and two scheduled probes (one successful and one safely failed),
+      PASS: {{ component_run_id }} migrated a legacy project to a protected API,
+      a private peer and two scheduled probes (one successful and one safely
+      failed),
       observed non-overlap, preserved configuration and write-only secrets
       through migration, isolated component updates, restored the first
       component revision, and verified retirement scope.
