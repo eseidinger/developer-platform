@@ -17,8 +17,13 @@ sudo bash scripts/setup/prepare-tempo-storage.sh
 bash scripts/up.sh
 ```
 
-Run the preparation command again after a host reboot, before starting the
-Compose stack. The image and mount live in `/var/lib/developer-platform`,
+On systemd hosts, preparation installs and enables a persistent mount unit and
+a Docker service dependency. After reboot, the trace filesystem mounts before
+Docker starts; a failed mount prevents Docker from starting. Installing these
+units reloads systemd without restarting Docker. Existing installations receive
+this configuration on the next remote deployment, or by rerunning the preparation
+command locally. Hosts without systemd must rerun preparation after each reboot,
+before Docker starts. The image and mount live in `/var/lib/developer-platform`,
 outside the source checkout and platform backup. Tempo retains blocks for 24
 hours; this is configuration, not proof that elapsed deletion has occurred. The
 same bounded filesystem is mounted at `/data/tempo` and `/var/tempo` inside
