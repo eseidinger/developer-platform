@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query'
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button'
@@ -8,11 +9,15 @@ import { listProjects } from '@/features/projects/projects-api'
 
 function ProjectList() {
   const { status } = useAuth()
+  const [showRetired, setShowRetired] = useState(false)
   const projectsQuery = useQuery({
     queryKey: ['projects'],
     queryFn: listProjects,
     enabled: status === 'authenticated',
   })
+  const visibleProjects = projectsQuery.data?.filter(
+    (project) => showRetired || project.status !== 'retired',
+  )
 
   if (status !== 'authenticated') {
     return null
@@ -44,6 +49,15 @@ function ProjectList() {
         </div>
       </div>
 
+      <label className="mt-4 flex items-center gap-2 text-sm">
+        <input
+          type="checkbox"
+          checked={showRetired}
+          onChange={(event) => setShowRetired(event.target.checked)}
+        />
+        Show retired projects
+      </label>
+
       {projectsQuery.isLoading && (
         <p role="status" className="mt-4 text-sm text-muted-foreground">
           Loading projects…
@@ -62,9 +76,18 @@ function ProjectList() {
         </p>
       )}
 
-      {projectsQuery.data && projectsQuery.data.length > 0 && (
+      {projectsQuery.data &&
+        projectsQuery.data.length > 0 &&
+        visibleProjects?.length === 0 && (
+          <p className="mt-4 text-sm text-muted-foreground">
+            All your projects are retired. Select “Show retired projects” to
+            view them.
+          </p>
+        )}
+
+      {visibleProjects && visibleProjects.length > 0 && (
         <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
-          {projectsQuery.data.map((project) => (
+          {visibleProjects.map((project) => (
             <li
               key={project.name}
               className="flex items-center justify-between gap-4 px-4 py-3"
