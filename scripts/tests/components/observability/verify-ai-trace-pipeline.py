@@ -68,7 +68,9 @@ def verify_workload_trace(endpoint, query_port, opener):
     scope.scope.name = "io.quarkus.opentelemetry"
     scope.scope.version = "3.27.0"
     scope.scope.attributes.add().value.string_value = MARKER
-    trace_id, now = uuid4().bytes, time.time_ns()
+    # Tempo search serializes trace IDs as unpadded hex. Exercise a leading
+    # zero on every run while retaining a unique synthetic 120-bit suffix.
+    trace_id, now = b"\x00" + uuid4().bytes[1:], time.time_ns()
     operations = (
         "chat",
         "text_completion",
@@ -218,7 +220,10 @@ def verify_workload_trace(endpoint, query_port, opener):
                 f"http://127.0.0.1:{query_port}/api/search?" + params, timeout=5
             ) as response:
                 found = json.load(response)
-            return any(t["traceID"] == trace_id.hex() for t in found.get("traces", []))
+            return any(
+                t["traceID"].lower().zfill(32) == trace_id.hex()
+                for t in found.get("traces", [])
+            )
 
         wait(searchable)
     print(
