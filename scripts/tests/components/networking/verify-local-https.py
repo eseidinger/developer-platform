@@ -41,6 +41,21 @@ def command(*arguments, check=True):
     return result
 
 
+def wait_ready(
+    request, host, path, *, seconds=20, clock=time.monotonic, sleep=time.sleep
+):
+    """The CA is written before Caddy finishes activating its TLS listeners."""
+    deadline = clock() + seconds
+    while clock() < deadline:
+        try:
+            if request(host, path) == 200:
+                return
+        except (OSError, http.client.HTTPException):
+            pass
+        sleep(0.25)
+    raise AssertionError("Gateway verified HTTPS readiness timed out")
+
+
 def main():
     context = command("context", "show").stdout.strip()
     endpoint = command(
@@ -129,6 +144,14 @@ def main():
                 finally:
                     connection.close()
 
+            # Warm both certificate/routing paths with verified positive
+            # controls. Once ready, every denial below remains a strict check.
+            wait_ready(
+                request,
+                "identity.localhost",
+                "/realms/platform/.well-known/openid-configuration",
+            )
+            wait_ready(request, "api-provider.apps.localhost", "/api/identity")
             for host, path, expected in (
                 (
                     "identity.localhost",
