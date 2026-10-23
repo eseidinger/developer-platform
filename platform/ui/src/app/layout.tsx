@@ -1,6 +1,9 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { useAuth } from '@/auth/auth-context'
+import { Button } from '@/components/ui/button'
 
 function AppLayout() {
+  const { status, signOut } = useAuth()
   return (
     <div className="min-h-svh bg-background text-foreground">
       <a
@@ -42,6 +45,15 @@ function AppLayout() {
               Platform admin
             </NavLink>
           </nav>
+          {status === 'authenticated' && (
+            <Button
+              variant="outline"
+              className="ml-3"
+              onClick={() => void signOut()}
+            >
+              Log out
+            </Button>
+          )}
         </div>
       </header>
       <main

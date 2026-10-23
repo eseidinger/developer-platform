@@ -14,7 +14,7 @@ function createUserManager(config: PortalAuthConfig) {
     post_logout_redirect_uri: config.redirectUri,
     response_type: 'code',
     scope: 'openid profile email',
-    automaticSilentRenew: false,
+    automaticSilentRenew: true,
     monitorSession: false,
     loadUserInfo: false,
     stateStore: new WebStorageStateStore({ store: window.sessionStorage }),

@@ -41,6 +41,15 @@ These fixture tests do not prove a complete deployed Keycloak/lifecycle journey.
 
 Authentication uses the installed `oidc-client-ts` client. Portal tokens stay
 in memory; protocol transaction state uses session storage across the redirect.
+The client renews tokens automatically while the identity-provider session remains
+valid. After a reload, a non-secret session flag triggers one silent SSO attempt;
+expired SSO or browser cookie restrictions fall back to the sign-in button.
+The header's **Log out** action stops renewal, clears private query data and local
+credentials, and redirects through the provider's logout endpoint. It also clears
+the session flag so returning from logout does not automatically sign in again.
+Keycloak initialization allows logout redirects to the portal's registered login
+redirect URIs. Existing deployments need identity initialization and the updated
+portal image to receive the complete change.
 
 ## Current commands
 

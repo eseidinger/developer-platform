@@ -58,10 +58,12 @@ audience_mapper=$(cat <<'JSON'
 JSON
 )
 
+# Reuse the registered login redirect URIs for RP-initiated portal logout.
+# Keycloak's '+' value does not permit arbitrary post-logout destinations.
 kcadm update "clients/$portal_id" -r platform \
   -s "redirectUris=$redirect_uris" \
   -s "webOrigins=$web_origins" \
-  -s 'attributes={"pkce.code.challenge.method":"S256"}' \
+  -s 'attributes={"pkce.code.challenge.method":"S256","post.logout.redirect.uris":"+"}' \
   -s "protocolMappers=$audience_mapper"
 
 # Confidential console: keep the secret synchronized and require PKCE.

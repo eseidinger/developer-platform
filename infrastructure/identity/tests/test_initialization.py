@@ -120,7 +120,8 @@ class InitializationTests(unittest.TestCase):
             ],
         )
         self.assertEqual(
-            json.loads(settings["attributes"]), {"pkce.code.challenge.method": "S256"}
+            json.loads(settings["attributes"]),
+            {"pkce.code.challenge.method": "S256", "post.logout.redirect.uris": "+"},
         )
         mapper = json.loads(settings["protocolMappers"])[0]
         self.assertEqual(mapper["config"]["included.client.audience"], "platform-api")

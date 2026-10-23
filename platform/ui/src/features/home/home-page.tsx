@@ -10,7 +10,7 @@ const foundationItems = [
 ] as const
 
 function HomePage() {
-  const { error, signIn, signOut, status, user } = useAuth()
+  const { error, signIn, status, user } = useAuth()
   const subject =
     typeof user?.profile.sub === 'string' ? user.profile.sub : null
   const displayName =
@@ -41,12 +41,9 @@ function HomePage() {
               Signed in{displayName ? ` as ${displayName}` : ''}. Access is
               determined by platform-owned grants.
             </p>
-            <Button variant="outline" onClick={() => void signOut()}>
-              Clear portal session
-            </Button>
           </div>
         )}
-        {status === 'error' && (
+        {error && (
           <p role="alert" className="text-sm text-destructive">
             {error}
           </p>
