@@ -27,6 +27,34 @@ const base = {
 }
 afterEach(() => vi.resetAllMocks())
 describe('access contract and redaction', () => {
+  it('retains optional human display names alongside stable identity fields', () => {
+    const request = {
+      ...base,
+      kind: 'human-request',
+      spec: {
+        policyId: 'policy',
+        principalId: 'prn_alice',
+        issuer: 'https://identity.example',
+        subject: 'subject-alice',
+        expiresAt: '2026-11-01T00:00:00Z',
+      },
+    }
+    expect(
+      parseAccessResource('human-request', request).spec,
+    ).not.toHaveProperty('displayName')
+    expect(
+      parseAccessResource('human-request', {
+        ...request,
+        spec: { ...request.spec, displayName: 'alice' },
+      }).spec,
+    ).toMatchObject({ displayName: 'alice', principalId: 'prn_alice' })
+    expect(
+      parseAccessResource('human-request', {
+        ...request,
+        spec: { ...request.spec, displayName: null },
+      }).spec,
+    ).toHaveProperty('displayName', null)
+  })
   it('retains safe service metadata while removing credential values and extra nested fields', () => {
     const parsed = parseAccessResource('service-access', {
       ...base,

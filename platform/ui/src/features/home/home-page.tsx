@@ -13,6 +13,8 @@ function HomePage() {
   const { error, signIn, signOut, status, user } = useAuth()
   const subject =
     typeof user?.profile.sub === 'string' ? user.profile.sub : null
+  const displayName =
+    user?.profile.preferred_username ?? user?.profile.name ?? subject
 
   return (
     <section aria-labelledby="page-title" className="max-w-3xl space-y-8">
@@ -36,8 +38,8 @@ function HomePage() {
         {status === 'authenticated' && (
           <div className="flex flex-wrap items-center gap-3">
             <p className="text-sm text-muted-foreground">
-              Signed in{subject ? ` as ${subject}` : ''}. Access is determined
-              by platform-owned grants.
+              Signed in{displayName ? ` as ${displayName}` : ''}. Access is
+              determined by platform-owned grants.
             </p>
             <Button variant="outline" onClick={() => void signOut()}>
               Clear portal session

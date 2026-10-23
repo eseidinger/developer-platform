@@ -722,7 +722,8 @@ function AccessWorkspace({ project }: { project: string }) {
                             >
                               <div className="flex flex-wrap justify-between gap-2">
                                 <span className="font-medium break-all">
-                                  {request.spec.principalId}
+                                  {request.spec.displayName ??
+                                    request.spec.principalId}
                                 </span>
                                 <State state={request.state} />
                               </div>
@@ -731,6 +732,7 @@ function AccessWorkspace({ project }: { project: string }) {
                                 expires {request.spec.expiresAt}
                               </p>
                               <p className="text-xs break-all text-muted-foreground">
+                                {request.spec.principalId} ·{' '}
                                 {request.spec.issuer} / {request.spec.subject}
                               </p>
                               {request.state === 'approved' && (
@@ -805,7 +807,9 @@ function AccessWorkspace({ project }: { project: string }) {
                           >
                             <div className="flex flex-wrap justify-between gap-2">
                               <span className="break-all">
-                                {membership.spec.principalId} →{' '}
+                                {membership.spec.displayName ??
+                                  membership.spec.principalId}{' '}
+                                →{' '}
                                 {ownGroups.find(
                                   (g) => g.id === membership.spec.groupId,
                                 )?.name ?? membership.spec.groupId}
@@ -813,7 +817,7 @@ function AccessWorkspace({ project }: { project: string }) {
                               <State state={membership.state} />
                             </div>
                             <p className="text-xs break-all text-muted-foreground">
-                              {membership.id}
+                              {membership.id} · {membership.spec.principalId}
                             </p>
                             {manage &&
                               ['active', 'provisioning', 'failed'].includes(

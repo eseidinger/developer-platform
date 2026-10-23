@@ -31,6 +31,9 @@ def initialize(conn):
     conn.execute("""CREATE TABLE IF NOT EXISTS hosted_access_principals (
         issuer TEXT NOT NULL, subject TEXT NOT NULL, id TEXT NOT NULL, kind TEXT NOT NULL,
         PRIMARY KEY(issuer, subject), CHECK(kind IN ('user', 'service')))""")
+    conn.execute(
+        "ALTER TABLE hosted_access_principals ADD COLUMN IF NOT EXISTS display_name TEXT"
+    )
     conn.execute("""CREATE TABLE IF NOT EXISTS hosted_access_operations (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(), resource_id TEXT NOT NULL,
         version BIGINT NOT NULL, action TEXT NOT NULL, state TEXT NOT NULL DEFAULT 'queued',
@@ -283,8 +286,43 @@ def principal(conn, issuer, subject, kind="user", principal_id=None):
     return row[0]
 
 
-def enroll(conn, policy, issuer, subject):
+def with_principal_names(conn, resources):
+    """Enrich authorized rows without changing stored specs or resource versions.
+
+    Issuer and subject together identify a person. Names are presentation only;
+    they never participate in authorization and may be unavailable until login.
+    """
+    ids = list({row["spec"]["principalId"] for row in resources})
+    if not ids:
+        return resources
+    names = dict(
+        conn.execute(
+            """SELECT h.id, COALESCE(p.display_name, h.display_name)
+            FROM hosted_access_principals h
+            LEFT JOIN platform_principals p ON p.issuer=h.issuer AND p.subject=h.subject
+            WHERE h.id=ANY(%s)""",
+            (ids,),
+        ).fetchall()
+    )
+    return [
+        {
+            **row,
+            "spec": {
+                **row["spec"],
+                "displayName": names.get(row["spec"]["principalId"]),
+            },
+        }
+        for row in resources
+    ]
+
+
+def enroll(conn, policy, issuer, subject, display_name=None):
     pid = principal(conn, issuer, subject)
+    if display_name:
+        conn.execute(
+            "UPDATE hosted_access_principals SET display_name=%s WHERE issuer=%s AND subject=%s",
+            (display_name, issuer, subject),
+        )
     name = policy["id"] + ":" + pid
     request = by_name(conn, "human-request", policy["project"], name)
     if request and request["state"] == "expired":

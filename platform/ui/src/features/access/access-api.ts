@@ -50,6 +50,7 @@ const policySchema = z.object({
 })
 const groupSchema = z.object({ displayName: z.string() })
 const humanSchema = z.object({
+  displayName: z.string().nullable().optional(),
   policyId: z.string(),
   principalId: z.string(),
   issuer: z.string(),

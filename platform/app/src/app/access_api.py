@@ -421,7 +421,9 @@ def install(app, control):
     ):
         control.require_permission(principal, "grant", project)
         with control.connect() as conn:
-            rows = store.listing(conn, "human-request", project)
+            rows = store.with_principal_names(
+                conn, store.listing(conn, "human-request", project)
+            )
             return {"items": [r for r in rows if state is None or r["state"] == state]}
 
     @app.post(
@@ -514,7 +516,11 @@ def install(app, control):
     def list_memberships(project: str, principal: Principal = caller):
         control.require_permission(principal, "grant", project)
         with control.connect() as conn:
-            return {"items": store.listing(conn, "membership", project)}
+            return {
+                "items": store.with_principal_names(
+                    conn, store.listing(conn, "membership", project)
+                )
+            }
 
     @app.post(
         "/v1/projects/{project}/application-access-requests/{resource_id}/groups",
@@ -1042,7 +1048,18 @@ def install(app, control):
             ).verify(body.get("accessToken", ""))
             if token["azp"] != "browser-" + policy["id"]:
                 raise HTTPException(401, "Expected the application browser identity")
-            pid, request = store.enroll(conn, policy, token["iss"], token["sub"])
+            # Only verified identity claims supply the cached presentation name.
+            display_name = next(
+                (
+                    token[key]
+                    for key in ("preferred_username", "name", "email")
+                    if isinstance(token.get(key), str) and token[key].strip()
+                ),
+                None,
+            )
+            pid, request = store.enroll(
+                conn, policy, token["iss"], token["sub"], display_name
+            )
             control.required_audit(
                 Actor("oidc", token["iss"] + "|" + token["sub"]),
                 "application-access.human.enroll",

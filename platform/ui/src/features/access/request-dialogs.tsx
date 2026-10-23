@@ -61,7 +61,7 @@ export function HumanActionDialog({
   return (
     <AccessDialog
       title={title}
-      description={`${resource.spec.principalId} requests access to ${project}. Platform roles assign no application groups.`}
+      description={`${resource.spec.displayName ?? resource.spec.principalId} requests access to ${project}. Platform roles assign no application groups.`}
       submitLabel={title}
       resource={resource}
       reload={reload}
