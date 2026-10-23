@@ -7,11 +7,10 @@ repository root.
 
 Hosted-application acceptance has a separate
 [`test-platform-hosted-access.yml`](../tests/platform/test-platform-hosted-access.yml)
-wrapper.
-It defaults to an offline plan, does not deploy the platform, and requires
-explicit API-origin confirmation for live runs. Prepare the runner environment,
-public digest-pinned neutral fixture, and protected operator session on the
-target using the
+wrapper. It defaults to an offline plan, does not deploy the platform, and
+requires explicit API-origin confirmation for live runs. Prepare the runner
+environment, public digest-pinned neutral fixture, and protected operator
+session on the target using the
 [acceptance harness procedure](../../docs/operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness).
 This suite needs a renewable human platform-administrator session on the target,
 not the basic suite's controller-side test-runner JSON. Runner/fixture-only
@@ -35,15 +34,15 @@ retirement. See the
 `test-platform-components.yml` is the Phase 2A acceptance suite. Run it with the
 normal platform inventory and the protected test-runner output; it creates and
 retires its own disposable project, so it needs no human token. It checks legacy
-migration, two stable internal Services, a scheduled internal connectivity
-probe, non-overlap, invalid-cron rejection, an isolated component update,
-revision history, and component retirement scope. It deliberately does not
-trigger or inspect backup storage: backup evidence remains a separate
-operational track. It also checks the authorized component-log search and
-polling-cursor contract; That endpoint's Kubernetes log retention remains best
-effort. PLAN-017 adds a separate authorized retained-log endpoint for minimized
-centralized operational events, configured for seven days. Its deployed and
-elapsed-retention checks are separate from this component suite.
+migration, two stable Services, scheduled private-peer connectivity and
+protected public-backend denial, non-overlap, invalid-cron rejection, an
+isolated component update, revision history, and component retirement scope. It
+deliberately does not trigger or inspect backup storage: backup evidence remains
+a separate operational track. It also checks the authorized component-log search
+and polling-cursor contract; That endpoint's Kubernetes log retention remains
+best effort. PLAN-017 adds a separate authorized retained-log endpoint for
+minimized centralized operational events, configured for seven days. Its
+deployed and elapsed-retention checks are separate from this component suite.
 
 ## Scoped operational drills
 
@@ -126,18 +125,20 @@ production allow-list merely to pass the drill.
 The PostgreSQL, Keycloak, capacity, and failure-signal drills intentionally
 disrupt shared services and must not run in routine CI. The rollback-data helper
 now creates a named PostgreSQL resource and checks persistence through its bound
-workload; a live rerun is still required. `scripts/tests/platform/isolation.py`,
-`scripts/tests/platform/data_preservation.py`, and
-`scripts/tests/platform/interrupted_provisioning.py` now use run-scoped named
-PostgreSQL resources and the web/PostgreSQL fixture, but await live runs. The
-interruption drill pauses the shared k3d server and kills the Platform API; it
-requires an otherwise idle lab and is not a routine acceptance check. The
-historical passes do not validate the current binding contract. The human-access
-harness now uses named resources and expiring credentials; its full live rerun
-remains separate from the older implicit-database evidence. Egress alters only a
-disposable workload but depends on operator policy and an external listener.
-Keep these drills in an explicitly approved protected pipeline rather than
-pull-request CI.
+workload; a live rerun of that Ansible wrapper is still required. The Python
+isolation and data-preservation runners use run-scoped named PostgreSQL
+resources and the web/PostgreSQL fixture. Both passed with complete retirement
+in the
+[October 23 remote validation](../../docs/operators/validation/remote-2026-10-23.md).
+The revised `scripts/tests/platform/interrupted_provisioning.py` still awaits a
+live run. The interruption drill pauses the shared k3d server and kills the
+Platform API; it requires an otherwise idle lab and is not a routine acceptance
+check. The historical passes do not validate the current binding contract. The
+human-access harness now uses named resources and expiring credentials; its full
+live rerun remains separate from the older implicit-database evidence. Egress
+alters only a disposable workload but depends on operator policy and an external
+listener. Keep these drills in an explicitly approved protected pipeline rather
+than pull-request CI.
 
 The failure-signal drill also temporarily disables capacity admission so its
 disposable canary tests only application, ingress, and monitoring signals. It
@@ -146,17 +147,17 @@ cleanup.
 
 ## Assertion scope and cleanup results
 
-The egress suite tests both API declaration rejection and a real connection
-from the unapproved workload. It then grants the narrow policy and requires
+The egress suite tests both API declaration rejection and a real connection from
+the unapproved workload. It then grants the narrow policy and requires
 successful connectivity to the same target as a positive control. The target
 must remain reachable throughout this comparison.
 
 The component suite waits for both services to be ready after rollback and
-expects no data services unless named resources were explicitly provisioned.
-The resource inventory now reports actual named-store resources and bindings.
-The PostgreSQL outage suite checks the control-plane database, catalog access,
-and recovery-request workflow using an unbound workload. Application data
-continuity through named PostgreSQL bindings remains the separate rollback and
+expects no data services unless named resources were explicitly provisioned. The
+resource inventory now reports actual named-store resources and bindings. The
+PostgreSQL outage suite checks the control-plane database, catalog access, and
+recovery-request workflow using an unbound workload. Application data continuity
+through named PostgreSQL bindings remains the separate rollback and
 data-preservation scenario.
 
 API cleanup uses confirmed creation responses, retries changing retirement
