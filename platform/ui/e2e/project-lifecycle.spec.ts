@@ -49,6 +49,8 @@ test('creates, deploys, rolls back, and retires a project through the portal', a
     .getByRole('dialog')
     .getByRole('button', { name: 'Retire project' })
     .click()
+  await expect(page.getByRole('link', { name: 'demo' })).toHaveCount(0)
+  await page.getByRole('checkbox', { name: 'Show retired projects' }).check()
   await expect(page.getByRole('link', { name: 'demo' })).toBeVisible()
   await expect(page.getByText('retired', { exact: true })).toBeVisible()
   expect(fixture.isRetired()).toBe(true)
