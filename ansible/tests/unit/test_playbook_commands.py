@@ -22,6 +22,39 @@ def mappings(value):
 
 
 class PlaybookCommandTests(unittest.TestCase):
+    def test_postgres_recovery_verifies_fresh_identity_tokens_before_review(self):
+        play = load_playbook(
+            ANSIBLE_DIR / "tests/platform/test-platform-postgres-outage.yml"
+        )[0]
+        tasks = list(mappings(play))
+        readiness = next(
+            row for row in tasks if row.get("register") == "postgres_recovered_readyz"
+        )
+        authentication = next(
+            row
+            for row in tasks
+            if row.get("register") == "postgres_recovered_runner_token"
+        )
+        review = next(
+            row
+            for row in tasks
+            if row.get("name")
+            == "Resolve the recovery request as platform administrator"
+        )
+        self.assertLess(tasks.index(readiness), tasks.index(authentication))
+        self.assertLess(tasks.index(authentication), tasks.index(review))
+        self.assertEqual(
+            authentication["ansible.builtin.uri"]["body"]["grant_type"],
+            "client_credentials",
+        )
+        self.assertIn("== 200", authentication["until"])
+        self.assertGreater(authentication["retries"], 1)
+        self.assertTrue(authentication["no_log"])
+        self.assertIn(
+            "postgres_recovered_runner_token.json.access_token",
+            review["ansible.builtin.uri"]["headers"]["Authorization"],
+        )
+
     def test_scheduled_probe_requires_private_connectivity_and_public_denial(self):
         play = load_playbook(
             ANSIBLE_DIR / "tests/platform/test-platform-components.yml"

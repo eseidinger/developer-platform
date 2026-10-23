@@ -285,6 +285,26 @@
           retries: 30
           delay: 2
 
+        # Keycloak shares this PostgreSQL service. Cached bearer tokens can
+        # authenticate API reads before its database pool can mint new tokens;
+        # cleanup needs a fresh runner token, so verify that recovery too.
+        - name: >-
+            Wait for fresh runner authentication after PostgreSQL recovery
+          ansible.builtin.uri:
+            url: "{{ platform_oidc_token_url }}"
+            method: POST
+            body_format: form-urlencoded
+            body:
+              grant_type: client_credentials
+              client_id: "{{ platform_test_runner_client_id }}"
+              client_secret: "{{ platform_test_runner_client_secret }}"
+            status_code: 200
+          register: postgres_recovered_runner_token
+          until: postgres_recovered_runner_token.status | default(0) == 200
+          retries: 30
+          delay: 2
+          no_log: true
+
         - name: >-
             Require recovered catalog access without an implicit database
           ansible.builtin.uri:
@@ -312,7 +332,7 @@
             method: PATCH
             headers:
               Authorization: >-
-                Bearer {{ postgres_runner_token.json.access_token }}
+                Bearer {{ postgres_recovered_runner_token.json.access_token }}
             body_format: json
             body:
               status: resolved
