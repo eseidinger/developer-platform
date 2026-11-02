@@ -37,6 +37,17 @@ would pause services and transfer platform data to the configured external S3
 repository. CouchDB backup capture, off-host restore, application reconnection
 and the remaining Phase 8 exit checks are therefore not claimed here.
 
+The project-scoped browser console was deployed on November 2 from revision
+`30dd17e2ca159bbb16b465600b55eb93f20cadbf`. It uses the same active human
+lease and private relay as native clients, so reader and writer operations stay
+within one named database. It is a platform document and Mango console, not
+Fauxton. Forty focused provider, relay and console tests passed, as did the full
+UI check and two browser scenarios covering reader and writer actions. On the
+host, console enablement and all three packaged browser assets were confirmed;
+CouchDB, the relay, PostgreSQL and the Platform API were healthy, and API
+readiness returned 200. A browser session with a real deployed human CouchDB
+lease remains to be exercised before claiming deployed console acceptance.
+
 ## Scope and decisions
 
 - Add Apache CouchDB as an optional, shared Docker Compose service. Each named
