@@ -1,4 +1,4 @@
-"""Portal-authenticated, lease-bound official RustFS/Qdrant console gateway.
+"""Portal-authenticated, lease-bound browser gateway for named stores.
 
 Launch assertions travel only in POST bodies. Host-only cookies authorize one
 human credential generation; native requests still authenticate at the relay.
@@ -36,7 +36,7 @@ from fastapi.responses import (
 from . import catalog, dashboards, recovery
 
 COOKIE = "__Host-store-console"
-PROVIDERS = {"s3", "qdrant", "opensearch", "neo4j"}
+PROVIDERS = {"s3", "qdrant", "opensearch", "neo4j", "couchdb"}
 ISSUER = "developer-platform-store-console"
 HOP = {
     "host",
@@ -83,7 +83,7 @@ def lease(conn, credential_id):
     ).fetchone()[0]:
         return None
     row = conn.execute(
-        """SELECT c.credential_id,c.relay_port,c.expires_at,g.issuer,g.subject,r.provider,r.resource_id,r.created_at,c.admission_sha256,host(i.host)
+        """SELECT c.credential_id,c.relay_port,c.expires_at,g.issuer,g.subject,r.provider,r.resource_id,r.created_at,c.admission_sha256,host(i.host),g.mode
         FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
         LEFT JOIN store_instances i USING(resource_id)
         JOIN projects p ON p.name=r.owner_project
@@ -108,6 +108,7 @@ def lease(conn, credential_id):
                 "created_at",
                 "admission_sha256",
                 "native_host",
+                "mode",
             ),
             row,
         )
@@ -171,6 +172,7 @@ def landing(provider):
         "qdrant": "/dashboard/",
         "opensearch": "/",
         "neo4j": "/browser/",
+        "couchdb": "/__platform/couchdb/",
     }[provider]
 
 
@@ -502,6 +504,10 @@ def create_gateway(
             return response
         row = await authorize(request.cookies.get(COOKIE), "session", port)
         frontend = row["provider"] == "opensearch"
+        if row["provider"] == "couchdb" and path.startswith("__platform/"):
+            from . import couchdb_console
+
+            return couchdb_console.asset(path, request.method, row)
         if row["provider"] == "neo4j" and path == "" and request.method == "GET":
             # Catalog-authorized connection discovery; never leak raw native addresses.
             return JSONResponse(
@@ -600,13 +606,38 @@ def create_gateway(
             else b""
         )
         authorization = {}
+        if row["provider"] == "couchdb":
+            from . import couchdb_console
+
+            if request.headers.get("authorization"):
+                raise HTTPException(400, "Use the active platform console session")
+            try:
+                couchdb_console.authorize(request.method.encode(), raw, row)
+            except ValueError:
+                raise HTTPException(
+                    403, "CouchDB operation is outside this lease"
+                ) from None
+            couchdb_auth = couchdb_console.authorization(row)
+        else:
+            couchdb_auth = None
         if not static and not frontend:
             from .http_relay import identity
 
             try:
                 authorization = identity(
                     h11.Request(
-                        method=request.method, target=raw, headers=request.headers.raw
+                        method=request.method,
+                        target=raw,
+                        headers=(
+                            [
+                                (name, value)
+                                for name, value in request.headers.raw
+                                if name != b"authorization"
+                            ]
+                            + [(b"authorization", couchdb_auth)]
+                            if couchdb_auth
+                            else request.headers.raw
+                        ),
                     ),
                     row,
                 )
@@ -652,6 +683,15 @@ def create_gateway(
             if name.lower() not in HOP
             and not name.lower().startswith(("x-forwarded-", "x-platform-store-"))
         ]
+        if row["provider"] == "couchdb":
+            # Browser metadata and cookies never enter the private data relay.
+            headers = [
+                (name, value)
+                for name, value in headers
+                if name.lower()
+                in {"accept", "content-type", "if-match", "if-none-match"}
+            ]
+            headers.append(("Authorization", couchdb_auth.decode()))
         headers.append(("Host", request.headers["host"]))
         if frontend:
             from .opensearch import tenant

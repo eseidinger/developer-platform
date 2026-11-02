@@ -146,13 +146,18 @@ encrypted configuration backup. No CouchDB port is published to applications.
 Each named resource is one `resource_<uuid>` database. Applications receive
 `COUCHDB_URL`, `COUCHDB_DATABASE`, `COUCHDB_USERNAME` and `COUCHDB_PASSWORD`.
 Use the URL through the private relay; for a human lease, open the CLI SSH
-tunnel and replace the URL host/port with the tunnel endpoint. Both grant modes
-use native users. The relay enforces read-only operations and binds every
-request to the database and current lease; CouchDB membership alone permits
-document writes. Writers can create named JSON Mango indexes with up to 16
-simple fields and delete their named indexes. Direct design-document edits,
-server APIs, replication APIs and Fauxton are unavailable to project
-credentials.
+tunnel and replace the URL host/port with the tunnel endpoint. In **My store
+access**, an active human lease can also launch the platform's project-scoped
+CouchDB console. It lists and edits documents, runs bounded Mango queries, and
+lets writers create named indexes. It is a platform console, not the server-wide
+Fauxton administrator. Its browser session and every data request are checked
+against the current lease. Native credentials stay on the server for console
+requests. Both grant modes use native users. The relay enforces read-only
+operations and binds every request to the database and current lease; CouchDB
+membership alone permits document writes. Writers can create named JSON Mango
+indexes with up to 16 simple fields and delete their named indexes. Direct
+design-document edits, server APIs, replication APIs and Fauxton are unavailable
+to project credentials.
 
 Database size is reported from CouchDB's file size; the byte quota is advisory
 and capacity admission uses the operator allocation. Plan disk space for

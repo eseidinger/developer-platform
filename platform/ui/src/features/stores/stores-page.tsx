@@ -1056,13 +1056,30 @@ function HumanAccess({
                 {shown ? 'Hide credential values' : 'Reveal credential values'}
               </Button>
               {resource.provider === 'couchdb' && (
-                <p>
-                  Connect to COUCHDB_URL with COUCHDB_USERNAME and
-                  COUCHDB_PASSWORD, using COUCHDB_DATABASE for document
-                  requests. Human access requires the private SSH tunnel.
-                  Read-only leases can query documents but cannot change them. A
-                  browser console is not available.
-                </p>
+                <>
+                  <p>
+                    The project console opens only this lease’s CouchDB
+                    database. It can browse documents and run Mango queries;
+                    read-write leases can edit documents and create named
+                    indexes. Data access closes at lease expiry or revocation.
+                  </p>
+                  {resource.console_url && (
+                    <Button
+                      disabled={disabled}
+                      variant="outline"
+                      onClick={() =>
+                        void action(() => openConsole(credential.credential_id))
+                      }
+                    >
+                      Open CouchDB console
+                    </Button>
+                  )}
+                  <p>
+                    For native clients, use COUCHDB_URL, COUCHDB_DATABASE,
+                    COUCHDB_USERNAME and COUCHDB_PASSWORD through the private
+                    SSH tunnel.
+                  </p>
+                </>
               )}
               {['s3', 'qdrant', 'opensearch', 'neo4j'].includes(
                 resource.provider,

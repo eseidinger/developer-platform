@@ -74,6 +74,14 @@ lease's `PGPORT`, maintenance database `PGDATABASE`, username `PGUSER`, SSL mode
 saving is disabled. Renew and reconnect with the new lease port/username at
 expiry.
 
+For CouchDB, **My store access** offers a project-scoped browser console for an
+active human lease. Open the lease and choose **Open CouchDB console** to browse
+documents and run Mango queries. A read-write lease can also save or delete
+documents and create named indexes. The console is limited to that one database
+and closes on lease expiry or revocation. It does not provide Fauxton's
+server-wide administration functions. Native HTTP clients can use the private
+SSH tunnel and the lease's `COUCHDB_*` connection values.
+
 Both application and human read-write access include application-schema
 create/alter/drop. Readers have existing/future table access. Server
 administration, extension installation, access grants/default ACL changes and

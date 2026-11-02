@@ -229,6 +229,7 @@ test.each([
   ['qdrant', 'Qdrant', 'QDRANT_API_KEY'],
   ['opensearch', 'OpenSearch', 'OPENSEARCH_PASSWORD'],
   ['neo4j', 'Neo4j', 'NEO4J_PASSWORD'],
+  ['couchdb', 'CouchDB', 'COUCHDB_PASSWORD'],
 ] as const)(
   '%s console launch sends an ephemeral POST assertion without caching it or placing it in a URL',
   async (provider, label, key) => {
