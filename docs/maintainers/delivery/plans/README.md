@@ -9,6 +9,7 @@ must not be read as proof that the corresponding source capability is absent:
 
 - [Deployed Platform API acceptance suite](deployed-api-acceptance.md) — proposed first installed-platform test stage
 - [Energy-system use-case enablement priority](energy-system-integration.md)
+- [Protected identity lookup for hosted applications](identity-lookup.md) — planned application-scoped identity API
 - [Generic use-case enablement increment](use-case-enablement-increment.md)
 - [Phase 4 tracing and Grafana dashboards](phase-4-tracing-and-dashboards.md)
 - [Phase 5 AI operations](phase-5-ai-operations.md) — in progress; portal package 5.6 owner-accepted
