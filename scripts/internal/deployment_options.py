@@ -35,7 +35,7 @@ ADDRESSES = {
     "neo4j-controller": ("NEO4J_CONTROLLER_IP", 31),
     "local-application-edge": ("LOCAL_APPLICATION_EDGE_IP", 32),
 }
-PROFILES = {"s3", "qdrant", "opensearch", "neo4j"}
+PROFILES = {"s3", "qdrant", "opensearch", "neo4j", "couchdb"}
 
 
 def fail(message):
@@ -109,6 +109,7 @@ def platform_inventory_settings(options):
             "stores",
             "network",
             "search_console_network",
+            "couchdb_network",
             "k3s_image",
             "bootstrap_subject",
             "store_ssh_host",
@@ -175,6 +176,12 @@ def platform_inventory_settings(options):
                 "opensearch-dashboards": ("OPENSEARCH_DASHBOARDS_IP", 3),
             },
         ),
+        (
+            "couchdb_network",
+            29,
+            "STORE_COUCHDB_SUBNET",
+            {"couchdb": ("COUCHDB_IP", 2)},
+        ),
     ]:
         config = options.get(field)
         if config is None:
@@ -184,8 +191,12 @@ def platform_inventory_settings(options):
         networks.append(subnet)
         result[key] = str(subnet)
         result.update(addresses(config, subnet, specification, "platform_" + field))
-    if len(networks) == 2 and networks[0].overlaps(networks[1]):
-        fail("Platform and search-console networks must not overlap")
+    if any(
+        first.overlaps(second)
+        for index, first in enumerate(networks)
+        for second in networks[index + 1 :]
+    ):
+        fail("Platform Docker networks must not overlap")
     image = options.get("k3s_image")
     if image is not None:
         if not isinstance(image, str) or not re.fullmatch(

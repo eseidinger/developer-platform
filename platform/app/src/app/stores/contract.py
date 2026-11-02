@@ -7,7 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 NAME = r"^[a-z][a-z0-9-]{0,30}[a-z0-9]$|^[a-z]$"
 Mode = Literal["read-only", "read-write"]
-Provider = Literal["postgresql", "s3", "opensearch", "neo4j", "qdrant"]
+Provider = Literal["postgresql", "s3", "opensearch", "neo4j", "qdrant", "couchdb"]
 
 
 class Strict(BaseModel):

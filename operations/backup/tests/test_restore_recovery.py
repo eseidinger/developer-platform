@@ -18,13 +18,14 @@ class RestoreRecoveryTests(unittest.TestCase):
             bundle = Path(directory)
             manifest = {'resources': [{'provider': 's3', 'state': 'retired'},
                 {'provider': 'qdrant', 'state': 'active'}, {'provider': 'opensearch', 'state': 'purging'},
-                {'provider': 'neo4j', 'state': 'purged'}]}
+                {'provider': 'couchdb', 'state': 'active'}, {'provider': 'neo4j', 'state': 'purged'}]}
             (bundle / 'store-recovery.json').write_text(json.dumps(manifest))
             with self.assertRaisesRegex(RuntimeError, 'volume is missing'):
                 restore.store_volume_restore_targets(bundle)
-            for filename in ('rustfs-data.tar.gz', 'qdrant-storage.tar.gz', 'opensearch-data.tar.gz'):
+            for filename in ('couchdb-data.tar.gz', 'rustfs-data.tar.gz', 'qdrant-storage.tar.gz', 'opensearch-data.tar.gz'):
                 (bundle / filename).write_bytes(b'synthetic archive identity')
             self.assertEqual(restore.store_volume_restore_targets(bundle), [
+                ('couchdb', 'couchdb_data', 'couchdb-data.tar.gz'),
                 ('opensearch', 'opensearch_data', 'opensearch-data.tar.gz'),
                 ('qdrant', 'qdrant_data', 'qdrant-storage.tar.gz'),
                 ('rustfs', 'rustfs_data', 'rustfs-data.tar.gz')])

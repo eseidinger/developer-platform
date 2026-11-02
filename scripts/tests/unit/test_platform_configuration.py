@@ -78,6 +78,7 @@ class PlatformConfigurationTests(unittest.TestCase):
             },
             "network": {"subnet": "10.55.8.0/24"},
             "search_console_network": {"subnet": "10.55.9.0/29"},
+            "couchdb_network": {"subnet": "10.55.10.0/29"},
         }
         specification = {
             "environment": {"PLATFORM_DOMAIN": "platform.fixture.example"},
@@ -155,6 +156,7 @@ class PlatformConfigurationTests(unittest.TestCase):
                 }
             },
             {"options": {"search_console_network": {"subnet": "172.30.80.0/29"}}},
+            {"options": {"couchdb_network": {"subnet": "172.30.80.0/29"}}},
             {"tracing": {"sample_rate": "NaN"}},
             {"tracing": {"retention": "0h"}},
         ]:

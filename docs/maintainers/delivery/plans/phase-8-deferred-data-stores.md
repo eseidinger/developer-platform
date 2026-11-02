@@ -1,7 +1,8 @@
 # Phase 8 — Deferred Data Stores
 
-Status: package 8.3 selected for planning on November 2, 2026; implementation
-has not started. Packages 8.1 and 8.2 remain deferred and unscheduled.
+Status: package 8.3 selected on November 2, 2026; source implementation and
+disposable fixture pass, with deployed acceptance open. Packages 8.1 and 8.2
+remain deferred and unscheduled.
 Measurements and comparisons for activated stores belong to
 [Phase 9](phase-9-store-measurement-and-comparison.md).
 

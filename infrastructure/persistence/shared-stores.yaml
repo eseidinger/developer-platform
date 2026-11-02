@@ -1,5 +1,32 @@
 ---
 services:
+  couchdb:
+    profiles: [couchdb]
+    image:
+      "couchdb:3.5.3@sha256:bed314d10cdf58c0fff63352db4c3f168df58a1\
+        85a773c0e2295105375c5ef10"
+    user: couchdb
+    restart: unless-stopped
+    environment:
+      COUCHDB_USER: ${COUCHDB_ADMIN_USER:-platform_admin}
+      COUCHDB_PASSWORD: ${COUCHDB_ADMIN_PASSWORD:?Run scripts/init.py}
+    volumes:
+      - couchdb_data:/opt/couchdb/data
+      - ./couchdb.ini:/opt/couchdb/etc/local.d/10-platform.ini:ro
+    networks:
+      store-couchdb:
+        ipv4_address: ${COUCHDB_IP:-172.30.82.2}
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 768m
+    cpus: 0.5
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:5984/_up]
+      interval: 15s
+      timeout: 5s
+      start_period: 60s
+      retries: 5
+
   rustfs:
     profiles: [s3]
     image:

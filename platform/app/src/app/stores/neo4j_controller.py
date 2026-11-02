@@ -264,6 +264,7 @@ class Controller:
             "rustfs": "s3",
             "opensearch": "opensearch",
             "qdrant": "qdrant",
+            "couchdb": "couchdb",
         }
         result = []
         for item in self.engine.call("GET", "/containers/json?all=1"):

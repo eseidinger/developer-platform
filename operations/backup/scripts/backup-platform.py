@@ -175,7 +175,8 @@ class Job:
         if 'neo4j' in providers:
             self.neo4j_state(bundle, manifest)
             providers.remove('neo4j')
-        volumes = {'s3': ('rustfs', ['/data']), 'qdrant': ('qdrant', ['/qdrant/storage']),
+        volumes = {'couchdb': ('couchdb', ['/opt/couchdb/data']),
+                   's3': ('rustfs', ['/data']), 'qdrant': ('qdrant', ['/qdrant/storage']),
                    'opensearch': ('opensearch', ['/usr/share/opensearch/data'])}
         if providers - volumes.keys():
             raise BackupError('Data-store provider has no protected volume capture')

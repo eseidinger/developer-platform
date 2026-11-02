@@ -77,7 +77,8 @@ def store_volume_restore_targets(bundle):
         return []
     manifest = json.loads(path.read_text())
     providers = {row['provider'] for row in manifest['resources'] if row['state'] != 'purged'} - {'postgresql','neo4j'}
-    mapping = {'s3': ('rustfs', 'rustfs_data', 'rustfs-data.tar.gz'),
+    mapping = {'couchdb': ('couchdb', 'couchdb_data', 'couchdb-data.tar.gz'),
+        's3': ('rustfs', 'rustfs_data', 'rustfs-data.tar.gz'),
         'qdrant': ('qdrant', 'qdrant_data', 'qdrant-storage.tar.gz'),
         'opensearch': ('opensearch', 'opensearch_data', 'opensearch-data.tar.gz')}
     if providers - mapping.keys():

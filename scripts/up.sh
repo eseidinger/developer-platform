@@ -62,6 +62,9 @@ for profile in "${store_profiles[@]}"; do
     qdrant)
       store_services+=(qdrant)
       ;;
+    couchdb)
+      store_services+=(couchdb)
+      ;;
     neo4j)
       docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 \
         infrastructure/persistence/neo4j

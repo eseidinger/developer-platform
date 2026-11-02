@@ -68,6 +68,7 @@ class StoreApiTests(TestCase):
             "qdrant": "advisory",
             "opensearch": "advisory",
             "neo4j": "advisory",
+            "couchdb": "advisory",
             "postgresql": "advisory: PostgreSQL has no hard per-database byte quota",
         }
         for provider, expected in modes.items():

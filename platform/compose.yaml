@@ -107,6 +107,9 @@ services:
       OPENSEARCH_CA_FILE: /run/stores/opensearch-ca.pem
       QDRANT_IP: ${QDRANT_IP:-172.30.80.18}
       QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      COUCHDB_IP: ${COUCHDB_IP:-172.30.82.2}
+      COUCHDB_ADMIN_USER: ${COUCHDB_ADMIN_USER:-platform_admin}
+      COUCHDB_ADMIN_PASSWORD: ${COUCHDB_ADMIN_PASSWORD:-}
       TELEMETRY_CATALOG_PASSWORD: >-
         ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
       DATABASE_BASTION_TOKEN: ${DATABASE_BASTION_TOKEN:?Run scripts/init.py}
@@ -182,6 +185,7 @@ services:
         ipv4_address: ${PLATFORM_API_IP:-172.30.80.11}
       search-consoles:
         ipv4_address: ${STORE_SEARCH_API_IP:-172.30.81.2}
+      store-couchdb: {}
     depends_on:
       host-capacity:
         condition: service_started
@@ -222,7 +226,10 @@ services:
       OPENSEARCH_IP: ${OPENSEARCH_IP:-172.30.80.17}
       OPENSEARCH_CA_FILE: /run/stores/opensearch-ca.pem
       QDRANT_IP: ${QDRANT_IP:-172.30.80.18}
+      COUCHDB_IP: ${COUCHDB_IP:-172.30.82.2}
       STORE_RELAY_PASSWORD: ${STORE_RELAY_PASSWORD:?Run scripts/init.py}
+      COUCHDB_ADMIN_USER: ${COUCHDB_ADMIN_USER:-platform_admin}
+      COUCHDB_ADMIN_PASSWORD: ${COUCHDB_ADMIN_PASSWORD:-}
     depends_on:
       platform-api:
         condition: service_healthy
@@ -232,6 +239,7 @@ services:
       platform:
         ipv4_address: ${STORE_RELAY_IP:-172.30.80.15}
       store-consoles: {}
+      store-couchdb: {}
     read_only: true
     tmpfs: ["/tmp"]
     cap_drop: [ALL]

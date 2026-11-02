@@ -355,9 +355,13 @@ function Workspace({
                   early; retained backup copies expire normally.
                 </p>
               )}
-              {['postgresql', 'opensearch', 'qdrant', 'neo4j'].includes(
-                resource.provider,
-              ) && (
+              {[
+                'postgresql',
+                'opensearch',
+                'qdrant',
+                'neo4j',
+                'couchdb',
+              ].includes(resource.provider) && (
                 <p>
                   {resource.provider} byte quotas are advisory; monitoring and
                   admission controls cannot guarantee a hard limit.
@@ -1051,6 +1055,15 @@ function HumanAccess({
               <Button variant="outline" onClick={() => setShown(!shown)}>
                 {shown ? 'Hide credential values' : 'Reveal credential values'}
               </Button>
+              {resource.provider === 'couchdb' && (
+                <p>
+                  Connect to COUCHDB_URL with COUCHDB_USERNAME and
+                  COUCHDB_PASSWORD, using COUCHDB_DATABASE for document
+                  requests. Human access requires the private SSH tunnel.
+                  Read-only leases can query documents but cannot change them. A
+                  browser console is not available.
+                </p>
+              )}
               {['s3', 'qdrant', 'opensearch', 'neo4j'].includes(
                 resource.provider,
               ) &&

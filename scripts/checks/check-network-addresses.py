@@ -64,9 +64,17 @@ def addresses(config):
                 f"The fixed address for {service} must be a usable address in PLATFORM_SUBNET."
             )
     search_subnet, _ = console_addresses(config)
-    if subnet.overlaps(search_subnet):
+    couchdb_subnet, _ = couchdb_addresses(config)
+    if any(
+        first.overlaps(second)
+        for first, second in (
+            (subnet, search_subnet),
+            (subnet, couchdb_subnet),
+            (search_subnet, couchdb_subnet),
+        )
+    ):
         raise ValueError(
-            "The isolated search-console subnet must not overlap PLATFORM_SUBNET."
+            "The platform, search-console and CouchDB subnets must not overlap."
         )
     return subnet, result
 
@@ -100,6 +108,25 @@ def console_addresses(config):
             "Search-console addresses must be distinct usable IPv4 addresses in their isolated subnet, excluding its gateway."
         ) from None
     return subnet, result
+
+
+def couchdb_addresses(config):
+    try:
+        subnet = ipaddress.IPv4Network(
+            config.get("STORE_COUCHDB_SUBNET", "172.30.82.0/29")
+        )
+        address = ipaddress.IPv4Address(config.get("COUCHDB_IP", "172.30.82.2"))
+        if address not in subnet or address in (
+            subnet.network_address,
+            subnet.broadcast_address,
+            subnet.network_address + 1,
+        ):
+            raise ValueError()
+    except ValueError:
+        raise ValueError(
+            "CouchDB address must be a usable IPv4 address in its isolated subnet, excluding its gateway."
+        ) from None
+    return subnet, {"couchdb": address}
 
 
 def conflicts(subnet, fixed, network, labels):
@@ -170,13 +197,19 @@ def check():
         )
 
     search_subnet, search_fixed = console_addresses(config)
+    couchdb_subnet, couchdb_fixed = couchdb_addresses(config)
     errors = []
     for name, selected_subnet, selected_fixed in (
         (NETWORK, subnet, fixed),
         ("developer-platform-search-consoles", search_subnet, search_fixed),
+        ("developer-platform-store-couchdb", couchdb_subnet, couchdb_fixed),
     ):
         if name in existing:
             network = json.loads(docker("network", "inspect", name))[0]
+            if name == "developer-platform-store-couchdb" and not network.get(
+                "Internal"
+            ):
+                raise ValueError("Existing CouchDB network must be internal")
             if args.validate_networks:
                 configured = network.get("IPAM", {}).get("Config", [])
                 if not any(

@@ -1,10 +1,19 @@
 # CouchDB Provider — Next Data Store Increment
 
-Status: selected for planning on November 2, 2026; implementation and deployed
-acceptance have not started. This plan refines [Phase 8 package 8.3](phase-8-deferred-data-stores.md#83-document-stores)
+Status: selected on November 2, 2026; source implementation and disposable
+CouchDB fixture pass. Deployed acceptance has not started. This plan refines
+[Phase 8 package 8.3](phase-8-deferred-data-stores.md#83-document-stores)
 and [PLAN-033](../backlog.md#data-store-expansion-tasks). It does not select
 MongoDB. Phase 7's unfinished acceptance and other Phase 8 packages remain
 independent. The existing [store policies](data-store-expansion.md) apply.
+
+The disposable CouchDB-only Compose fixture on November 2 verified the pinned
+image, repeated provisioning, cross-database denial, document and Mango queries,
+administrator-only index changes, service restart, recovered security and native
+credential revocation. The relay's read-only and admin-index boundaries passed
+focused local tests. The PostgreSQL provider constraint migration passed twice
+in a disposable database. No deployed resource, off-host restore or application
+reconnection is claimed by these checks.
 
 ## Scope and decisions
 
@@ -35,7 +44,7 @@ and [Mango API reference](https://docs.couchdb.org/en/stable/api/database/find.h
 1. Give each resource private access to only its database, with separate
    platform-managed human and application identities. Route every client request,
    including read-write access, through the access gateway; only the operator
-   controller may reach CouchDB directly. Verify that a credential cannot
+   API and trusted relay may reach CouchDB directly. Verify that a credential cannot
    enumerate or access another database, system database, server API or another
    project's data. Database names alone provide no isolation.
 1. Design a fail-closed HTTP access gateway for read-only credentials. Allow

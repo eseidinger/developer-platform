@@ -34,7 +34,7 @@ def validate_manifest(value):
         resource_id: UUID
         owner_project: str = Field(pattern=NAME, max_length=32)
         name: str = Field(pattern=NAME, max_length=32)
-        provider: Literal["postgresql", "s3", "opensearch", "neo4j", "qdrant"]
+        provider: Literal["postgresql", "s3", "opensearch", "neo4j", "qdrant", "couchdb"]
         state: Literal["active", "retired", "purging", "purged"]
         version: int = Field(ge=1)
         quota_bytes: int = Field(gt=0)

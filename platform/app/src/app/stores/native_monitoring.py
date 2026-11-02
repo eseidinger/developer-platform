@@ -279,6 +279,13 @@ def qdrant(provider, resources):
     return qdrant_samples(raw, resources)
 
 
+def couchdb(provider, resources):
+    status = provider.root.request("GET", "/_up")
+    if status.get("status") != "ok":
+        raise ValueError("CouchDB is unavailable")
+    return [line("platform_native_couchdb_up", 1, {"provider": "couchdb"})]
+
+
 def containers(resources):
     from .neo4j import Neo4j
 
@@ -289,7 +296,7 @@ def containers(resources):
     result = []
     for item in root["containers"]:
         provider = item["provider"]
-        if provider not in {"postgresql", "s3", "qdrant", "opensearch", "neo4j"}:
+        if provider not in {"postgresql", "s3", "qdrant", "opensearch", "neo4j", "couchdb"}:
             raise ValueError()
         labels = {"provider": provider, "scope": "shared"}
         if item.get("resource_id"):
@@ -487,6 +494,7 @@ def loop(stop, control):
                 ("opensearch", opensearch),
                 ("qdrant", qdrant),
                 ("neo4j", neo4j),
+                ("couchdb", couchdb),
             ]:
                 enabled = name == "postgresql" or name in selected
                 lines.append(

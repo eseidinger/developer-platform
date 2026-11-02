@@ -119,6 +119,43 @@ class NetworkBootstrapTests(unittest.TestCase):
                 network_addresses.addresses(config)
             self.assertNotIn("private-value", str(denied.exception))
 
+    def test_couchdb_network_is_isolated_and_rejects_gateway_or_overlap(self):
+        subnet, fixed = network_addresses.couchdb_addresses({})
+        self.assertEqual(str(subnet), "172.30.82.0/29")
+        self.assertEqual(str(fixed["couchdb"]), "172.30.82.2")
+        for config in (
+            {"COUCHDB_IP": "172.30.82.1"},
+            {"COUCHDB_IP": "172.30.80.33"},
+            {"STORE_COUCHDB_SUBNET": "172.30.80.0/29", "COUCHDB_IP": "172.30.80.2"},
+            {"STORE_COUCHDB_SUBNET": "private-value"},
+        ):
+            with self.subTest(config=config), self.assertRaises(ValueError) as denied:
+                network_addresses.addresses(config)
+            self.assertNotIn("private-value", str(denied.exception))
+
+    def test_existing_couchdb_network_must_remain_internal(self):
+        couchdb = {
+            "Internal": False,
+            "IPAM": {"Config": [{"Subnet": "172.30.82.0/29"}]},
+            "Containers": {},
+        }
+        with (
+            patch.object(network_addresses, "settings", return_value={}),
+            patch.object(
+                sys, "argv", ["check-network-addresses.py", "--validate-networks"]
+            ),
+            patch.object(
+                network_addresses,
+                "docker",
+                side_effect=[
+                    "developer-platform-store-couchdb",
+                    json.dumps([couchdb]),
+                ],
+            ),
+            self.assertRaisesRegex(ValueError, "must be internal"),
+        ):
+            network_addresses.check()
+
     def test_daemon_failure_never_forwards_arbitrary_diagnostics(self):
         with (
             patch.object(

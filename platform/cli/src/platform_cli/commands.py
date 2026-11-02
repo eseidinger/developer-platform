@@ -46,6 +46,7 @@ SENSITIVE_KEYS = {
     "opensearch_password",
     "qdrant_api_key",
     "neo4j_password",
+    "couchdb_password",
 }
 
 

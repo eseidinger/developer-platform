@@ -8,6 +8,7 @@ from app.stores import providers
 
 class ProviderSelectionTests(TestCase):
     def test_all_provider_quota_modes_are_available_to_resource_detail(self):
+        from app.stores.couchdb import CouchDB
         from app.stores.neo4j import Neo4j
         from app.stores.opensearch import OpenSearch
         from app.stores.postgres import Postgres
@@ -17,11 +18,12 @@ class ProviderSelectionTests(TestCase):
         self.assertEqual(
             [
                 kind.quota_enforcement
-                for kind in (Postgres, S3, OpenSearch, Qdrant, Neo4j)
+                for kind in (Postgres, S3, OpenSearch, Qdrant, Neo4j, CouchDB)
             ],
             [
                 "advisory: PostgreSQL has no hard per-database byte quota",
                 "hard",
+                "advisory",
                 "advisory",
                 "advisory",
                 "advisory",
@@ -34,7 +36,7 @@ class ProviderSelectionTests(TestCase):
                 [p["id"] for p in providers.availability() if p["enabled"]],
                 ["postgresql"],
             )
-            for name in ("s3", "qdrant", "opensearch", "neo4j"):
+            for name in ("s3", "qdrant", "opensearch", "neo4j", "couchdb"):
                 with self.assertRaises(providers.ProviderUnavailable):
                     providers.get(name)
 
@@ -71,11 +73,30 @@ class ProviderSelectionTests(TestCase):
                 with self.assertRaises(providers.ProviderUnavailable):
                     providers.get(name)
 
+    def test_couchdb_requires_selection_admin_secret_and_capacity(self):
+        env = {
+            "STORE_ENABLED_PROVIDERS": "postgresql,couchdb",
+            "COUCHDB_IP": "172.30.82.2",
+            "COUCHDB_ADMIN_PASSWORD": "s" * 32,
+        }
+        with patch.dict(os.environ, env, clear=True):
+            couchdb = next(p for p in providers.availability() if p["id"] == "couchdb")
+            self.assertFalse(couchdb["enabled"])
+            os.environ["STORE_CAPACITY_BYTES"] = (
+                '{"postgresql":1073741824,"couchdb":1073741824}'
+            )
+            couchdb = next(p for p in providers.availability() if p["id"] == "couchdb")
+            self.assertTrue(couchdb["enabled"])
+            del os.environ["COUCHDB_ADMIN_PASSWORD"]
+            with self.assertRaises(providers.ProviderUnavailable):
+                providers.get("couchdb")
+
     def test_every_http_binding_points_to_its_lease_not_the_raw_service(self):
         for name, variable in [
             ("s3", "AWS_ENDPOINT_URL_S3"),
             ("opensearch", "OPENSEARCH_URL"),
             ("qdrant", "QDRANT_URL"),
+            ("couchdb", "COUCHDB_URL"),
         ]:
             backend = Mock()
             backend.credentials.return_value = {

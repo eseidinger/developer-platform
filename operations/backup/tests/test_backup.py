@@ -98,10 +98,10 @@ class BackupTests(unittest.TestCase):
         path = bundle / 'store-recovery.json'
         backup.atomic_json(path, {'resources': [
             {'provider': provider, 'state': state} for provider, state in
-            [('postgresql', 'active'), ('s3', 'retired'), ('qdrant', 'active'), ('opensearch', 'purging'), ('neo4j', 'purged')]]})
+            [('postgresql', 'active'), ('s3', 'retired'), ('qdrant', 'active'), ('opensearch', 'purging'), ('couchdb', 'active'), ('neo4j', 'purged')]]})
         with patch.object(self.job, 'volume_state') as volumes:
             self.job.data_store_state(bundle)
-        self.assertEqual(volumes.call_args.args[1], [('opensearch', ['/usr/share/opensearch/data']),
+        self.assertEqual(volumes.call_args.args[1], [('couchdb', ['/opt/couchdb/data']), ('opensearch', ['/usr/share/opensearch/data']),
             ('qdrant', ['/qdrant/storage']), ('rustfs', ['/data'])])
         backup.atomic_json(path, {'resources': [{'provider': 'unknown', 'state': 'active'}]})
         with patch.object(self.job, 'volume_state') as volumes, self.assertRaises(backup.BackupError):

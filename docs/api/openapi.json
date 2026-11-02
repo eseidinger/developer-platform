@@ -1331,7 +1331,8 @@
               "s3",
               "opensearch",
               "neo4j",
-              "qdrant"
+              "qdrant",
+              "couchdb"
             ],
             "title": "Provider",
             "type": "string"

@@ -114,6 +114,10 @@ the [human database access guide](../../docs/developers/database-access.md).
   - **Default when omitted:** Preserve remote settings
   - **Purpose:** Separate private IPv4 `/29` and optional console-address
     overrides
+- **`platform_couchdb_network`**
+  - **Default when omitted:** Preserve remote settings
+  - **Purpose:** Isolated private IPv4 `/29` for CouchDB with an optional fixed
+    CouchDB address override
 - **`platform_k3s_image`**
   - **Default when omitted:** Preserve remote pin
   - **Purpose:** Supported `rancher/k3s:v1.35/36/37.<patch>-k3s<release>` pin,
@@ -153,13 +157,14 @@ For example, select all optional providers with explicit data budgets:
 
 ```yaml
 platform_stores:
-  profiles: [s3, qdrant, opensearch, neo4j]
+  profiles: [s3, qdrant, opensearch, neo4j, couchdb]
   capacity_bytes:
     postgresql: 17179869184
     s3: 8589934592
     qdrant: 4294967296
     opensearch: 4294967296
     neo4j: 4294967296
+    couchdb: 4294967296
   neo4j:
     max_instances: 4
     memory_bytes: 1610612736
@@ -167,7 +172,7 @@ platform_stores:
 
 These are example data allocations, not a host sizing guarantee. Every selected
 provider and PostgreSQL require positive integer byte budgets. Profiles must be
-a list containing only `s3`, `qdrant`, `opensearch`, `neo4j`, with no
+a list containing only `s3`, `qdrant`, `opensearch`, `neo4j`, `couchdb`, with no
 duplicates. `profiles: []` selects PostgreSQL only. Neo4j limits apply to
 retained instances platform-wide (1–64) and memory per instance (1–16 GiB).
 Review combined service, workload, telemetry and recovery requirements before

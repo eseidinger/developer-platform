@@ -34,6 +34,7 @@ def backend_endpoint(lease):
         "s3": ("RUSTFS_IP", 9000),
         "opensearch": ("OPENSEARCH_IP", 9200),
         "qdrant": ("QDRANT_IP", 6333),
+        "couchdb": ("COUCHDB_IP", 5984),
     }
     setting, port = endpoints[lease["provider"]]
     import ipaddress
@@ -71,7 +72,7 @@ def snapshot():
             "SELECT COALESCE(backup_until>now(),false) FROM store_control WHERE singleton"
         ).fetchone()[0]:
             return {}
-        rows = conn.execute("""SELECT c.relay_port,c.credential_id,c.expires_at,r.resource_id,r.provider,g.kind,c.admission_sha256,host(i.host)
+        rows = conn.execute("""SELECT c.relay_port,c.credential_id,c.expires_at,r.resource_id,r.provider,g.kind,c.admission_sha256,host(i.host),c.mode
             FROM store_credentials c JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)
             LEFT JOIN store_instances i USING(resource_id)
             JOIN projects p ON p.name=r.owner_project
@@ -105,6 +106,7 @@ def snapshot():
             "admission_sha256": row[6],
             "native_host": row[7],
             "s3_sessions": sessions.get(str(row[1]), {}),
+            "mode": row[8],
         }
         for row in rows
         if row[4] in selected

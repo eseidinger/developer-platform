@@ -35,6 +35,7 @@ def get(name):
         "s3": ("RUSTFS_IP", ("RUSTFS_ACCESS_KEY", "RUSTFS_SECRET_KEY")),
         "opensearch": ("OPENSEARCH_IP", ("OPENSEARCH_ADMIN_PASSWORD",)),
         "qdrant": ("QDRANT_IP", ("QDRANT_API_KEY",)),
+        "couchdb": ("COUCHDB_IP", ("COUCHDB_ADMIN_PASSWORD",)),
     }
     if name not in definitions:
         raise ProviderUnavailable(
@@ -58,6 +59,10 @@ def get(name):
             from .qdrant import Qdrant
 
             return Qdrant()
+        if name == "couchdb":
+            from .couchdb import CouchDB
+
+            return CouchDB()
         from .opensearch import OpenSearch
 
         return OpenSearch()
@@ -68,7 +73,7 @@ def get(name):
 
 
 def capabilities(name):
-    if name not in {"postgresql", "s3", "opensearch", "qdrant", "neo4j"}:
+    if name not in {"postgresql", "s3", "opensearch", "qdrant", "neo4j", "couchdb"}:
         raise ProviderUnavailable("Unknown provider")
     full = name == "neo4j"
     return {
@@ -82,7 +87,7 @@ def capabilities(name):
 
 def availability():
     result = []
-    for name in ("postgresql", "s3", "opensearch", "qdrant", "neo4j"):
+    for name in ("postgresql", "s3", "opensearch", "qdrant", "neo4j", "couchdb"):
         try:
             get(name)
             budget(name)
@@ -178,6 +183,7 @@ def connection(resource, credential):
             "s3": "AWS_ENDPOINT_URL_S3",
             "qdrant": "QDRANT_URL",
             "opensearch": "OPENSEARCH_URL",
+            "couchdb": "COUCHDB_URL",
         }[resource["provider"]]
         fields[key] = endpoint
     return fields

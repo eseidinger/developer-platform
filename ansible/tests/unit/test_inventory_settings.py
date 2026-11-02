@@ -293,6 +293,7 @@ class InventorySettingsTests(unittest.TestCase):
                         "platform_stores",
                         "platform_network",
                         "platform_search_console_network",
+                        "platform_couchdb_network",
                         "platform_k3s_image",
                         "platform_store_ssh_host",
                         "platform_database_bastion_bind_ip",
