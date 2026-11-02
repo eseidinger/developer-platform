@@ -1,57 +1,121 @@
 # Application lifecycle
 
-Status: the selected architecture through Phase 5 is one Python/FastAPI Platform API application. It owns platform metadata, grants, desired revisions, operations, policy, runtime observation, and infrastructure execution. Project workloads run only on the existing Kubernetes/k3d infrastructure. A second compute adapter or deployable service extraction is optional Phase 6 work.
+Status: the selected architecture through Phase 5 is one Python/FastAPI Platform
+API application. It owns platform metadata, grants, desired revisions,
+operations, policy, runtime observation, and infrastructure execution. Project
+workloads run only on the existing Kubernetes/k3d infrastructure. A second
+compute adapter or deployable service extraction is optional Phase 6 work.
 
 ## Application boundary
 
-The [Python API](../../platform/app/src/app/main.py) is the single public and operational application. Logical responsibilities remain separated in code so they can be tested and evolved without creating distributed services:
+The [Python API](../../platform/app/src/app/main.py) is the single public and
+operational application. Logical responsibilities remain separated in code so
+they can be tested and evolved without creating distributed services:
 
-| Responsibility | Ownership in the Python application |
-|---|---|
-| API and identity | OIDC authentication, request validation, versioned HTTP contract, and operation status |
-| Catalog and authorization | Projects, application specifications, stable IDs, grants, and machine credentials |
-| Lifecycle and policy | Desired revisions, capability checks, concurrency control, rollback, retirement, and audit |
-| Operation execution | Durable queued operations, authorization rechecks, retries, and redacted results |
-| Infrastructure integration | PostgreSQL provisioning, Kubernetes resources, routing, secrets, and monitoring discovery |
-| Runtime observation | Readiness, component status, logs, resource usage, drift, and failure reasons |
+- **Responsibility:** API and identity
+  - **Ownership in the Python application:** OIDC authentication, request
+    validation, versioned HTTP contract, and operation status
+- **Responsibility:** Catalog and authorization
+  - **Ownership in the Python application:** Projects, application
+    specifications, stable IDs, grants, and machine credentials
+- **Responsibility:** Lifecycle and policy
+  - **Ownership in the Python application:** Desired revisions, capability
+    checks, concurrency control, rollback, retirement, and audit
+- **Responsibility:** Operation execution
+  - **Ownership in the Python application:** Durable queued operations,
+    authorization rechecks, retries, and redacted results
+- **Responsibility:** Infrastructure integration
+  - **Ownership in the Python application:** PostgreSQL provisioning, Kubernetes
+    resources, routing, secrets, and monitoring discovery
+- **Responsibility:** Runtime observation
+  - **Ownership in the Python application:** Readiness, component status, logs,
+    resource usage, drift, and failure reasons
 
-These are module and data-ownership boundaries inside one deployable application. They do not imply network APIs, separate service identities, separate deployments, or independently operated databases.
+These are module and data-ownership boundaries inside one deployable
+application. They do not imply network APIs, separate service identities,
+separate deployments, or independently operated databases.
 
 ## Request and operation flow
 
-Each deployment request authenticates the caller, checks the current platform grant, validates the public contract and supported capabilities, then atomically stores the desired revision and durable operation before returning `202 Accepted`. Other mutations use their domain's resource/version and response contract. Repeated requests for an unchanged revision reuse its active operation. Expected-revision checks prevent stale updates.
+Each deployment request authenticates the caller, checks the current platform
+grant, validates the public contract and supported capabilities, then atomically
+stores the desired revision and durable operation before returning
+`202 Accepted`. Other mutations use their domain's resource/version and response
+contract. Repeated requests for an unchanged revision reuse its active
+operation. Expected-revision checks prevent stale updates.
 
-The in-process worker claims queued or interrupted operations using database locks, rechecks authorization and revision freshness, and executes the approved steps. It resolves approved named-store bindings, generates component-scoped Secrets and relay-port egress, applies Kubernetes resources with server-side apply, publishes monitoring discovery, and records a redacted result. A separate store worker provisions independent resources and reconciles grants and credential rotation; deployments never create an implicit project database. The worker observes existing state before retrying operations whose outcome may be unknown.
+The in-process worker claims queued or interrupted operations using database
+locks, rechecks authorization and revision freshness, and executes the approved
+steps. It resolves approved named-store bindings, generates component-scoped
+Secrets and relay-port egress, applies Kubernetes resources with server-side
+apply, publishes monitoring discovery, and records a redacted result. A separate
+store worker provisions independent resources and reconciles grants and
+credential rotation; deployments never create an implicit project database. The
+worker observes existing state before retrying operations whose outcome may be
+unknown.
 
-Catalog, PostgreSQL, and Kubernetes changes are not one transaction. Partial failures therefore remain visible as durable operations. Idempotent `ensure`, observation, retry, rollback, and retirement behavior prevent blind recreation or implicit data deletion.
+Catalog, PostgreSQL, and Kubernetes changes are not one transaction. Partial
+failures therefore remain visible as durable operations. Idempotent `ensure`,
+observation, retry, rollback, and retirement behavior prevent blind recreation
+or implicit data deletion.
 
 ## Public contract
 
-The API uses platform concepts such as projects, applications, components, revisions, operations, grants, resources, and endpoints. Clients do not submit namespaces, Kubernetes kinds, Compose projects, or provider credentials. Unsupported capabilities are rejected before infrastructure side effects.
+The API uses platform concepts such as projects, applications, components,
+revisions, operations, grants, resources, and endpoints. Clients do not submit
+namespaces, Kubernetes kinds, Compose projects, or provider credentials.
+Unsupported capabilities are rejected before infrastructure side effects.
 
-Technology independence is a contract constraint, not a requirement to implement multiple providers. The capability endpoint describes the selected Kubernetes environment. Error responses use stable platform categories and redact backend details while retaining an operation ID for authorized diagnosis.
+Technology independence is a contract constraint, not a requirement to implement
+multiple providers. The capability endpoint describes the selected Kubernetes
+environment. Error responses use stable platform categories and redact backend
+details while retaining an operation ID for authorized diagnosis.
 
 ## Infrastructure implementation
 
 The Python application integrates directly with the selected infrastructure:
 
-- Kubernetes/k3d for application services, scheduled components, Secrets, Services, and Ingress;
+- Kubernetes/k3d for application services, scheduled components, Secrets,
+  Services, and Ingress;
 - PostgreSQL outside k3d for platform state and named-resource databases;
-- operator-selected RustFS, OpenSearch, Qdrant and dedicated Neo4j Community for additional named resources;
+- operator-selected RustFS, OpenSearch, Qdrant and dedicated Neo4j Community for
+  additional named resources;
 - Caddy and Traefik for edge and cluster routing;
-- Prometheus, Loki, Tempo, Alloy, Grafana, Alertmanager, and discovery files for observability;
-- Keycloak through the generic OIDC boundary for authentication and machine identities.
+- Prometheus, Loki, Tempo, Alloy, Grafana, Alertmanager, and discovery files for
+  observability;
+- Keycloak through the generic OIDC boundary for authentication and machine
+  identities.
 
-There is no direct Docker application-workload adapter. Docker remains the host runtime for the platform, identity, persistence, monitoring, and k3d containers.
+There is no direct Docker application-workload adapter. Docker remains the host
+runtime for the platform, identity, persistence, monitoring, and k3d containers.
 
 ## State and lifecycle
 
-The application persists stable project/application IDs, immutable desired revisions, operations, grants, credentials, audit records, and retirement inventories in platform-owned PostgreSQL state. Hosted application databases remain logically separate. Persistent data defaults to retention when workload resources are removed; permanent deletion requires an explicit authorized decision. Applications own row-level domain retention. The platform owns whole-database, backup, log, metric, revision, audit, credential, and release-evidence retention under [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md).
+The application persists stable project/application IDs, immutable desired
+revisions, operations, grants, credentials, audit records, and retirement
+inventories in platform-owned PostgreSQL state. Hosted application databases
+remain logically separate. Persistent data defaults to retention when workload
+resources are removed; permanent deletion requires an explicit authorized
+decision. Applications own row-level domain retention. The platform owns
+whole-database, backup, log, metric, revision, audit, credential, and
+release-evidence retention under
+[ADR-020](decisions/ADR-020-generic-hosted-application-integration.md).
 
-An accepted operation means the desired state was recorded, not that the workload is healthy. Operation results and live runtime observations remain distinct. Drift is reported rather than silently repaired unless a future policy explicitly enables reconciliation.
+An accepted operation means the desired state was recorded, not that the
+workload is healthy. Operation results and live runtime observations remain
+distinct. Drift is reported rather than silently repaired unless a future policy
+explicitly enables reconciliation.
 
-See the [current provisioning sequence](diagrams/provisioning.md), [ApplicationSpec](application-contract.md), [security model](../maintainers/delivery/history/security-design.md), and [Phase 2C capability plan](../maintainers/delivery/history/phase-2c-platform-capabilities.md).
+See the [current provisioning sequence](diagrams/provisioning.md),
+[ApplicationSpec](application-contract.md),
+[security model](../maintainers/delivery/history/security-design.md), and
+[Phase 2C capability plan](../maintainers/delivery/history/phase-2c-platform-capabilities.md).
 
 ## Optional Phase 6
 
-If a concrete need is recorded, [optional Phase 6](evolution.md) may add a direct Docker workload adapter or extract one or more deployable services. Neither package is part of the current architecture, and neither gates Phases 2 through 5. Any activated package requires contract parity, state migration, authorization, audit, backup/restore, operational evidence, and rollback before replacing an existing path.
+If a concrete need is recorded, [optional Phase 6](evolution.md) may add a
+direct Docker workload adapter or extract one or more deployable services.
+Neither package is part of the current architecture, and neither gates Phases 2
+through 5. Any activated package requires contract parity, state migration,
+authorization, audit, backup/restore, operational evidence, and rollback before
+replacing an existing path.

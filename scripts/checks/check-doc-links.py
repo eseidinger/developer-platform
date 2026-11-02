@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 """Check local Markdown links in repository documentation."""
 
-from pathlib import Path
 import re
 import sys
+from pathlib import Path
 from urllib.parse import unquote
-
 
 ROOT = Path(__file__).resolve().parents[2]
 SEARCH_ROOTS = [
@@ -18,9 +17,14 @@ SEARCH_ROOTS = [
     ROOT / "examples",
 ]
 IGNORED_PARTS = {"node_modules", ".git", ".pytest_cache", ".venv", "venv"}
-LINK = re.compile(r"!?\[[^\]]*\]\((?P<destination><[^>]+>|[^)\s]+)(?:\s+['\"][^)]*['\"])?\)")
-EXPLICIT_ANCHOR = re.compile(r"<a\b[^>]*\b(?:id|name)\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE)
+LINK = re.compile(
+    r"!?\[[^\]]*\]\((?P<destination><[^>]+>|[^)\s]+)(?:\s+['\"][^)]*['\"])?\)"
+)
+EXPLICIT_ANCHOR = re.compile(
+    r"<a\b[^>]*\b(?:id|name)\s*=\s*['\"]([^'\"]+)['\"]", re.IGNORECASE
+)
 HEADING = re.compile(r"^#{1,6}\s+(?P<title>.+?)\s*#*\s*$")
+FENCE = re.compile(r"^ {0,3}(?P<marker>`{3,}|~{3,})(?P<info>.*)$")
 
 
 def markdown_files() -> list[Path]:
@@ -48,14 +52,10 @@ def anchors(path: Path) -> set[str]:
         return set()
     result: set[str] = set()
     counts: dict[str, int] = {}
-    in_fence = False
-    for line in path.read_text().splitlines():
-        if line.lstrip().startswith(("```", "~~~")):
-            in_fence = not in_fence
-            continue
-        if in_fence:
-            continue
-        result.update(match.group(1).lower() for match in EXPLICIT_ANCHOR.finditer(line))
+    for _, line in visible_lines(path):
+        result.update(
+            match.group(1).lower() for match in EXPLICIT_ANCHOR.finditer(line)
+        )
         match = HEADING.match(line)
         if not match:
             continue
@@ -67,13 +67,22 @@ def anchors(path: Path) -> set[str]:
 
 
 def visible_lines(path: Path):
-    in_fence = False
+    fence_marker: str | None = None
     for number, line in enumerate(path.read_text().splitlines(), 1):
-        if line.lstrip().startswith(("```", "~~~")):
-            in_fence = not in_fence
+        match = FENCE.match(line)
+        if fence_marker is None and match:
+            fence_marker = match.group("marker")
             continue
-        if not in_fence:
-            yield number, line
+        if fence_marker is not None:
+            if (
+                match
+                and match.group("marker")[0] == fence_marker[0]
+                and len(match.group("marker")) >= len(fence_marker)
+                and not match.group("info").strip()
+            ):
+                fence_marker = None
+            continue
+        yield number, line
 
 
 errors: list[str] = []
@@ -84,7 +93,11 @@ for source in markdown_files():
             if destination.startswith(("http://", "https://", "mailto:", "data:")):
                 continue
             file_part, separator, anchor = destination.partition("#")
-            target = source if not file_part else (source.parent / unquote(file_part)).resolve()
+            target = (
+                source
+                if not file_part
+                else (source.parent / unquote(file_part)).resolve()
+            )
             if target.is_dir():
                 target = target / "README.md"
             if not target.exists():

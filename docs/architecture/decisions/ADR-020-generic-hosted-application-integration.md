@@ -55,9 +55,9 @@ does not create an application-specific realm. The platform creates separate
 OAuth clients and audiences for each application or technical purpose and
 creates application groups inside a project/application scope. Group resources
 have opaque stable platform IDs; their human-readable names are mutable
-attributes and are not authorization keys. In the Keycloak reference profile,
-an application group is represented as an application-resource-client role
-whose value is the stable group ID. A protocol mapper emits those roles in a
+attributes and are not authorization keys. In the Keycloak reference profile, an
+application group is represented as an application-resource-client role whose
+value is the stable group ID. A protocol mapper emits those roles in a
 client-scoped `groups` claim. Tokens expose only group IDs relevant to their
 target client and application, rather than all of a principal's platform
 memberships. This mapping is an identity-provider adapter detail, not a public
@@ -79,11 +79,11 @@ The supported lab profile uses Keycloak as the OIDC provider, one
 platform-managed OAuth2 Proxy deployment/configuration per public application,
 and a shared replicated platform authorizer. OAuth2 Proxy owns that
 application's browser client, cookie, callback, and OIDC exchange; it reads the
-client-scoped `groups` claim and forwards verified claims only to the authorizer.
-The authorizer validates machine bearer tokens, records first-login requests,
-matches route policy, applies the platform revocation view, and emits normalized
-upstream headers. Browser traffic passes through both components; machine
-traffic bypasses browser-session handling but still passes through the
+client-scoped `groups` claim and forwards verified claims only to the
+authorizer. The authorizer validates machine bearer tokens, records first-login
+requests, matches route policy, applies the platform revocation view, and emits
+normalized upstream headers. Browser traffic passes through both components;
+machine traffic bypasses browser-session handling but still passes through the
 authorizer. A conforming replacement may change products while preserving this
 separation and the public security behavior.
 
@@ -92,26 +92,25 @@ separation and the public security behavior.
 A human account is created in, or federated into, the configured identity
 provider by identity administration. The Developer Platform does not manage
 realm passwords, MFA, recovery, invitations, or self-registration, and a project
-administrator cannot create a realm user. On first access to a
-`browser-session` route, Authorization Code with PKCE verifies the person and
-creates a secure browser session. The authorizer maps the stable OIDC
-`(issuer, subject)` pair to an opaque platform principal and automatically
-creates or reuses one pending request keyed by application, issuer, and subject.
-First login does not assign a group and does not admit the request to the
-application. A browser receives a platform-owned pending page; an API-style
-request receives a safe `403 application_access_pending` problem containing the
-request ID. Neither response reaches the application backend.
+administrator cannot create a realm user. On first access to a `browser-session`
+route, Authorization Code with PKCE verifies the person and creates a secure
+browser session. The authorizer maps the stable OIDC `(issuer, subject)` pair to
+an opaque platform principal and automatically creates or reuses one pending
+request keyed by application, issuer, and subject. First login does not assign a
+group and does not admit the request to the application. A browser receives a
+platform-owned pending page; an API-style request receives a safe
+`403 application_access_pending` problem containing the request ID. Neither
+response reaches the application backend.
 
 A provider project administrator reviews the pending request through the
 platform control plane and assigns one or more application groups, such as
-`application-users` or `application-administrators`. The platform reconciles
-the membership to the identity-provider representation used for the client's
-group claim. On the next token or session refresh, the access layer checks the
-stable group IDs against the route policy. A matching membership admits the
-request; an authenticated principal without one receives `403`. A project
-administrator may assign the application-administrator group to themselves or
-another person, but the platform project role does not confer that application
-group automatically.
+`application-users` or `application-administrators`. The platform reconciles the
+membership to the identity-provider representation used for the client's group
+claim. On the next token or session refresh, the access layer checks the stable
+group IDs against the route policy. A matching membership admits the request; an
+authenticated principal without one receives `403`. A project administrator may
+assign the application-administrator group to themselves or another person, but
+the platform project role does not confer that application group automatically.
 
 #### Machine authorization
 
@@ -133,14 +132,14 @@ header contract.
 
 Both paths expose the same normalized identity context: an opaque stable
 principal ID mapped to issuer and subject, principal kind (`user` or `service`),
-stable application-group IDs, and, where applicable, validated client ID.
-Email, username, display name, group display name, and credential value are
-attributes, never stable authorization keys. The stable identity fields and
-group IDs are always available after authorization. Display name is released
-only when the access policy explicitly opts in; email additionally requires an
-explicit opt-in covered by the project's personal-data classification record.
-Optional attributes may be absent and must not affect authorization. Deleted
-and recreated identities receive a new mapping and do not inherit earlier
+stable application-group IDs, and, where applicable, validated client ID. Email,
+username, display name, group display name, and credential value are attributes,
+never stable authorization keys. The stable identity fields and group IDs are
+always available after authorization. Display name is released only when the
+access policy explicitly opts in; email additionally requires an explicit opt-in
+covered by the project's personal-data classification record. Optional
+attributes may be absent and must not affect authorization. Deleted and
+recreated identities receive a new mapping and do not inherit earlier
 memberships.
 
 The access boundary supplies this context on each admitted upstream request
@@ -150,8 +149,8 @@ not parse the session cookie, receive the bearer token, or query the identity
 provider to determine the current caller. Because the platform has already
 enforced coarse route authorization, an application with no object- or
 row-specific rules needs no additional authorization code. Applications remain
-responsible for any finer domain decision that cannot be represented safely as
-a route-and-method group policy.
+responsible for any finer domain decision that cannot be represented safely as a
+route-and-method group policy.
 
 A public component may use different modes on explicit, non-overlapping exact
 path or segment-aware path-prefix and HTTP-method matches. Query parameters do
@@ -200,16 +199,19 @@ Groups, access policies, human access requests, memberships, service-access
 requests, and approvals are first-class Platform API resources separate from the
 application deployment declaration. Stable IDs are platform-generated, updates
 use resource versions/`If-Match`, repeated creates support idempotency, and
-provider reconciliation uses durable operations. Ordinary reads contain no
-token or client-secret value.
+provider reconciliation uses durable operations. Ordinary reads contain no token
+or client-secret value.
 
 The initial lifecycle vocabulary is:
 
-| Resource | States |
-| --- | --- |
-| Human access request | `pending`, `approved`, `rejected`, `cancelled`, `expired` |
-| Membership | `provisioning`, `active`, `revocation-pending`, `revoked`, `failed` |
-| Service access | `pending`, `approved`, `provisioning`, `active`, `rejected`, `cancelled`, `failed` |
+- **Resource:** Human access request
+  - **States:** `pending`, `approved`, `rejected`, `cancelled`, `expired`
+- **Resource:** Membership
+  - **States:** `provisioning`, `active`, `revocation-pending`, `revoked`,
+    `failed`
+- **Resource:** Service access
+  - **States:** `pending`, `approved`, `provisioning`, `active`, `rejected`,
+    `cancelled`, `failed`
 
 Approval creates separately revocable membership records rather than mutating
 historical requests. A group cannot be deleted while an active policy or
@@ -221,8 +223,8 @@ The existing platform `project-admin` role is the bootstrap and administration
 authority for application groups, policies, approvals, and memberships. An
 `application-administrators` group protects application administrator routes but
 does not grant Platform API authority. A project administrator receives no
-application membership implicitly and may explicitly assign one to themselves.
-A platform administrator may recover project administration without thereby
+application membership implicitly and may explicitly assign one to themselves. A
+platform administrator may recover project administration without thereby
 receiving application access. A separate delegated application-access platform
 role is outside the initial profile.
 
@@ -269,47 +271,89 @@ redelivered through the controlled secret path. Recovery status and evidence
 contain counts and identifiers, never secret values.
 
 The project is the first-release service-credential isolation boundary. A
-service credential delivered through the project secret mechanism may be
-visible to every component in that project. Application owners must not assume
+service credential delivered through the project secret mechanism may be visible
+to every component in that project. Application owners must not assume
 component-level secret isolation or attribution. A request made with that
 credential identifies the project service client, not the individual component
 that used it. Component-scoped secret bindings or workload identity require a
 separate generic capability and are not part of this increment.
 
 Secret values are write-only through ordinary platform APIs, excluded from
-desired state and ordinary reads, and redacted from logs, metrics, audit details,
-plans, and acceptance evidence.
+desired state and ordinary reads, and redacted from logs, metrics, audit
+details, plans, and acceptance evidence.
 
 ### Retention
 
-| Data | Accepted first-release policy |
-| --- | --- |
-| Application database rows | The application owner defines and enforces domain-row retention while the project is active. |
-| Project database after workload retirement | Retained until an explicitly authorized project purge. Retirement alone does not delete it. |
-| Verified backups | Keep the latest verified snapshot plus 14 daily, 8 weekly, and 6 monthly recovery points. Deleted live data may remain recoverable until containing snapshots expire. |
-| Workload logs | Seven-day centralized retention target. PLAN-017 must implement Kubernetes workload collection; kubelet best effort does not satisfy the target. |
-| Metrics | Seven days or 4 GB, whichever limit is reached first. Metrics contain no Confidential or Restricted values. |
-| Application revisions and operations | Keep the latest 25 revisions, plus protected revisions referenced by active operations or the last successful restart. Finished operations may be pruned with their revision; the audit record retains safe history. |
-| Application access requests | Pending requests expire after 30 days. Remove terminal request records 90 days after approval, rejection, cancellation, or expiry; rejected requests require explicit reopening before then. |
-| Application memberships | Retain active membership records. Remove revoked records after 90 days; retain their safe lifecycle audit events. |
-| Audit events | Append-only with no automatic expiry in the lab. Review storage growth at least annually before introducing an owner-approved pruning or archive policy. |
-| Revoked credentials | Remove usable live secret material through the credential lifecycle; retain only non-secret lifecycle and audit metadata. Backup copies expire under backup retention. |
-| Acceptance evidence | Retain with the corresponding platform release and include only sanitized Public or Internal metadata. |
+- **Data:** Application database rows
+  - **Accepted first-release policy:** The application owner defines and
+    enforces domain-row retention while the project is active.
+- **Data:** Project database after workload retirement
+  - **Accepted first-release policy:** Retained until an explicitly authorized
+    project purge. Retirement alone does not delete it.
+- **Data:** Verified backups
+  - **Accepted first-release policy:** Keep the latest verified snapshot plus 14
+    daily, 8 weekly, and 6 monthly recovery points. Deleted live data may remain
+    recoverable until containing snapshots expire.
+- **Data:** Workload logs
+  - **Accepted first-release policy:** Seven-day centralized retention target.
+    PLAN-017 must implement Kubernetes workload collection; kubelet best effort
+    does not satisfy the target.
+- **Data:** Metrics
+  - **Accepted first-release policy:** Seven days or 4 GB, whichever limit is
+    reached first. Metrics contain no Confidential or Restricted values.
+- **Data:** Application revisions and operations
+  - **Accepted first-release policy:** Keep the latest 25 revisions, plus
+    protected revisions referenced by active operations or the last successful
+    restart. Finished operations may be pruned with their revision; the audit
+    record retains safe history.
+- **Data:** Application access requests
+  - **Accepted first-release policy:** Pending requests expire after 30 days.
+    Remove terminal request records 90 days after approval, rejection,
+    cancellation, or expiry; rejected requests require explicit reopening before
+    then.
+- **Data:** Application memberships
+  - **Accepted first-release policy:** Retain active membership records. Remove
+    revoked records after 90 days; retain their safe lifecycle audit events.
+- **Data:** Audit events
+  - **Accepted first-release policy:** Append-only with no automatic expiry in
+    the lab. Review storage growth at least annually before introducing an
+    owner-approved pruning or archive policy.
+- **Data:** Revoked credentials
+  - **Accepted first-release policy:** Remove usable live secret material
+    through the credential lifecycle; retain only non-secret lifecycle and audit
+    metadata. Backup copies expire under backup retention.
+- **Data:** Acceptance evidence
+  - **Accepted first-release policy:** Retain with the corresponding platform
+    release and include only sanitized Public or Internal metadata.
 
-The platform owns whole-database, backup, log, metric, revision, audit, credential,
-and release-evidence retention. Applications own domain-record retention inside
-their database. A future purge workflow must remove the live project database,
-live credentials, and applicable platform state without rewriting existing
-verified backups.
+The platform owns whole-database, backup, log, metric, revision, audit,
+credential, and release-evidence retention. Applications own domain-record
+retention inside their database. A future purge workflow must remove the live
+project database, live credentials, and applicable platform state without
+rewriting existing verified backups.
 
 ### Data classification
 
-| Classification | Examples | Required handling |
-| --- | --- | --- |
-| Public | Published documentation and public image references | May be publicly exposed through a separately declared capability; classification alone never makes an application route anonymous. |
-| Internal | Project names, topology, image digests, revisions, operation IDs, health, and resource data | Expose only through authenticated platform or operator surfaces unless separately published. |
-| Confidential | Customer or personal data, domain identifiers, database contents, and business results | Restrict to authorized project access, include only in encrypted backups, and minimize or redact from telemetry. |
-| Restricted | Passwords, tokens, client secrets, private keys, database credentials, and backup credentials | Use managed secret mechanisms only; never place in desired state, ordinary reads, logs, metrics, audit details, explanations, or acceptance evidence. |
+- **Classification:** Public
+  - **Examples:** Published documentation and public image references
+  - **Required handling:** May be publicly exposed through a separately declared
+    capability; classification alone never makes an application route anonymous.
+- **Classification:** Internal
+  - **Examples:** Project names, topology, image digests, revisions, operation
+    IDs, health, and resource data
+  - **Required handling:** Expose only through authenticated platform or
+    operator surfaces unless separately published.
+- **Classification:** Confidential
+  - **Examples:** Customer or personal data, domain identifiers, database
+    contents, and business results
+  - **Required handling:** Restrict to authorized project access, include only
+    in encrypted backups, and minimize or redact from telemetry.
+- **Classification:** Restricted
+  - **Examples:** Passwords, tokens, client secrets, private keys, database
+    credentials, and backup credentials
+  - **Required handling:** Use managed secret mechanisms only; never place in
+    desired state, ordinary reads, logs, metrics, audit details, explanations,
+    or acceptance evidence.
 
 The first-release platform accepts ordinary application data up to Confidential
 in PostgreSQL. Restricted data is limited to managed credential and secret
@@ -317,14 +361,15 @@ mechanisms. General Restricted business data requires a separate review and is
 not accepted by default while PostgreSQL transport is unencrypted and host/root
 operators remain a trusted boundary.
 
-Domain identifiers default to Confidential unless an application owner records
-a lower classification. Metrics contain only Public or Internal data. Logs may
+Domain identifiers default to Confidential unless an application owner records a
+lower classification. Metrics contain only Public or Internal data. Logs may
 contain Internal operational data and explicitly approved Confidential
-correlation values, but no customer payloads or Restricted values. Normal structured
-Quarkus/Spring message retention was enabled at the owner’s request on October 19,
-2026; messages remain subject to those classification limits. The collector drops
-unknown JSON fields and applies best-effort credential-pattern redaction. This
-does not authorize arbitrary customer payloads or make redaction exhaustive.
+correlation values, but no customer payloads or Restricted values. Normal
+structured Quarkus/Spring message retention was enabled at the owner’s request
+on October 19, 2026; messages remain subject to those classification limits. The
+collector drops unknown JSON fields and applies best-effort credential-pattern
+redaction. This does not authorize arbitrary customer payloads or make redaction
+exhaustive.
 
 Classification is project governance metadata, separate from the deployment
 declaration so a deployment cannot lower its own handling requirements. Project
@@ -364,8 +409,8 @@ authorization indefinitely.
 Accepting unencrypted PostgreSQL transport and project-wide secret visibility is
 a bounded lab choice, not a general production guarantee. An application that
 requires database TLS, multiple public components, component-scoped secrets, or
-general Restricted business-data handling requests a new generic capability;
-the platform must reject or defer that requirement rather than add an
+general Restricted business-data handling requests a new generic capability; the
+platform must reject or defer that requirement rather than add an
 application-specific exception.
 
 ## Validation
@@ -380,11 +425,11 @@ PLAN-017 must demonstrate seven-day centralized workload-log retention and the
 classification boundary. PLAN-018 must demonstrate authenticated HTTPS,
 wrong-audience denial, unrelated-destination denial, and sanitized evidence.
 Identity acceptance must also prove that first login creates a pending human
-request without access, machine credentials are unusable until provider
-approval and group assignment, group-protected routes return `403` without a
-matching membership, externally supplied identity/group headers are ignored,
-the private backend cannot bypass the access boundary, and platform roles confer
-no application group. It must demonstrate client-scoped group claims, separate
+request without access, machine credentials are unusable until provider approval
+and group assignment, group-protected routes return `403` without a matching
+membership, externally supplied identity/group headers are ignored, the private
+backend cannot bypass the access boundary, and platform roles confer no
+application group. It must demonstrate client-scoped group claims, separate
 browser and machine route behavior, membership revocation and authorizer-cache
 expiry within the accepted staleness bound, and audit of membership changes. It
 must also test exact/segment-prefix normalization, method behavior, overlap and

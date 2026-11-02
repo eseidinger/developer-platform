@@ -53,18 +53,18 @@ resources or silently losing updates.
 
 The platform validates a token and checks current grants on API requests.
 Workers recheck relevant authority before carrying out durable work. Keycloak
-claims establish identity but do not replace the platform's project grants.
-For hosted application traffic, the gateway intersects token claims with active
+claims establish identity but do not replace the platform's project grants. For
+hosted application traffic, the gateway intersects token claims with active
 platform memberships. A stale token alone cannot recreate a revoked grant.
 Protected application backends also have network rules that limit the path to
 the shared authorizer.
 
 Failures in identity, audit, policy snapshots, or capacity observation do not
 become implicit permission to proceed. For example, an unavailable capacity
-assessment rejects a deployment instead of guessing that room exists; an
-expired access snapshot stops protected traffic instead of continuing with an
-unbounded old policy. These choices favor a visible failure over an unsafe or
-unverifiable success.
+assessment rejects a deployment instead of guessing that room exists; an expired
+access snapshot stops protected traffic instead of continuing with an unbounded
+old policy. These choices favor a visible failure over an unsafe or unverifiable
+success.
 
 ## Separate stored intent from observed runtime state
 

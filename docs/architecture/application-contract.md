@@ -20,8 +20,8 @@ resources; a deployment declaration cannot mutate authority.
 `platform.example/v1alpha2` is the preferred multi-component schema. It supports
 long-running services, scheduled components, stable internal discovery, one
 public service, component resources and readiness, and the current shared
-PostgreSQL profile. The API also accepts the earlier `v1alpha1` envelope and flat
-legacy form for compatibility.
+PostgreSQL profile. The API also accepts the earlier `v1alpha1` envelope and
+flat legacy form for compatibility.
 
 Compatibility forms map into the same canonical desired state, revisions, and
 operations. They are not separate provider implementations. A breaking semantic
@@ -31,28 +31,29 @@ field must not silently acquire a different meaning.
 ## Contract principles
 
 1. A deployment is a complete desired-state `PUT`, not a patch.
-2. Unknown fields and unsupported capabilities fail before provider side effects.
-3. The environment capability endpoint advertises supported features; clients do
+1. Unknown fields and unsupported capabilities fail before provider side
+   effects.
+1. The environment capability endpoint advertises supported features; clients do
    not infer support from Kubernetes details.
-4. Image tags are resolved to immutable digests before a revision is accepted.
-5. Semantically identical desired state reuses the current revision.
-6. `If-Match` protects updates from stale writers.
-7. Accepted intent, provider application, and live readiness are distinct states.
-8. Secret values and provider credentials never appear in ordinary status,
+1. Image tags are resolved to immutable digests before a revision is accepted.
+1. Semantically identical desired state reuses the current revision.
+1. `If-Match` protects updates from stale writers.
+1. Accepted intent, provider application, and live readiness are distinct
+   states.
+1. Secret values and provider credentials never appear in ordinary status,
    diagnostics, audit records, or generated plans.
-9. PostgreSQL data is retained independently of workload lifecycle.
-10. Provider portability is a contract constraint, not a requirement to operate a
-    second provider.
-
-<a id="application-metrics-declaration-phase-4-implementation-in-progress"></a>
+1. PostgreSQL data is retained independently of workload lifecycle.
+1. Provider portability is a contract constraint, not a requirement to operate a
+   second provider.
 
 ## Application metrics declaration
 
 A service component may opt in to platform collection of Prometheus-format
 application metrics with `telemetry.metrics: {port: "http", path: "/metrics"}`,
 where `http` names one declared HTTP service port. The API accepts this additive
-`v1alpha2` declaration and advertises `applicationMetrics`. Existing declarations
-remain valid. Unknown fields and invalid ports or paths fail before side effects.
+`v1alpha2` declaration and advertises `applicationMetrics`. Existing
+declarations remain valid. Unknown fields and invalid ports or paths fail before
+side effects.
 
 The platform derives scrape targets from the accepted project/component identity
 and reaches them on a private, platform-controlled path. Metrics collection must
@@ -61,11 +62,10 @@ URLs, scrape credentials, or caller-supplied project labels. Bound sample count,
 series cardinality, response size, scrape rate and retention to the lab budget.
 Allow only Public or Internal metric names and label values; reject or drop
 secrets, personal data, raw paths with identifiers and unbounded labels.
-Operators may use the shared Prometheus/Grafana backends; project readers receive
-only fixed project-scoped views through the Platform API. Missing or failed
-scrapes are explicit, not healthy zeros. See [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023).
-
-<a id="application-tracing-declaration-phase-4-implementation-in-progress"></a>
+Operators may use the shared Prometheus/Grafana backends; project readers
+receive only fixed project-scoped views through the Platform API. Missing or
+failed scrapes are explicit, not healthy zeros. See
+[Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023).
 
 ## Application tracing declaration
 
@@ -73,18 +73,18 @@ Service and scheduled components may opt in to a private OpenTelemetry trace
 export path with the additive `v1alpha2` field
 `spec.components[].telemetry.tracing.enabled: true`. The API accepts this
 additive field and advertises `applicationTracing`. Omission or `false` keeps
-tracing disabled.
-The platform supplies a private OTLP endpoint and verified project/application/
-component identity. A workload cannot choose its own project identity through
-span attributes, and a declaration cannot configure an arbitrary exporter URL
-or bypass the authenticated application access boundary.
+tracing disabled. The platform supplies a private OTLP endpoint and verified
+project/application/ component identity. A workload cannot choose its own
+project identity through span attributes, and a declaration cannot configure an
+arbitrary exporter URL or bypass the authenticated application access boundary.
 
 Safe W3C trace context may cross the platform boundary and permitted internal
 calls, but it conveys no authority. Incoming external baggage and trace metadata
 are untrusted. Raw traces remain operator-only; any project-facing read is a
 fixed, bounded, server-scoped Platform API view. Span export excludes secrets,
 personal data, bodies, SQL text and raw identifier-bearing URLs, with explicit
-sampling and storage limits. See [Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#44-let-hosted-applications-participate-in-tracing-plan-024).
+sampling and storage limits. See
+[Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#44-let-hosted-applications-participate-in-tracing-plan-024).
 The chosen backend, collector path, token verification, budget and read contract
 are recorded in [ADR-021](decisions/ADR-021-phase-4-tracing-boundary.md).
 
@@ -109,8 +109,8 @@ realms. Humans use first-login enrollment: authentication creates a pending
 access request with no authority, and a provider project administrator assigns
 application groups before access succeeds. Machine principals are
 pre-authorized: the provider approves a service-access request and its groups
-before the consumer credential becomes usable. Platform and project roles do
-not imply application-group membership.
+before the consumer credential becomes usable. Platform and project roles do not
+imply application-group membership.
 
 The Keycloak reference adapter maps each stable application-group ID to an
 application-client role and emits relevant roles in a client-scoped `groups`
@@ -125,27 +125,29 @@ are rejected, unmatched routes are denied, and every public application route
 requires `browser-session` or `bearer-token`; anonymous routes are unsupported.
 Policies use immutable atomically activated revisions. Authorization snapshots,
 machine tokens, and browser claim refresh are bounded to five minutes and fail
-closed after expiry. [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md)
-defines request retention, session lifetime, credential rotation, and recovery
+closed after expiry.
+[ADR-020](decisions/ADR-020-generic-hosted-application-integration.md) defines
+request retention, session lifetime, credential rotation, and recovery
 reconciliation.
 
 On each admitted request, the platform boundary supplies the normalized caller
 and stable group IDs through reserved `X-Platform-Principal-*` headers.
 Application middleware reads that context; it does not parse platform sessions
-or bearer tokens. The platform has already performed coarse route
-authorization. Applications own only finer object-, row-, or domain-level
-decisions that cannot be represented by the route policy. Display name is
-released only by explicit policy opt-in; email additionally requires classified
-personal-data handling. Neither is an authorization key.
+or bearer tokens. The platform has already performed coarse route authorization.
+Applications own only finer object-, row-, or domain-level decisions that cannot
+be represented by the route policy. Display name is released only by explicit
+policy opt-in; email additionally requires classified personal-data handling.
+Neither is an authorization key.
 
-Stores are independent named resources with explicit component bindings.
-No declaration form provisions an implicit project database. Binding credentials
+Stores are independent named resources with explicit component bindings. No
+declaration form provisions an implicit project database. Binding credentials
 and relay egress reach only the named consuming component. PostgreSQL traffic
 inside the private relay boundary is outside the initial encrypted-channel
-requirement and is not TLS-protected. Human remote native access uses SSH.
-See the [store lifecycle and recovery contract](../operators/data-stores.md). Application
-secrets are project-scoped and may be visible to every component in the project.
-These are explicit first-release limits, not application-specific behavior.
+requirement and is not TLS-protected. Human remote native access uses SSH. See
+the [store lifecycle and recovery contract](../operators/data-stores.md).
+Application secrets are project-scoped and may be visible to every component in
+the project. These are explicit first-release limits, not application-specific
+behavior.
 
 Applications own domain data, fine-grained domain authorization, and row-level
 retention. The platform owns application-group lifecycle, coarse route
@@ -159,8 +161,8 @@ Internal, Confidential, and Restricted handling rules.
 
 The API validates schema, names, images, ports, resources, schedules, probes,
 capabilities, quotas, connectivity policy, and project consistency before
-persisting a new revision. It authenticates the issuer/subject pair and evaluates
-the current platform grant for the requested project and action.
+persisting a new revision. It authenticates the issuer/subject pair and
+evaluates the current platform grant for the requested project and action.
 
 A durable operation rechecks authorization and revision freshness before making
 infrastructure changes. Backend errors are translated into stable platform error

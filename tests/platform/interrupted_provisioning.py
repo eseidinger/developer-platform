@@ -8,17 +8,18 @@ error paths. A host kill or power loss still needs operator recovery.
 import argparse
 import json
 import os
-from pathlib import Path
 import re
 import stat
 import subprocess
+from pathlib import Path
 from uuid import UUID
 
+from .data_preservation import project_row, visit, web_postgres_declaration
 from .harness import (
     API,
+    ROOT,
     DrillError,
     Keycloak,
-    ROOT,
     operator_tokens,
     origin,
     require,
@@ -27,7 +28,6 @@ from .harness import (
     wait_for,
 )
 from .human_database import IMAGE, RUN_ID, wait_deployment
-from .data_preservation import project_row, visit, web_postgres_declaration
 
 SERVER = "k3d-workloads-server-0"
 OUTAGE_CONFIRMATION = "pause-" + SERVER + "-and-kill-platform-api"
@@ -149,7 +149,7 @@ class Report:
 def command(args, *, timeout=30):
     try:
         result = subprocess.run(
-            args, capture_output=True, text=True, timeout=timeout, cwd=ROOT
+            args, capture_output=True, text=True, timeout=timeout, cwd=ROOT, check=False
         )
     except (OSError, subprocess.TimeoutExpired):
         raise DrillError("host_command_failed") from None
@@ -355,7 +355,7 @@ def interrupt(args, api, report, initial_revision):
 def api_ready(api):
     try:
         return api.request("GET", "/readyz").get("status") == "ready"
-    except Exception:
+    except Exception:  # noqa: BLE001 - Record and clean up after any drill failure.
         return False
 
 
@@ -482,7 +482,7 @@ def main(argv=None):
         error = None
         try:
             run(args, config, api, report)
-        except (Exception, KeyboardInterrupt) as exc:
+        except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
             error = (
                 str(exc)
                 if isinstance(exc, DrillError)
@@ -496,7 +496,7 @@ def main(argv=None):
         if report.data["outage"] != "restore-failed-manual-action-required":
             try:
                 retire(api, report)
-            except (Exception, KeyboardInterrupt):
+            except (Exception, KeyboardInterrupt):  # noqa: BLE001 - Record and clean up after any drill failure.
                 report.data["cleanup"] = "incomplete-retry-required"
                 report.save()
         else:
@@ -512,7 +512,7 @@ def main(argv=None):
         report.save()
         print("REPORT " + str(report.directory / "report.json"), flush=True)
         return 0 if report.data["result"] == "passed" else 1
-    except (Exception, KeyboardInterrupt) as exc:
+    except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
         code = (
             str(exc)
             if isinstance(exc, DrillError)

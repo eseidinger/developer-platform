@@ -103,7 +103,7 @@ def snapshot(runtime, log):
         return {"state": "unavailable", "enabled": True, "reason": host["reason"]}
     try:
         nodes, pods = _items(runtime, "v1", "Node"), _items(runtime, "v1", "Pod")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error("Capacity admission query failed error_type=%s", type(exc).__name__)
         return {
             "state": "unavailable",

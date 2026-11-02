@@ -34,7 +34,9 @@ def validate_manifest(value):
         resource_id: UUID
         owner_project: str = Field(pattern=NAME, max_length=32)
         name: str = Field(pattern=NAME, max_length=32)
-        provider: Literal["postgresql", "s3", "opensearch", "neo4j", "qdrant", "couchdb"]
+        provider: Literal[
+            "postgresql", "s3", "opensearch", "neo4j", "qdrant", "couchdb"
+        ]
         state: Literal["active", "retired", "purging", "purged"]
         version: int = Field(ge=1)
         quota_bytes: int = Field(gt=0)
@@ -211,7 +213,7 @@ def main():
             catalog.lock(conn)
             plan = reconcile(conn, manifest, args.apply)
         print(json.dumps(plan, sort_keys=True))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Provider diagnostics may contain secrets.
         # Provider/query errors can contain connection secrets or source data.
         message = (
             str(error) if isinstance(error, catalog.Conflict) else type(error).__name__

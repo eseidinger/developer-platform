@@ -60,16 +60,16 @@ application context resolved from the caller's grant.
 
 `POST /v1/application-identity/users/resolve`
 
-Request: `{"preferredUsername":"alice"}`. The value must be nonempty and
-within a documented length limit. Matching uses the identity provider's
-canonical rules for `preferred_username`; the Platform must not silently choose
-among multiple matching active accounts.
+Request: `{"preferredUsername":"alice"}`. The value must be nonempty and within
+a documented length limit. Matching uses the identity provider's canonical rules
+for `preferred_username`; the Platform must not silently choose among multiple
+matching active accounts.
 
 Success: `{"principalId":"prn_…","kind":"user","preferredUsername":"alice"}`.
 The Platform reads the current realm account, requires it to be active, and
-atomically creates or reuses the stable mapping from configured `(issuer,
-subject)` to principal ID. The response may include the configured issuer only
-if a consumer needs it for display; the caller never chooses it.
+atomically creates or reuses the stable mapping from configured
+`(issuer, subject)` to principal ID. The response may include the configured
+issuer only if a consumer needs it for display; the caller never chooses it.
 
 ### List eligible services
 
@@ -91,19 +91,19 @@ documented maximum page size and stable ordering.
 Request: `{"principalId":"prn_…","kind":"user"}` or
 `{"principalId":"prn_…","kind":"service"}`.
 
-Success: `{"principalId":"prn_…","kind":"…","assignable":true}`.
-For a user, the Platform resolves the stored issuer and subject and confirms
-that the current realm account exists and is active. For a service, it confirms
-that the principal belongs to an active service-access resource whose target
-is the caller's application. A service principal without an active matching
-resource is not assignable. This check does not grant application access.
+Success: `{"principalId":"prn_…","kind":"…","assignable":true}`. For a user, the
+Platform resolves the stored issuer and subject and confirms that the current
+realm account exists and is active. For a service, it confirms that the
+principal belongs to an active service-access resource whose target is the
+caller's application. A service principal without an active matching resource is
+not assignable. This check does not grant application access.
 
-The application performs validation in the server-side assignment handler,
-after authenticating and authorizing its operator and before its local write.
-Because the Platform and application do not share a transaction, a successful
-check is a point-in-time statement. The application must enforce its own
-permissions when they are used; it cannot treat an old validation result as a
-permanent service-access grant.
+The application performs validation in the server-side assignment handler, after
+authenticating and authorizing its operator and before its local write. Because
+the Platform and application do not share a transaction, a successful check is a
+point-in-time statement. The application must enforce its own permissions when
+they are used; it cannot treat an old validation result as a permanent
+service-access grant.
 
 ## Errors and availability
 
@@ -128,8 +128,8 @@ does not automatically delete them.
 
 The current Platform already maps `(issuer, subject)` to stable hosted-access
 principal IDs and stores service-access resources and their states. Human
-principals are currently created on first application contact, so complete
-realm lookup and active-account validation require a read-only identity-provider
+principals are currently created on first application contact, so complete realm
+lookup and active-account validation require a read-only identity-provider
 adapter. The adapter must resolve an exact login name and fetch an account by
 subject, expose only required fields, and use credentials with the minimum
 required realm-read permissions. Provider errors must remain distinct from
@@ -141,16 +141,16 @@ Acceptance requires evidence that:
 1. An active user without previous application login resolves to the same
    principal ID on repeated calls; disabled, absent, and ambiguous users cannot
    be assigned.
-2. A caller can list and validate only active service access to its own target
+1. A caller can list and validate only active service access to its own target
    application; pending, revoked, and cross-application access is excluded.
-3. Revoking the caller's lookup grant denies its next API call.
-4. Revoking service access or disabling a user prevents the next server-side
+1. Revoking the caller's lookup grant denies its next API call.
+1. Revoking service access or disabling a user prevents the next server-side
    assignment check, including when a prior lookup succeeded.
-5. Responses contain no secrets and use `no-store`; lookup and denial events
-   are audited without sensitive claims.
-6. Identity-provider outage prevents new user resolution and validation without
+1. Responses contain no secrets and use `no-store`; lookup and denial events are
+   audited without sensitive claims.
+1. Identity-provider outage prevents new user resolution and validation without
    producing a false `not found` result.
-7. The principal-ID column is unique, and validation by ID cannot return an
+1. The principal-ID column is unique, and validation by ID cannot return an
    arbitrary identity if stored rows conflict.
 
 ## Required contract decisions before implementation
@@ -162,20 +162,20 @@ recorded in this specification and reflected in the API contract:
    operation, the credential type and provisioning path, rotation and revocation
    behavior, and the binding between caller identity and stable application ID.
    An application name alone is insufficient as a binding key.
-2. **Username semantics:** Confirm that `preferred_username` is the unique login
+1. **Username semantics:** Confirm that `preferred_username` is the unique login
    identifier in the supported provider profile. Define case sensitivity,
    Unicode normalization, exact-match behavior, and the result when an account
    is renamed. A renamed account must retain its principal ID because the
    mapping is keyed by issuer and subject.
-3. **Principal-ID uniqueness:** Add a database uniqueness constraint on
+1. **Principal-ID uniqueness:** Add a database uniqueness constraint on
    `hosted_access_principals.id` and a migration that checks existing rows for
    duplicates before applying it. Define how validation handles a detected
    integrity conflict; it must fail closed.
-4. **Service eligibility and pagination:** Specify the exact service-resource
+1. **Service eligibility and pagination:** Specify the exact service-resource
    states and approval evidence required for eligibility. Define the cursor
    encoding, maximum page size, stable sort key, and whether pages represent a
    snapshot or may reflect changes between requests. Callers must revalidate a
    selected service before assignment regardless of pagination semantics.
-5. **Identity-provider adapter:** Define the read-only lookup-by-name and
+1. **Identity-provider adapter:** Define the read-only lookup-by-name and
    lookup-by-subject operations, minimum provider permissions, timeouts, and
    distinction between absent accounts and provider failures.

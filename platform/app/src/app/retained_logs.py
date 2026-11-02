@@ -41,7 +41,7 @@ def safe_log_record(message):
     """Revalidate the collector's bounded JSON schema at the project read boundary."""
     record = json.loads(message)
     if not isinstance(record, dict):
-        raise ValueError("Invalid application log")
+        raise TypeError("Invalid application log")
     if "event" in record:
         return safe_event(message)
     if (
@@ -212,7 +212,7 @@ def observe_retained_logs(
                 state="ok", reason=None, next_cursor=result["lines"][-1]["timestamp"]
             )
         return result
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Retained log query failed project=%s error_type=%s",
             project,

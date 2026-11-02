@@ -40,7 +40,7 @@ class _ObservedExporter(SpanExporter):
 
         try:
             result = self.delegate.export(spans)
-        except Exception:
+        except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             result = SpanExportResult.FAILURE
         counts = {}
         for item in spans:

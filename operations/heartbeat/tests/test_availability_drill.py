@@ -1,9 +1,8 @@
 import importlib.util
-from pathlib import Path
 import subprocess
 import unittest
+from pathlib import Path
 from unittest.mock import call, patch
-
 
 SCRIPT = Path(__file__).parents[1] / "scripts" / "drill-platform-availability.py"
 SPEC = importlib.util.spec_from_file_location("availability_drill", SCRIPT)
@@ -18,14 +17,31 @@ class AvailabilityRecoveryTests(unittest.TestCase):
 
         availability.reconcile_platform("/opt/developer-platform", 600)
 
-        self.assertEqual(command.call_args_list, [
-            call("docker", "compose", "stop", "--timeout", "60", timeout=180,
-                 cwd="/opt/developer-platform"),
-            call("docker", "compose", "rm", "--force", timeout=180,
-                 cwd="/opt/developer-platform"),
-            call("bash", "scripts/up.sh", timeout=600,
-                 cwd="/opt/developer-platform"),
-        ])
+        self.assertEqual(
+            command.call_args_list,
+            [
+                call(
+                    "docker",
+                    "compose",
+                    "stop",
+                    "--timeout",
+                    "60",
+                    timeout=180,
+                    cwd="/opt/developer-platform",
+                ),
+                call(
+                    "docker",
+                    "compose",
+                    "rm",
+                    "--force",
+                    timeout=180,
+                    cwd="/opt/developer-platform",
+                ),
+                call(
+                    "bash", "scripts/up.sh", timeout=600, cwd="/opt/developer-platform"
+                ),
+            ],
+        )
 
     @patch.object(availability, "command")
     def test_postgres_health_requires_healthy_container(self, command):

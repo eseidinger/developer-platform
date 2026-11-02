@@ -3,8 +3,8 @@
 Status: source implementation, October 13, 2026. Deployed login and complete
 administration acceptance have not yet been recorded.
 
-`devplat` requires Python 3.12 or newer and is a client for the public Developer Platform API. Install the Python
-package and inspect the commands:
+`devplat` requires Python 3.12 or newer and is a client for the public Developer
+Platform API. Install the Python package and inspect the commands:
 
 ```bash
 python3 -m pip install -e 'platform/cli[dev]'
@@ -24,8 +24,9 @@ devplat deploy apply --project orders --file application.json --wait
 
 An externally obtained `PLATFORM_ACCESS_TOKEN` takes precedence over the client
 credential variables. A project deployment credential can deploy and inspect one
-project; it cannot configure application access, grant roles, or manage credentials.
-The client ID and secret never belong in CLI arguments or a profile.
+project; it cannot configure application access, grant roles, or manage
+credentials. The client ID and secret never belong in CLI arguments or a
+profile.
 
 ## Profiles and human login
 
@@ -43,15 +44,17 @@ devplat auth status --output json
 Login uses OIDC Device Authorization with PKCE. Follow the printed verification
 URL and user code. The CLI keeps access tokens in memory and binds any renewable
 session to its profile, issuer, client ID, and subject in the OS keyring. If no
-secure keyring is available, use an externally supplied short-lived administrator
-access token. `devplat auth logout` clears the local session and requests provider
-revocation. `devplat profiles delete lab` clears its bound session as well.
+secure keyring is available, use an externally supplied short-lived
+administrator access token. `devplat auth logout` clears the local session and
+requests provider revocation. `devplat profiles delete lab` clears its bound
+session as well.
 
 For human profile authentication, clear `PLATFORM_ACCESS_TOKEN`,
-`PLATFORM_TOKEN_ENDPOINT`, `PLATFORM_CLIENT_ID`, and `PLATFORM_CLIENT_SECRET` from
-the shell. Environment authentication takes precedence over a profile session.
-Use `--profile NAME` to select another profile for one command. `PLATFORM_API_URL`
-and `PLATFORM_CA_BUNDLE` may override the profile for a process.
+`PLATFORM_TOKEN_ENDPOINT`, `PLATFORM_CLIENT_ID`, and `PLATFORM_CLIENT_SECRET`
+from the shell. Environment authentication takes precedence over a profile
+session. Use `--profile NAME` to select another profile for one command.
+`PLATFORM_API_URL` and `PLATFORM_CA_BUNDLE` may override the profile for a
+process.
 
 ## Project administration
 
@@ -61,39 +64,42 @@ authorized project state. `deploy apply` sends a complete declaration; `config`,
 `secrets`, `restart`, `rollback`, `data-services`, and `retirement` manage its
 lifecycle. `grants` and `credentials` manage project roles and CI identities.
 `governance` and `access` manage hosted application identity. Commands under
-`operator` require their corresponding privileged API role.
-`stores` manages named resources, explicit component bindings, human grants,
-SSH keys and expiring credential leases. `stores access tunnel` opens a verified
-local TCP forward for an active store lease; see the
-[human database access guide](database-access.md).
-`stores retire` and `stores purge` require `--confirm-resource-id UUID` matching
-the target resource. `stores grants revoke` requires `--confirm-grant-id UUID`
-matching the target grant.
-`operator audit export --start TIMESTAMP --end TIMESTAMP --format csv` writes the
-bounded CSV response to stdout; the default JSON format uses normal output modes.
+`operator` require their corresponding privileged API role. `stores` manages
+named resources, explicit component bindings, human grants, SSH keys and
+expiring credential leases. `stores access tunnel` opens a verified local TCP
+forward for an active store lease; see the
+[human database access guide](database-access.md). `stores retire` and
+`stores purge` require `--confirm-resource-id UUID` matching the target
+resource. `stores grants revoke` requires `--confirm-grant-id UUID` matching the
+target grant.
+`operator audit export --start TIMESTAMP --end TIMESTAMP --format csv` writes
+the bounded CSV response to stdout; the default JSON format uses normal output
+modes.
 
-`metrics get --project orders --component web` reads bounded HTTP request metrics;
-`traces get TRACE_ID --project orders` reads one retained project trace. The
-`ai policy`, `ai runs`, and `ai proposals` groups expose the corresponding AI API
-operations. Mutations read complete JSON documents with `--file`: policy replacement
-accepts `classification`, run creation accepts `kind`, proposal creation accepts
-`run_id`, and approval/execution accept the exact reviewed `diff_sha256`. Policy
-replacement, approval, and execution also require `--confirm-project orders`.
-Execution returns a durable operation ID; use `operations get` or `operations watch`
-to inspect deployment readiness. AI eligibility, authority, and stale approval
-checks remain enforced by the API. AI-run creation allows a 120-second read
-timeout for the server's 90-second investigation budget and is never retried
-automatically. If a model request fails, the saved result preserves prior
-evidence and known costs and marks unavailable provider usage as incomplete.
+`metrics get --project orders --component web` reads bounded HTTP request
+metrics; `traces get TRACE_ID --project orders` reads one retained project
+trace. The `ai policy`, `ai runs`, and `ai proposals` groups expose the
+corresponding AI API operations. Mutations read complete JSON documents with
+`--file`: policy replacement accepts `classification`, run creation accepts
+`kind`, proposal creation accepts `run_id`, and approval/execution accept the
+exact reviewed `diff_sha256`. Policy replacement, approval, and execution also
+require `--confirm-project orders`. Execution returns a durable operation ID;
+use `operations get` or `operations watch` to inspect deployment readiness. AI
+eligibility, authority, and stale approval checks remain enforced by the API.
+AI-run creation allows a 120-second read timeout for the server's 90-second
+investigation budget and is never retried automatically. If a model request
+fails, the saved result preserves prior evidence and known costs and marks
+unavailable provider usage as incomplete.
 
 Use `--output json` for machine output on stdout. Progress, recovery IDs, and
 warnings go to stderr. `logs --follow` emits successive JSON objects while it
 runs. `--debug` shows only method, API path, status, timing, and request ID.
-Exit codes are `0` success, `2` local input/configuration error, `3` authentication,
-`4` authorization, `5` not found, `6` conflict or stale revision, `7` API validation
-or contract-coverage error, `8` unavailable service/transport, `9` failed durable
-operation, and `10` timeout or interrupted waiting. A timeout or interruption does not
-cancel work already accepted by the server.
+Exit codes are `0` success, `2` local input/configuration error, `3`
+authentication, `4` authorization, `5` not found, `6` conflict or stale
+revision, `7` API validation or contract-coverage error, `8` unavailable
+service/transport, `9` failed durable operation, and `10` timeout or interrupted
+waiting. A timeout or interruption does not cancel work already accepted by the
+server.
 
 Updates to hosted access resources use the quoted ETag returned by an earlier
 read or create response:
@@ -105,12 +111,12 @@ devplat access policy apply --project orders --application orders \
   --file access-policy.json --if-match '"3"' --wait
 ```
 
-`access policy apply`, `config replace`, and `governance replace` read a complete
-JSON document from `--file PATH` or `--file -`. Access policy updates replace the
-entire policy, including existing browser rules. Required ETags are never
-silently retried after a version conflict. Idempotent group and service creates
-accept `--idempotency-key`; if omitted, the CLI prints a generated key on stderr
-so an uncertain request can be retried with the same key and body.
+`access policy apply`, `config replace`, and `governance replace` read a
+complete JSON document from `--file PATH` or `--file -`. Access policy updates
+replace the entire policy, including existing browser rules. Required ETags are
+never silently retried after a version conflict. Idempotent group and service
+creates accept `--idempotency-key`; if omitted, the CLI prints a generated key
+on stderr so an uncertain request can be retried with the same key and body.
 
 ## Worker access to its application's public service
 
@@ -132,8 +138,8 @@ devplat access services approve svc_REQUEST_ID --project orders \
 Use the actual request ID, group ID, and current quoted request ETag from the
 preceding results. The provider project administrator approves incoming access;
 the consumer chooses no groups. The active response reports the provider URL,
-audience, and managed secret prefix. The service client ID, secret, and token URL
-are injected into the consumer project's managed secret, visible to its
+audience, and managed secret prefix. The service client ID, secret, and token
+URL are injected into the consumer project's managed secret, visible to its
 components. The worker obtains short-lived application tokens and calls the
 public HTTPS route. Declare outbound HTTPS to both the issuer and provider in
 the worker's application declaration. The CLI does not read or display the
@@ -142,9 +148,10 @@ managed service client secret.
 Use `access services rotate` to provision a replacement credential, then
 `access services confirm` after the workload adopts it. `--emergency` on rotate
 removes old-client authority without overlap. Use `access operations watch` to
-follow reconciliation and `access operations retry OPERATION_ID --if-match '"N"'`
-to retry a failed resource operation with its current ETag. A submitted approval
-is not usable access until provisioning completes.
+follow reconciliation and
+`access operations retry OPERATION_ID --if-match '"N"'` to retry a failed
+resource operation with its current ETag. A submitted approval is not usable
+access until provisioning completes.
 
 Secret input is accepted from a hidden prompt, stdin, or an owner-only regular
 file via `--value-file`; it is never an argument value. CI credential creation

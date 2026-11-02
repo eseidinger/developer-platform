@@ -19,60 +19,70 @@ redacted HTTP results as evidence.
 
 ## Human PostgreSQL access acceptance playbook
 
-The opt-in [`test-platform-human-database-access.yml`](../../../ansible/tests/platform/test-platform-human-database-access.yml)
+The opt-in
+[`test-platform-human-database-access.yml`](../../../ansible/tests/platform/test-platform-human-database-access.yml)
 wrapper automates the Phase 10.7 core tunnel and SQL checks. It does **not**
 deploy the platform, install the bastion, publish the neutral fixture, or close
 the full acceptance gate. Its default `plan` validates the run scope without
-contacting the platform API. A live `run` creates two private, run-scoped fixture
-projects (`hd-<run-id>-a` and `hd-<run-id>-b`) with separate named resources
-and explicit read-write component bindings.
-Their data and projects are retained for explicit owner-reviewed retirement;
-the runner revokes its temporary human grant and test persona. Never run it
-against real application data.
+contacting the platform API. A live `run` creates two private, run-scoped
+fixture projects (`hd-<run-id>-a` and `hd-<run-id>-b`) with separate named
+resources and explicit read-write component bindings. Their data and projects
+are retained for explicit owner-reviewed retirement; the runner revokes its
+temporary human grant and test persona. Never run it against real application
+data.
 
-The current runner uses expiring named-resource credentials. Its SQL check expects
-the resource's effective `_reader` role: the issued `credential_*` login switches
-to that role by its operator-configured database default. Use the lease's `PGUSER`
-for authentication. The current full live wrapper rerun remains separate from
-EV-52–72's scoped native/browser evidence. Use a dedicated
-human administrator with no existing named-store grants or registered SSH key;
-it refuses to replace an operator's existing key or disrupt their leases. Historical
-evidence below describes the earlier implicit project-database model and does not
-establish acceptance for this replacement. See the [current workflow](../data-stores.md).
+The current runner uses expiring named-resource credentials. Its SQL check
+expects the resource's effective `_reader` role: the issued `credential_*` login
+switches to that role by its operator-configured database default. Use the
+lease's `PGUSER` for authentication. The current full live wrapper rerun remains
+separate from EV-52–72's scoped native/browser evidence. Use a dedicated human
+administrator with no existing named-store grants or registered SSH key; it
+refuses to replace an operator's existing key or disrupt their leases.
+Historical evidence below describes the earlier implicit project-database model
+and does not establish acceptance for this replacement. See the
+[current workflow](../data-stores.md).
 
 First deploy the platform and the restricted bastion using
 [`install-human-database-access.yml`](../../../ansible/operations/install-human-database-access.yml).
 Install or update the host-side runner environment from
-`tests/platform/requirements.txt` as in [Prepare the runner and fixture](#prepare-the-runner-and-fixture).
-Transfer `scripts/tests/platform/check-human-database-access.py`,
+`tests/platform/requirements.txt` as in
+[Prepare the runner and fixture](#prepare-the-runner-and-fixture). Transfer
+`scripts/tests/platform/check-human-database-access.py`,
 `tests/platform/human_database.py`, and updated requirements to the target
-through the same reviewed runner-only update process used for hosted access;
-the Ansible acceptance wrapper does not transfer code. Publish the neutral
-fixture to an approved public registry and use its immutable digest, not a tag.
+through the same reviewed runner-only update process used for hosted access; the
+Ansible acceptance wrapper does not transfer code. Publish the neutral fixture
+to an approved public registry and use its immutable digest, not a tag.
 
-Prepare a mode `0600` renewable human platform-administrator session file on
-the target with the [operator-session procedure](#obtain-a-private-operator-session-for-the-hosted-access-harness).
+Prepare a mode `0600` renewable human platform-administrator session file on the
+target with the
+[operator-session procedure](#obtain-a-private-operator-session-for-the-hosted-access-harness).
 Independently verify the dedicated bastion's Ed25519 host key and place its
-`[127.0.0.1]:2222` entry in a root-readable mode `0600` known-hosts file on
-the target. Do not generate the trust file from an unverified first connection.
-For a non-default private bastion address or port, use the matching host/port
-variables; keep the bastion behind the approved management firewall. The
-runner requires local root access to verify the installed `sshd` restrictions.
+`[127.0.0.1]:2222` entry in a root-readable mode `0600` known-hosts file on the
+target. Do not generate the trust file from an unverified first connection. For
+a non-default private bastion address or port, use the matching host/port
+variables; keep the bastion behind the approved management firewall. The runner
+requires local root access to verify the installed `sshd` restrictions.
 
-From the controller checkout, use a fresh 12-character lowercase hexadecimal
-run ID and the exact API origin (normally the host-local loopback API):
+From the controller checkout, use a fresh 12-character lowercase hexadecimal run
+ID and the exact API origin (normally the host-local loopback API):
 
 ```bash
-ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-human-database-access.yml \
+FIXTURE_IMAGE='docker.io/example/neutral-fixture@sha256:'\
+'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
+ansible-playbook -i ansible/inventory.yml \
+  ansible/tests/platform/test-platform-human-database-access.yml \
   -e human_database_run_id=0123456789ab \
-  -e human_database_fixture_image=docker.io/example/neutral-fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  -e "human_database_fixture_image=$FIXTURE_IMAGE"
 
-ansible-playbook -i ansible/inventory.yml ansible/tests/platform/test-platform-human-database-access.yml \
+ansible-playbook -i ansible/inventory.yml \
+  ansible/tests/platform/test-platform-human-database-access.yml \
   -e human_database_command=run \
   -e human_database_run_id=0123456789ab \
-  -e human_database_fixture_image=docker.io/example/neutral-fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
-  -e human_database_operator_token_file=/opt/developer-platform/.runtime/operator-session.json \
-  -e human_database_known_hosts_file=/opt/developer-platform/.runtime/db-known-hosts \
+  -e "human_database_fixture_image=$FIXTURE_IMAGE" \
+  -e human_database_operator_token_file=/opt/developer-platform/\
+.runtime/operator-session.json \
+  -e human_database_known_hosts_file=/opt/developer-platform/\
+.runtime/db-known-hosts \
   -e human_database_confirm_environment=http://127.0.0.1:8000
 ```
 
@@ -93,15 +103,15 @@ directly.
 
 ## Executed human PostgreSQL access acceptance: October 15, 2026
 
-**EV-47 · owner-accepted passing core tests; partial Phase 10.7 / PLAN-008 evidence.** The live run on
-`node-01.eseidinger.de` used two disposable projects,
-`hd-5f39d4862423-a` and `hd-5f39d4862423-b`, and the immutable fixture
+**EV-47 · owner-accepted passing core tests; partial Phase 10.7 / PLAN-008
+evidence.** The live run on `node-01.eseidinger.de` used two disposable
+projects, `hd-5f39d4862423-a` and `hd-5f39d4862423-b`, and the immutable fixture
 `docker.io/eseidinger/developer-platform-acceptance-fixture@sha256:5c14c1bedfc653e98f958b88deacc5af488f885a5d9a6d3b96e9325938b3f0ad`.
 The private report is
 `/opt/developer-platform/.runtime/human-database-access/5f39d4862423/report.json`
-(mode `0600`). Run `5f39d4862423` lasted from 17:43:50 to 17:44:13 UTC.
-It returned `core-passed`: all 14 named checks passed, cleanup was `complete`,
-and `gateClosed` was `false`. The runner revoked its temporary grant and test
+(mode `0600`). Run `5f39d4862423` lasted from 17:43:50 to 17:44:13 UTC. It
+returned `core-passed`: all 14 named checks passed, cleanup was `complete`, and
+`gateClosed` was `false`. The runner revoked its temporary grant and test
 persona; it retained both fixture projects for owner-reviewed retirement.
 
 The automated checks covered isolated bastion configuration, a human platform
@@ -115,9 +125,9 @@ Ed25519 host key was checked against the controller's trusted host key.
 
 The owner then confirmed the browser and SQL journey using a separate portal
 grant on project A. The portal displayed a one-time SQL password that
-disappeared when its dialog reopened. A tunnel through the operator's
-ProxyJump reached the project A database and read its synthetic marker; a write
-and a project B login were denied. Replacing the SSH key changed the portal
+disappeared when its dialog reopened. A tunnel through the operator's ProxyJump
+reached the project A database and read its synthetic marker; a write and a
+project B login were denied. Replacing the SSH key changed the portal
 fingerprint; a new connection with the old key was denied and the replacement
 key connected before revocation. After the portal grant was revoked, the owner
 observed termination of the existing SQL session and denial of a new SQL login;
@@ -127,54 +137,58 @@ database-identity panel.
 
 Two UI defects surfaced during this journey and were fixed and deployed before
 the final portal check: revoke sent surplus grant fields to a strict API and
-returned 422, and the personal identity panel displayed stale cached data
-after the API returned 404. Focused UI regression tests passed (nine tests
-after the second fix), as did UI typecheck, lint, and build. The final deployed
-UI asset was `index-C2zxuYLg.js`; the API was ready and the bastion active.
-The installation record identified source `b3acaef1e413e698d772c218dc336da8d55684b0+dirty`:
-the deployed fixes came from a working tree, so this string does not attest an
-exact committed source tree.
+returned 422, and the personal identity panel displayed stale cached data after
+the API returned 404. Focused UI regression tests passed (nine tests after the
+second fix), as did UI typecheck, lint, and build. The final deployed UI asset
+was `index-C2zxuYLg.js`; the API was ready and the bastion active. The
+installation record identified source
+`b3acaef1e413e698d772c218dc336da8d55684b0+dirty`: the deployed fixes came from a
+working tree, so this string does not attest an exact committed source tree.
 
 **Follow-up, October 15, 2026:** A fresh deployment recorded clean source
-revision `9826de70829b47f18b8c8018c9348fc81dcb8c43` at 19:14:21 UTC;
-the API `/readyz` returned `ready`. The owner completed retirement of both
-fixture projects. A read-only catalog check confirmed both statuses are
-`retired`, and PostgreSQL still contains their two retained databases. Project
-B first returned `202 retiring` while its namespace was being deleted; after
-the namespace disappeared, the confirmed request completed retirement. The
-automated and manual access checks above preceded this clean deployment and
-were not repeated against it.
+revision `9826de70829b47f18b8c8018c9348fc81dcb8c43` at 19:14:21 UTC; the API
+`/readyz` returned `ready`. The owner completed retirement of both fixture
+projects. A read-only catalog check confirmed both statuses are `retired`, and
+PostgreSQL still contains their two retained databases. Project B first returned
+`202 retiring` while its namespace was being deleted; after the namespace
+disappeared, the confirmed request completed retirement. The automated and
+manual access checks above preceded this clean deployment and were not repeated
+against it.
 
 **Owner acceptance, October 15, 2026:** The owner accepts the 14 passing
-automated checks and the completed manual portal, tunnel, SQL, key-rotation,
-and revocation checks as passed evidence. No repeat run is required solely
-because the same fixes were subsequently deployed from clean commit `9826de7`.
-This decision accepts the checks performed; it does not report the deferred
-reviews as passed or change the original report's `gateClosed: false` result.
+automated checks and the completed manual portal, tunnel, SQL, key-rotation, and
+revocation checks as passed evidence. No repeat run is required solely because
+the same fixes were subsequently deployed from clean commit `9826de7`. This
+decision accepts the checks performed; it does not report the deferred reviews
+as passed or change the original report's `gateClosed: false` result.
 
 The external-path probe from the controller could not connect to bastion port
 2222, consistent with its loopback listener, but a full remote firewall review
 remains deferred. Browser storage and independent log, screenshot, and evidence
 redaction review remain deferred too. The retired fixture databases remain
-retained under the normal data-retention policy. This record does not close PLAN-008 or the
-Phase 10 gate; the three remaining reviews are the final, lowest-priority
+retained under the normal data-retention policy. This record does not close
+PLAN-008 or the Phase 10 gate; the three remaining reviews are the final,
+lowest-priority
 [10.8 work package](../../maintainers/delivery/plans/phase-10-anytime-leftovers.md#108-complete-the-lowest-priority-human-database-leftovers-plan-008).
 See [EV-47](../../maintainers/delivery/backlog.md#verification-register).
 
 ## Neutral hosted-application acceptance harness
 
 Validation status (October 11, 2026): the deployed neutral-fixture core suite,
-including held-token expiry, passed in run `c927adee1d50` ([EV-45](../../maintainers/delivery/backlog.md#verification-register)).
-The [dated evidence below](#executed-hosted-access-core-acceptance-october-11-2026)
-records its scope and remaining checks; the full hosted-access gate is still open. Run it only
-after the [hosted-access installation](../identity-and-access.md#hosted-application-access-installation-and-recovery)
+including held-token expiry, passed in run `c927adee1d50`
+([EV-45](../../maintainers/delivery/backlog.md#verification-register)). The
+[dated evidence below](#executed-hosted-access-core-acceptance-october-11-2026)
+records its scope and remaining checks; the full hosted-access gate is still
+open. Run it only after the
+[hosted-access installation](../identity-and-access.md#hosted-application-access-installation-and-recovery)
 is deployed. It does not deploy, upgrade, or reset the platform.
 
-The entry point is `scripts/tests/platform/check-hosted-access.py`. It uses two uniquely named
-projects, `ha-<12-hex-run-id>-provider` and `ha-<run-id>-consumer`, each with one
-public API, one private worker, and its own PostgreSQL database. The neutral
-fixture deliberately has no application authorization and contains only synthetic
-markers. Never use its image with real application data.
+The entry point is `scripts/tests/platform/check-hosted-access.py`. It uses two
+uniquely named projects, `ha-<12-hex-run-id>-provider` and
+`ha-<run-id>-consumer`, each with one public API, one private worker, and its
+own PostgreSQL database. The neutral fixture deliberately has no application
+authorization and contains only synthetic markers. Never use its image with real
+application data.
 
 ### Prepare the runner and fixture
 
@@ -196,24 +210,29 @@ works with a read-only root filesystem.
 
 #### Publish the fixture through GitHub Actions
 
-The [hosted-access fixture workflow](../../../.github/workflows/hosted-access-fixture.yaml)
+The
+[hosted-access fixture workflow](../../../.github/workflows/hosted-access-fixture.yaml)
 publishes the neutral fixture, not the host-side runner. It runs harness safety
-and real PostgreSQL persistence tests, then checks the amd64 container's readiness
-with a non-root user, read-only filesystem, and dropped capabilities. A successful
-tag release builds `linux/amd64` and `linux/arm64` images following
+and real PostgreSQL persistence tests, then checks the amd64 container's
+readiness with a non-root user, read-only filesystem, and dropped capabilities.
+A successful tag release builds `linux/amd64` and `linux/arm64` images following
 [Docker's multi-platform publishing pattern](https://docs.docker.com/build/ci/github-actions/multi-platform/).
 It does not deploy the platform, execute live acceptance, or close the gate.
 
 Configure these GitHub repository or `dockerhub` environment settings first:
 
-- Variable `DOCKERHUB_USERNAME`: the Docker Hub account used for login (for example `eseidinger`).
-- Optional variable `DOCKERHUB_NAMESPACE`: the destination organization; defaults to the login account.
-- Secret `DOCKERHUB_TOKEN`: a Docker Hub access token authorized to push to the destination repository.
+- Variable `DOCKERHUB_USERNAME`: the Docker Hub account used for login (for
+  example `eseidinger`).
+- Optional variable `DOCKERHUB_NAMESPACE`: the destination organization;
+  defaults to the login account.
+- Secret `DOCKERHUB_TOKEN`: a Docker Hub access token authorized to push to the
+  destination repository.
 
 Create a **public** Docker Hub repository named
 `<namespace>/developer-platform-acceptance-fixture`. Configure the GitHub
 `dockerhub` environment with tag restrictions or required reviewers if desired.
-Do not store the Docker Hub token in inventory, `.env`, Git, or command arguments.
+Do not store the Docker Hub token in inventory, `.env`, Git, or command
+arguments.
 
 After committing and pushing the workflow and fixture changes, publish a new
 stable version from the intended commit:
@@ -232,8 +251,8 @@ namespace is `eseidinger`. No mutable `latest` alias is published.
 The workflow verifies anonymous registry access and puts the digest-pinned
 `export HA_IMAGE=docker.io/<namespace>/developer-platform-acceptance-fixture@sha256:<digest>`
 command in its run summary. Copy that reference into the host's shell and use
-`--fixture-image "$HA_IMAGE"` for the plan and run below. No Docker Hub login
-or local fixture build is needed on the platform host for this published image.
+`--fixture-image "$HA_IMAGE"` for the plan and run below. No Docker Hub login or
+local fixture build is needed on the platform host for this published image.
 
 Fixture source changes require publishing a new version and using its new
 registry digest; updating the host-side runner alone does not update deployed
@@ -241,28 +260,32 @@ fixture code. The state-write endpoint accepts both fixed-length and streamed
 HTTP/1.1 chunked JSON, with a 256-byte decoded-body limit, bounded framing and
 read timeout. Invalid or ambiguous framing returns `400 invalid_marker` before
 accessing PostgreSQL. Regression tests exercise the real authorizer/proxy's
-chunked forwarding into the HTTP fixture, including durable PostgreSQL read-back.
+chunked forwarding into the HTTP fixture, including durable PostgreSQL
+read-back.
 
 Before a live run, wildcard application DNS, public HTTPS certificates trusted
-by the host and fixture container, the hosted authorizer/proxy, the provisioner's
-existing client/user-management permissions, and available workload capacity
-must be ready. Approve the provider and issuer's apply-time IP addresses on TCP
-443 through the normal operator egress configuration. The harness neither
-widens that allow-list nor disables TLS checks. Supply a resolvable unrelated
-host outside those permitted addresses for the negative egress assertion. Its TCP
-443 endpoint must be reachable from the platform host in the fixture Pods' IP
-families so that the harness can establish an outside-policy positive control.
-The operator needs access to the host's private `.env`, `kubectl`, and
-`.runtime/admin.kubeconfig`. Override `--kubectl` or `--settings` if necessary.
+by the host and fixture container, the hosted authorizer/proxy, the
+provisioner's existing client/user-management permissions, and available
+workload capacity must be ready. Approve the provider and issuer's apply-time IP
+addresses on TCP 443 through the normal operator egress configuration. The
+harness neither widens that allow-list nor disables TLS checks. Supply a
+resolvable unrelated host outside those permitted addresses for the negative
+egress assertion. Its TCP 443 endpoint must be reachable from the platform host
+in the fixture Pods' IP families so that the harness can establish an
+outside-policy positive control. The operator needs access to the host's private
+`.env`, `kubectl`, and `.runtime/admin.kubeconfig`. Override `--kubectl` or
+`--settings` if necessary.
 
-Use the [private operator-session procedure](#obtain-a-private-operator-session-for-the-hosted-access-harness)
-below to authenticate an existing **human platform administrator**. It saves a mode
-`0600` JSON session file containing exactly `access_token`, `refresh_token`, and
-`client_id` (normally `platform-cli`). Do not supply passwords, bearer tokens,
-refresh tokens, or client secrets as command arguments. The harness renews the
-operator session in memory; it never writes renewed credentials to the journal.
-Obtain a fresh session for crash recovery if the original session is no longer
-usable. The existing operator account and its grants are not changed.
+Use the
+[private operator-session procedure](#obtain-a-private-operator-session-for-the-hosted-access-harness)
+below to authenticate an existing **human platform administrator**. It saves a
+mode `0600` JSON session file containing exactly `access_token`,
+`refresh_token`, and `client_id` (normally `platform-cli`). Do not supply
+passwords, bearer tokens, refresh tokens, or client secrets as command
+arguments. The harness renews the operator session in memory; it never writes
+renewed credentials to the journal. Obtain a fresh session for crash recovery if
+the original session is no longer usable. The existing operator account and its
+grants are not changed.
 
 For routine machine-driven acceptance, the harness also accepts the protected
 client-credentials file described in the
@@ -273,8 +296,8 @@ a human session; machine credentials do not satisfy those identity assertions.
 ### Update the runner without redeploying platform services
 
 A runner/fixture-only release does not require `ansible/deploy.yml`. From the
-controller checkout of the intended release, transfer the test package and
-entry points to the existing installation (substitute the actual host/install
+controller checkout of the intended release, transfer the test package and entry
+points to the existing installation (substitute the actual host/install
 directory). This includes the package initializers needed by the new layout:
 
 ```bash
@@ -283,22 +306,22 @@ rsync -aR --exclude=__pycache__ \
   root@node-01.eseidinger.de:/opt/developer-platform/
 ```
 
-Run `sha256sum tests/platform/harness.py` on both sides and confirm they
-match. If runner dependencies changed, update the runner environment from
+Run `sha256sum tests/platform/harness.py` on both sides and confirm they match.
+If runner dependencies changed, update the runner environment from
 `tests/platform/requirements.txt` as well. The transfer updates test code only;
-it does not start platform services or run a live scenario.
-On the host set `HA_IMAGE` to the new published fixture's immutable registry
-digest before generating a fresh plan/run ID. Copying fixture source onto the
-host does not update its container image. This transfer does not update the
-control-plane revision in `.runtime/installation-record.json`; record runner
-hash and fixture digest separately. Changes to platform services still require
-the supported deployment procedure.
+it does not start platform services or run a live scenario. On the host set
+`HA_IMAGE` to the new published fixture's immutable registry digest before
+generating a fresh plan/run ID. Copying fixture source onto the host does not
+update its container image. This transfer does not update the control-plane
+revision in `.runtime/installation-record.json`; record runner hash and fixture
+digest separately. Changes to platform services still require the supported
+deployment procedure.
 
 ### Obtain a private operator session for the hosted-access harness
 
-Run on the platform host from its installation directory in a trusted shell
-with tracing disabled. Keep `.runtime` private and do not share the printed
-approval URL, session file, or tokens. Set the actual HTTPS issuer; for the local
+Run on the platform host from its installation directory in a trusted shell with
+tracing disabled. Keep `.runtime` private and do not share the printed approval
+URL, session file, or tokens. Set the actual HTTPS issuer; for the local
 development CA, also set `SSL_CERT_FILE` to the trusted CA file (the Python
 example does not use `CURL_CA_BUNDLE`). Never disable certificate verification.
 Copy the self-contained example below into the host shell: deployment transfers
@@ -325,8 +348,17 @@ import urllib.request
 
 issuer = os.environ["ISSUER"].rstrip("/")
 parts = urllib.parse.urlsplit(issuer)
-if parts.scheme != "https" or not parts.hostname or parts.username or parts.password or parts.query or parts.fragment:
-    raise SystemExit("Use the configured HTTPS issuer without credentials or query parameters.")
+if (
+    parts.scheme != "https"
+    or not parts.hostname
+    or parts.username
+    or parts.password
+    or parts.query
+    or parts.fragment
+):
+    raise SystemExit(
+        "Use the configured HTTPS issuer without credentials or query parameters."
+    )
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, *args, **kwargs):
@@ -365,7 +397,10 @@ device = post("auth/device", {
     "client_id": "platform-cli", "scope": "openid",
     "code_challenge": challenge, "code_challenge_method": "S256",
 })
-if not all(device.get(key) for key in ("device_code", "verification_uri_complete", "expires_in")):
+if not all(
+    device.get(key)
+    for key in ("device_code", "verification_uri_complete", "expires_in")
+):
     raise SystemExit("Device authorization could not be started.")
 
 print("Open:", device["verification_uri_complete"], flush=True)
@@ -375,10 +410,15 @@ deadline = time.monotonic() + int(device["expires_in"])
 while time.monotonic() < deadline:
     result = post("token", {
         "grant_type": "urn:ietf:params:oauth:grant-type:device_code",
-        "client_id": "platform-cli", "device_code": device["device_code"], "code_verifier": verifier,
+        "client_id": "platform-cli",
+        "device_code": device["device_code"],
+        "code_verifier": verifier,
     })
     if "access_token" in result:
-        if not all(isinstance(result.get(key), str) and result[key] for key in ("access_token", "refresh_token")):
+        if not all(
+            isinstance(result.get(key), str) and result[key]
+            for key in ("access_token", "refresh_token")
+        ):
             raise SystemExit("No complete renewable session returned; nothing saved.")
         session = {key: result[key] for key in ("access_token", "refresh_token")}
         session["client_id"] = "platform-cli"
@@ -408,9 +448,9 @@ Open the printed URL while the command is polling; approval must finish before
 the device code expires. `authorization_pending` and `slow_down` are expected
 polling responses, not reasons to pipe an empty response into a JSON parser.
 Success atomically replaces `.runtime/operator-session.json` with exactly
-`access_token`, `refresh_token`, and `client_id`, mode `0600`. A rejected, expired,
-or incomplete exchange leaves an existing session untouched; do not run the
-harness until a fresh save succeeds. Avoid `curl --fail | … > session.json`,
+`access_token`, `refresh_token`, and `client_id`, mode `0600`. A rejected,
+expired, or incomplete exchange leaves an existing session untouched; do not run
+the harness until a fresh save succeeds. Avoid `curl --fail | … > session.json`,
 which can truncate the session before authentication succeeds. The harness does
 not persist rotated refresh tokens, so obtain a fresh session for subsequent
 runs or cleanup retries. A successful login still requires an existing human
@@ -421,7 +461,8 @@ platform-admin grant, which the harness checks before provisioning.
 An offline plan performs no network calls or writes:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/tests/platform/check-hosted-access.py plan \
+.runtime/acceptance-venv/bin/python \
+  scripts/tests/platform/check-hosted-access.py plan \
   --run-id 0123456789ab \
   --fixture-image '<public-registry>/hosted-access-fixture@sha256:<digest>' \
   --apps-domain apps.example.org \
@@ -432,7 +473,8 @@ Choose a fresh run ID for each live run. Repeat the API origin exactly as the
 explicit environment confirmation:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/tests/platform/check-hosted-access.py run \
+.runtime/acceptance-venv/bin/python \
+  scripts/tests/platform/check-hosted-access.py run \
   --api http://127.0.0.1:8000 \
   --confirm-environment http://127.0.0.1:8000 \
   --run-id 0123456789ab \
@@ -447,22 +489,23 @@ and retention records; pending human first login, explicit provider approval,
 group headers, bounded claim refresh, cookie/CSRF handling and stable identity;
 provider-approved service credentials and client-scoped groups/audience; allowed
 public HTTPS consumer-to-provider traffic and hashed synthetic correlation;
-project-wide credential visibility in the private worker; missing/invalid/wrong-audience,
-unapproved/wrong-group, ambiguous/unmatched path and forged-header denials;
-private-backend bypass and unrelated-egress denial; retained, project-isolated
-PostgreSQL state after restart; policy activation/rollback; normal and emergency
-rotation; and denial of already issued tokens/sessions after revocation.
-Network isolation checks require successful TCP controls to the same resolved
-addresses immediately before and after each negative probe. Backend controls
-run from the existing authorizer; the unrelated-egress control runs from the
-platform host. The harness does not create a probe Pod or change network policies.
-Timeouts and active connection refusals can count as denial only with these
-controls. DNS failures, address changes, unexpected network errors, unavailable
-controls, or any successful negative connection fail the check. Probes cover the
-ready source Pods' configured IPv4/IPv6 families; absence of IPv6 routing on an
-IPv4-only cluster is not treated as isolation evidence. Reports contain only
-outcome counts, family flags, and control-success flags for these probes, never
-raw exception text or response bodies.
+project-wide credential visibility in the private worker;
+missing/invalid/wrong-audience, unapproved/wrong-group, ambiguous/unmatched path
+and forged-header denials; private-backend bypass and unrelated-egress denial;
+retained, project-isolated PostgreSQL state after restart; policy
+activation/rollback; normal and emergency rotation; and denial of already issued
+tokens/sessions after revocation. Network isolation checks require successful
+TCP controls to the same resolved addresses immediately before and after each
+negative probe. Backend controls run from the existing authorizer; the
+unrelated-egress control runs from the platform host. The harness does not
+create a probe Pod or change network policies. Timeouts and active connection
+refusals can count as denial only with these controls. DNS failures, address
+changes, unexpected network errors, unavailable controls, or any successful
+negative connection fail the check. Probes cover the ready source Pods'
+configured IPv4/IPv6 families; absence of IPv6 routing on an IPv4-only cluster
+is not treated as isolation evidence. Reports contain only outcome counts,
+family flags, and control-success flags for these probes, never raw exception
+text or response bodies.
 
 `--timed` additionally holds a real machine token until expiry (up to five
 minutes). `--allow-recovery-reconcile` separately authorizes the **global**
@@ -479,11 +522,11 @@ probes, Kubernetes readiness and provider/consumer central correlation through
 authorized retained-log reads. Prometheus defaults to operator-local
 `http://127.0.0.1:9090`; `--prometheus` selects another trusted operator origin.
 Deploy PLAN-017 source first and publish a new fixture digest: the EV-45 fixture
-does not emit operational envelopes. Checks run before retirement without granting
-monitoring application access. The report keeps the monitoring/retention check
-deferred even on success: immediate ingestion does not prove seven elapsed days
-or compactor deletion. EV-45 remains historical evidence, not evidence for this
-new increment.
+does not emit operational envelopes. Checks run before retirement without
+granting monitoring application access. The report keeps the
+monitoring/retention check deferred even on success: immediate ingestion does
+not prove seven elapsed days or compactor deletion. EV-45 remains historical
+evidence, not evidence for this new increment.
 
 Normal completion and caught failures attempt fixture retirement and synthetic
 identity cleanup. The harness refuses changed or out-of-scope resources. It
@@ -494,7 +537,8 @@ removes that grant and account. Abrupt termination or unavailable dependencies
 can leave resources or cleanup pending. Keep the private journal and retry:
 
 ```bash
-.runtime/acceptance-venv/bin/python scripts/tests/platform/check-hosted-access.py cleanup \
+.runtime/acceptance-venv/bin/python \
+  scripts/tests/platform/check-hosted-access.py cleanup \
   --api http://127.0.0.1:8000 \
   --confirm-environment http://127.0.0.1:8000 \
   --run-id 0123456789ab \
@@ -505,16 +549,16 @@ The default output directory is `.runtime/hosted-access/<run-id>` (mode `0700`).
 Its `state.json` contains cleanup handles but no credentials. Its mode-`0600`
 `report.json` contains named assertions, safe timings/statuses, fixture image,
 deployment revisions/operation IDs, resource bounds, harness source hash,
-synthetic project/route references, and pinned egress
-CIDRs; it contains no raw identity claims, cookies, passwords, tokens, or secret
-values. Treat the evidence as Internal. For `run`, exit zero means the selected core checks
-and cleanup completed; `result: core-passed` always has `gateClosed: false`.
-Exit nonzero means a failed check, dependency/configuration problem, or incomplete
+synthetic project/route references, and pinned egress CIDRs; it contains no raw
+identity claims, cookies, passwords, tokens, or secret values. Treat the
+evidence as Internal. For `run`, exit zero means the selected core checks and
+cleanup completed; `result: core-passed` always has `gateClosed: false`. Exit
+nonzero means a failed check, dependency/configuration problem, or incomplete
 cleanup. Review the report before using it as evidence.
 
 The PostgreSQL isolation check records `writeHttpStatus`,
-`consumerReadHttpStatus`, `writeMarkerMatches`, and `consumerMarkerMatches`;
-the restart read-back check records `readHttpStatus`. A pass requires the write
+`consumerReadHttpStatus`, `writeMarkerMatches`, and `consumerMarkerMatches`; the
+restart read-back check records `readHttpStatus`. A pass requires the write
 response to match the durable synthetic marker, the consumer to retain its own
 initial marker, and the provider to return the durable marker after restart.
 Only statuses and comparison booleans are included, not markers or response
@@ -524,22 +568,21 @@ PostgreSQL provisioning or network failure.
 The full gate still needs the explicit deferred checks: a verified backup
 restore, control-plane outage/five-minute fail-closed behavior, long browser and
 rotation timers, request retention, component monitoring/centralized log
-retention, DNS-address-change/reapply behavior, and the separately owned versioned energy-system suite. Skipped
-optional drills are also recorded as deferred, never as passed.
+retention, DNS-address-change/reapply behavior, and the separately owned
+versioned energy-system suite. Skipped optional drills are also recorded as
+deferred, never as passed.
 
 For remote execution, `ansible/tests/platform/test-platform-hosted-access.yml`
-defaults to
-`plan` and uses the prepared runner environment above. Supply
+defaults to `plan` and uses the prepared runner environment above. Supply
 `hosted_access_run_id`, `hosted_access_fixture_image`, and
 `hosted_access_apps_domain`, plus `hosted_access_issuer` for the offline plan;
-for `run` or `cleanup`, additionally supply
-`hosted_access_command`, `hosted_access_confirm_environment` equal to
-`hosted_access_api`, and the **target-host path**
-`hosted_access_operator_token_file`. Optional flags are
+for `run` or `cleanup`, additionally supply `hosted_access_command`,
+`hosted_access_confirm_environment` equal to `hosted_access_api`, and the
+**target-host path** `hosted_access_operator_token_file`. Optional flags are
 `hosted_access_timed`, `hosted_access_monitoring`, and
 `hosted_access_allow_recovery_reconcile`, all false by default.
-`hosted_access_prometheus` defaults to target loopback port 9090.
-It does not transfer credentials or install dependencies.
+`hosted_access_prometheus` defaults to target loopback port 9090. It does not
+transfer credentials or install dependencies.
 
 Local verification: the offline/safety/fixture tests pass, the fixture image
 builds, and its non-root/read-only readiness and real PostgreSQL persistence
@@ -548,10 +591,11 @@ running platform or substitute for the live acceptance run.
 
 ## Executed hosted-access core acceptance: October 11, 2026
 
-Evidence ID: [EV-45](../../maintainers/delivery/backlog.md#verification-register).
-Source: the operator-provided `report.json` from the live node-01 lab, reviewed
-after the run. This documentation records that report; it is not an independent
-rerun, a fresh host inspection, or full Phase 3/F-10 acceptance.
+Evidence ID:
+[EV-45](../../maintainers/delivery/backlog.md#verification-register). Source:
+the operator-provided `report.json` from the live node-01 lab, reviewed after
+the run. This documentation records that report; it is not an independent rerun,
+a fresh host inspection, or full Phase 3/F-10 acceptance.
 
 ### Run identity and retained evidence
 
@@ -566,8 +610,9 @@ rerun, a fresh host inspection, or full Phase 3/F-10 acceptance.
   recovery reconciliation not enabled.
 - Runner/fixture release: `hosted-access-v0.1.2`, source commit
   `e8f74fdd522ab18bd06ffed06073525494a90345`. The runner was updated separately
-  from platform services. The report does not identify the deployed control-plane
-  source revision; this release reference is not a runtime-version assertion.
+  from platform services. The report does not identify the deployed
+  control-plane source revision; this release reference is not a runtime-version
+  assertion.
 - Harness SHA-256:
   `e57bb05502634e1f40666be57e3224e2bbd0df80391164c19082541e204c5f00`.
 - Fixture image:
@@ -576,36 +621,36 @@ rerun, a fresh host inspection, or full Phase 3/F-10 acceptance.
   revision 1, each with a public API and private worker. Per component: CPU
   request/limit `50m`/`250m`; memory request/limit `64Mi`/`128Mi`.
 - Private evidence remains on the host at
-  `/opt/developer-platform/.runtime/hosted-access/c927adee1d50/report.json`, with
-  cleanup handles in the adjacent `state.json`. Classification: Internal;
-  preserve the journal under the approved evidence-retention policy. Do not
-  copy the operator session, credentials, or raw identity claims into Git.
+  `/opt/developer-platform/.runtime/hosted-access/c927adee1d50/report.json`,
+  with cleanup handles in the adjacent `state.json`. Classification: Internal;
+  preserve the journal under the approved evidence-retention policy. Do not copy
+  the operator session, credentials, or raw identity claims into Git.
 
 ### Passed scope
 
 The 39 named assertions cover:
 
 - Digest-pinned readiness of two projects/four components; pending first human
-  login despite platform-admin status; explicit human approval and bounded
-  claim refresh; withheld optional personal attributes; secure browser cookies,
-  CSRF protection, and stable identity after rename.
+  login despite platform-admin status; explicit human approval and bounded claim
+  refresh; withheld optional personal attributes; secure browser cookies, CSRF
+  protection, and stable identity after rename.
 - Machine audience and client-scoped groups; missing/invalid/wrong-audience
   token rejection (`401`); wrong-group/unmatched/segment-prefix rejection
-  (`403`); encoded-slash rejection (`400`); `HEAD`/explicit `OPTIONS`; replacement
-  of forged identity headers and stripping of the bearer token; denial of a
-  valid but unapproved machine.
+  (`403`); encoded-slash rejection (`400`); `HEAD`/explicit `OPTIONS`;
+  replacement of forged identity headers and stripping of the bearer token;
+  denial of a valid but unapproved machine.
 - Project-wide service binding visible to the private worker, successful
   consumer-to-provider public HTTPS through the managed credential, and hashed
   synthetic cross-project correlation.
 - Provider and consumer direct-backend bypass denial, unrelated-egress denial,
   and DNS-address-pinned egress. Every negative probe had healthy same-address
   controls before and after. Both backend probes had zero connections and one
-  active refusal; the unrelated-egress probe had zero connections and two
-  active refusals. No timeout, DNS error, address mismatch, or unexpected error
-  supplied the denial evidence. Probes covered IPv4 only (`ipvSix: false`);
-  this run does not demonstrate IPv6 isolation. The report captured four pinned
-  CIDR entries (two unique addresses), including an IPv6 pin, which is not proof
-  of IPv6 connectivity or enforcement.
+  active refusal; the unrelated-egress probe had zero connections and two active
+  refusals. No timeout, DNS error, address mismatch, or unexpected error
+  supplied the denial evidence. Probes covered IPv4 only (`ipvSix: false`); this
+  run does not demonstrate IPv6 isolation. The report captured four pinned CIDR
+  entries (two unique addresses), including an IPv6 pin, which is not proof of
+  IPv6 connectivity or enforcement.
 - Separate project PostgreSQL state, preservation of provider revision across
   restart, and read-back of the durable marker after restart. Write and consumer
   read both returned `200`, both marker comparisons passed, and post-restart
@@ -617,14 +662,14 @@ The 39 named assertions cover:
 - Expiry denial of an already issued machine token and revocation denial of an
   existing human session and an already issued machine token.
 
-| Measurement | Observed seconds |
-|---|---:|
-| Human approval and bounded claim refresh | 241.453 |
-| Normal adoption revokes old client | 0.006 |
-| Emergency no-overlap check | 0.006 |
-| Held machine token until expiry denial | 300.131 |
-| Human revocation with existing session | 2.357 |
-| Machine revocation with issued token | 2.310 |
+| Measurement                              | Observed seconds |
+| ---------------------------------------- | ---------------: |
+| Human approval and bounded claim refresh |          241.453 |
+| Normal adoption revokes old client       |            0.006 |
+| Emergency no-overlap check               |            0.006 |
+| Held machine token until expiry denial   |          300.131 |
+| Human revocation with existing session   |            2.357 |
+| Machine revocation with issued token     |            2.310 |
 
 These are this run's measurements, not latency guarantees. In particular,
 healthy-system revocation results do not prove the dependency-outage bound.
@@ -658,11 +703,12 @@ this neutral suite.
 
 ## Executed hosted-access monitoring acceptance: October 11, 2026
 
-Evidence ID: [EV-46](../../maintainers/delivery/backlog.md#verification-register).
-Source: the operator-provided live node-01 `report.json`, following the
+Evidence ID:
+[EV-46](../../maintainers/delivery/backlog.md#verification-register). Source:
+the operator-provided live node-01 `report.json`, following the
 operator-confirmed deployment and healthy Alloy startup. This records supplied
-evidence, not an independent rerun or full Phase 3/F-10 acceptance. EV-45 remains
-the earlier historical core run.
+evidence, not an independent rerun or full Phase 3/F-10 acceptance. EV-45
+remains the earlier historical core run.
 
 ### Run identity
 
@@ -674,11 +720,11 @@ the earlier historical core run.
 - Requested drills: `tokenExpiry: true`, `componentMonitoring: true`,
   `recoveryReconcile: false` (`--timed --monitoring`, without global reconcile).
 - Runner/fixture release: `hosted-access-v0.2.0`, source
-  `b360ddee34444748c95705c597aa7b17491cd05b`. The Alloy UID/GID and readiness fix
-  was implemented and the operator reported redeployment before this run.
+  `b360ddee34444748c95705c597aa7b17491cd05b`. The Alloy UID/GID and readiness
+  fix was implemented and the operator reported redeployment before this run.
   That fix was not part of the fixture release and requires no new fixture
-  image. The report does not attest the exact deployed control-plane revision
-  or working-tree contents; do not treat the release as that attestation.
+  image. The report does not attest the exact deployed control-plane revision or
+  working-tree contents; do not treat the release as that attestation.
 - Harness SHA-256:
   `baa046e028656dfe9dc45c578390bcd33923e2c25b20dbd84313b2cbc5ab845c`.
 - Fixture image:
@@ -697,41 +743,41 @@ the earlier historical core run.
 The 39 core assertions described in EV-45 passed again. Six additional checks
 passed before fixture retirement:
 
-| Named check | UTC observation |
-|---|---|
+| Named check                                | UTC observation |
+| ------------------------------------------ | --------------- |
 | `provider-component-public-boundary-probe` | 19:07:26.310652 |
-| `provider-component-semantic-readiness` | 19:07:26.314516 |
-| `provider-centralized-safe-correlation` | 19:07:28.614805 |
+| `provider-component-semantic-readiness`    | 19:07:26.314516 |
+| `provider-centralized-safe-correlation`    | 19:07:28.614805 |
 | `consumer-component-public-boundary-probe` | 19:07:28.617914 |
-| `consumer-component-semantic-readiness` | 19:07:28.620554 |
-| `consumer-centralized-safe-correlation` | 19:07:28.696688 |
+| `consumer-component-semantic-readiness`    | 19:07:28.620554 |
+| `consumer-centralized-safe-correlation`    | 19:07:28.696688 |
 
 For each project, the public probe matched its API component's declared
-`/health/ready` URL with `probe_kind=access-boundary` and successful login/denial
-semantics. Kubernetes ready-pod metrics independently supplied semantic readiness.
-Project-authorized retained-log reads found the expected opaque synthetic
-correlation, revision `1` and populated operation metadata. These reads prove
-safe-envelope retrieval through the API; they do not certify arbitrary raw-log
-storage or customer/domain correlation. The monitoring summary records
-`componentProbes: passed`, `centralIngestion: passed` and
+`/health/ready` URL with `probe_kind=access-boundary` and successful
+login/denial semantics. Kubernetes ready-pod metrics independently supplied
+semantic readiness. Project-authorized retained-log reads found the expected
+opaque synthetic correlation, revision `1` and populated operation metadata.
+These reads prove safe-envelope retrieval through the API; they do not certify
+arbitrary raw-log storage or customer/domain correlation. The monitoring summary
+records `componentProbes: passed`, `centralIngestion: passed` and
 `sevenDayRetention: not-time-verified`.
 
 Core PostgreSQL write/read and restart read-back returned `200`; marker
 comparisons passed. Backend bypass and unrelated-egress checks had healthy
 same-address controls before and after, with no successful negative connection,
 timeout, DNS error, address mismatch or unexpected error. The tested network
-family was IPv4 only; IPv6 CIDR pins are not IPv6 isolation evidence.
-Measured approval/claim refresh was 241.681 seconds; normal adoption revocation
-0.006 seconds; emergency no-overlap 0.005 seconds; held-token expiry denial
-298.127 seconds; existing-human-session revocation 2.338 seconds and issued
+family was IPv4 only; IPv6 CIDR pins are not IPv6 isolation evidence. Measured
+approval/claim refresh was 241.681 seconds; normal adoption revocation 0.006
+seconds; emergency no-overlap 0.005 seconds; held-token expiry denial 298.127
+seconds; existing-human-session revocation 2.338 seconds and issued
 machine-token revocation 2.240 seconds. These are observations, not guarantees
 or dependency-outage evidence.
 
 ### Collector repair, cleanup and remaining acceptance
 
 The preceding run `3c17ed6dcdac` failed with
-`component_retained_correlation_unavailable`; cleanup completed with data retained.
-The operator's collector output showed a restart loop caused by
+`component_retained_correlation_unavailable`; cleanup completed with data
+retained. The operator's collector output showed a restart loop caused by
 `mkdir /var/lib/alloy/remotecfg: permission denied`. The pinned image's state
 directory is `473:473`, mode `0770`; UID `0` with GID `0` and all capabilities
 dropped could not write it. The repair uses `0:473`, retains the named state
@@ -747,17 +793,17 @@ The same nine deferred checks listed for EV-45 remain deferred, including the
 combined `component-monitoring-and-central-log-retention` entry: deployed probes
 and immediate ingestion now have evidence, but seven elapsed days and compactor
 deletion do not. This run does not query retained logs after workload restart or
-cleanup, exercise collector/backend outages, or verify alert delivery.
-Record post-retirement/restart readback and a seven-day retention-boundary drill
-with collector/backend health, collection gaps and compactor delay before
-closing PLAN-017. PLAN-009, PLAN-018, PLAN-019, F-10 and Phase 10 remain open;
-the externally owned energy suite and configuration contract are unchanged.
+cleanup, exercise collector/backend outages, or verify alert delivery. Record
+post-retirement/restart readback and a seven-day retention-boundary drill with
+collector/backend health, collection gaps and compactor delay before closing
+PLAN-017. PLAN-009, PLAN-018, PLAN-019, F-10 and Phase 10 remain open; the
+externally owned energy suite and configuration contract are unchanged.
 
 ## Executed local validation — October 2, 2026
 
 The following controlled checks completed on the local lab. They are local
-verification evidence, not Phase 1B task closure; the remaining checks below
-are still required.
+verification evidence, not Phase 1B task closure; the remaining checks below are
+still required.
 
 - [x] Fresh Keycloak/PostgreSQL bootstrap completed with a new individual
   Keycloak user receiving the one-time persisted `platform-admin` grant.
@@ -767,8 +813,8 @@ are still required.
   the restricted writer succeeded, while a direct writer `INSERT` was denied.
 - [x] Disposable authorization project A exists and received separate `viewer`,
   `developer`, and `project-admin` grants.
-- [x] The browser PKCE portal completed Keycloak login for the deployed
-  identity provider without retaining an access token outside the browser tab.
+- [x] The browser PKCE portal completed Keycloak login for the deployed identity
+  provider without retaining an access token outside the browser tab.
 - [x] Separate viewer/developer/project-admin users completed the
   role-denial/cross-project matrix.
 - [x] A second platform-admin grant was revoked; its unchanged token received
@@ -780,8 +826,8 @@ are still required.
 - [x] Real security-rule notifications were received and repeated events stayed
   one grouped ongoing incident. Retained evidence is not required for these
   owner-confirmed checks.
-- [x] The controlled notification-delivery-failure exercise is omitted from
-  this Phase 1B task by owner direction.
+- [x] The controlled notification-delivery-failure exercise is omitted from this
+  Phase 1B task by owner direction.
 
 ## Bootstrap a fresh local identity service
 
@@ -795,14 +841,14 @@ docker compose up -d postgres keycloak-db-init keycloak proxy
 
 `--volumes` deletes PostgreSQL, Keycloak, monitoring, and other Compose service
 data as well as the k3d cluster. It preserves `.env`, backups, and installed
-tools. A newly generated `.env` has fresh secrets. Do not combine it with an
-old PostgreSQL volume: the Keycloak database password will not match.
+tools. A newly generated `.env` has fresh secrets. Do not combine it with an old
+PostgreSQL volume: the Keycloak database password will not match.
 
 Open `https://identity.localhost`, choose **Administration Console**, and sign
 in as `admin` using `KEYCLOAK_ADMIN_PASSWORD` from `.env`. In the `platform`
-realm, create an enabled individual bootstrap user, set a password, and copy
-its immutable **ID**. Set that value as `PLATFORM_BOOTSTRAP_SUBJECT` in `.env`,
-then start the platform:
+realm, create an enabled individual bootstrap user, set a password, and copy its
+immutable **ID**. Set that value as `PLATFORM_BOOTSTRAP_SUBJECT` in `.env`, then
+start the platform:
 
 ```bash
 bash scripts/up.sh
@@ -835,32 +881,53 @@ Generate a verifier/challenge and request a device code:
 
 ```bash
 export CODE_VERIFIER="$(python3 -c 'import secrets; print(secrets.token_urlsafe(64))')"
-export CODE_CHALLENGE="$(printf %s "$CODE_VERIFIER" | python3 -c 'import sys,hashlib,base64; print(base64.urlsafe_b64encode(hashlib.sha256(sys.stdin.buffer.read()).digest()).rstrip(b"=").decode())')"
-DEVICE_RESPONSE="$(curl --fail-with-body -sS -X POST "$ISSUER/protocol/openid-connect/auth/device" \
+export CODE_CHALLENGE="$(printf %s "$CODE_VERIFIER" | python3 -c '
+import sys, hashlib, base64
+digest = hashlib.sha256(sys.stdin.buffer.read()).digest()
+print(base64.urlsafe_b64encode(digest).rstrip(b"=").decode())
+')"
+DEVICE_RESPONSE="$(
+  curl --fail-with-body -sS -X POST \
+    "$ISSUER/protocol/openid-connect/auth/device" \
   --data-urlencode 'client_id=platform-cli' \
   --data-urlencode 'scope=openid' \
   --data-urlencode "code_challenge=$CODE_CHALLENGE" \
-  --data-urlencode 'code_challenge_method=S256')"
-export DEVICE_CODE="$(printf '%s' "$DEVICE_RESPONSE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["device_code"])')"
-printf '%s' "$DEVICE_RESPONSE" | python3 -c 'import json,sys; r=json.load(sys.stdin); print("Open:", r["verification_uri_complete"]); print("Code:", r["user_code"])'
+  --data-urlencode 'code_challenge_method=S256'
+)"
+export DEVICE_CODE="$(printf '%s' "$DEVICE_RESPONSE" | python3 -c '
+import json, sys
+print(json.load(sys.stdin)["device_code"])
+')"
+printf '%s' "$DEVICE_RESPONSE" | python3 -c '
+import json, sys
+response = json.load(sys.stdin)
+print("Open:", response["verification_uri_complete"])
+print("Code:", response["user_code"])
+'
 ```
 
 Open the printed URL, authenticate as the intended individual user in the
 `platform` realm, and approve the request. Only then exchange the device code:
 
 ```bash
-TOKEN_RESPONSE="$(curl --fail-with-body -sS -X POST "$ISSUER/protocol/openid-connect/token" \
+TOKEN_RESPONSE="$(
+  curl --fail-with-body -sS -X POST \
+    "$ISSUER/protocol/openid-connect/token" \
   --data-urlencode 'grant_type=urn:ietf:params:oauth:grant-type:device_code' \
   --data-urlencode 'client_id=platform-cli' \
   --data-urlencode "device_code=$DEVICE_CODE" \
-  --data-urlencode "code_verifier=$CODE_VERIFIER")"
-export PLATFORM_ACCESS_TOKEN="$(printf '%s' "$TOKEN_RESPONSE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')"
+  --data-urlencode "code_verifier=$CODE_VERIFIER"
+)"
+export PLATFORM_ACCESS_TOKEN="$(printf '%s' "$TOKEN_RESPONSE" | python3 -c '
+import json, sys
+print(json.load(sys.stdin)["access_token"])
+')"
 unset DEVICE_RESPONSE DEVICE_CODE TOKEN_RESPONSE CODE_CHALLENGE CODE_VERIFIER
 ```
 
-An `authorization_pending` response means approval has not completed. Tokens
-are short-lived; keep them only in the current shell. Reuse this procedure for
-every test user and save the resulting tokens under distinct shell variables.
+An `authorization_pending` response means approval has not completed. Tokens are
+short-lived; keep them only in the current shell. Reuse this procedure for every
+test user and save the resulting tokens under distinct shell variables.
 
 ## Create accounts, projects, and scoped grants
 
@@ -894,7 +961,10 @@ export VIEWER_SUB='…'
 export DEVELOPER_SUB='…'
 export PROJECT_ADMIN_SUB='…'
 
-for grant in "$VIEWER_SUB viewer" "$DEVELOPER_SUB developer" "$PROJECT_ADMIN_SUB project-admin"; do
+for grant in \
+  "$VIEWER_SUB viewer" \
+  "$DEVELOPER_SUB developer" \
+  "$PROJECT_ADMIN_SUB project-admin"; do
   set -- $grant
   curl --fail-with-body -X PUT "$API/projects/$A/grants" \
     -H "Authorization: Bearer $ADMIN_TOKEN" \
@@ -914,12 +984,17 @@ Obtain a separate token for each person and store it as `VIEWER_TOKEN`,
 Record timestamp, code revision, principal, target project, HTTP status, and
 redacted response for every assertion.
 
-| Principal | Expected result |
-| --- | --- |
-| Viewer on A | Lists A; `PUT /projects/A`, retirement, and grant changes return `403` |
-| Developer on A | Lists A and may reapply A's complete spec; retirement and grant changes return `403` |
-| Project admin on A | May manage grants on A; mutation and grant changes on B return `403` |
-| Platform admin | May access both projects and manage platform grants |
+- **Principal:** Viewer on A
+  - **Expected result:** Lists A; `PUT /projects/A`, retirement, and grant
+    changes return `403`
+- **Principal:** Developer on A
+  - **Expected result:** Lists A and may reapply A's complete spec; retirement
+    and grant changes return `403`
+- **Principal:** Project admin on A
+  - **Expected result:** May manage grants on A; mutation and grant changes on B
+    return `403`
+- **Principal:** Platform admin
+  - **Expected result:** May access both projects and manage platform grants
 
 Use the actual project variables. A non-mutating grant attempt is useful for
 negative assertions:
@@ -932,8 +1007,8 @@ curl -sS -o /dev/null -w '%{http_code}\n' -X PUT "$API/projects/$A/grants" \
 ```
 
 The expected result is `403`. Later Phase 1B data surfaces (logs, metrics,
-secrets, and jobs) must receive the same checks when their endpoints exist;
-they are not present in the current API.
+secrets, and jobs) must receive the same checks when their endpoints exist; they
+are not present in the current API.
 
 ## Prove immediate platform-grant revocation
 
@@ -985,9 +1060,9 @@ redacted operator export.
 ## Test security-event notifications
 
 Complete this exercise only after the SMTP destination has been configured using
-the [Alertmanager guide](../../../operations/alertmanager/README.md). It supplies
-controlled evidence for OPS-002-T01. Use disposable identities/projects and do
-not copy tokens, Keycloak passwords, raw audit details, or Alertmanager
+the [Alertmanager guide](../../../operations/alertmanager/README.md). It
+supplies controlled evidence for OPS-002-T01. Use disposable identities/projects
+and do not copy tokens, Keycloak passwords, raw audit details, or Alertmanager
 configuration into evidence.
 
 ### Preflight the audit collector
@@ -1041,15 +1116,15 @@ resource labels, so further matching events should remain one ongoing incident.
 
    Substitute the configured platform domain. Each response must be `401`.
 
-2. Sign in as a disposable viewer through the portal, then attempt an
+1. Sign in as a disposable viewer through the portal, then attempt an
    unauthorized project-grant change on the same project five times. Each result
    must be `403`; this generates `RepeatedAccessDenials` without modifying a
    grant.
 
-3. As a platform administrator, grant or revoke a disposable project role. This
+1. As a platform administrator, grant or revoke a disposable project role. This
    creates a `PrivilegedChange` event without the repeated-event threshold.
 
-4. Inspect active rule state from the host:
+1. Inspect active rule state from the host:
 
    ```bash
    curl -sS http://127.0.0.1:9090/api/v1/alerts
@@ -1060,10 +1135,10 @@ resource labels, so further matching events should remain one ongoing incident.
    their notifications arrive and that the repeated activity produces one
    grouped ongoing incident rather than duplicate notifications.
 
-5. Use the portal's restricted audit export for the exact exercise time window.
-   Correlate each alert's resource labels and latest event ID with redacted audit
-   records. Do not retain raw principal IDs or credentials.
+1. Use the portal's restricted audit export for the exact exercise time window.
+   Correlate each alert's resource labels and latest event ID with redacted
+   audit records. Do not retain raw principal IDs or credentials.
 
 The repeated-event alerts clear after their 15-minute event window no longer
-contains five events, plus rule evaluation. Document that delayed resolution;
-do not repeatedly generate denials solely to make the alert persist.
+contains five events, plus rule evaluation. Document that delayed resolution; do
+not repeatedly generate denials solely to make the alert persist.

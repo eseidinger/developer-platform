@@ -22,7 +22,9 @@ deploy:
       with:
         python-version: "3.12"
     - run: python3 -m pip install developer-platform-cli
-    - run: devplat deploy apply --project orders --file application.json --wait --output json
+    - run: >-
+        devplat deploy apply --project orders --file application.json
+        --wait --output json
       env:
         PLATFORM_API_URL: ${{ vars.PLATFORM_API_URL }}
         PLATFORM_TOKEN_ENDPOINT: ${{ vars.PLATFORM_TOKEN_ENDPOINT }}
@@ -31,5 +33,6 @@ deploy:
 ```
 
 Limit the credential to its project and rotate or revoke it through the platform
-when a repository, environment, or team member no longer needs deployment access.
-Avoid shell tracing (`set -x`) around any command that handles credentials.
+when a repository, environment, or team member no longer needs deployment
+access. Avoid shell tracing (`set -x`) around any command that handles
+credentials.

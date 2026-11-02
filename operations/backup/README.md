@@ -1,32 +1,39 @@
 # Platform backups
 
-Use the canonical [backup and recovery guide](../../docs/operators/backup-and-recovery.md)
-for the operator workflow. This source-adjacent page retains detailed playbook,
-systemd, fixture, and recovery implementation reference.
+Use the canonical
+[backup and recovery guide](../../docs/operators/backup-and-recovery.md) for the
+operator workflow. This source-adjacent page retains detailed playbook, systemd,
+fixture, and recovery implementation reference.
 
 Run deployment commands from the repository root.
 
 ## Current lab policy
 
-[ADR-010](../../docs/architecture/decisions/ADR-010-single-environment-lab.md) selects the existing platform and watchdog for controlled, reversible checks. Do not create an additional test or recovery environment as a routine next step. The isolated recovery procedures below remain references for past drills or a future explicitly chosen exercise; new isolated drills are deferred, and their unverified acceptance criteria stay open.
+[ADR-010](../../docs/architecture/decisions/ADR-010-single-environment-lab.md)
+selects the existing platform and watchdog for controlled, reversible checks. Do
+not create an additional test or recovery environment as a routine next step.
+The isolated recovery procedures below remain references for past drills or a
+future explicitly chosen exercise; new isolated drills are deferred, and their
+unverified acceptance criteria stay open.
 
 ## Current implementation and recovery limits
 
 Scheduled capture includes the full PostgreSQL catalog and Keycloak database,
-current application Secrets, generated store configuration, named native volumes,
-Neo4j instance/image inventory and verified purge intent. Native-store bundles
-pause managed leases for at most 35 minutes and stop retained native instances
-for capture; applications must tolerate interruption and reconnect. Caddy and
-Grafana are also briefly stopped. See the [capture contract](../../docs/operators/data-stores.md#retention-and-capacity).
+current application Secrets, generated store configuration, named native
+volumes, Neo4j instance/image inventory and verified purge intent. Native-store
+bundles pause managed leases for at most 35 minutes and stop retained native
+instances for capture; applications must tolerate interruption and reconnect.
+Caddy and Grafana are also briefly stopped. See the
+[capture contract](../../docs/operators/data-stores.md#retention-and-capacity).
 
 The automated playbook and `check`/`seed-marker` examples below preserve the
-legacy `project_<name>`/`database` Secret assumptions. For named PostgreSQL,
-the helper also has an explicit [quarantined SQL marker check](#verify-a-named-postgresql-marker).
-Neither path establishes full named-store application recovery. The restore
-script handles store volumes and quarantine but refuses replay of recovered
-component bindings and still submits internal stored specs for selected-project
-reapply. Use reviewed
-public declarations and fresh grants/bindings as described in the
+legacy `project_<name>`/`database` Secret assumptions. For named PostgreSQL, the
+helper also has an explicit
+[quarantined SQL marker check](#verify-a-named-postgresql-marker). Neither path
+establishes full named-store application recovery. The restore script handles
+store volumes and quarantine but refuses replay of recovered component bindings
+and still submits internal stored specs for selected-project reapply. Use
+reviewed public declarations and fresh grants/bindings as described in the
 [current recovery workflow](../../docs/operators/backup-and-recovery.md#reapply-restored-projects).
 Deployed off-host application reconnection remains unverified.
 
@@ -36,22 +43,47 @@ Run these commands from the repository root on the **WSL/Ansible controller**.
 Use the source backup inventory for backup tasks and the separate recovery
 inventory for the disposable VM.
 
-| Task | Playbook | Details |
-| --- | --- | --- |
-| Configure existing S3 repository access | [setup-backup.yml](ansible/setup-backup.yml) | [Credentials and initialization](#encrypted-s3-backup-repository-setup) |
-| Install scheduled backups and alerts | [deploy-backup.yml](ansible/deploy-backup.yml) | [Schedule and watchdog prerequisites](#scheduled-backups-and-independent-backup-alerts) |
-| Exercise failed-backup email and verified recovery in the existing lab | [drill-backup-failure.yml](ansible/drill-backup-failure.yml) | [In-place failure drill](#failed-backup-notification-drill-on-the-existing-lab) |
-| Exercise stalled/overdue backup detection | [stalled](ansible/drill-backup-stalled.yml), [overdue](ansible/drill-backup-overdue.yml) | [Real-time freshness drills](#stalled-and-overdue-backup-drills) |
-| Inspect a running/completed freshness drill | [check-backup-drill.yml](ansible/check-backup-drill.yml) | Fetches the latest report without changing the drill |
-| Create a pre-backup marker and verified backup | [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml) | [Source test preparation](#automate-marker-creation-and-the-source-backup) |
-| Restore and test a fresh isolated VM | [restore-recovery.yml](ansible/restore-recovery.yml) | [Recovery inventory and safeguards](#restore-a-fresh-recovery-vm-with-ansible) |
-| Verify recovery storage and credential failure paths | [check-recovery-failure-modes.yml](ansible/check-recovery-failure-modes.yml) | [Read-only recovery preflight](#read-only-recovery-failure-preflight) |
+- **Task:** Configure existing S3 repository access
+  - **Playbook:** [setup-backup.yml](ansible/setup-backup.yml)
+  - **Details:**
+    [Credentials and initialization](#encrypted-s3-backup-repository-setup)
+- **Task:** Install scheduled backups and alerts
+  - **Playbook:** [deploy-backup.yml](ansible/deploy-backup.yml)
+  - **Details:**
+    [Schedule and watchdog prerequisites](#scheduled-backups-and-independent-backup-alerts)
+- **Task:** Exercise failed-backup email and verified recovery in the existing
+  lab
+  - **Playbook:** [drill-backup-failure.yml](ansible/drill-backup-failure.yml)
+  - **Details:**
+    [In-place failure drill](#failed-backup-notification-drill-on-the-existing-lab)
+- **Task:** Exercise stalled/overdue backup detection
+  - **Playbook:** [stalled](ansible/drill-backup-stalled.yml),
+    [overdue](ansible/drill-backup-overdue.yml)
+  - **Details:**
+    [Real-time freshness drills](#stalled-and-overdue-backup-drills)
+- **Task:** Inspect a running/completed freshness drill
+  - **Playbook:** [check-backup-drill.yml](ansible/check-backup-drill.yml)
+  - **Details:** Fetches the latest report without changing the drill
+- **Task:** Create a pre-backup marker and verified backup
+  - **Playbook:** [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml)
+  - **Details:**
+    [Source test preparation](#automate-marker-creation-and-the-source-backup)
+- **Task:** Restore and test a fresh isolated VM
+  - **Playbook:** [restore-recovery.yml](ansible/restore-recovery.yml)
+  - **Details:**
+    [Recovery inventory and safeguards](#restore-a-fresh-recovery-vm-with-ansible)
+- **Task:** Verify recovery storage and credential failure paths
+  - **Playbook:**
+    [check-recovery-failure-modes.yml](ansible/check-recovery-failure-modes.yml)
+  - **Details:**
+    [Read-only recovery preflight](#read-only-recovery-failure-preflight)
 
 ### Backup setup and scheduling
 
-Prepare `operations/backup/ansible/inventory.backup.yml` from its example and set
-the source host. Configure the external watchdog's backup endpoint/schema/token
-before deploying the schedule. Credentials are prompted privately.
+Prepare `operations/backup/ansible/inventory.backup.yml` from its example and
+set the source host. Configure the external watchdog's backup
+endpoint/schema/token before deploying the schedule. Credentials are prompted
+privately.
 
 ```bash
 ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
@@ -76,30 +108,30 @@ ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
 The helper uses the installed runner and its existing lock. It overrides the
 Docker command in memory for one attempt, failing database capture before any
 service is stopped or data uploaded. The previous verified snapshot/time must
-remain unchanged. It waits five minutes for the external watchdog to send
-BACKUP DOWN with reason `failed`, then attempts a normal verified backup in
-a finally block. Recovery capture briefly interrupts Caddy/Grafana and runs
-normal retention. No credentials or permanent configuration are changed.
+remain unchanged. It waits five minutes for the external watchdog to send BACKUP
+DOWN with reason `failed`, then attempts a normal verified backup in a finally
+block. Recovery capture briefly interrupts Caddy/Grafana and runs normal
+retention. No credentials or permanent configuration are changed.
 
-Override the notification window with `-e backup_drill_wait_seconds=600` if
-the watchdog scheduler needs longer; supported range is 60–1800 seconds.
-The lock is held throughout: overlapping backup attempts are refused and
-notification retries defer to the drill. Avoid the regular 00:00/12:00 UTC
-backup windows. The normal schedule remains enabled.
+Override the notification window with `-e backup_drill_wait_seconds=600` if the
+watchdog scheduler needs longer; supported range is 60–1800 seconds. The lock is
+held throughout: overlapping backup attempts are refused and notification
+retries defer to the drill. Avoid the regular 00:00/12:00 UTC backup windows.
+The normal schedule remains enabled.
 
 A transient systemd service owns the drill, so losing the controller connection
 does not cancel recovery. Power loss, forced termination or a genuine backup
 failure can still prevent recovery; inspect the drill journal and normal backup
-status before retrying. Do not kill the service to shorten the wait.
-Check mode is rejected because this is an operational exercise.
+status before retrying. Do not kill the service to shorten the wait. Check mode
+is rejected because this is an operational exercise.
 
 The playbook fetches before/failure/recovery evidence under
-`.runtime/backup-drill/<host>/<run>/`; the private source report and helper remain
-in the printed `/root/backup-drill-*` directory. Inspect
-`journalctl -u <backup-drill-unit> --no-pager` if the playbook fails.
-A passing report proves the runner outcomes and watchdog HTTP acceptance,
-not mailbox receipt. Confirm both emails separately before recording acceptance.
-This exercises database-capture failure, not upload failure, overdue/stalled
+`.runtime/backup-drill/<host>/<run>/`; the private source report and helper
+remain in the printed `/root/backup-drill-*` directory. Inspect
+`journalctl -u <backup-drill-unit> --no-pager` if the playbook fails. A passing
+report proves the runner outcomes and watchdog HTTP acceptance, not mailbox
+receipt. Confirm both emails separately before recording acceptance. This
+exercises database-capture failure, not upload failure, overdue/stalled
 detection or notification-delivery failure.
 
 ### Stalled and overdue backup drills
@@ -128,7 +160,8 @@ ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
   operations/backup/ansible/check-backup-drill.yml
 ```
 
-Wait for a `passed` report **and both emails** before starting the next exercise:
+Wait for a `passed` report **and both emails** before starting the next
+exercise:
 
 ```bash
 ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
@@ -137,27 +170,27 @@ ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
 
 Overdue detection lets the previous verified capture age past **24 hours**, then
 allows five minutes for the watchdog notification. It sends no artificial start
-or success event while waiting. A real recovery backup follows. Depending on
-the previous capture time, this takes up to roughly 24 hours plus the
-notification window and recovery duration. Expect BACKUP DOWN condition
-`overdue`, then BACKUP UP. This deliberately exceeds the normal RPO target for
-the exercise; existing stored recovery points are preserved.
+or success event while waiting. A real recovery backup follows. Depending on the
+previous capture time, this takes up to roughly 24 hours plus the notification
+window and recovery duration. Expect BACKUP DOWN condition `overdue`, then
+BACKUP UP. This deliberately exceeds the normal RPO target for the exercise;
+existing stored recovery points are preserved.
 
 Both launch playbooks return after preflight, not after completion. A transient
-`platform-backup-freshness-drill.service` continues without the controller.
-The installed runner's lock prevents concurrent backup/drill work throughout.
-**Scheduled captures are skipped with lock-contention failures during the drill**;
-the timers are not disabled or edited. The drill's final verified backup restores
-freshness; normal future timer runs resume after the lock is released.
-Applications run normally during the wait; recovery capture briefly pauses
-Caddy/Grafana, as in ordinary backups.
+`platform-backup-freshness-drill.service` continues without the controller. The
+installed runner's lock prevents concurrent backup/drill work throughout.
+**Scheduled captures are skipped with lock-contention failures during the
+drill**; the timers are not disabled or edited. The drill's final verified
+backup restores freshness; normal future timer runs resume after the lock is
+released. Applications run normally during the wait; recovery capture briefly
+pauses Caddy/Grafana, as in ordinary backups.
 
-The notification window can be increased with
-`-e backup_drill_wait_seconds=600` (60–1800 seconds supported).
-The helper checks the authenticated watchdog protocol without refreshing its
-state. It requires a recent successful local backup and no pending notification
-or service recovery. The existing watchdog must be healthy/UP before the exercise;
-local preflight alone cannot certify its current notification state.
+The notification window can be increased with `-e backup_drill_wait_seconds=600`
+(60–1800 seconds supported). The helper checks the authenticated watchdog
+protocol without refreshing its state. It requires a recent successful local
+backup and no pending notification or service recovery. The existing watchdog
+must be healthy/UP before the exercise; local preflight alone cannot certify its
+current notification state.
 
 Reports are retained privately in
 `/var/lib/developer-platform-backup-drill/freshness-*/report.json`; `latest`
@@ -165,8 +198,8 @@ points to the last launched run. The check playbook fetches
 `.runtime/backup-drill/<host>/freshness-latest.json` and flags failures. Archive
 this controller copy before collecting another run if needed; original remote
 reports remain separate. A report marked `passed` verifies elapsed thresholds
-and runner recovery, **not** cron execution or mailbox receipt. Record the actual
-DOWN reason and both email receipts in the backlog.
+and runner recovery, **not** cron execution or mailbox receipt. Record the
+actual DOWN reason and both email receipts in the backlog.
 
 To inspect or gracefully abort on node-01:
 
@@ -180,13 +213,17 @@ the report. An aborted exercise is not marked passed. Do not force-kill it.
 Power loss or genuine recovery failures can still prevent recovery. After an
 abnormal termination, inspect the report and
 `/var/lib/developer-platform-backup/status.json`; once the drill has stopped,
-run `systemctl start platform-backup.service` if recovery is needed.
-A killed drill can leave a `running` report; the check playbook flags it if the
-service is no longer active. A host reboot releases the lock; the existing
-backup recovery service/timer remains responsible for recovery.
+run `systemctl start platform-backup.service` if recovery is needed. A killed
+drill can leave a `running` report; the check playbook flags it if the service
+is no longer active. A host reboot releases the lock; the existing backup
+recovery service/timer remains responsible for recovery.
 
 These exercises cover natural backup age and a stalled attempt while local
-monitoring remains available. [ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md) accepts skipping the missing-update/local-monitoring-outage exercise for this lab. Notification-delivery-failure injection is an accepted limitation under ADR-011; these exercises do not claim restoration acceptance.
+monitoring remains available.
+[ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md)
+accepts skipping the missing-update/local-monitoring-outage exercise for this
+lab. Notification-delivery-failure injection is an accepted limitation under
+ADR-011; these exercises do not claim restoration acceptance.
 
 ### Recovery drill
 
@@ -200,18 +237,20 @@ ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
 
 Use the printed snapshot ID and independent controller marker path in the
 recovery inventory: `recovery_snapshot`, `recovery_marker_file`, and
-`recovery_projects: [smoke]`. [Create/start a fresh VM](#local-recovery-vm-in-wsl-2)
-and accept its verified SSH host key, then run:
+`recovery_projects: [smoke]`.
+[Create/start a fresh VM](#local-recovery-vm-in-wsl-2) and accept its verified
+SSH host key, then run:
 
 ```bash
 ansible-playbook -i operations/backup/ansible/inventory.recovery.yml \
   operations/backup/ansible/restore-recovery.yml
 ```
 
-The restore playbook refuses existing installations. Its fetched report must show
-`result: passed` and `historical_data_verified: true` for a marker drill.
-For an already-restored VM, [rerun only the check script](#run-tests-against-the-prepared-recovery-vm).
-Do not rerun restoration to troubleshoot an acceptance failure.
+The restore playbook refuses existing installations. Its fetched report must
+show `result: passed` and `historical_data_verified: true` for a marker drill.
+For an already-restored VM,
+[rerun only the check script](#run-tests-against-the-prepared-recovery-vm). Do
+not rerun restoration to troubleshoot an acceptance failure.
 
 The sections below explain configuration, recovery behavior, script usage, and
 limitations. Manual restore commands are in the
@@ -219,30 +258,54 @@ limitations. Manual restore commands are in the
 
 ## Read-only recovery failure preflight
 
-When an operator explicitly provisions the disposable recovery VM, run this before a selected restore to verify that recovery fails safely with unavailable storage and invalid credentials:
+When an operator explicitly provisions the disposable recovery VM, run this
+before a selected restore to verify that recovery fails safely with unavailable
+storage and invalid credentials:
 
 ```bash
 ansible-playbook -i operations/backup/ansible/inventory.recovery.yml \
   operations/backup/ansible/check-recovery-failure-modes.yml
 ```
 
-It prompts privately for the real S3 credentials and repository password, then deliberately tests an unreachable loopback S3 endpoint, a wrong password, and a missing password. Each selected command must fail. Restic is invoked with `--no-lock`; the playbook does not initialize, lock, restore, prune, retag, or otherwise write the repository. It saves a non-secret pass/fail report under `.runtime/recovery-evidence/` and removes its temporary credentials even after a failure.
+It prompts privately for the real S3 credentials and repository password, then
+deliberately tests an unreachable loopback S3 endpoint, a wrong password, and a
+missing password. Each selected command must fail. Restic is invoked with
+`--no-lock`; the playbook does not initialize, lock, restore, prune, retag, or
+otherwise write the repository. It saves a non-secret pass/fail report under
+`.runtime/recovery-evidence/` and removes its temporary credentials even after a
+failure.
 
-Select a subset with, for example, `-e 'recovery_preflight_cases=["wrong-password","missing-password"]'`. A successful preflight proves only that the negative cases failed; it does not prove an unavailable bundle can be restored. Deliberately corrupting the sole live repository is an accepted limitation under [ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md); repository `check`, verified readback, and checksum-rejection tests remain the available evidence. Do not run it against `node-01`.
+Select a subset with, for example,
+`-e 'recovery_preflight_cases=["wrong-password","missing-password"]'`. A
+successful preflight proves only that the negative cases failed; it does not
+prove an unavailable bundle can be restored. Deliberately corrupting the sole
+live repository is an accepted limitation under
+[ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md);
+repository `check`, verified readback, and checksum-rejection tests remain the
+available evidence. Do not run it against `node-01`.
 
 ## Quarterly recovery review
 
-On the first Saturday of January, April, July, and October, the operator reviews the latest verified snapshot inventory, runs `sudo /usr/local/sbin/platform-restic check` on `node-01`, and records the result in the delivery backlog or operations log. If recovery access or the stored scope has changed, explicitly provision the WSL recovery VM and run the read-only preflight before any selected restore.
+On the first Saturday of January, April, July, and October, the operator reviews
+the latest verified snapshot inventory, runs
+`sudo /usr/local/sbin/platform-restic check` on `node-01`, and records the
+result in the delivery backlog or operations log. If recovery access or the
+stored scope has changed, explicitly provision the WSL recovery VM and run the
+read-only preflight before any selected restore.
 
-A routine full fresh-VM restore is not scheduled for this lab under ADR-010. Perform one after material changes to backed-up state, backup format, credentials, database version, or bootstrap behavior, or during an actual recovery event.
+A routine full fresh-VM restore is not scheduled for this lab under ADR-010.
+Perform one after material changes to backed-up state, backup format,
+credentials, database version, or bootstrap behavior, or during an actual
+recovery event.
 
 ## Encrypted S3 backup repository setup
 
-[setup-backup.yml](ansible/setup-backup.yml) installs the distribution's `restic` package
-and CA certificates on the existing Ubuntu platform host. It configures a
-root-only restic command and verifies access to an encrypted S3 repository.
-It runs independently of `deploy.yml` and does not redeploy or stop the platform.
-See the [platform Ansible prerequisites](../../ansible/README.md) for the controller requirements.
+[setup-backup.yml](ansible/setup-backup.yml) installs the distribution's
+`restic` package and CA certificates on the existing Ubuntu platform host. It
+configures a root-only restic command and verifies access to an encrypted S3
+repository. It runs independently of `deploy.yml` and does not redeploy or stop
+the platform. See the [platform Ansible prerequisites](../../ansible/README.md)
+for the controller requirements.
 
 The example uses the confirmed Hetzner destination:
 `s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform`, region
@@ -255,33 +318,37 @@ From the local checkout on your Ansible controller:
 ```bash
 cp operations/backup/ansible/inventory.backup.example.yml operations/backup/ansible/inventory.backup.yml
 # Set ansible_host and ansible_user for node-01.
-ansible-playbook -i operations/backup/ansible/inventory.backup.yml operations/backup/ansible/setup-backup.yml \
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/setup-backup.yml \
   -e backup_restic_initialize=true
 ```
 
 This first-run command explicitly allows repository creation. The playbook first
-tries to open the repository; if successful, initialization is skipped. If opening
-fails, initialization is attempted only with this flag, and restic refuses an
-existing repository config. Authentication/network/password failures remain
-failures; no existing repository is removed or reset. For an existing repository,
-omit the flag. Reruns preserve its encryption password and fail if a different
-password is supplied; they may update the S3 credentials.
+tries to open the repository; if successful, initialization is skipped. If
+opening fails, initialization is attempted only with this flag, and restic
+refuses an existing repository config. Authentication/network/password failures
+remain failures; no existing repository is removed or reset. For an existing
+repository, omit the flag. Reruns preserve its encryption password and fail if a
+different password is supplied; they may update the S3 credentials.
 
 The playbook prompts privately for the access key ID, secret key and repository
-password (at least 20 characters, entered twice). Generate and save the repository
-password in a password manager independently of the platform host **before** the
-first run. Store recovery access to the S3 credentials there too. The repository
-password is distinct from the S3 secret key. Changing the local password does not
-rotate a restic repository key; use restic's separate key-management workflow.
+password (at least 20 characters, entered twice). Generate and save the
+repository password in a password manager independently of the platform host
+**before** the first run. Store recovery access to the S3 credentials there too.
+The repository password is distinct from the S3 secret key. Changing the local
+password does not rotate a restic repository key; use restic's separate
+key-management workflow.
 
 If SSH uses a password, add `--ask-pass`; for a non-root sudo account, add
-`--ask-become-pass` when needed. For unattended runs, use an encrypted vars file:
+`--ask-become-pass` when needed. For unattended runs, use an encrypted vars
+file:
 
 ```bash
 ansible-vault create operations/backup/ansible/backup-secrets.yml
 # In the editor, define backup_s3_access_key, backup_s3_secret_key,
 # and backup_restic_password. This path is ignored by Git.
-ansible-playbook -i operations/backup/ansible/inventory.backup.yml operations/backup/ansible/setup-backup.yml \
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/setup-backup.yml \
   -e @operations/backup/ansible/backup-secrets.yml --ask-vault-pass
 ```
 
@@ -290,12 +357,14 @@ values inline on the command line. Secret tasks suppress output and diffs.
 
 Files installed on the host:
 
-| Path | Purpose / permissions |
-|---|---|
-| `/etc/developer-platform/backup/` | Root-only configuration directory, `0700` |
-| `restic.env` inside that directory | Shell-quoted S3 configuration/credentials, `0600` |
-| `restic-password` inside that directory | Repository password, `0600`; preserved on reruns |
-| `/usr/local/sbin/platform-restic` | Root-only configured command, `0700` |
+- **Path:** `/etc/developer-platform/backup/`
+  - **Purpose / permissions:** Root-only configuration directory, `0700`
+- **Path:** `restic.env` inside that directory
+  - **Purpose / permissions:** Shell-quoted S3 configuration/credentials, `0600`
+- **Path:** `restic-password` inside that directory
+  - **Purpose / permissions:** Repository password, `0600`; preserved on reruns
+- **Path:** `/usr/local/sbin/platform-restic`
+  - **Purpose / permissions:** Root-only configured command, `0700`
 
 On the host, inspect the repository without printing credentials:
 
@@ -308,72 +377,85 @@ repository creation/opening and snapshot listing, **not backup or recovery**.
 The wrapper loads trusted root-owned shell configuration; it is not a systemd
 EnvironmentFile. Arguments are forwarded unchanged to restic.
 
-The confirmed policy remains every 12 hours, retaining 14 daily, 8 weekly and
-6 monthly recovery points, with RPO 24 hours and RTO four hours. This setup
-playbook does **not** schedule capture, apply retention/prune, or perform a backup
-or restore. Use [scheduled backup deployment](#scheduled-backups-and-independent-backup-alerts) for capture, retention and independent reporting. Live verification and restore remain OPS-006-T02/T03 work in the
-[delivery backlog](../../docs/maintainers/delivery/backlog.md). Preserve platform
-configuration, database roles/data, secrets and required service state in the
-recovery bundle; a repository alone does not cover that inventory.
+The confirmed policy remains every 12 hours, retaining 14 daily, 8 weekly and 6
+monthly recovery points, with RPO 24 hours and RTO four hours. This setup
+playbook does **not** schedule capture, apply retention/prune, or perform a
+backup or restore. Use
+[scheduled backup deployment](#scheduled-backups-and-independent-backup-alerts)
+for capture, retention and independent reporting. Live verification and restore
+remain OPS-006-T02/T03 work in the
+[delivery backlog](../../docs/maintainers/delivery/backlog.md). Preserve
+platform configuration, database roles/data, secrets and required service state
+in the recovery bundle; a repository alone does not cover that inventory.
 
 Validate without deploying:
 
 ```bash
-ansible-playbook -i operations/backup/ansible/inventory.backup.example.yml operations/backup/ansible/setup-backup.yml --syntax-check
+ansible-playbook -i \
+  operations/backup/ansible/inventory.backup.example.yml \
+  operations/backup/ansible/setup-backup.yml --syntax-check
 ```
 
-`--check` connects to inspect the host and previews package/file changes, but skips
-all restic commands and repository creation/access checks. It still requires the
-private input variables and validates an existing password if present. A successful
-check run does not verify S3 permissions or password recovery.
+`--check` connects to inspect the host and previews package/file changes, but
+skips all restic commands and repository creation/access checks. It still
+requires the private input variables and validates an existing password if
+present. A successful check run does not verify S3 permissions or password
+recovery.
 
-References: [restic S3 repositories](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html#s3-compatible-storage)
-and [restic installation](https://restic.readthedocs.io/en/stable/020_installation.html).
+References:
+[restic S3 repositories](https://restic.readthedocs.io/en/stable/030_preparing_a_new_repo.html#s3-compatible-storage)
+and
+[restic installation](https://restic.readthedocs.io/en/stable/020_installation.html).
 
 ## Scheduled backups and independent backup alerts
 
-After repository setup, [deploy-backup.yml](ansible/deploy-backup.yml) installs the backup
-runner and systemd units. The existing platform stays deployed. **Each backup
-briefly stops Caddy and Grafana while archiving their named volumes**, then starts
-the same containers before S3 upload. Public ingress and Grafana are interrupted
-during that capture window. PostgreSQL keeps running; native-store capture also
-interrupts managed data access and stops native services/instances as described above. Avoid concurrent
-platform deployment, manual container replacement or configuration changes during
-backup capture. Measure this window on the first run.
+After repository setup, [deploy-backup.yml](ansible/deploy-backup.yml) installs
+the backup runner and systemd units. The existing platform stays deployed.
+**Each backup briefly stops Caddy and Grafana while archiving their named
+volumes**, then starts the same containers before S3 upload. Public ingress and
+Grafana are interrupted during that capture window. PostgreSQL keeps running;
+native-store capture also interrupts managed data access and stops native
+services/instances as described above. Avoid concurrent platform deployment,
+manual container replacement or configuration changes during backup capture.
+Measure this window on the first run.
 
 Deploy in this order:
 
-1. Update the external watchdog using its existing [deployment playbook](../watchdog/ansible/README.md).
-   Re-run `php /absolute/path/watchdog/import-schema.php` on the hosting account
-   to add `backup_monitor`; repeat import preserves existing heartbeat/history.
-2. Add a **new**, random `backup_token` of at least 32 letters/digits/underscores/hyphens
-   to the hosting account's private `config.local.php`. It must differ from the
-   host heartbeat token. Keep existing database/mail/heartbeat settings. The token
-   is also supplied privately to `deploy-backup.yml`. Enabling it starts backup
-   monitoring: a BACKUP DOWN/no-backup email is expected until the first verified
-   backup is reported. Existing host outage emails continue independently.
-3. Set `backup_watchdog_url` in `operations/backup/ansible/inventory.backup.yml` to the new endpoint,
-   for example `https://status.example.com/backup.php`, and keep `backup_instance`
-   stable (`node-01`). This identity scopes retention; changing it creates a new
-   retention group. The endpoint's authenticated preflight must pass before the
-   playbook enables any timer.
-4. Deploy and request the first backup from the controller:
+1. Update the external watchdog using its existing
+   [deployment playbook](../watchdog/ansible/README.md). Re-run
+   `php /absolute/path/watchdog/import-schema.php` on the hosting account to add
+   `backup_monitor`; repeat import preserves existing heartbeat/history.
+1. Add a **new**, random `backup_token` of at least 32
+   letters/digits/underscores/hyphens to the hosting account's private
+   `config.local.php`. It must differ from the host heartbeat token. Keep
+   existing database/mail/heartbeat settings. The token is also supplied
+   privately to `deploy-backup.yml`. Enabling it starts backup monitoring: a
+   BACKUP DOWN/no-backup email is expected until the first verified backup is
+   reported. Existing host outage emails continue independently.
+1. Set `backup_watchdog_url` in `operations/backup/ansible/inventory.backup.yml`
+   to the new endpoint, for example `https://status.example.com/backup.php`, and
+   keep `backup_instance` stable (`node-01`). This identity scopes retention;
+   changing it creates a new retention group. The endpoint's authenticated
+   preflight must pass before the playbook enables any timer.
+1. Deploy and request the first backup from the controller:
 
 ```bash
-ansible-playbook -i operations/backup/ansible/inventory.backup.yml operations/backup/ansible/deploy-backup.yml \
+ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
+  operations/backup/ansible/deploy-backup.yml \
   -e backup_run_now=true
 ```
 
-Enter the new backup token at the private prompt. Add `--ask-pass` / `--ask-become-pass`
-if your SSH/sudo setup needs them. For unattended use, store `backup_watchdog_token`
-in the same Vault-encrypted variables file used by setup and pass
-`-e @operations/backup/ansible/backup-secrets.yml --ask-vault-pass`. The deployment does not need the
-S3 keys or restic password again: it uses the existing root-only configuration.
-No email destination is changed by this playbook. Backup alerts use the existing
-external watchdog mail transport and recipients.
+Enter the new backup token at the private prompt. Add `--ask-pass` /
+`--ask-become-pass` if your SSH/sudo setup needs them. For unattended use, store
+`backup_watchdog_token` in the same Vault-encrypted variables file used by setup
+and pass `-e @operations/backup/ansible/backup-secrets.yml --ask-vault-pass`.
+The deployment does not need the S3 keys or restic password again: it uses the
+existing root-only configuration. No email destination is changed by this
+playbook. Backup alerts use the existing external watchdog mail transport and
+recipients.
 
-The first backup starts asynchronously; a successful Ansible run does not mean the
-backup finished. On `node-01`:
+The first backup starts asynchronously; a successful Ansible run does not mean
+the backup finished. On `node-01`:
 
 ```bash
 sudo systemctl status platform-backup.service --no-pager
@@ -383,104 +465,122 @@ sudo /usr/local/sbin/platform-restic snapshots --tag developer-platform,verified
 sudo systemctl list-timers platform-backup.timer platform-backup-notify.timer
 ```
 
-Expected after completion: `result: success`, a `last_verified_snapshot`, a recent
-`last_verified_capture`, and the verified snapshot listed remotely. Confirm the
-external **BACKUP UP** email after the initial DOWN notification. The ordinary host
-heartbeat cannot refresh this state. Service exit failure can also mean a valid
-backup has a pending notification; distinguish `status.json` from
-`notification.json` and inspect the retry service.
+Expected after completion: `result: success`, a `last_verified_snapshot`, a
+recent `last_verified_capture`, and the verified snapshot listed remotely.
+Confirm the external **BACKUP UP** email after the initial DOWN notification.
+The ordinary host heartbeat cannot refresh this state. Service exit failure can
+also mean a valid backup has a pending notification; distinguish `status.json`
+from `notification.json` and inspect the retry service.
 
 ### Capture, verification and retention
 
-The timer runs at **00:00 and 12:00 UTC**, with persistent catch-up after downtime.
-The service limits a complete run to two hours. A process lock excludes overlapping
-captures, retention and notification updates. A boot recovery unit and
-`ExecStopPost` restart the exact containers recorded before an interruption and
-mark unfinished attempts failed. Do not manually replace these containers while
-recovery intent exists. Restart failures retain `resume.json` for investigation.
+The timer runs at **00:00 and 12:00 UTC**, with persistent catch-up after
+downtime. The service limits a complete run to two hours. A process lock
+excludes overlapping captures, retention and notification updates. A boot
+recovery unit and `ExecStopPost` restart the exact containers recorded before an
+interruption and mark unfinished attempts failed. Do not manually replace these
+containers while recovery intent exists. Restart failures retain `resume.json`
+for investigation.
 
 Each encrypted recovery bundle contains:
 
-- A compressed `pg_dumpall` of databases, roles and the platform catalog. This is
-  not a single transaction across databases; coordinate writes if cross-database
-  consistency is required.
+- A compressed `pg_dumpall` of databases, roles and the platform catalog. This
+  is not a single transaction across databases; coordinate writes if
+  cross-database consistency is required.
 - Deployed source/configuration (`compose.yaml`, `.env`, `scripts`, `platform`,
-  `infrastructure`, `persistence`, `identity`), including `DATABASE_KEY` and database credentials.
+  `infrastructure`, `persistence`, `identity`), including `DATABASE_KEY` and
+  database credentials.
 - `/etc/developer-platform`, including backup/heartbeat credentials; installed
   backup helper programs and systemd units. Keep independent copies of recovery
-  credentials outside this host and repository so they are available to decrypt it.
-- Current `app-secrets` in `project-secrets.json`, excluding previous rotation values.
-- Retained native-store/Neo4j volume archives and `store-recovery.json`; generated
-  `.runtime/stores` configuration is included when present.
-- Stopped-service archives of Caddy data/config and Grafana state, including SQLite.
+  credentials outside this host and repository so they are available to decrypt
+  it.
+- Current `app-secrets` in `project-secrets.json`, excluding previous rotation
+  values.
+- Retained native-store/Neo4j volume archives and `store-recovery.json`;
+  generated `.runtime/stores` configuration is included when present.
+- Stopped-service archives of Caddy data/config and Grafana state, including
+  SQLite.
 - A manifest with capture start time, checksums, run identity and installation
-  identity, plus installed restic/PostgreSQL versions, container image IDs/digests
-  and optional `backup_source_revision` from inventory. Source files are included
-  even if the remote deployment is not a Git checkout.
+  identity, plus installed restic/PostgreSQL versions, container image
+  IDs/digests and optional `backup_source_revision` from inventory. Source files
+  are included even if the remote deployment is not a Git checkout.
 
 The runner uploads with a `pending` tag, restores that **exact snapshot** into a
 private temporary directory and compares all bundle checksums. Only then is it
-retagged `verified`, and its resulting full snapshot ID recorded. Failed readback
-snapshots remain pending for diagnosis and cannot displace verified recovery
-points through retention. Temporary plaintext staging/readback is removed after
-the run or interrupted-run recovery. Allow disk capacity for both copies.
+retagged `verified`, and its resulting full snapshot ID recorded. Failed
+readback snapshots remain pending for diagnosis and cannot displace verified
+recovery points through retention. Temporary plaintext staging/readback is
+removed after the run or interrupted-run recovery. Allow disk capacity for both
+copies.
 
-Retention selects only this installation's `developer-platform,verified` snapshots,
-keeping 14 daily, 8 weekly, 6 monthly and at least the latest snapshot. These rules
-overlap rather than guaranteeing 28 distinct snapshots. `forget --prune` reclaims
-unreferenced data; `restic check` then checks repository structure. Retention runs
-only after successful readback. A retention failure reports failure while preserving
-the recorded verified snapshot. Pending snapshots require explicit investigation
-and separate cleanup, and are not automatically removed.
+Retention selects only this installation's `developer-platform,verified`
+snapshots, keeping 14 daily, 8 weekly, 6 monthly and at least the latest
+snapshot. These rules overlap rather than guaranteeing 28 distinct snapshots.
+`forget --prune` reclaims unreferenced data; `restic check` then checks
+repository structure. Retention runs only after successful readback. A retention
+failure reports failure while preserving the recorded verified snapshot. Pending
+snapshots require explicit investigation and separate cleanup, and are not
+automatically removed.
 
 Excluded: raw PostgreSQL volumes, Kubernetes node files, generated cluster
-credentials (regenerate on bootstrap), telemetry history volumes (Prometheus/Loki/
-Alertmanager), and the independently hosted watchdog database/configuration.
-Back up the external watchdog through its hosting provider separately. Images are
-recorded, not exported: ensure required images remain available or reproducible.
+credentials (regenerate on bootstrap), telemetry history volumes
+(Prometheus/Loki/ Alertmanager), and the independently hosted watchdog
+database/configuration. Back up the external watchdog through its hosting
+provider separately. Images are recorded, not exported: ensure required images
+remain available or reproducible.
 
 ### Failure signals and remaining acceptance
 
-The runner posts start/success/failure with a unique run ID and capture-start time
-using a separate backup token. An external cron checks backup age even if the
-platform host or Prometheus is down. It alerts for a failed attempt, no verified
-backup, a running attempt older than two hours, or capture age over 24 hours.
-Stale events cannot override newer results; failure does not refresh the last
-successful capture. Notifications are deduplicated and failed mail handoff is
-retried by cron. Host and backup channels share the external hosting/mail provider;
-silent watchdog-hosting/scheduler failure is an accepted lab limitation under [ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md), with no additional observer required.
+The runner posts start/success/failure with a unique run ID and capture-start
+time using a separate backup token. An external cron checks backup age even if
+the platform host or Prometheus is down. It alerts for a failed attempt, no
+verified backup, a running attempt older than two hours, or capture age over 24
+hours. Stale events cannot override newer results; failure does not refresh the
+last successful capture. Notifications are deduplicated and failed mail handoff
+is retried by cron. Host and backup channels share the external hosting/mail
+provider; silent watchdog-hosting/scheduler failure is an accepted lab
+limitation under
+[ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md),
+with no additional observer required.
 
-Notification transport failure does not invalidate a verified snapshot. A durable
-outbox retries every five minutes. If initial start delivery fails, a later success
-or failure carries the complete run identity; the external monitor can still
-accept it without a start event. Meanwhile, its previous success continues aging.
+Notification transport failure does not invalidate a verified snapshot. A
+durable outbox retries every five minutes. If initial start delivery fails, a
+later success or failure carries the complete run identity; the external monitor
+can still accept it without a start event. Meanwhile, its previous success
+continues aging.
 
 The operator-reported September 26, 2026 drill passed automated restore checks
 including a pre-backup SQL marker. Precisely measured RPO/RTO, live S3 failure
-tests, scenario-specific backup-alert receipt, and database-backed application acceptance
-remain separate evidence requirements. Selected DOWN/UP paths have since been reported; see the [current backlog](../../docs/maintainers/delivery/backlog.md#current-backup-and-recovery-progress).
+tests, scenario-specific backup-alert receipt, and database-backed application
+acceptance remain separate evidence requirements. Selected DOWN/UP paths have
+since been reported; see the
+[current backlog](../../docs/maintainers/delivery/backlog.md#current-backup-and-recovery-progress).
 Exact-file readback is not an application restore exercise. Continue with
 [backup and recovery](../../docs/operators/backup-and-recovery.md).
 
 Local validation:
 
 ```bash
-ansible-playbook -i operations/backup/ansible/inventory.backup.example.yml operations/backup/ansible/deploy-backup.yml --syntax-check
+ansible-playbook -i \
+  operations/backup/ansible/inventory.backup.example.yml \
+  operations/backup/ansible/deploy-backup.yml --syntax-check
 python3 -m unittest discover -s operations/backup/tests -v
 php operations/watchdog/tests/backup.php
 ```
 
 `--check` previews host installation without contacting the backup endpoint or
 repository, enabling timers, or executing backups. It still requires configured
-input values and an existing platform/restic setup. Do not treat it as live acceptance.
+input values and an existing platform/restic setup. Do not treat it as live
+acceptance.
 
 ## Local recovery VM in WSL 2
 
 Use [recovery-vm.py](scripts/recovery-vm.py) to create an empty Ubuntu 24.04
-amd64 guest with its own kernel, disk, systemd and Docker installation. This needs
-x86_64 WSL 2 with read/write access to `/dev/kvm`. Allocate enough memory to WSL
-for the guest plus your existing workloads; the defaults are 4 virtual CPUs,
-8192 MiB RAM and a sparse 100 GiB disk. Keep the VM in the WSL Linux filesystem.
+amd64 guest with its own kernel, disk, systemd and Docker installation. This
+needs x86_64 WSL 2 with read/write access to `/dev/kvm`. Allocate enough memory
+to WSL for the guest plus your existing workloads; the defaults are 4 virtual
+CPUs, 8192 MiB RAM and a sparse 100 GiB disk. Keep the VM in the WSL Linux
+filesystem.
 
 Install tools inside WSL:
 
@@ -504,13 +604,13 @@ python3 operations/backup/scripts/recovery-vm.py start
 ```
 
 For an existing VM, run only `start`; `create` refuses to overwrite its disk.
-You can use another existing public key by changing `--public-key` and the matching
-`ssh -i` path in the commands below. Creation never copies the private key.
-It downloads Canonical's Ubuntu release image and checksum
-manifest over HTTPS and verifies SHA-256 before publishing the VM directory.
-This is checksum verification over HTTPS, not detached GPG signature verification.
-`image.json` records the exact source URL and digest; the release URL can change
-between new creations. Keep this metadata with restore-drill evidence.
+You can use another existing public key by changing `--public-key` and the
+matching `ssh -i` path in the commands below. Creation never copies the private
+key. It downloads Canonical's Ubuntu release image and checksum manifest over
+HTTPS and verifies SHA-256 before publishing the VM directory. This is checksum
+verification over HTTPS, not detached GPG signature verification. `image.json`
+records the exact source URL and digest; the release URL can change between new
+creations. Keep this metadata with restore-drill evidence.
 
 The start command stays in the foreground. Leave that terminal open. In another
 WSL terminal, inspect the serial console and connect after cloud-init provisions
@@ -547,12 +647,14 @@ developer_platform:
       ansible_ssh_private_key_file: ~/.ssh/platform-recovery
 ```
 
-Store it under `.runtime/`. The VM helper provisions only the operating system and
-SSH. Follow the [isolated recovery procedure](../../docs/operators/backup-and-recovery.md#restore-into-an-isolated-installation)
+Store it under `.runtime/`. The VM helper provisions only the operating system
+and SSH. Follow the
+[isolated recovery procedure](../../docs/operators/backup-and-recovery.md#restore-into-an-isolated-installation)
 for platform prerequisites, original credentials, SQL import, and acceptance;
-ordinary fresh-platform deployment is not a complete restore procedure. Configure
-restic with existing S3 credentials/password and **do not initialize a repository**.
-Leave heartbeat and scheduled backup deployment disabled in the recovery guest.
+ordinary fresh-platform deployment is not a complete restore procedure.
+Configure restic with existing S3 credentials/password and **do not initialize a
+repository**. Leave heartbeat and scheduled backup deployment disabled in the
+recovery guest.
 
 For browser access to guest HTTPS, open a tunnel from WSL once Caddy is running:
 
@@ -571,28 +673,31 @@ python3 operations/backup/scripts/recovery-vm.py stop
 ```
 
 Alternatively, run `sudo shutdown -h now` inside the VM. The disk and restored
-platform are preserved. To resume later, run `start` from WSL and reconnect by SSH.
+platform are preserved. To resume later, run `start` from WSL and reconnect by
+SSH.
 
 Wait for the start terminal to exit before shutting down WSL or moving VM files.
-The stop command requests ACPI poweroff; it does not forcibly kill a stuck guest.
-Use the console log to diagnose shutdown problems. Guest reboot also exits QEMU;
-run `start` again to boot it. No delete/reset command is provided, and `create`
-refuses an existing destination. All disk, seed and log files are private under
-Git-ignored `.runtime/recovery-vm/`; restored secrets remain on that disk.
+The stop command requests ACPI poweroff; it does not forcibly kill a stuck
+guest. Use the console log to diagnose shutdown problems. Guest reboot also
+exits QEMU; run `start` again to boot it. No delete/reset command is provided,
+and `create` refuses an existing destination. All disk, seed and log files are
+private under Git-ignored `.runtime/recovery-vm/`; restored secrets remain on
+that disk.
 
 Use `--cpus`, `--memory-mb` and `--ssh-port` on `start` to override resources;
 `--disk-gb` applies at creation. For multiple drills, choose a different
-`--directory` on all commands and a different SSH port on each running VM. Record
-elapsed preparation and restoration time against the four-hour RTO.
+`--directory` on all commands and a different SSH port on each running VM.
+Record elapsed preparation and restoration time against the four-hour RTO.
 
-References: [Ubuntu cloud images](https://cloud-images.ubuntu.com/releases/noble/release/),
+References:
+[Ubuntu cloud images](https://cloud-images.ubuntu.com/releases/noble/release/),
 [QEMU invocation](https://www.qemu.org/docs/master/system/invocation.html),
 [cloud-init SSH configuration](https://docs.cloud-init.io/en/latest/reference/yaml_examples/ssh.html).
 
 ### Remove the recovery VM or start a fresh drill
 
-Run these commands in **WSL from the repository root**. First copy any test reports
-you want to keep to `.runtime/recovery-evidence/`, as described in the
+Run these commands in **WSL from the repository root**. First copy any test
+reports you want to keep to `.runtime/recovery-evidence/`, as described in the
 [test workflow](#run-tests-against-the-prepared-recovery-vm).
 
 If the VM is running, request shutdown:
@@ -610,11 +715,12 @@ To permanently remove the default recovery VM:
 rm -r -- .runtime/recovery-vm
 ```
 
-This deletes the VM disk, restored databases and secrets, cloud-init seed, console
-log, and reports still stored inside the guest. It leaves separately copied
-`.runtime/recovery-evidence/`, your SSH key, the production host, and the S3 backup
-repository untouched. For a VM created with `--directory`, use that exact directory
-instead after checking its contents and confirming its QEMU process has exited.
+This deletes the VM disk, restored databases and secrets, cloud-init seed,
+console log, and reports still stored inside the guest. It leaves separately
+copied `.runtime/recovery-evidence/`, your SSH key, the production host, and the
+S3 backup repository untouched. For a VM created with `--directory`, use that
+exact directory instead after checking its contents and confirming its QEMU
+process has exited.
 
 Alternatively, preserve the old VM before starting another drill:
 
@@ -634,8 +740,8 @@ python3 operations/backup/scripts/recovery-vm.py create \
 python3 operations/backup/scripts/recovery-vm.py start
 ```
 
-In another WSL terminal, remove the old SSH host-key entry for this local forwarded
-port and connect to the new guest:
+In another WSL terminal, remove the old SSH host-key entry for this local
+forwarded port and connect to the new guest:
 
 ```bash
 ssh-keygen -R '[127.0.0.1]:2222'
@@ -650,11 +756,12 @@ not inherit the previous installation.
 ## Automated recovery acceptance checks
 
 [test-recovery.py](scripts/test-recovery.py) checks an already-restored, running
-installation. It does not restore files, import SQL, provision the VM, or reapply
-projects. It requires the restored `.env`, `scripts`/Compose files, working local
-API, and `.runtime/bin/kubectl` plus the regenerated admin kubeconfig. Recovery
-settings must be `EDGE_BIND_IP=127.0.0.1`, `PLATFORM_DOMAIN=platform.localhost`,
-and `APPS_DOMAIN=apps.localhost`. Leave production alert senders disabled.
+installation. It does not restore files, import SQL, provision the VM, or
+reapply projects. It requires the restored `.env`, `scripts`/Compose files,
+working local API, and `.runtime/bin/kubectl` plus the regenerated admin
+kubeconfig. Recovery settings must be `EDGE_BIND_IP=127.0.0.1`,
+`PLATFORM_DOMAIN=platform.localhost`, and `APPS_DOMAIN=apps.localhost`. Leave
+production alert senders disabled.
 
 ### Run tests against the prepared recovery VM
 
@@ -665,8 +772,9 @@ and `APPS_DOMAIN=apps.localhost`. Leave production alert senders disabled.
    python3 operations/backup/scripts/recovery-vm.py start
    ```
 
-2. **Another WSL terminal, repository root:** copy the current helper and connect.
-   Repeat the copy after script updates; `/tmp` may be cleared when the VM reboots.
+1. **Another WSL terminal, repository root:** copy the current helper and
+   connect. Repeat the copy after script updates; `/tmp` may be cleared when the
+   VM reboots.
 
    ```bash
    scp -i ~/.ssh/platform-recovery -P 2222 \
@@ -674,7 +782,7 @@ and `APPS_DOMAIN=apps.localhost`. Leave production alert senders disabled.
    ssh -i ~/.ssh/platform-recovery -p 2222 recovery@127.0.0.1
    ```
 
-3. **Inside the recovery VM:** wait for boot configuration, then run the suite
+1. **Inside the recovery VM:** wait for boot configuration, then run the suite
    against the already-restored `smoke` project and verified bundle. The script
    prints the report path and exits nonzero on failure.
 
@@ -689,12 +797,14 @@ and `APPS_DOMAIN=apps.localhost`. Leave production alert senders disabled.
    If this is a fresh VM, first complete the
    [isolated restore and project reapply](../../docs/operators/backup-and-recovery.md#restore-into-an-isolated-installation).
    For an existing restored VM, allow the services time to restart. The suite
-   retries API readiness and ingress, and allows up to 180 seconds per monitoring
-   check for Prometheus readiness, Grafana health, and scrape convergence. Persistent
-   failures identify the specific monitoring check in the report. Inspect `sudo docker compose -f /opt/developer-platform/compose.yaml ps -a`
-   if necessary, then rerun the suite once the cause is resolved.
+   retries API readiness and ingress, and allows up to 180 seconds per
+   monitoring check for Prometheus readiness, Grafana health, and scrape
+   convergence. Persistent failures identify the specific monitoring check in
+   the report. Inspect
+   `sudo docker compose -f /opt/developer-platform/compose.yaml ps -a` if
+   necessary, then rerun the suite once the cause is resolved.
 
-4. **Inside the VM:** inspect the exact report path printed by the runner:
+1. **Inside the VM:** inspect the exact report path printed by the runner:
 
    ```bash
    sudo cat /opt/developer-platform/.runtime/recovery/checks-REPLACE_WITH_ID.json
@@ -705,18 +815,19 @@ and `APPS_DOMAIN=apps.localhost`. Leave production alert senders disabled.
    acceptance. On failure, use `failed_stage` to investigate before rerunning.
    Every run creates a separate report, preserving earlier evidence.
 
-5. **WSL, repository root:** save the report independently of the VM, replacing
+1. **WSL, repository root:** save the report independently of the VM, replacing
    the filename with the one printed by the runner:
 
    ```bash
+   REPORT_NAME=checks-REPLACE_WITH_ID.json
    mkdir -p .runtime/recovery-evidence
    (umask 077
     ssh -i ~/.ssh/platform-recovery -p 2222 recovery@127.0.0.1 \
-      'sudo cat /opt/developer-platform/.runtime/recovery/checks-REPLACE_WITH_ID.json' \
-      > .runtime/recovery-evidence/checks-REPLACE_WITH_ID.json)
+      "sudo cat /opt/developer-platform/.runtime/recovery/$REPORT_NAME" \
+      > ".runtime/recovery-evidence/$REPORT_NAME")
    ```
 
-6. **WSL, repository root:** shut down the VM after collecting evidence:
+1. **WSL, repository root:** shut down the VM after collecting evidence:
 
    ```bash
    python3 operations/backup/scripts/recovery-vm.py stop
@@ -727,16 +838,16 @@ for subsequent test runs; no recreation or reimport is needed.
 
 ### Checks and report interpretation
 
-The suite verifies bundle checksums, API readiness/catalog membership, deployment
-rollout, HTTP ingress, Prometheus readiness/scrape health and Grafana database
-health. A temporary restricted pod uses the existing project database secret to
-verify the workload network path, database identity, transactional write/read,
-and absence of CONNECT privilege on the platform catalog. It pulls the configured
-PostgreSQL image directly; it does not use the failing k3d image-import path.
-The test table is temporary and rolled back. Successful pods are deleted. Failed pods are retained and their names recorded
-in the report for diagnosis; delete them after inspection. If the process is
-forcibly killed, inspect/remove any leftover
-`recovery-check-*` pod in the tested namespace.
+The suite verifies bundle checksums, API readiness/catalog membership,
+deployment rollout, HTTP ingress, Prometheus readiness/scrape health and Grafana
+database health. A temporary restricted pod uses the existing project database
+secret to verify the workload network path, database identity, transactional
+write/read, and absence of CONNECT privilege on the platform catalog. It pulls
+the configured PostgreSQL image directly; it does not use the failing k3d
+image-import path. The test table is temporary and rolled back. Successful pods
+are deleted. Failed pods are retained and their names recorded in the report for
+diagnosis; delete them after inspection. If the process is forcibly killed,
+inspect/remove any leftover `recovery-check-*` pod in the tested namespace.
 
 Every check run writes a new private JSON report under
 `/opt/developer-platform/.runtime/recovery/checks-<id>.json`, or the new file
@@ -747,9 +858,10 @@ Image-pull/configuration failures fail early. The runner does not send alerts.
 
 ### Verify data written before backup
 
-On the **source host**, explicitly seed a marker in an existing project's database
-before taking a new backup. This creates a uniquely named persistent table and
-one row, using that project's derived credentials through the API container:
+On the **source host**, explicitly seed a marker in an existing project's
+database before taking a new backup. This creates a uniquely named persistent
+table and one row, using that project's derived credentials through the API
+container:
 
 ```bash
 sudo python3 /path/to/test-recovery.py seed-marker --project smoke \
@@ -757,15 +869,15 @@ sudo python3 /path/to/test-recovery.py seed-marker --project smoke \
 sudo systemctl start platform-backup.service
 ```
 
-Copy the marker receipt to independent storage and then to the recovery VM.
-Keep the original receipt outside the backup: it defines what must be recovered.
-A receipt with `seeded: false` is not valid evidence; a failed seeding run must be
+Copy the marker receipt to independent storage and then to the recovery VM. Keep
+the original receipt outside the backup: it defines what must be recovered. A
+receipt with `seeded: false` is not valid evidence; a failed seeding run must be
 investigated. Seeding never overwrites a receipt. The marker table intentionally
 remains for backup; remove it only after completing the drill, using the exact
 name recorded in the receipt.
 
-Restore the **new** verified snapshot into a fresh isolated recovery installation,
-then run there:
+Restore the **new** verified snapshot into a fresh isolated recovery
+installation, then run there:
 
 ```bash
 sudo python3 /tmp/test-recovery.py check --project smoke \
@@ -773,24 +885,26 @@ sudo python3 /tmp/test-recovery.py check --project smoke \
 ```
 
 The pod must find the expected row and the backup capture must postdate the
-receipt. Missing table/row, a mismatched project, or invalid receipt fails the run.
-Without `--marker`, a passing report explicitly sets `historical_data_verified`
-to false. This marker proves SQL data survival, not a database-backed application's
-end-to-end transaction behavior. Network denial to other namespaces/internet,
-public DNS/TLS, live alert delivery, and full recovery-time/data-loss targets
-remain separate checks. Test duration is **not** total RTO; record VM preparation,
-restoration start and simulated failure timestamps separately.
+receipt. Missing table/row, a mismatched project, or invalid receipt fails the
+run. Without `--marker`, a passing report explicitly sets
+`historical_data_verified` to false. This marker proves SQL data survival, not a
+database-backed application's end-to-end transaction behavior. Network denial to
+other namespaces/internet, public DNS/TLS, live alert delivery, and full
+recovery-time/data-loss targets remain separate checks. Test duration is **not**
+total RTO; record VM preparation, restoration start and simulated failure
+timestamps separately.
 
 ### Verify a named PostgreSQL marker
 
-This manual check verifies one named resource's SQL data while restored access is
-still quarantined. It uses PostgreSQL operator access and validates the resource
-UUID, owning project, provider, restored catalog, bundle checksum, and marker
-timestamp. It does not exercise a fresh grant, component binding, application
-transaction, or reconnection. The automated recovery playbook does not invoke it.
+This manual check verifies one named resource's SQL data while restored access
+is still quarantined. It uses PostgreSQL operator access and validates the
+resource UUID, owning project, provider, restored catalog, bundle checksum, and
+marker timestamp. It does not exercise a fresh grant, component binding,
+application transaction, or reconnection. The automated recovery playbook does
+not invoke it.
 
-On the **source host**, choose an existing named PostgreSQL resource UUID from the
-store catalog and seed before taking a new verified backup. Keep the receipt
+On the **source host**, choose an existing named PostgreSQL resource UUID from
+the store catalog and seed before taking a new verified backup. Keep the receipt
 outside the backup and copy it to the isolated recovery host:
 
 ```bash
@@ -814,7 +928,8 @@ sudo --preserve-env=PLATFORM_ACCESS_TOKEN \
 The private passing report identifies `mode: named-store-catalog-sql`,
 `quarantine_verified: true`, and `application_reconnected: false`. Require
 `result: passed` and `historical_data_verified: true` for this SQL marker drill.
-Continue with the [fresh approval and binding procedure](../../docs/operators/backup-and-recovery.md#named-data-store-recovery)
+Continue with the
+[fresh approval and binding procedure](../../docs/operators/backup-and-recovery.md#named-data-store-recovery)
 and separately verify a bound application's data transaction.
 
 ### Local tests for the prepared scripts
@@ -830,32 +945,34 @@ python3 operations/backup/scripts/test-recovery.py --help
 ```
 
 The optional encrypted-restic integration test is skipped unless
-`RESTIC_TEST_BINARY` points to a local restic executable. Passing local tests does
-not replace running the acceptance suite inside the restored VM.
+`RESTIC_TEST_BINARY` points to a local restic executable. Passing local tests
+does not replace running the acceptance suite inside the restored VM.
 
 ## Restore a fresh recovery VM with Ansible
 
-[restore-recovery.yml](ansible/restore-recovery.yml) automates the restore procedure
-for the VM created by `recovery-vm.py`. Use a **fresh VM**: the playbook refuses an
-existing `/opt/developer-platform`, recovery staging directory, platform sender
-timers, or Docker containers/volumes. It targets only the `recovery` inventory
-group and requires Ubuntu 24.04+ amd64, hostname `platform-recovery`, and SSH at
-`127.0.0.1:2222`. It does not support production hosts or an in-place restore.
+[restore-recovery.yml](ansible/restore-recovery.yml) automates the restore
+procedure for the VM created by `recovery-vm.py`. Use a **fresh VM**: the
+playbook refuses an existing `/opt/developer-platform`, recovery staging
+directory, platform sender timers, or Docker containers/volumes. It targets only
+the `recovery` inventory group and requires Ubuntu 24.04+ amd64, hostname
+`platform-recovery`, and SSH at `127.0.0.1:2222`. It does not support production
+hosts or an in-place restore.
 
-In **WSL, repository root**, after creating/starting the VM and accepting its SSH
-host key:
+In **WSL, repository root**, after creating/starting the VM and accepting its
+SSH host key:
 
 ```bash
 cp operations/backup/ansible/inventory.recovery.example.yml \
   operations/backup/ansible/inventory.recovery.yml
 ```
 
-Edit the copied inventory: set `recovery_snapshot` to an explicit verified snapshot
-ID (for example, the full ID corresponding to `c03a2bcc` in the first drill), and
-select `recovery_projects`. The default is `[smoke]`. Review stored project images
-before selecting them: starting applications can cause external side effects.
-An optional `recovery_marker_file` is a controller-side path to the independently
-saved receipt; when using it, select only the matching project.
+Edit the copied inventory: set `recovery_snapshot` to an explicit verified
+snapshot ID (for example, the full ID corresponding to `c03a2bcc` in the first
+drill), and select `recovery_projects`. The default is `[smoke]`. Review stored
+project images before selecting them: starting applications can cause external
+side effects. An optional `recovery_marker_file` is a controller-side path to
+the independently saved receipt; when using it, select only the matching
+project.
 
 Run from **WSL**:
 
@@ -866,39 +983,43 @@ ansible-playbook \
 ```
 
 Enter S3 credentials and the **existing** repository password at the private
-prompts. There is no repository initialization, prune, or backup scheduling step.
-Repository/region can be overridden by inventory; defaults match the existing
-Hetzner repository. Snapshots must carry `developer-platform,verified` tags and
-belong to `node-01`. A short ID is resolved to exactly one full snapshot ID.
+prompts. There is no repository initialization, prune, or backup scheduling
+step. Repository/region can be overridden by inventory; defaults match the
+existing Hetzner repository. Snapshots must carry `developer-platform,verified`
+tags and belong to `node-01`. A short ID is resolved to exactly one full
+snapshot ID.
 
-The playbook installs restic and Docker, retrieves the bundle, verifies checksums,
-restores the original credentials, applies loopback/test domains, imports SQL,
-restores Caddy/Grafana volumes, installs pinned Kubernetes tooling, bootstraps the
-cluster, reapplies selected catalog specs, and runs `test-recovery.py` for each
-selected project. Caddy uses internal TLS for test domains; Grafana alerting/SMTP
-and Alertmanager delivery are disabled. Host service/config archives are preserved
-in the bundle but not installed, so production heartbeat and backup timers stay
-absent. PostgreSQL and workload image versions come from the restored files/specs.
+The playbook installs restic and Docker, retrieves the bundle, verifies
+checksums, restores the original credentials, applies loopback/test domains,
+imports SQL, restores Caddy/Grafana volumes, installs pinned Kubernetes tooling,
+bootstraps the cluster, reapplies selected catalog specs, and runs
+`test-recovery.py` for each selected project. Caddy uses internal TLS for test
+domains; Grafana alerting/SMTP and Alertmanager delivery are disabled. Host
+service/config archives are preserved in the bundle but not installed, so
+production heartbeat and backup timers stay absent. PostgreSQL and workload
+image versions come from the restored files/specs.
 
 SQL import keeps private stdout/stderr under
 `/opt/developer-platform/.runtime/recovery/`. Only the known bootstrap duplicate
 errors for role `postgres` and database `platform` are accepted; any other
 nonempty diagnostic or repeated duplicate stops restoration. Service volumes may
-contain image-created directories but must contain no files/links before restore.
-The entire process is bounded by Ansible asynchronous task timeouts.
+contain image-created directories but must contain no files/links before
+restore. The entire process is bounded by Ansible asynchronous task timeouts.
 
 Acceptance reports are fetched into the controller's Git-ignored
-`.runtime/recovery-evidence/<inventory-host>/<run-timestamp>/` directory, including
-reports from failed acceptance suites. Earlier restoration failures stop before
-acceptance and require inspection of the VM/private logs. The verified snapshot
-selection is recorded on the VM in `/root/platform-recovery/snapshot.json`.
+`.runtime/recovery-evidence/<inventory-host>/<run-timestamp>/` directory,
+including reports from failed acceptance suites. Earlier restoration failures
+stop before acceptance and require inspection of the VM/private logs. The
+verified snapshot selection is recorded on the VM in
+`/root/platform-recovery/snapshot.json`.
 
 This is deliberately a **one-shot** restore. If restoration fails, inspect the
-cause, then [recreate the VM](#remove-the-recovery-vm-or-start-a-fresh-drill) before
-rerunning. It never automatically deletes partially restored data. Once restored,
-use the [check script](#run-tests-against-the-prepared-recovery-vm) for repeat tests.
-Without a marker receipt, passing checks do not establish historical data recovery.
-Record whole-drill start/completion separately from acceptance-test duration.
+cause, then [recreate the VM](#remove-the-recovery-vm-or-start-a-fresh-drill)
+before rerunning. It never automatically deletes partially restored data. Once
+restored, use the [check script](#run-tests-against-the-prepared-recovery-vm)
+for repeat tests. Without a marker receipt, passing checks do not establish
+historical data recovery. Record whole-drill start/completion separately from
+acceptance-test duration.
 
 Validate playbook syntax without connecting:
 
@@ -917,10 +1038,10 @@ and SQL diagnostic classification; they do not prove a live end-to-end restore.
 The [prepare-recovery-test.yml](ansible/prepare-recovery-test.yml) playbook runs
 against the **source host**, using the existing backup inventory and installed
 backup service. It creates one uniquely named table/row in the selected project,
-saves a separate marker receipt on the controller before backup, starts the managed
-backup service, and verifies that the successful capture occurred after marker
-commit. It does not need S3/password prompts because backup access is already
-configured on the source.
+saves a separate marker receipt on the controller before backup, starts the
+managed backup service, and verifies that the successful capture occurred after
+marker commit. It does not need S3/password prompts because backup access is
+already configured on the source.
 
 From **WSL, repository root**:
 
@@ -934,23 +1055,29 @@ ansible-playbook \
 The source project must exist and its platform API container must be running.
 Normal backup behavior applies, including brief Caddy/Grafana interruption and
 retention. Each run intentionally creates a new marker and private evidence
-directory; this is a test action, not an idempotent configuration playbook.
-The marker remains in the source database until explicitly cleaned up after the
-drill. No production data or backup is automatically deleted by the marker helper.
+directory; this is a test action, not an idempotent configuration playbook. The
+marker remains in the source database until explicitly cleaned up after the
+drill. No production data or backup is automatically deleted by the marker
+helper.
 
 The final output provides the full snapshot ID and controller marker path. Set
-`recovery_snapshot`, `recovery_projects: [smoke]`, and `recovery_marker_file` in the
-separate recovery inventory, then run `restore-recovery.yml` against a fresh VM.
-Use the absolute controller marker path. The acceptance report must show both
-`result: passed` and `historical_data_verified: true`.
+`recovery_snapshot`, `recovery_projects: [smoke]`, and `recovery_marker_file` in
+the separate recovery inventory, then run `restore-recovery.yml` against a fresh
+VM. Use the absolute controller marker path. The acceptance report must show
+both `result: passed` and `historical_data_verified: true`.
 
 If a backup was already running before the marker commit, the timestamp check
-rejects it. Let it finish and run a new backup; do not accept the old snapshot as
-marker evidence. Source receipts and captured status remain available under
-`.runtime/recovery-evidence/<inventory-host>/recovery-test-<unique-id>/` for diagnosis.
-A pending notification may produce a nonzero service exit even with a verified
-backup; the playbook reports the service exit code separately from snapshot proof.
+rejects it. Let it finish and run a new backup; do not accept the old snapshot
+as marker evidence. Source receipts and captured status remain available under
+`.runtime/recovery-evidence/<inventory-host>/recovery-test-<unique-id>/` for
+diagnosis. A pending notification may produce a nonzero service exit even with a
+verified backup; the playbook reports the service exit code separately from
+snapshot proof.
 
 ## Project secrets
 
-The bundle includes `project-secrets.json` (every project's `app-secrets`, mode 0600). It needs `kubectl` and `.runtime/admin.kubeconfig` on the backup host; capture fails if the cluster is unreachable. Treat restic repository access as access to these secrets. Recovery re-applies each selected project's secrets and restarts its pods. See ADR-015.
+The bundle includes `project-secrets.json` (every project's `app-secrets`, mode
+0600). It needs `kubectl` and `.runtime/admin.kubeconfig` on the backup host;
+capture fails if the cluster is unreachable. Treat restic repository access as
+access to these secrets. Recovery re-applies each selected project's secrets and
+restarts its pods. See ADR-015.

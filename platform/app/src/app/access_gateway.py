@@ -284,7 +284,7 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
         while True:
             try:
                 await refresh()
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
                 pass  # Retain only the existing snapshot until its original deadline.
             await asyncio.sleep(2)
 

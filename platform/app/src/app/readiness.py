@@ -157,7 +157,7 @@ def observe_deployment(
             type(exc).__name__,
         )
         return _snapshot("unknown", desired_image, reason="ObserverUnavailable")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Deployment readiness query failed project=%s error_type=%s",
             project,
@@ -190,7 +190,7 @@ def observe_deployment(
             ),
         )
         pods = _field(response, "items", []) or []
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Deployment pod observation failed project=%s error_type=%s",
             project,

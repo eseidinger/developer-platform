@@ -20,7 +20,7 @@ def sample(conn):
             used = providers.get(resource["provider"]).usage(resource)
             if isinstance(used, bool) or not isinstance(used, int) or used < 0:
                 raise ValueError("Invalid usage")
-        except Exception:
+        except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             conn.execute(
                 """UPDATE store_resources SET usage_attempt_at=now(),usage_error=true
                 WHERE resource_id=%s""",

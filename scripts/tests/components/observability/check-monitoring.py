@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Disposable Linux/Docker monitoring fixtures; never deploy the platform or send alerts."""
+
 import http.server
 import json
 import shutil
@@ -32,16 +33,26 @@ class Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/slow":
             time.sleep(6)
-        code = {"/error": 500, "/redirect": 302, "/health/ready": 403,
-                "/machine": 401, "/unavailable": 503}.get(self.path, 200)
-        if self.headers.get("Host") not in {"smoke.apps.localhost", "api-provider.apps.localhost"}:
+        code = {
+            "/error": 500,
+            "/redirect": 302,
+            "/health/ready": 403,
+            "/machine": 401,
+            "/unavailable": 503,
+        }.get(self.path, 200)
+        if self.headers.get("Host") not in {
+            "smoke.apps.localhost",
+            "api-provider.apps.localhost",
+        }:
             code = 400
         self.send_response(code)
         if code == 302:
             self.send_header("Location", "/ok")
         self.end_headers()
         try:
-            self.wfile.write(b"wrong application\n" if self.path == "/wrong" else b"hello-world\n")
+            self.wfile.write(
+                b"wrong application\n" if self.path == "/wrong" else b"hello-world\n"
+            )
         except (BrokenPipeError, ConnectionResetError):
             pass
 
@@ -51,10 +62,17 @@ class Handler(http.server.BaseHTTPRequestHandler):
 
 def main():
     context = run("docker", "context", "show").strip()
-    endpoint = run("docker", "context", "inspect", context,
-                   "--format", "{{.Endpoints.docker.Host}}").strip()
+    endpoint = run(
+        "docker",
+        "context",
+        "inspect",
+        context,
+        "--format",
+        "{{.Endpoints.docker.Host}}",
+    ).strip()
     # The fixture's loopback server must share the daemon's host network.
     import os
+
     if os.environ.get("DOCKER_HOST", endpoint) != "unix:///var/run/docker.sock":
         raise RuntimeError("Fixture requires the local Linux Docker socket")
     name = "platform-probe-test-" + uuid.uuid4().hex[:10]
@@ -66,10 +84,20 @@ def main():
         temp.chmod(0o755)
         config = ROOT / "infrastructure/monitoring"
         configuration = (config / "prometheus.yaml").read_text()
-        configuration = configuration.replace("/run/prometheus/metrics-reader.token", "/etc/prometheus/metrics-reader.token")
-        configuration = configuration.replace("/run/prometheus/metrics-reader-ca.crt", "/etc/prometheus/cert.pem")
-        configuration = configuration.replace("/run/prometheus/capacity-reader.token", "/etc/prometheus/metrics-reader.token")
-        configuration = configuration.replace("/run/prometheus/capacity-reader-ca.crt", "/etc/prometheus/cert.pem")
+        configuration = configuration.replace(
+            "/run/prometheus/metrics-reader.token",
+            "/etc/prometheus/metrics-reader.token",
+        )
+        configuration = configuration.replace(
+            "/run/prometheus/metrics-reader-ca.crt", "/etc/prometheus/cert.pem"
+        )
+        configuration = configuration.replace(
+            "/run/prometheus/capacity-reader.token",
+            "/etc/prometheus/metrics-reader.token",
+        )
+        configuration = configuration.replace(
+            "/run/prometheus/capacity-reader-ca.crt", "/etc/prometheus/cert.pem"
+        )
         (temp / "prometheus.yml").write_text(configuration)
         shutil.copy(config / "alerts.yaml", temp / "alerts.yml")
         shutil.copy(config / "capacity-rules.yaml", temp / "capacity-rules.yml")
@@ -78,15 +106,71 @@ def main():
         (temp / "discovery/application-metrics.json").write_text("[]\n")
         # Disposable credentials satisfy config validation without reading the lab's secrets.
         (temp / "metrics-reader.token").write_text("monitoring-fixture-only\n")
-        run("openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1",
-            "-subj", "/CN=smoke.apps.localhost", "-keyout", str(temp / "key.pem"),
-            "-out", str(temp / "cert.pem"))
-        print(run("docker", "run", "--rm", "--entrypoint", "/bin/promtool", "-v",
-                  f"{temp}:/etc/prometheus:ro", PROMETHEUS, "check", "config", "/etc/prometheus/prometheus.yml"))
-        print(run("docker", "run", "--rm", "--entrypoint", "/bin/promtool", "-v",
-                  f"{config}:/work:ro", "-w", "/work", PROMETHEUS, "test", "rules", "tests/alerts.test.yaml"))
-        print(run("docker", "run", "--rm", "--entrypoint", "/bin/promtool", "-v",
-                  f"{config}:/work:ro", "-w", "/work", PROMETHEUS, "test", "rules", "tests/capacity.test.yaml"))
+        run(
+            "openssl",
+            "req",
+            "-x509",
+            "-newkey",
+            "rsa:2048",
+            "-nodes",
+            "-days",
+            "1",
+            "-subj",
+            "/CN=smoke.apps.localhost",
+            "-keyout",
+            str(temp / "key.pem"),
+            "-out",
+            str(temp / "cert.pem"),
+        )
+        print(
+            run(
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "/bin/promtool",
+                "-v",
+                f"{temp}:/etc/prometheus:ro",
+                PROMETHEUS,
+                "check",
+                "config",
+                "/etc/prometheus/prometheus.yml",
+            )
+        )
+        print(
+            run(
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "/bin/promtool",
+                "-v",
+                f"{config}:/work:ro",
+                "-w",
+                "/work",
+                PROMETHEUS,
+                "test",
+                "rules",
+                "tests/alerts.test.yaml",
+            )
+        )
+        print(
+            run(
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "/bin/promtool",
+                "-v",
+                f"{config}:/work:ro",
+                "-w",
+                "/work",
+                PROMETHEUS,
+                "test",
+                "rules",
+                "tests/capacity.test.yaml",
+            )
+        )
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(temp / "cert.pem", temp / "key.pem")
         tls_server.socket = tls.wrap_socket(tls_server.socket, server_side=True)
@@ -97,10 +181,26 @@ def main():
             port = sock.getsockname()[1]
         base = f"http://127.0.0.1:{port}"
         try:
-            run("docker", "run", "--rm", "-d", "--name", name, "--network", "host",
-                "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges:true",
-                "-v", f"{config / 'blackbox.yaml'}:/etc/blackbox.yaml:ro", BLACKBOX,
-                "--config.file=/etc/blackbox.yaml", f"--web.listen-address=127.0.0.1:{port}")
+            run(
+                "docker",
+                "run",
+                "--rm",
+                "-d",
+                "--name",
+                name,
+                "--network",
+                "host",
+                "--read-only",
+                "--cap-drop",
+                "ALL",
+                "--security-opt",
+                "no-new-privileges:true",
+                "-v",
+                f"{config / 'blackbox.yaml'}:/etc/blackbox.yaml:ro",
+                BLACKBOX,
+                "--config.file=/etc/blackbox.yaml",
+                f"--web.listen-address=127.0.0.1:{port}",
+            )
             for _ in range(50):
                 try:
                     with urllib.request.urlopen(base + "/-/healthy", timeout=1):
@@ -110,62 +210,126 @@ def main():
             else:
                 raise RuntimeError(run("docker", "logs", name))
             cases = [
-                ("/ok", "http_status", 1), ("/ok", "http_hello_world", 1),
-                ("/wrong", "http_status", 1), ("/wrong", "http_hello_world", 0),
-                ("/error", "http_status", 0), ("/redirect", "http_status", 0),
-                ("/slow", "http_status", 0), ("/ok", "https_status", 0),
+                ("/ok", "http_status", 1),
                 ("/ok", "http_hello_world", 1),
-                ("/health/ready", "http_protected", 1), ("/machine", "http_protected", 1),
-                ("/redirect", "http_protected", 1), ("/unavailable", "http_protected", 0),
+                ("/wrong", "http_status", 1),
+                ("/wrong", "http_hello_world", 0),
+                ("/error", "http_status", 0),
+                ("/redirect", "http_status", 0),
+                ("/slow", "http_status", 0),
+                ("/ok", "https_status", 0),
+                ("/ok", "http_hello_world", 1),
+                ("/health/ready", "http_protected", 1),
+                ("/machine", "http_protected", 1),
+                ("/redirect", "http_protected", 1),
+                ("/unavailable", "http_protected", 0),
                 ("/ok", "http_protected", 0),
             ]
             for path, module, expected in cases:
-                query = urllib.parse.urlencode({"target": f"http://127.0.0.1:{server.server_port}{path}",
-                                                "module": module, "hostname": "smoke.apps.localhost"})
-                with urllib.request.urlopen(base + "/probe?" + query, timeout=10) as response:
+                query = urllib.parse.urlencode(
+                    {
+                        "target": f"http://127.0.0.1:{server.server_port}{path}",
+                        "module": module,
+                        "hostname": "smoke.apps.localhost",
+                    }
+                )
+                with urllib.request.urlopen(
+                    base + "/probe?" + query, timeout=10
+                ) as response:
                     metrics = response.read().decode()
                 assert f"probe_success {expected}\n" in metrics, (path, module, metrics)
                 print(f"PASS {module} {path}: probe_success={expected}")
-            query = urllib.parse.urlencode({"target": f"https://127.0.0.1:{tls_server.server_port}/ok",
-                                            "module": "https_hello_world", "hostname": "smoke.apps.localhost"})
-            with urllib.request.urlopen(base + "/probe?" + query, timeout=10) as response:
+            query = urllib.parse.urlencode(
+                {
+                    "target": f"https://127.0.0.1:{tls_server.server_port}/ok",
+                    "module": "https_hello_world",
+                    "hostname": "smoke.apps.localhost",
+                }
+            )
+            with urllib.request.urlopen(
+                base + "/probe?" + query, timeout=10
+            ) as response:
                 assert "probe_success 0\n" in response.read().decode()
             print("PASS untrusted TLS certificate rejected")
             # Use the actual discovery generator and relabel configuration in a real Prometheus.
             sys.path.insert(0, str(ROOT / "platform" / "app" / "src"))
             from app.monitoring import atomic_write, target_groups
-            groups = target_groups([
-                ("smoke", {"probe_profile": "hello-world"}, "applied"),
-                ("broken", {}, "failed"),
-                ("provider", {"components": [
-                    {"name": "api", "type": "service", "exposure": "public", "readiness_path": "/health/ready"},
-                    {"name": "worker", "type": "service"}]}, "applied"),
-            ], "apps.localhost")
+
+            groups = target_groups(
+                [
+                    ("smoke", {"probe_profile": "hello-world"}, "applied"),
+                    ("broken", {}, "failed"),
+                    (
+                        "provider",
+                        {
+                            "components": [
+                                {
+                                    "name": "api",
+                                    "type": "service",
+                                    "exposure": "public",
+                                    "readiness_path": "/health/ready",
+                                },
+                                {"name": "worker", "type": "service"},
+                            ]
+                        },
+                        "applied",
+                    ),
+                ],
+                "apps.localhost",
+            )
             for group in groups:
-                group["targets"] = [f"http://127.0.0.1:{server.server_port}/" +
-                                    ({"smoke": "ok", "provider": "health/ready"}.get(group["labels"]["project"], "error"))]
+                group["targets"] = [
+                    f"http://127.0.0.1:{server.server_port}/"
+                    + (
+                        {"smoke": "ok", "provider": "health/ready"}.get(
+                            group["labels"]["project"], "error"
+                        )
+                    )
+                ]
             atomic_write(temp / "discovery/applications.json", json.dumps(groups))
             configuration = (temp / "prometheus.yml").read_text()
-            configuration = configuration.replace("refresh_interval: 15s", "refresh_interval: 1s")
+            configuration = configuration.replace(
+                "refresh_interval: 15s", "refresh_interval: 1s"
+            )
             applications_scrape = "  - job_name: applications\n    metrics_path: /probe\n    scrape_timeout: 10s"
             if applications_scrape not in configuration:
                 raise AssertionError("The applications scrape configuration changed")
-            configuration = configuration.replace(applications_scrape,
-                "  - job_name: applications\n    scrape_interval: 1s\n    metrics_path: /probe\n    scrape_timeout: 1s")
-            configuration = configuration.replace("blackbox-exporter:9115", f"127.0.0.1:{port}")
+            configuration = configuration.replace(
+                applications_scrape,
+                "  - job_name: applications\n    scrape_interval: 1s\n    metrics_path: /probe\n    scrape_timeout: 1s",
+            )
+            configuration = configuration.replace(
+                "blackbox-exporter:9115", f"127.0.0.1:{port}"
+            )
             configuration = configuration.replace("alertmanager:9093", "127.0.0.1:9")
             (temp / "prometheus.yml").write_text(configuration)
             with socket.socket() as sock:
                 sock.bind(("127.0.0.1", 0))
                 prom_port = sock.getsockname()[1]
-            run("docker", "run", "-d", "--name", prometheus_name, "--network", "host",
-                "-v", f"{temp}:/etc/prometheus:ro", PROMETHEUS,
-                "--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.path=/tmp/data",
-                f"--web.listen-address=127.0.0.1:{prom_port}")
+            run(
+                "docker",
+                "run",
+                "-d",
+                "--name",
+                prometheus_name,
+                "--network",
+                "host",
+                "-v",
+                f"{temp}:/etc/prometheus:ro",
+                PROMETHEUS,
+                "--config.file=/etc/prometheus/prometheus.yml",
+                "--storage.tsdb.path=/tmp/data",
+                f"--web.listen-address=127.0.0.1:{prom_port}",
+            )
+
             def query(expression):
-                url = f"http://127.0.0.1:{prom_port}/api/v1/query?" + urllib.parse.urlencode({"query": expression})
+                url = (
+                    f"http://127.0.0.1:{prom_port}/api/v1/query?"
+                    + urllib.parse.urlencode({"query": expression})
+                )
                 with urllib.request.urlopen(url, timeout=2) as response:
                     return json.load(response)["data"]["result"]
+
             def wait_for(check):
                 for _ in range(100):
                     try:
@@ -174,25 +338,62 @@ def main():
                     except (OSError, KeyError):
                         pass
                     time.sleep(0.2)
-                raise AssertionError("Prometheus discovery did not converge: " + run("docker", "logs", prometheus_name))
+                raise AssertionError(
+                    "Prometheus discovery did not converge: "
+                    + run("docker", "logs", prometheus_name)
+                )
+
             wait_for(lambda: len(query('probe_success{job="applications"}')) == 3)
-            values = {r["metric"]["application"]: r["value"][1]
-                      for r in query('probe_success{job="applications"}')}
+            values = {
+                r["metric"]["application"]: r["value"][1]
+                for r in query('probe_success{job="applications"}')
+            }
             assert values == {"smoke": "1", "broken": "0", "provider": "1"}, values
-            provider, = query('probe_success{job="applications",project="provider"}')
-            assert provider["metric"]["component"] == "api" and provider["metric"]["probe_kind"] == "access-boundary"
-            assert provider["metric"]["instance"] == "http://api-provider.apps.localhost/health/ready"
-            print("PASS generated targets, hostname routing, module selection and application labels")
-            atomic_write(temp / "discovery/applications.json", json.dumps([
-                group for group in groups if group["labels"]["application"] != "smoke"]))
+            (provider,) = query('probe_success{job="applications",project="provider"}')
+            assert (
+                provider["metric"]["component"] == "api"
+                and provider["metric"]["probe_kind"] == "access-boundary"
+            )
+            assert (
+                provider["metric"]["instance"]
+                == "http://api-provider.apps.localhost/health/ready"
+            )
+            print(
+                "PASS generated targets, hostname routing, module selection and application labels"
+            )
+            atomic_write(
+                temp / "discovery/applications.json",
+                json.dumps(
+                    [
+                        group
+                        for group in groups
+                        if group["labels"]["application"] != "smoke"
+                    ]
+                ),
+            )
             wait_for(lambda: len(query('probe_success{job="applications"}')) == 2)
             remaining = query('probe_success{job="applications"}')
-            assert {row["metric"]["application"] for row in remaining} == {"broken", "provider"}
-            print("PASS discovery removes retired target without restarting Prometheus; failed target remains")
+            assert {row["metric"]["application"] for row in remaining} == {
+                "broken",
+                "provider",
+            }
+            print(
+                "PASS discovery removes retired target without restarting Prometheus; failed target remains"
+            )
 
         finally:
-            subprocess.run(["docker", "rm", "-f", prometheus_name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            subprocess.run(["docker", "rm", "-f", name], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            subprocess.run(
+                ["docker", "rm", "-f", prometheus_name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
+            subprocess.run(
+                ["docker", "rm", "-f", name],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                check=False,
+            )
             for service in (server, tls_server):
                 service.shutdown()
                 service.server_close()

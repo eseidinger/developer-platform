@@ -401,7 +401,7 @@ def best_effort_audit(
         return record_event(
             actor, action, target_kind, target_id, result, scope, detail
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         # Do not include backend error text: it may contain a credential or provider detail.
         log.error("Could not record audit event action=%s result=%s", action, result)
         return None
@@ -691,7 +691,7 @@ def ready():
         runtime.resources.get(api_version="v1", kind="Namespace").get(
             name="platform-system"
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         raise HTTPException(503, "Dependency unavailable")
     return {"status": "ready"}
 
@@ -828,11 +828,11 @@ def create_deployment_credential(
         }
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         if provider:
             try:
                 delete_credential_client(provider["provider_resource_id"])
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
                 pass
         required_audit(
             actor,
@@ -960,11 +960,11 @@ def rotate_deployment_credential(
             "predecessor_id": str(credential_id),
             "predecessor_expires_at": old_expiry.isoformat(),
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         if provider:
             try:
                 delete_credential_client(provider["provider_resource_id"])
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
                 pass
         required_audit(
             actor,
@@ -1165,11 +1165,11 @@ def rotate_test_runner_credential(
             "predecessor_id": str(credential_id),
             "predecessor_expires_at": old_expiry.isoformat(),
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         if provider:
             try:
                 delete_credential_client(provider["provider_resource_id"])
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
                 pass
         required_audit(
             actor,
@@ -1309,11 +1309,11 @@ def create_test_identity(
         }
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         if provider:
             try:
                 delete_credential_client(provider["provider_resource_id"])
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
                 pass
         required_audit(
             actor,
@@ -1835,7 +1835,7 @@ def provision(
                 "current_revision": conflict.current,
             },
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         required_audit(
             actor,
             "project.provision",
@@ -2087,7 +2087,7 @@ def create_ai_run(
     try:
         tools = ai_tools.make_tools(name, lambda _: snapshot, connect, runtime)
         outcome = ai_agent.run(body.kind, run_id, model, tools, project=name)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error("AI run failed run_id=%s error_type=%s", run_id, type(exc).__name__)
         outcome = {
             "state": "failed",
@@ -2199,7 +2199,7 @@ def _ai_runtime_failed(name, spec):
             == "failed"
             for c in services
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         return False
 
 
@@ -2272,7 +2272,7 @@ def get_ai_proposal(
                 result["observation"]["metrics"] = application_metrics.observe(
                     name, monitored["name"]
                 )
-            except Exception:
+            except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                 result["observation"]["metrics"] = {"state": "unavailable"}
     return result
 
@@ -2591,7 +2591,7 @@ def put_configuration(
                 "current_revision": conflict.current,
             },
         )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         required_audit(
             actor,
             "project.configuration.update",
@@ -3311,7 +3311,7 @@ def data_services(name: str, principal: Principal = Depends(current_principal)):
             ).fetchone()
     except HTTPException:
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Data-service observation failed project=%s error_type=%s",
             name,
@@ -3689,7 +3689,7 @@ def rollback(
             {**detail, "reason": "project_retired"},
         )
         raise HTTPException(409, "Retired projects cannot be rolled back")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         required_audit(
             actor,
             "project.rollback",
@@ -3824,7 +3824,7 @@ def restart(name: str, principal: Principal = Depends(current_principal)):
             {"status_code": exc.status_code},
         )
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         required_audit(
             actor,
             "project.restart",
@@ -4276,7 +4276,7 @@ def purge_project(
                 {"status_code": exc.status_code},
             )
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             required_audit(
                 actor,
                 "project.purge",
@@ -4543,7 +4543,7 @@ def retire(
             {"status_code": exc.status_code},
         )
         raise
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         required_audit(
             actor,
             "project.retire",

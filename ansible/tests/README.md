@@ -46,21 +46,21 @@ from tests. Imported test implementation lives under `ansible/tasks/tests/`.
 
 ## Ownership and cleanup
 
-The main platform suite includes project-scoped CI deployment, cross-project
-and administration denial, secret-mutation denial, rotation, and revocation.
-The former standalone CI-credential playbook has been consolidated into it.
+The main platform suite includes project-scoped CI deployment, cross-project and
+administration denial, secret-mutation denial, rotation, and revocation. The
+former standalone CI-credential playbook has been consolidated into it.
 
-API suites register successful project creation responses. Their `always`
-blocks invoke the shared cleanup helper with those responses; a name alone
-never establishes ownership. Partial creation cleans only confirmed fixtures.
-Cleanup refreshes retirement scopes, waits for provider revocation, attempts
-remaining fixtures after an error, and fails the final result if incomplete.
-Named-store data remains retained; tests do not purge it.
+API suites register successful project creation responses. Their `always` blocks
+invoke the shared cleanup helper with those responses; a name alone never
+establishes ownership. Partial creation cleans only confirmed fixtures. Cleanup
+refreshes retirement scopes, waits for provider revocation, attempts remaining
+fixtures after an error, and fails the final result if incomplete. Named-store
+data remains retained; tests do not purge it.
 
-Shared environment/service restoration stays in the relevant playbook's
-`always` block. Restoration failures are recorded while remaining cleanup is
-attempted, then cause the final assertion to fail. Offline tests verify these
-boundaries and exercise cleanup failures without contacting a platform.
+Shared environment/service restoration stays in the relevant playbook's `always`
+block. Restoration failures are recorded while remaining cleanup is attempted,
+then cause the final assertion to fail. Offline tests verify these boundaries
+and exercise cleanup failures without contacting a platform.
 
 The rollback-schema contract requires application dependencies and no longer
 silently skips when they are missing. CI runs it in the application environment.

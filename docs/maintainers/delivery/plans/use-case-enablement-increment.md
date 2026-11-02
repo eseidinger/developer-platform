@@ -27,24 +27,60 @@ or business rules.
 
 Validate the scenario against the current platform:
 
-| Capability | Current state | PLAN-016 action |
-| --- | --- | --- |
-| Multi-component applications | Supported by `v1alpha2` | Confirm contract |
-| Public component ingress | Supported, one public service per project | Accepted as sufficient for the first release |
-| Private worker | Representable as a private service | Document pattern |
-| Scheduled work | Supported | Confirm limits |
-| Digest-pinned public images | Supported | Require for acceptance |
-| Custom readiness | Supported | Require for public services |
-| Resource and execution limits | Supported | Application owner confirms the use case fits the advertised limits; verify the declarations |
-| DNS/443 egress | Supported and pinned at apply time | Document reapply semantics |
-| Separate project databases | Supported | Confirm ownership and retention |
-| Durable storage | PostgreSQL only | Application owner confirms no filesystem, PVC, or object store is required |
-| PostgreSQL TLS | Not supported | Accepted outside the cross-project encrypted-channel requirement |
-| Project secrets | Supported, but project-wide | Accepted as the first-release service-credential isolation boundary |
-| Classification and domain retention | Governance record required | Application owner confirms the projects can supply the required records |
-| Browser/service OIDC clients | Not implemented | Route to PLAN-009 |
-| Component monitoring | Incorrect for `v1alpha2` | Route to PLAN-017 |
-| Workload-log retention | Best effort | Implement the accepted seven-day centralized target in PLAN-017 |
+- **Capability:** Multi-component applications
+  - **Current state:** Supported by `v1alpha2`
+  - **PLAN-016 action:** Confirm contract
+- **Capability:** Public component ingress
+  - **Current state:** Supported, one public service per project
+  - **PLAN-016 action:** Accepted as sufficient for the first release
+- **Capability:** Private worker
+  - **Current state:** Representable as a private service
+  - **PLAN-016 action:** Document pattern
+- **Capability:** Scheduled work
+  - **Current state:** Supported
+  - **PLAN-016 action:** Confirm limits
+- **Capability:** Digest-pinned public images
+  - **Current state:** Supported
+  - **PLAN-016 action:** Require for acceptance
+- **Capability:** Custom readiness
+  - **Current state:** Supported
+  - **PLAN-016 action:** Require for public services
+- **Capability:** Resource and execution limits
+  - **Current state:** Supported
+  - **PLAN-016 action:** Application owner confirms the use case fits the
+    advertised limits; verify the declarations
+- **Capability:** DNS/443 egress
+  - **Current state:** Supported and pinned at apply time
+  - **PLAN-016 action:** Document reapply semantics
+- **Capability:** Separate project databases
+  - **Current state:** Supported
+  - **PLAN-016 action:** Confirm ownership and retention
+- **Capability:** Durable storage
+  - **Current state:** PostgreSQL only
+  - **PLAN-016 action:** Application owner confirms no filesystem, PVC, or
+    object store is required
+- **Capability:** PostgreSQL TLS
+  - **Current state:** Not supported
+  - **PLAN-016 action:** Accepted outside the cross-project encrypted-channel
+    requirement
+- **Capability:** Project secrets
+  - **Current state:** Supported, but project-wide
+  - **PLAN-016 action:** Accepted as the first-release service-credential
+    isolation boundary
+- **Capability:** Classification and domain retention
+  - **Current state:** Governance record required
+  - **PLAN-016 action:** Application owner confirms the projects can supply the
+    required records
+- **Capability:** Browser/service OIDC clients
+  - **Current state:** Not implemented
+  - **PLAN-016 action:** Route to PLAN-009
+- **Capability:** Component monitoring
+  - **Current state:** Incorrect for `v1alpha2`
+  - **PLAN-016 action:** Route to PLAN-017
+- **Capability:** Workload-log retention
+  - **Current state:** Best effort
+  - **PLAN-016 action:** Implement the accepted seven-day centralized target in
+    PLAN-017
 
 The current schema and limits are documented in the
 [application declaration reference](../../../developers/application-spec.md),

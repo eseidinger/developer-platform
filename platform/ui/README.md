@@ -2,10 +2,11 @@
 
 This is the source-adjacent UI implementation reference. Portal workflows belong
 in the [developer UI guide](../../docs/developers/ui.md), and cross-component
-maintenance guidance belongs in the [UI maintainer guide](../../docs/maintainers/ui.md).
+maintenance guidance belongs in the
+[UI maintainer guide](../../docs/maintainers/ui.md).
 
-This directory contains the React and TypeScript workspace for the Platform Control
-Plane portal. The technology selection is recorded in
+This directory contains the React and TypeScript workspace for the Platform
+Control Plane portal. The technology selection is recorded in
 [ADR-019](../../docs/architecture/decisions/ADR-019-react-ui-technology-stack.md).
 Delivery is sequenced in the
 [UI implementation plan](../../docs/maintainers/delivery/plans/ui.md).
@@ -13,18 +14,20 @@ Delivery is sequenced in the
 ## Status
 
 The routed React portal implements project lifecycle and diagnostics, grants,
-deployment credentials, hosted application access, named stores and human leases,
-platform administration, and AI assistance. API types are generated from the
-committed OpenAPI document. Component and fixture browser tests exercise selected
-journeys; deployed acceptance is recorded separately in the delivery backlog.
+deployment credentials, hosted application access, named stores and human
+leases, platform administration, and AI assistance. API types are generated from
+the committed OpenAPI document. Component and fixture browser tests exercise
+selected journeys; deployed acceptance is recorded separately in the delivery
+backlog.
 
 The browser authentication boundary uses `oidc-client-ts` for provider-neutral
 Authorization Code with PKCE. The public `/portal/config` endpoint supplies the
-issuer, client ID, and redirect URI. User and access-token state stays in memory;
-only the protocol transaction state needed across the redirect uses session storage.
-The production API image builds and serves the portal. Vite development uses
-its configured API proxy; browser tests use deterministic intercepted APIs.
-These fixture tests do not prove a complete deployed Keycloak/lifecycle journey.
+issuer, client ID, and redirect URI. User and access-token state stays in
+memory; only the protocol transaction state needed across the redirect uses
+session storage. The production API image builds and serves the portal. Vite
+development uses its configured API proxy; browser tests use deterministic
+intercepted APIs. These fixture tests do not prove a complete deployed
+Keycloak/lifecycle journey.
 
 ## Selected stack
 
@@ -39,17 +42,17 @@ These fixture tests do not prove a complete deployed Keycloak/lifecycle journey.
 - Type-aware ESLint, JSX accessibility checks, and strict TypeScript
 - Prettier with Tailwind class sorting, and npm with the committed lockfile
 
-Authentication uses the installed `oidc-client-ts` client. Portal tokens stay
-in memory; protocol transaction state uses session storage across the redirect.
-The client renews tokens automatically while the identity-provider session remains
-valid. After a reload, a non-secret session flag triggers one silent SSO attempt;
-expired SSO or browser cookie restrictions fall back to the sign-in button.
-The header's **Log out** action stops renewal, clears private query data and local
-credentials, and redirects through the provider's logout endpoint. It also clears
-the session flag so returning from logout does not automatically sign in again.
-Keycloak initialization allows logout redirects to the portal's registered login
-redirect URIs. Existing deployments need identity initialization and the updated
-portal image to receive the complete change.
+Authentication uses the installed `oidc-client-ts` client. Portal tokens stay in
+memory; protocol transaction state uses session storage across the redirect. The
+client renews tokens automatically while the identity-provider session remains
+valid. After a reload, a non-secret session flag triggers one silent SSO
+attempt; expired SSO or browser cookie restrictions fall back to the sign-in
+button. The header's **Log out** action stops renewal, clears private query data
+and local credentials, and redirects through the provider's logout endpoint. It
+also clears the session flag so returning from logout does not automatically
+sign in again. Keycloak initialization allows logout redirects to the portal's
+registered login redirect URIs. Existing deployments need identity
+initialization and the updated portal image to receive the complete change.
 
 ## Current commands
 
@@ -74,10 +77,9 @@ npm run preview
 
 `check` verifies the generated API contract, lint (including accessibility),
 formatting, types, application and helper unit tests, and production build. CI
-runs this same command.
-Accessibility lint uses `eslint-plugin-jsx-a11y-x`, whose declared peer range
-supports the project's ESLint 10; the original plugin currently supports up to
-ESLint 9.
+runs this same command. Accessibility lint uses `eslint-plugin-jsx-a11y-x`,
+whose declared peer range supports the project's ESLint 10; the original plugin
+currently supports up to ESLint 9.
 
 `format` applies Prettier formatting and Tailwind class ordering; `format:check`
 checks without writing. Generated API types, build output, and browser-test
@@ -107,6 +109,6 @@ authoritative for authorization, validation, lifecycle, audit, and redaction.
 Client-side role checks only explain or hide unavailable actions; they never
 grant them.
 
-Bearer tokens and one-time secrets must not enter persistent browser storage, URLs,
-logs, query-cache keys, screenshots, or test artifacts. One-time secret responses
-must also bypass the ordinary TanStack Query cache.
+Bearer tokens and one-time secrets must not enter persistent browser storage,
+URLs, logs, query-cache keys, screenshots, or test artifacts. One-time secret
+responses must also bypass the ordinary TanStack Query cache.

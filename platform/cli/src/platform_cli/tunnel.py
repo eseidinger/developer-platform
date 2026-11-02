@@ -71,9 +71,9 @@ def ssh_command(
     destination = ssh.get("destination")
     try:
         if not isinstance(destination, str):
-            raise ValueError()
+            raise TypeError()
         ipaddress.ip_address(destination)
-    except ValueError:
+    except (TypeError, ValueError):
         raise ConfigurationError(
             "The platform returned an invalid relay address."
         ) from None

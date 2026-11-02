@@ -90,5 +90,5 @@ Policy snapshots have a bounded lifetime of at most five minutes. If the
 authorizer cannot refresh an expired snapshot or cannot compile it, protected
 traffic fails closed. Access operations coordinate Keycloak projection and
 authorizer acknowledgement before a policy or service grant is considered
-active. Revocation can deny from platform state even while an older signed
-token is still within its token lifetime.
+active. Revocation can deny from platform state even while an older signed token
+is still within its token lifetime.

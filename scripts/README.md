@@ -39,9 +39,8 @@ evaluation is an explicitly invoked benchmark that calls the configured model;
 it is not part of the routine regression suite. Cross-store bound application
 commands live under `scripts/tests/platform/`. Reusable runner logic lives in
 [`tests/platform/`](../tests/README.md), separate from the platform application.
-Platform tests can change or
-retire resources; the interruption and outage drills also affect shared
-services. Read the specific script and the
+Platform tests can change or retire resources; the interruption and outage
+drills also affect shared services. Read the specific script and the
 [acceptance guide](../docs/operators/validation/acceptance.md) before execution.
 The directory name alone does not authorize running a test.
 

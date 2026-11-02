@@ -3,9 +3,9 @@
 Status: optional current component.
 
 The PHP/MySQL watchdog belongs on a host independent of the platform. It records
-authenticated heartbeat and backup signals, displays freshness, and can notify on
-state changes. Its value comes from crossing the Docker/k3d/platform-host failure
-boundary.
+authenticated heartbeat and backup signals, displays freshness, and can notify
+on state changes. Its value comes from crossing the Docker/k3d/platform-host
+failure boundary.
 
 Use the [watchdog component guide](../../../operations/watchdog/README.md) and
 [watchdog Ansible guide](../../../operations/watchdog/ansible/README.md) for

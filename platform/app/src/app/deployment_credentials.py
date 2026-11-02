@@ -97,7 +97,7 @@ def reconcile_pending_cleanup(
     for credential_id, provider_resource_id, kind, project in rows:
         try:
             delete_client(provider_resource_id)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             log.warning(
                 "Automation credential cleanup deferred credential_id=%s error_type=%s",
                 credential_id,
@@ -136,7 +136,7 @@ def cleanup_loop(
     while not stop.is_set():
         try:
             reconcile_pending_cleanup(connect, delete_client, audit, log)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             log.error(
                 "Automation credential cleanup iteration failed error_type=%s",
                 type(exc).__name__,

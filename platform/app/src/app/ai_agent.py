@@ -242,7 +242,7 @@ def _run(kind, run_id, model, tools, *, clock=time.monotonic):
                     )
                     usage = answer.usage_metadata or {}
 
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                 missing_usage = ai_pricing.Estimate(None, False, None, None, None)
                 _estimates.get().append(missing_usage)
                 ai_observability.usage(missing_usage)
@@ -335,7 +335,7 @@ def _run(kind, run_id, model, tools, *, clock=time.monotonic):
                     )
                     if len(content) > MAX_TOOL_RESULT_BYTES:
                         raise ValueError("Tool result too large")
-                except Exception:
+                except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                     tracing.annotate("platform.ai.tool_error_count", 1)
                     observation = None
                     content = json.dumps(

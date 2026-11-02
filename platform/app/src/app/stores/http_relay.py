@@ -8,6 +8,7 @@ No URL, header, body or provider diagnostic is logged.
 
 import asyncio
 import base64
+import contextlib
 import hashlib
 import hmac
 import json
@@ -138,7 +139,7 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
     front = h11.Connection(h11.SERVER, max_incomplete_event_size=16384)
     request = await asyncio.wait_for(_event(front, reader), 5)
     if not isinstance(request, h11.Request):
-        raise ValueError("HTTP request required")
+        raise TypeError("HTTP request required")
     headers = identity(request, lease)
     admin_index = False
     if lease["provider"] == "couchdb":
@@ -272,7 +273,7 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
                     await remote_writer.drain()
                     return
                 else:
-                    raise ValueError("Unexpected request event")
+                    raise TypeError("Unexpected request event")
 
         async def download():
             while True:
@@ -306,7 +307,7 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
                     if isinstance(event, h11.EndOfMessage):
                         return
                 else:
-                    raise ValueError("Unexpected response event")
+                    raise TypeError("Unexpected response event")
 
         sender, receiver = (
             asyncio.create_task(upload()),
@@ -325,7 +326,5 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
             await asyncio.gather(sender, receiver, return_exceptions=True)
     finally:
         remote_writer.close()
-        try:
+        with contextlib.suppress(Exception):
             await remote_writer.wait_closed()
-        except Exception:
-            pass

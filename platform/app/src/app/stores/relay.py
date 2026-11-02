@@ -304,9 +304,9 @@ class Relay:
             await asyncio.wait_for(
                 asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining
             )
-        except (Exception, asyncio.CancelledError):
+        except (Exception, asyncio.CancelledError):  # noqa: BLE001 - Untrusted transport errors stay private.
             # Fixed silence; errors/payloads must not escape to logs.
-            pass
+            log.debug("Store relay connection closed after transport failure")
         finally:
             for task in tasks:
                 task.cancel()
@@ -327,7 +327,7 @@ class Relay:
         try:
             leases = await asyncio.to_thread(self.load)
             self.last_success = time.monotonic()
-        except Exception:
+        except Exception:  # noqa: BLE001 - Every catalog failure must fail closed.
             leases = {}  # Catalog outage fails closed, including existing sessions.
         self.leases = leases
         for port in list(self.servers):
@@ -406,8 +406,8 @@ class Relay:
                 + b"\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
             )
             await writer.drain()
-        except Exception:
-            pass
+        except Exception:  # noqa: BLE001 - Health probes must not expose diagnostics.
+            log.debug("Store relay health response unavailable")
         finally:
             writer.close()
 

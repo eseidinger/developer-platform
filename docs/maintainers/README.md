@@ -14,8 +14,8 @@ or delivery plans. Application users should start in the
 - [UI](ui.md)
 - [Monitoring](monitoring.md)
 
-Source-adjacent READMEs describe repository layout and commands. These maintainer
-pages explain cross-component ownership and validation expectations.
+Source-adjacent READMEs describe repository layout and commands. These
+maintainer pages explain cross-component ownership and validation expectations.
 
 - [Testing requirements (draft)](testing-requirements.md)
 - [Time-dependent test requirements (draft)](time-dependent-test-requirements.md)
@@ -28,9 +28,9 @@ pages explain cross-component ownership and validation expectations.
 - [Active plans](delivery/plans/)
 - [Historical plans and analyses](delivery/history/)
 
-When work ships, promote lasting behavior into developer, operator, architecture,
-or reference documentation. Completed plans remain evidence but must not be the
-only place where supported behavior is documented.
+When work ships, promote lasting behavior into developer, operator,
+architecture, or reference documentation. Completed plans remain evidence but
+must not be the only place where supported behavior is documented.
 
 For an architectural change, update or supersede the relevant
 [ADR](../architecture/decisions/README.md), then update affected contracts and

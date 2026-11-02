@@ -87,7 +87,7 @@ def _emit(name, value, **labels):
         (instrument.record if name.endswith("seconds") else instrument.add)(
             value, attrs
         )
-    except Exception:
+    except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
         # Telemetry failures must never fail the model, tools or approval flow.
         pass
 

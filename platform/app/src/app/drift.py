@@ -86,7 +86,7 @@ def observe_drift(
                         )
                     else:
                         unknown = True
-                except Exception:
+                except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                     unknown = True
         if unknown and not differences:
             return {"state": "unknown", "differences": []}
@@ -105,7 +105,7 @@ def observe_drift(
             "Drift query failed project=%s error_type=%s", project, type(exc).__name__
         )
         return {"state": "unknown", "differences": []}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Drift query failed project=%s error_type=%s", project, type(exc).__name__
         )
@@ -208,5 +208,5 @@ def drift_loop(stop, connect, get_runtime, audit, log, interval: float) -> None:
     while not stop.wait(interval):
         try:
             scan_once(connect, get_runtime(), audit, state, log)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             log.error("Drift scan failed error_type=%s", type(exc).__name__)

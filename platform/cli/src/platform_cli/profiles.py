@@ -171,7 +171,7 @@ class SessionStore:
             return session
         except ConfigurationError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 - Map all command failures to a safe CLI error.
             raise ConfigurationError("Unable to read the OS keyring session.") from None
 
     def set(self, subject: str, refresh_token: str) -> None:
@@ -185,7 +185,7 @@ class SessionStore:
             self.backend().set_password(self.service, self.name, json.dumps(session))
         except ConfigurationError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 - Map all command failures to a safe CLI error.
             raise ConfigurationError("Unable to save the OS keyring session.") from None
 
     def delete(self) -> None:
@@ -195,7 +195,7 @@ class SessionStore:
                 backend.delete_password(self.service, self.name)
         except ConfigurationError:
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 - Map all command failures to a safe CLI error.
             raise ConfigurationError(
                 "Unable to clear the OS keyring session."
             ) from None

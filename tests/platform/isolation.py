@@ -181,7 +181,9 @@ def probe(kubectl, kubeconfig, project, own, foreign, peer_service, mode):
         mode,
     ]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=45)
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=45, check=False
+        )
         require(result.returncode == 0, "fixture_probe_failed")
         payload = json.loads(result.stdout)
         require(
@@ -341,7 +343,7 @@ def retire(api, report):
                     "cleanup_project_changed",
                 )
                 retire_project(api, project)
-        except (Exception, KeyboardInterrupt):
+        except (Exception, KeyboardInterrupt):  # noqa: BLE001 - Record and clean up after any drill failure.
             complete = False
     report.data["cleanup"] = (
         "retired-data-retained"
@@ -383,7 +385,7 @@ def main(argv=None):
         error = None
         try:
             run(args, api, report)
-        except (Exception, KeyboardInterrupt) as exc:
+        except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
             error = (
                 str(exc)
                 if isinstance(exc, DrillError)
@@ -395,7 +397,7 @@ def main(argv=None):
             )
         try:
             retire(api, report)
-        except (Exception, KeyboardInterrupt):
+        except (Exception, KeyboardInterrupt):  # noqa: BLE001 - Record and clean up after any drill failure.
             report.data["cleanup"] = "incomplete-retry-required"
             report.save()
         report.data.update(
@@ -409,7 +411,7 @@ def main(argv=None):
         report.save()
         print("REPORT " + str(report.directory / "report.json"), flush=True)
         return 0 if report.data["result"] == "passed" else 1
-    except (Exception, KeyboardInterrupt) as exc:
+    except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
         code = (
             str(exc)
             if isinstance(exc, DrillError)

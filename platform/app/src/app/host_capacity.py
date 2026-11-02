@@ -114,7 +114,7 @@ def read_snapshot(path=None, now=None):
             positive(value["cpu_millicores"])
             positive(value["memory_mib"])
         if not isinstance(data["services"], list):
-            raise ValueError
+            raise TypeError
         for value in data["services"]:
             positive(value["memory_mib"])
             if (
@@ -122,9 +122,9 @@ def read_snapshot(path=None, now=None):
                 or value["cpu_millicores"] < 0
                 or type(value["cpu_unbounded"]) is not bool
             ):
-                raise ValueError
+                raise TypeError
             if not isinstance(value["name"], str):
-                raise ValueError
+                raise TypeError
         return data
     except (OSError, ValueError, KeyError, TypeError, AttributeError):
         return {"state": "unavailable", "reason": "HostCapacitySnapshotUnavailable"}
@@ -165,7 +165,7 @@ def main():
         while True:
             try:
                 data = collect(engine)
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                 log.error(
                     "Host capacity collection failed error_type=%s",
                     type(error).__name__,

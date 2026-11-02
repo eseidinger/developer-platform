@@ -42,12 +42,12 @@ option. They obtain and renew access tokens with client credentials and verify
 that the file targets the selected API and configured issuer. Their preflight
 uses `/platform/test-context`; root runner credential-management endpoints
 remain restricted to human administrators. Project deployment credentials and
-short-lived test personas keep their existing test-runner permissions.
-Existing Ansible playbooks consume the same file.
+short-lived test personas keep their existing test-runner permissions. Existing
+Ansible playbooks consume the same file.
 
 Checks whose purpose is human authentication or human database access still
-require a real human session. Machine personas are never treated as humans,
-and this credential does not establish browser-login coverage.
+require a real human session. Machine personas are never treated as humans, and
+this credential does not establish browser-login coverage.
 
 ## Revocation and expiry
 
@@ -75,5 +75,5 @@ protected runner configuration and evidence path in both phases:
    denied by the Platform API with HTTP 403.
 
 A wrong secret, an early expired-phase invocation, or an already expired JWT
-cannot satisfy the test. Retain the private evidence only as long as needed;
-it contains a bearer token. This is a timed lab check, not a routine CI test.
+cannot satisfy the test. Retain the private evidence only as long as needed; it
+contains a bearer token. This is a timed lab check, not a routine CI test.

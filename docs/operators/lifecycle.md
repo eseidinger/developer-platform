@@ -22,16 +22,17 @@ bash scripts/up.sh
 ```
 
 Dedicated Neo4j instances are created outside Compose; stopping Compose does not
-stop those instances. Inspect their controller-owned state before host maintenance.
+stop those instances. Inspect their controller-owned state before host
+maintenance.
 
 Bootstrap starts an existing k3d cluster; it does not migrate the Kubernetes
-image or reapply saved application declarations automatically. Expected heartbeat
-alerts may fire during dependency downtime because maintenance windows are not
-implemented.
+image or reapply saved application declarations automatically. Expected
+heartbeat alerts may fire during dependency downtime because maintenance windows
+are not implemented.
 
 The Ansible deployment validates configuration, prevents overlap with protected
-drills, and recreates shared-service containers without deleting volumes. This is
-a shared-service outage, not a rolling control-plane deployment.
+drills, and recreates shared-service containers without deleting volumes. This
+is a shared-service outage, not a rolling control-plane deployment.
 
 ## Recreate the workload cluster
 
@@ -50,12 +51,12 @@ PostgreSQL and the platform catalog. Reapply the stored declarations and verify
 application data. Retaining a PostgreSQL volume is not a supported major-version
 upgrade by itself.
 
-`bash scripts/down.sh --volumes` deletes the cluster and persistent Compose named
-volumes, including shared-store data. It does not remove the host-bound Tempo
-filesystem or controller-created Neo4j instance volumes/networks. Those are outside
-Compose teardown and need separately scoped retirement/purge or operator cleanup.
-It is only for a deliberate disposable-lab reset. Both modes retain `.env`, local
-backup files, and installed tools.
+`bash scripts/down.sh --volumes` deletes the cluster and persistent Compose
+named volumes, including shared-store data. It does not remove the host-bound
+Tempo filesystem or controller-created Neo4j instance volumes/networks. Those
+are outside Compose teardown and need separately scoped retirement/purge or
+operator cleanup. It is only for a deliberate disposable-lab reset. Both modes
+retain `.env`, local backup files, and installed tools.
 
 ## Rotate the controller credential
 
@@ -70,12 +71,12 @@ There is not yet a generally accepted zero-downtime platform-upgrade procedure.
 For an upgrade on the lab:
 
 1. Define the exact source and image versions and affected state schemas.
-2. Create a verified backup and record the rollback conditions.
-3. Pause incompatible jobs or drills.
-4. Deploy through the normal Ansible or local bootstrap path.
-5. Verify API health, readiness, authorization, provider access, monitoring, and
+1. Create a verified backup and record the rollback conditions.
+1. Pause incompatible jobs or drills.
+1. Deploy through the normal Ansible or local bootstrap path.
+1. Verify API health, readiness, authorization, provider access, monitoring, and
    one representative application workflow.
-6. Record migrations, executor, timestamps, results, and unresolved uncertainty.
+1. Record migrations, executor, timestamps, results, and unresolved uncertainty.
 
 Application release and rollback are developer workflows. A workload rollback
 does not reverse its database schema or restore historical secret values; use

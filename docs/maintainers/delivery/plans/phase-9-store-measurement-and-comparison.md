@@ -24,17 +24,18 @@ the recovery exercises themselves belong to Phase 10.
 
 Start each measurement package when the corresponding provider or application
 fixture is available. Packages can run independently; a deferred Phase 8 store
-does not block measurements for a Phase 7 store. ODIP, VEF, Energy and Bot Social
-own their domain datasets, relevance judgments and interpretation. The platform
-owns common metric collection, dashboard provisioning and bounded operational
-measurements. No comparison result or threshold gates store selection or adoption.
+does not block measurements for a Phase 7 store. ODIP, VEF, Energy and Bot
+Social own their domain datasets, relevance judgments and interpretation. The
+platform owns common metric collection, dashboard provisioning and bounded
+operational measurements. No comparison result or threshold gates store
+selection or adoption.
 
 ## Comparison packages
 
 ### 9.1 — Analytics and object storage
 
-- Compare PostgreSQL and DuckDB on the same versioned ODIP energy data: daily and
-  monthly aggregation, generation/weather joins, windows, scenario costs and
+- Compare PostgreSQL and DuckDB on the same versioned ODIP energy data: daily
+  and monthly aggregation, generation/weather joins, windows, scenario costs and
   increasing volumes. Separate engine time from physical storage and transfer.
 - Compare PostgreSQL raw artifacts with immutable, versioned S3/Parquet objects:
   large-object streaming, checksums, versioning, backup/recovery and cost.
@@ -44,10 +45,11 @@ measurements. No comparison result or threshold gates store selection or adoptio
 
 ### 9.2 — Search
 
-Compare PostgreSQL full-text search and OpenSearch on versioned ODIP metadata and
-instructions, with Bot Social posts when available. Use manually judged queries
-for ranking, filters, facets, typo handling and incremental updates. Record
-latency and quality separately from the provider's functional rebuild tests.
+Compare PostgreSQL full-text search and OpenSearch on versioned ODIP metadata
+and instructions, with Bot Social posts when available. Use manually judged
+queries for ranking, filters, facets, typo handling and incremental updates.
+Record latency and quality separately from the provider's functional rebuild
+tests.
 
 ### 9.3 — Graph
 
@@ -60,19 +62,20 @@ constraint evaluation and optimization responsibility.
 ### 9.4 — Vector retrieval
 
 Compare pgvector and Qdrant, with OpenSearch if selected, on a versioned domain
-corpus and embedding model. Measure Recall@k, MRR or nDCG, p95 latency, filtering,
-indexing, memory and update/deletion behavior. Separate semantic memory, durable
-agent state and conversation history. No relevance threshold gates adoption.
+corpus and embedding model. Measure Recall@k, MRR or nDCG, p95 latency,
+filtering, indexing, memory and update/deletion behavior. Separate semantic
+memory, durable agent state and conversation history. No relevance threshold
+gates adoption.
 
 ### 9.5 — Deferred-store comparisons
 
 For each owner-activated Phase 8 provider, compare PostgreSQL/TimescaleDB/
-ClickHouse time-series and OLAP workloads (DuckDB as a bounded reference), Valkey
-against indexed/precomputed PostgreSQL and local application caching, or
+ClickHouse time-series and OLAP workloads (DuckDB as a bounded reference),
+Valkey against indexed/precomputed PostgreSQL and local application caching, or
 CouchDB against PostgreSQL JSONB for the selected package 8.3; compare MongoDB
-only if selected later. Use reproducible loads and include
-invalidation, consistency, indexing/schema evolution, memory and operating cost
-as applicable. Unactivated providers require no benchmark.
+only if selected later. Use reproducible loads and include invalidation,
+consistency, indexing/schema evolution, memory and operating cost as applicable.
+Unactivated providers require no benchmark.
 
 ## Eight performance dashboards
 
@@ -80,38 +83,106 @@ as applicable. Unactivated providers require no benchmark.
 in Phase 9, after the relevant provider or workload is available. Extend the
 existing PostgreSQL dashboard and link every performance dashboard from the
 existing named-resource overview. The overview's quota, lifecycle, credential
-cleanup and quarantine panels remain the common operational entry point.
-All eight performance dashboards now have generated definitions. Native
+cleanup and quarantine panels remain the common operational entry point. All
+eight performance dashboards now have generated definitions. Native
 PostgreSQL/OpenSearch/Qdrant statistics, RustFS OTLP, container measurements and
-Community JVM/relay metrics have source/local evidence. The application collector
-and real DuckDB profiling example provide workload histograms/numeric fields;
-external application instrumentation and deployed collection remain open.
-Private collector roles, missing/stale-data handling, alerts and real Prometheus
-query validation are implemented. See the [monitoring guide](../../../../infrastructure/monitoring/CAPACITY-AND-STORES.md#phase-7-store-performance).
+Community JVM/relay metrics have source/local evidence. The application
+collector and real DuckDB profiling example provide workload histograms/numeric
+fields; external application instrumentation and deployed collection remain
+open. Private collector roles, missing/stale-data handling, alerts and real
+Prometheus query validation are implemented. See the
+[monitoring guide](../../../../infrastructure/monitoring/CAPACITY-AND-STORES.md#phase-7-store-performance).
 
-| Dashboard / package | Required panels | Metrics source and implementation constraints |
-|---|---|---|
-| **PostgreSQL performance — Phase 9 / PLAN-026** | Transactions/sec and rollbacks; connection usage; blocked sessions and oldest transactions; cache hits and disk I/O; WAL/checkpoints; temporary spills; vacuum activity and dead tuples. | Extend the existing PostgreSQL exporter using native statistics. Optionally add aggregated execution statistics through `pg_stat_statements`, after reviewing preload changes, collection permissions and overhead. Do not export SQL text or unbounded query identifiers. |
-| **DuckDB / Parquet analytics — Phase 9 / PLAN-027** | Query duration and CPU time; peak buffer memory; temporary spill usage; rows scanned/returned; artifact transfer/checksum time; bytes downloaded; successful/failed runs. | Instrument application/job operations and extract selected DuckDB profiling fields. DuckDB is embedded: show workload/job observations rather than inventing a shared server. Keep query-engine time separate from storage transfer and integrity verification. |
-| **RustFS S3 performance — Phase 9 / PLAN-027** | GET/PUT throughput and latency; transferred bytes; errors/timeouts; backpressure; storage growth; scanner/healing activity; disk pressure. | Verify the pinned release's OTLP metrics and route them through Alloy where compatible, with a bounded metrics pipeline into Prometheus. Current operations documentation describes OTLP export; do not assume a native Prometheus scrape endpoint. Validate availability and scope of each operation/bucket metric before adding panels. |
-| **OpenSearch performance — Phase 9 / PLAN-028** | Search/indexing throughput and mean operation time; active searches; thread-pool queues/rejections; JVM heap/GC; circuit breakers; shard health; segment merges; cache efficiency; disk watermarks. | Use a restricted exporter polling cluster/node/index statistics over verified private TLS. Add application histograms for end-to-end search percentiles; accumulated native operation counts/times provide means, not p95/p99. Include single-node topology expectations when interpreting shard health. |
-| **Apache AGE performance and projection health — Phase 9 / PLAN-029** | Graph-query throughput/latency/errors; SQL lock waits and spills; projection freshness and pending source updates; rebuild duration/failures; last successful validation. | Reuse PostgreSQL statistics for database behavior, instrument graph operations in applications, and expose projection-worker freshness/rebuild metrics. Identify each signal's source; do not attribute shared PostgreSQL CPU/I/O exclusively to AGE. |
-| **Neo4j Community instance performance — Phase 9 / PLAN-029** | Per-resource instance availability/restarts; CPU/memory; JVM heap/GC; disk growth; Bolt connections; instrumented query latency/errors; backup interruption and duration. | Combine container metrics, a standard JVM exporter and client instrumentation, verified against the selected Community image. Validate connection counters against an available source. Native database-internal counters are conditional: the documented built-in metrics exporter is an Enterprise feature. Do not introduce a commercial edition to fill panels. Discover each dedicated instance from its stable resource identity. |
-| **pgvector performance — Phase 9 / PLAN-030** | Vector-query throughput/latency; index size and usage; HNSW/IVFFlat build progress; vacuum activity; resource consumption during indexing. | Combine PostgreSQL statistics/index-build progress and application vector-query histograms. Clearly distinguish shared-server usage from attributable workload usage. Recall measurements come only from explicit, versioned comparison runs, not an inferred live operational metric. |
-| **Qdrant performance — Phase 9 / PLAN-030** | Search/upsert throughput; latency percentiles and errors; point/vector counts; indexed versus unindexed points; optimizer activity; memory/page faults; file descriptors; snapshots. | Privately scrape native `/metrics`, with bounded per-collection dimensions and selected telemetry fields where required. Verify histogram and collection coverage in the pinned release; do not assume cloud-only `/sys_metrics` is available. |
+- **Dashboard / package:** **PostgreSQL performance — Phase 9 / PLAN-026**
+  - **Required panels:** Transactions/sec and rollbacks; connection usage;
+    blocked sessions and oldest transactions; cache hits and disk I/O;
+    WAL/checkpoints; temporary spills; vacuum activity and dead tuples.
+  - **Metrics source and implementation constraints:** Extend the existing
+    PostgreSQL exporter using native statistics. Optionally add aggregated
+    execution statistics through `pg_stat_statements`, after reviewing preload
+    changes, collection permissions and overhead. Do not export SQL text or
+    unbounded query identifiers.
+- **Dashboard / package:** **DuckDB / Parquet analytics — Phase 9 / PLAN-027**
+  - **Required panels:** Query duration and CPU time; peak buffer memory;
+    temporary spill usage; rows scanned/returned; artifact transfer/checksum
+    time; bytes downloaded; successful/failed runs.
+  - **Metrics source and implementation constraints:** Instrument
+    application/job operations and extract selected DuckDB profiling fields.
+    DuckDB is embedded: show workload/job observations rather than inventing a
+    shared server. Keep query-engine time separate from storage transfer and
+    integrity verification.
+- **Dashboard / package:** **RustFS S3 performance — Phase 9 / PLAN-027**
+  - **Required panels:** GET/PUT throughput and latency; transferred bytes;
+    errors/timeouts; backpressure; storage growth; scanner/healing activity;
+    disk pressure.
+  - **Metrics source and implementation constraints:** Verify the pinned
+    release's OTLP metrics and route them through Alloy where compatible, with a
+    bounded metrics pipeline into Prometheus. Current operations documentation
+    describes OTLP export; do not assume a native Prometheus scrape endpoint.
+    Validate availability and scope of each operation/bucket metric before
+    adding panels.
+- **Dashboard / package:** **OpenSearch performance — Phase 9 / PLAN-028**
+  - **Required panels:** Search/indexing throughput and mean operation time;
+    active searches; thread-pool queues/rejections; JVM heap/GC; circuit
+    breakers; shard health; segment merges; cache efficiency; disk watermarks.
+  - **Metrics source and implementation constraints:** Use a restricted exporter
+    polling cluster/node/index statistics over verified private TLS. Add
+    application histograms for end-to-end search percentiles; accumulated native
+    operation counts/times provide means, not p95/p99. Include single-node
+    topology expectations when interpreting shard health.
+- **Dashboard / package:** **Apache AGE performance and projection health —
+  Phase 9 / PLAN-029**
+  - **Required panels:** Graph-query throughput/latency/errors; SQL lock waits
+    and spills; projection freshness and pending source updates; rebuild
+    duration/failures; last successful validation.
+  - **Metrics source and implementation constraints:** Reuse PostgreSQL
+    statistics for database behavior, instrument graph operations in
+    applications, and expose projection-worker freshness/rebuild metrics.
+    Identify each signal's source; do not attribute shared PostgreSQL CPU/I/O
+    exclusively to AGE.
+- **Dashboard / package:** **Neo4j Community instance performance — Phase 9 /
+  PLAN-029**
+  - **Required panels:** Per-resource instance availability/restarts;
+    CPU/memory; JVM heap/GC; disk growth; Bolt connections; instrumented query
+    latency/errors; backup interruption and duration.
+  - **Metrics source and implementation constraints:** Combine container
+    metrics, a standard JVM exporter and client instrumentation, verified
+    against the selected Community image. Validate connection counters against
+    an available source. Native database-internal counters are conditional: the
+    documented built-in metrics exporter is an Enterprise feature. Do not
+    introduce a commercial edition to fill panels. Discover each dedicated
+    instance from its stable resource identity.
+- **Dashboard / package:** **pgvector performance — Phase 9 / PLAN-030**
+  - **Required panels:** Vector-query throughput/latency; index size and usage;
+    HNSW/IVFFlat build progress; vacuum activity; resource consumption during
+    indexing.
+  - **Metrics source and implementation constraints:** Combine PostgreSQL
+    statistics/index-build progress and application vector-query histograms.
+    Clearly distinguish shared-server usage from attributable workload usage.
+    Recall measurements come only from explicit, versioned comparison runs, not
+    an inferred live operational metric.
+- **Dashboard / package:** **Qdrant performance — Phase 9 / PLAN-030**
+  - **Required panels:** Search/upsert throughput; latency percentiles and
+    errors; point/vector counts; indexed versus unindexed points; optimizer
+    activity; memory/page faults; file descriptors; snapshots.
+  - **Metrics source and implementation constraints:** Privately scrape native
+    `/metrics`, with bounded per-collection dimensions and selected telemetry
+    fields where required. Verify histogram and collection coverage in the
+    pinned release; do not assume cloud-only `/sys_metrics` is available.
 
 ### Common collection and dashboard requirements
 
-- Keep dashboards, collectors, recording rules and alerts in versioned source and
-  provision through the existing Grafana/Prometheus/Alloy and Compose/Ansible
-  workflow. Extend the dashboard generator rather than hand-editing generated
-  JSON. Start with PostgreSQL enhancements and RustFS/OpenSearch/Qdrant native
-  collection, then AGE/pgvector workload views and DuckDB analytics; deliver
-  Neo4j coverage with its dedicated-instance provider. All eight remain in scope.
+- Keep dashboards, collectors, recording rules and alerts in versioned source
+  and provision through the existing Grafana/Prometheus/Alloy and
+  Compose/Ansible workflow. Extend the dashboard generator rather than
+  hand-editing generated JSON. Start with PostgreSQL enhancements and
+  RustFS/OpenSearch/Qdrant native collection, then AGE/pgvector workload views
+  and DuckDB analytics; deliver Neo4j coverage with its dedicated-instance
+  provider. All eight remain in scope.
 - Filter by provider, project, stable resource ID and instance where reliable
   attribution exists. Clearly label shared-service signals. Use catalog mappings
-  for generated database/bucket/index/collection names; dashboard filters are not
-  an authorization boundary. Apply the platform's monitoring access policy.
+  for generated database/bucket/index/collection names; dashboard filters are
+  not an authorization boundary. Apply the platform's monitoring access policy.
 - Show native performance alongside container CPU, memory limits, restarts and
   disk pressure. Add missing Docker-container collection where needed; existing
   Kubernetes workload metrics do not cover these Compose stores. Measure
@@ -126,12 +197,13 @@ query validation are implemented. See the [monitoring guide](../../../../infrast
   edition/API limitations and exact required permissions; monitoring must not
   widen human/application grants or expose administrator keys to browsers.
 - Show collector health, collection errors, last successful collection and stale
-  or missing data explicitly. Distinguish unavailable, disabled/unselected,
-  idle and scheduled maintenance; missing series must not imply healthy or zero.
-- Add actionable alerts for unavailability, sustained errors/rejections, resource
-  exhaustion and stalled maintenance. Tune thresholds using observed workloads;
-  dashboard thresholds do not impose store-adoption or benchmark success criteria.
-  Link relevant backup status, resource lifecycle and operator runbooks.
+  or missing data explicitly. Distinguish unavailable, disabled/unselected, idle
+  and scheduled maintenance; missing series must not imply healthy or zero.
+- Add actionable alerts for unavailability, sustained errors/rejections,
+  resource exhaustion and stalled maintenance. Tune thresholds using observed
+  workloads; dashboard thresholds do not impose store-adoption or benchmark
+  success criteria. Link relevant backup status, resource lifecycle and operator
+  runbooks.
 
 ### Verification and evidence
 
@@ -149,16 +221,18 @@ collectors, provider outages, counter resets, stale data and collection-denied
 credentials, plus alert firing/resolution and bounded labels. Verify dashboard
 provisioning, queries and drill-down links locally, then record deployed
 collection/visualization separately. Neo4j fixtures must cover per-instance
-identity/discovery and scheduled offline backup visibility. External applications
-own their required workload instrumentation; local synthetic evidence does not
-claim external instrumentation or deployed acceptance.
+identity/discovery and scheduled offline backup visibility. External
+applications own their required workload instrumentation; local synthetic
+evidence does not claim external instrumentation or deployed acceptance.
 
-Reference interfaces: [PostgreSQL statistics](https://www.postgresql.org/docs/18/monitoring-stats.html),
+Reference interfaces:
+[PostgreSQL statistics](https://www.postgresql.org/docs/18/monitoring-stats.html),
 [pgvector monitoring](https://github.com/pgvector/pgvector#monitoring),
 [DuckDB profiling metrics](https://duckdb.org/docs/current/dev/metrics),
 [RustFS observability](https://docs.rustfs.com/en/operations/observability),
 [OpenSearch node statistics](https://docs.opensearch.org/latest/api-reference/nodes-apis/nodes-stats/),
-[Qdrant monitoring](https://qdrant.tech/documentation/ops-monitoring/monitoring/) and
+[Qdrant monitoring](https://qdrant.tech/documentation/ops-monitoring/monitoring/)
+and
 [Neo4j metrics export](https://neo4j.com/docs/operations-manual/current/monitoring/metrics/expose/).
 These references guide release-specific verification rather than guaranteeing
 that every current-documentation metric exists in the pinned images.
@@ -166,10 +240,10 @@ that every current-documentation metric exists in the pinned images.
 ## Exit
 
 Record each performed comparison with versioned data, workload, environment,
-commands, equivalent-result checks, measurements, owner interpretation and limits.
-For each of the eight dashboards, record actual metric names/types/units,
-permissions, query validation, deployed collection and visualization, missing or
-stale-data behavior and alert response. Mark unavailable external application
-instrumentation and unscheduled comparisons explicitly; do not claim them passed.
-Phase 9 completion is independent of Phase 7/8 provider acceptance and of Phase 10
-leftovers.
+commands, equivalent-result checks, measurements, owner interpretation and
+limits. For each of the eight dashboards, record actual metric
+names/types/units, permissions, query validation, deployed collection and
+visualization, missing or stale-data behavior and alert response. Mark
+unavailable external application instrumentation and unscheduled comparisons
+explicitly; do not claim them passed. Phase 9 completion is independent of Phase
+7/8 provider acceptance and of Phase 10 leftovers.

@@ -1,34 +1,37 @@
 # Platform heartbeat
 
-Use the canonical [heartbeat overview](../../docs/operators/components/heartbeat.md)
-for its place in the operating model. This page retains deployment and drill
-details close to the component source.
+Use the canonical
+[heartbeat overview](../../docs/operators/components/heartbeat.md) for its place
+in the operating model. This page retains deployment and drill details close to
+the component source.
 
 Run deployment commands from the repository root.
 
-## Platform heartbeat
+## Deployment prerequisites
 
-`deploy-heartbeat.yml` runs on localhost and delegates installation to the platform
-host named by `heartbeat_target` (default `platform`). The target needs Ubuntu
-22.04+ or Debian with systemd, Python 3, SSH access, and sudo privileges. The
-platform API and Prometheus must already be available on local ports 8000 and
-9090. The playbook installs Python and CA certificates, the heartbeat script,
-a private environment file, and the systemd service and timer.
+`deploy-heartbeat.yml` runs on localhost and delegates installation to the
+platform host named by `heartbeat_target` (default `platform`). The target needs
+Ubuntu 22.04+ or Debian with systemd, Python 3, SSH access, and sudo privileges.
+The platform API and Prometheus must already be available on local ports 8000
+and 9090. The playbook installs Python and CA certificates, the heartbeat
+script, a private environment file, and the systemd service and timer.
 
 ```bash
 cp operations/heartbeat/ansible/inventory.heartbeat.example.yml /tmp/heartbeat-inventory.yml
 # Edit the platform SSH host/user and heartbeat_url.
-ansible-playbook -i /tmp/heartbeat-inventory.yml operations/heartbeat/ansible/deploy-heartbeat.yml --ask-pass --ask-become-pass
+ansible-playbook -i /tmp/heartbeat-inventory.yml \
+  operations/heartbeat/ansible/deploy-heartbeat.yml --ask-pass --ask-become-pass
 ```
 
 Enter the same token configured in the external watchdog's `config.local.php` at
 the private token prompt. Tokens must contain at least 32 letters, digits,
-underscores, or hyphens. For automation, supply `heartbeat_token` using an Ansible
-Vault encrypted variables file (`-e @secrets.yml --ask-vault-pass`). Use the normal
-Ansible `ansible_password` and `ansible_become_password` Vault variables for SSH
-and sudo passwords. Omit the corresponding password flags when using SSH keys
-or passwordless sudo. Ansible versions that require `sshpass` for password
-connections need it installed on the controller. Verify the SSH host key first.
+underscores, or hyphens. For automation, supply `heartbeat_token` using an
+Ansible Vault encrypted variables file (`-e @secrets.yml --ask-vault-pass`). Use
+the normal Ansible `ansible_password` and `ansible_become_password` Vault
+variables for SSH and sudo passwords. Omit the corresponding password flags when
+using SSH keys or passwordless sudo. Ansible versions that require `sshpass` for
+password connections need it installed on the controller. Verify the SSH host
+key first.
 
 The script is installed at `/usr/local/lib/developer-platform/heartbeat.py`, so
 the systemd dynamic user can read it even when `/opt/developer-platform` is
@@ -48,11 +51,13 @@ sudo systemctl status platform-heartbeat.timer
 sudo journalctl -u platform-heartbeat.service -n 30
 ```
 
-`--check` previews remote file/package changes but skips timer activation. Syntax
-validation does not connect to the host:
+`--check` previews remote file/package changes but skips timer activation.
+Syntax validation does not connect to the host:
 
 ```bash
-ansible-playbook -i operations/heartbeat/ansible/inventory.heartbeat.example.yml operations/heartbeat/ansible/deploy-heartbeat.yml --syntax-check
+ansible-playbook -i \
+  operations/heartbeat/ansible/inventory.heartbeat.example.yml \
+  operations/heartbeat/ansible/deploy-heartbeat.yml --syntax-check
 ```
 
 ## Availability drills
@@ -90,14 +95,15 @@ ansible-playbook -i operations/backup/ansible/inventory.backup.yml \
   operations/heartbeat/ansible/drill-docker-availability.yml
 ```
 
-Confirm the external watchdog DOWN and UP emails. This is not a physical host
-or power-loss test: it cannot independently recover a machine that is actually
+Confirm the external watchdog DOWN and UP emails. This is not a physical host or
+power-loss test: it cannot independently recover a machine that is actually
 offline. Recovery invokes the normal bootstrap reconciliation, but does not
 delete or recreate the existing cluster, named volumes, or project data.
 
 Both drills are live changes. Do not run them during provisioning, a backup
-capture, or another availability exercise. If a run fails, use the fetched report
-and `journalctl -u <printed-unit> --no-pager`, then verify `docker compose ps`,
+capture, or another availability exercise. If a run fails, use the fetched
+report and `journalctl -u <printed-unit> --no-pager`, then verify
+`docker compose ps`,
 `kubectl --kubeconfig /opt/developer-platform/.runtime/admin.kubeconfig get nodes`,
 and the heartbeat timer before retrying. A report proves observed monitoring and
 recovery state; email receipt remains an operator confirmation.

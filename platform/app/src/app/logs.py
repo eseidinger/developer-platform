@@ -116,7 +116,7 @@ def observe_logs(
             or []
         )
         api = api or CoreV1Api(runtime.client)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Pod log query failed project=%s error_type=%s", project, type(exc).__name__
         )
@@ -171,7 +171,7 @@ def observe_logs(
                         exc.status,
                     )
                     break
-                except Exception as exc:
+                except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                     failed += 1
                     log.error(
                         "Pod log read failed project=%s error_type=%s",

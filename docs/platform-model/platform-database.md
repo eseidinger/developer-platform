@@ -3,12 +3,12 @@
 The PostgreSQL database named `platform` is the platform's durable record of
 project identity, desired application state, authorization decisions, and work
 to be reconciled. It is not the database that an application uses for its own
-business data. Application data lives in independently created named resources. PostgreSQL
-resources use `resource_<uuid-without-hyphens>` databases; unbound applications
-receive no automatic database.
+business data. Application data lives in independently created named resources.
+PostgreSQL resources use `resource_<uuid-without-hyphens>` databases; unbound
+applications receive no automatic database.
 
-The diagram groups records by meaning. It shows conceptual relationships;
-not every line represents a database foreign-key constraint.
+The diagram groups records by meaning. It shows conceptual relationships; not
+every line represents a database foreign-key constraint.
 
 ```mermaid
 erDiagram
@@ -22,33 +22,64 @@ erDiagram
     PROJECTS ||--o{ DEPLOYMENT_CREDENTIALS : scopes
 ```
 
-| Record family | What it means |
-| --- | --- |
-| `projects`, `project_environments`, `project_applications` | Stable catalog identities and the currently supported default environment/application relationship. `projects` also holds current status and a current desired specification. |
-| `application_revisions` | Immutable numbered desired specifications. They let an update, comparison, or rollback refer to a precise declaration. |
-| `application_operations` | Durable deployment and restart work: target revision, original actor, state, attempts, bounded result, and error code. A worker can find queued or interrupted work after restart. |
-| `project_retirements`, `data_service_recovery_requests` | Retained retirement inventory and requests for operator-assisted data-service recovery. |
-| `platform_principals`, `platform_grants`, `platform_authorization_metadata` | The issuer/subject identities seen by the API, their project or platform roles, and authorization metadata. |
-| `deployment_credentials` | Automation-client identity and lifecycle metadata: provider client identifiers, project and kind, expiry, rotation lineage, use, and revocation state. It does not contain the client secret. |
-| `hosted_access_resources`, `hosted_access_principals` | Versioned groups, policies and policy revisions, governance, human requests, memberships, service requests, and stable hosted principal mappings. Service records hold credential identifiers and states, not credential values. |
-| `hosted_access_operations`, `hosted_access_idempotency`, `hosted_access_metadata`, `hosted_access_replicas` | Pending access reconciliation, replay protection, policy generation, and authorizer replica acknowledgements. |
-| `store_resources`, `store_grants`, `store_credentials`, store identity/recovery metadata | Independent resource lifecycle, explicit human and component authority, expiring credential generations, quarantine and verified purge intent. |
-| `ai_project_policies`, `ai_runs`, `ai_change_proposals` | AI classification, durable sourced run results and usage, exact rollback diffs, approvals and resulting operations. |
-| `platform_audit.events` | Append-only, restricted audit records identifying actor, action, scope, result, revision or operation, and redacted detail. |
+- **Record family:** `projects`, `project_environments`, `project_applications`
+  - **What it means:** Stable catalog identities and the currently supported
+    default environment/application relationship. `projects` also holds current
+    status and a current desired specification.
+- **Record family:** `application_revisions`
+  - **What it means:** Immutable numbered desired specifications. They let an
+    update, comparison, or rollback refer to a precise declaration.
+- **Record family:** `application_operations`
+  - **What it means:** Durable deployment and restart work: target revision,
+    original actor, state, attempts, bounded result, and error code. A worker
+    can find queued or interrupted work after restart.
+- **Record family:** `project_retirements`, `data_service_recovery_requests`
+  - **What it means:** Retained retirement inventory and requests for
+    operator-assisted data-service recovery.
+- **Record family:** `platform_principals`, `platform_grants`,
+  `platform_authorization_metadata`
+  - **What it means:** The issuer/subject identities seen by the API, their
+    project or platform roles, and authorization metadata.
+- **Record family:** `deployment_credentials`
+  - **What it means:** Automation-client identity and lifecycle metadata:
+    provider client identifiers, project and kind, expiry, rotation lineage,
+    use, and revocation state. It does not contain the client secret.
+- **Record family:** `hosted_access_resources`, `hosted_access_principals`
+  - **What it means:** Versioned groups, policies and policy revisions,
+    governance, human requests, memberships, service requests, and stable hosted
+    principal mappings. Service records hold credential identifiers and states,
+    not credential values.
+- **Record family:** `hosted_access_operations`, `hosted_access_idempotency`,
+  `hosted_access_metadata`, `hosted_access_replicas`
+  - **What it means:** Pending access reconciliation, replay protection, policy
+    generation, and authorizer replica acknowledgements.
+- **Record family:** `store_resources`, `store_grants`, `store_credentials`,
+  store identity/recovery metadata
+  - **What it means:** Independent resource lifecycle, explicit human and
+    component authority, expiring credential generations, quarantine and
+    verified purge intent.
+- **Record family:** `ai_project_policies`, `ai_runs`, `ai_change_proposals`
+  - **What it means:** AI classification, durable sourced run results and usage,
+    exact rollback diffs, approvals and resulting operations.
+- **Record family:** `platform_audit.events`
+  - **What it means:** Append-only, restricted audit records identifying actor,
+    action, scope, result, revision or operation, and redacted detail.
 
 This separation matters during partial failure. A project's desired revision can
 be present while its Kubernetes rollout is still pending. An approved service
 request can be present while Keycloak provisioning has failed. The operation
-record makes each unfinished step visible and recoverable without pretending
-the downstream resource already exists.
+record makes each unfinished step visible and recoverable without pretending the
+downstream resource already exists.
 
 ## State held elsewhere
 
-The platform database does **not** hold application rows. Those live in the selected named PostgreSQL or native provider resources. It does not hold write-only application
-secret values, service client secrets, or database passwords. Application and
-managed service credentials are placed in Kubernetes Secrets in the relevant
-namespace; Keycloak holds its client identities, and the platform derives some
-provider secrets from a protected runtime key. Store credential values are derived from protected operator keys and generation
+The platform database does **not** hold application rows. Those live in the
+selected named PostgreSQL or native provider resources. It does not hold
+write-only application secret values, service client secrets, or database
+passwords. Application and managed service credentials are placed in Kubernetes
+Secrets in the relevant namespace; Keycloak holds its client identities, and the
+platform derives some provider secrets from a protected runtime key. Store
+credential values are derived from protected operator keys and generation
 identities rather than stored as plaintext catalog rows.
 
 Keycloak stores realm accounts, client configuration, and projected client

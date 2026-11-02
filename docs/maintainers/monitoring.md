@@ -20,13 +20,15 @@ python3 scripts/generate/generate-dashboards.py --check
 
 The `check-*` scripts above use disposable Docker dependencies; they are fixture
 checks, not read-only inspection of an installed platform. Dashboard generation
-with `--check` is a source-only reproducibility check. Store/AI pipeline fixtures
-and their exact dependencies are linked in the source-adjacent monitoring guide.
+with `--check` is a source-only reproducibility check. Store/AI pipeline
+fixtures and their exact dependencies are linked in the source-adjacent
+monitoring guide.
 
-The source-adjacent [application monitoring README](../../infrastructure/monitoring/README.md)
+The source-adjacent
+[application monitoring README](../../infrastructure/monitoring/README.md)
 documents target generation, rule files, fixtures, and implementation tests. The
-[operator monitoring guide](../operators/monitoring.md) is canonical for signals,
-alerts, dashboards, and live acceptance. The
+[operator monitoring guide](../operators/monitoring.md) is canonical for
+signals, alerts, dashboards, and live acceptance. The
 [observability architecture](../architecture/observability.md) owns design and
 failure-boundary rationale.
 

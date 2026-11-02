@@ -64,5 +64,5 @@ class OperationStatus(BaseModel):
 
 def application_body(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
-        raise ValueError("application specification must be a JSON object")
+        raise TypeError("application specification must be a JSON object")
     return value

@@ -16,11 +16,10 @@ payloads. Ordinary platform and hosted-application instrumentation remains
 independent.
 
 `scripts/tests/components/observability/verify-ai-trace-pipeline.py` exercises
-the actual
-platform HTTP middleware and focused OpenLIT wrapper with synthetic provider
-responses through disposable production-pinned Alloy/Tempo containers. The
-October 17 local fixture reads back 100 of 100 root request traces and exactly
-ten model spans, including provider failure, with correct run/tool/model
+the actual platform HTTP middleware and focused OpenLIT wrapper with synthetic
+provider responses through disposable production-pinned Alloy/Tempo containers.
+The October 17 local fixture reads back 100 of 100 root request traces and
+exactly ten model spans, including provider failure, with correct run/tool/model
 parentage. It verifies rejection of incoming public trace context/baggage,
 private attribute/content removal and preservation of trusted internal
 unsampled-parent behavior. This is local delivery evidence; it does not
@@ -119,12 +118,12 @@ idle usage. Safe Tempo links contain only a fixed query and bounded time range.
 
 Run the AI backend tests and
 `scripts/tests/components/observability/verify-ai-metric-pipeline.py` (Docker).
-The former
-uses the actual LangChain/OpenAI/OpenLIT path with mock HTTP responses,
-including finalization and failure; it checks correlation, cardinality-safe
-metadata and seeded content exclusion. The latter uses disposable
-network-isolated Alloy/Prometheus containers and the production metric pipeline,
-checks filtering and translation, and parses every generated AI dashboard query.
+The former uses the actual LangChain/OpenAI/OpenLIT path with mock HTTP
+responses, including finalization and failure; it checks correlation,
+cardinality-safe metadata and seeded content exclusion. The latter uses
+disposable network-isolated Alloy/Prometheus containers and the production
+metric pipeline, checks filtering and translation, and parses every generated AI
+dashboard query.
 
 These fixtures are not deployed acceptance. Rollout must verify API restart,
 trace and direct-metric readback, collector failure/recovery, comparison with

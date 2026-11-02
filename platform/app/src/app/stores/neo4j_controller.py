@@ -8,6 +8,7 @@ import hashlib
 import hmac
 import ipaddress
 import json
+import logging
 import os
 import threading
 import time
@@ -22,6 +23,7 @@ from .neo4j import IMAGE
 LABEL = "developer-platform.neo4j-resource"
 LOCK = threading.Lock()
 DEADLINE = threading.local()
+log = logging.getLogger(__name__)
 
 
 def remaining():
@@ -447,8 +449,8 @@ def create_app(controller=None):
 
                 try:
                     await asyncio.to_thread(attach)
-                except Exception:
-                    pass  # Collection health exposes missing connectivity; never dump daemon data.
+                except Exception:  # noqa: BLE001 - Docker errors can contain private data.
+                    log.debug("Dedicated instance network reconciliation failed")
                 await asyncio.sleep(5)
 
         task = asyncio.create_task(maintain())
@@ -496,7 +498,7 @@ def create_app(controller=None):
                         del DEADLINE.until
 
             return await asyncio.to_thread(apply)
-        except Exception:
+        except Exception:  # noqa: BLE001 - Never return Docker details to callers.
             raise HTTPException(
                 503, "Dedicated instance operation unavailable"
             ) from None

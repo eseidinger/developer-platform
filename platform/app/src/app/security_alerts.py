@@ -89,7 +89,7 @@ def security_alert_loop(stop, directory: str, log) -> None:
     while not stop.is_set():
         try:
             publish(directory)
-        except Exception:
+        except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             # Audit data and database errors can contain sensitive context.
             log.error(
                 "Security audit metric collection failed; retaining previous metrics"

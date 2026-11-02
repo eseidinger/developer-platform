@@ -82,7 +82,7 @@ def _scheduled_status(
             type(exc).__name__,
         )
         return {**base, "state": "unknown", "reason": "ObserverUnavailable"}
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "CronJob status query failed project=%s component=%s error_type=%s",
             project,
@@ -116,7 +116,7 @@ def _scheduled_status(
                     )
                     if latest_failure is None or candidate[0] > latest_failure[0]:
                         latest_failure = candidate
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Job status query failed project=%s component=%s error_type=%s",
             project,

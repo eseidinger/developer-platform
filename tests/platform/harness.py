@@ -19,7 +19,7 @@ import stat
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from html.parser import HTMLParser
 from pathlib import Path
 from urllib.parse import urlsplit, urlunsplit
@@ -27,7 +27,6 @@ from uuid import uuid4
 
 import httpx2 as httpx
 import jwt
-
 
 ROOT = Path(__file__).resolve().parents[2]
 RUN_PATTERN = re.compile(r"[0-9a-f]{12}")
@@ -56,7 +55,7 @@ def require(condition, code):
 
 
 def utc():
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 def origin(url, *, internal=False):
@@ -531,6 +530,7 @@ class Kube:
             text=True,
             capture_output=True,
             timeout=timeout,
+            check=False,
         )
         require(result.returncode == 0, "kubernetes_command_failed")
         return result.stdout
@@ -649,6 +649,7 @@ def host_network_probe(body):
         text=True,
         capture_output=True,
         timeout=45,
+        check=False,
     )
     require(result.returncode == 0, "host_network_probe_failed")
     return json.loads(result.stdout)
@@ -917,7 +918,7 @@ class Drill:
                 statuses=(202,),
             )
 
-            def resource_ready():
+            def resource_ready(owner=owner, storage=storage):
                 found = owner.request("GET", "/v1/resources/" + storage["resource_id"])
                 return found["observed_state"] == "active"
 
@@ -936,7 +937,7 @@ class Drill:
                 )
                 bindings[component] = grant["grant_id"]
 
-            def bindings_ready():
+            def bindings_ready(owner=owner, project=project, bindings=bindings):
                 found = owner.request(
                     "GET", "/v1/projects/" + project + "/resource-bindings"
                 )["bindings"]
@@ -1104,7 +1105,7 @@ class Drill:
             "GET", self.resource("provider", "application-access-requests")
         )["items"]
         row = next(r for r in rows if r["id"] == request_id)
-        granted = self.owners["provider"].request(
+        self.owners["provider"].request(
             "POST",
             self.resource("provider", "application-access-requests", request_id)
             + "/approve",
@@ -1310,7 +1311,7 @@ class Drill:
         for role, project in self.projects.items():
             expression = 'probe_success{job="applications",project="' + project + '"}'
 
-            def boundary():
+            def boundary(expression=expression, role=role):
                 rows = metric(expression)
                 return (
                     len(rows) == 1
@@ -1333,13 +1334,15 @@ class Drill:
                 + '",label_platform_example_component="api"})'
             )
             wait_for(
-                lambda: any(float(row["value"][1]) >= 1 for row in metric(readiness)),
+                lambda readiness=readiness: any(
+                    float(row["value"][1]) >= 1 for row in metric(readiness)
+                ),
                 "component_semantic_readiness_unavailable",
                 120,
             )
             self.check(role + "-component-semantic-readiness", True)
 
-            def retained():
+            def retained(project=project):
                 result = self.api.request(
                     "GET",
                     "/projects/"
@@ -1438,7 +1441,7 @@ class Drill:
                 role + "-direct-backend-bypass-denied",
                 backend,
                 8080,
-                lambda body: self.kube.exec_json(
+                lambda body, role=role: self.kube.exec_json(
                     self.projects[role], "worker", NETWORK_PROBE, body
                 ),
                 self.kube.authorizer_probe,
@@ -1875,7 +1878,7 @@ def cleanup(journal, api, keycloak):
             "cleanup_persona_scope_mismatch",
         )
 
-        def revoked():
+        def revoked(persona=persona):
             return (
                 api.request(
                     "DELETE",
@@ -2116,7 +2119,7 @@ def main(argv=None):
         error = None
         try:
             Drill(args, journal, api, keycloak, Kube(args.kubectl)).run()
-        except (Exception, KeyboardInterrupt) as exc:
+        except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
             error = (
                 str(exc)
                 if isinstance(exc, DrillError)
@@ -2127,7 +2130,7 @@ def main(argv=None):
         finally:
             try:
                 cleanup(journal, api, keycloak)
-            except (Exception, KeyboardInterrupt):
+            except (Exception, KeyboardInterrupt):  # noqa: BLE001 - Record and clean up after any drill failure.
                 journal.report["cleanup"] = "incomplete-retry-required"
                 error = error or "cleanup_failed"
         journal.report.update(
@@ -2139,7 +2142,7 @@ def main(argv=None):
         print("REPORT " + str(args.output / "report.json"), flush=True)
         print("Full acceptance gate remains open; see deferred checks.", flush=True)
         return 1 if error else 0
-    except (Exception, KeyboardInterrupt) as exc:
+    except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
         code = (
             str(exc)
             if isinstance(exc, DrillError)

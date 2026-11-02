@@ -10,7 +10,7 @@ def _attempt(conn, table, field, identity, operation):
         with conn.transaction():
             operation()
         return True
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         code = (
             "ProviderUnavailable"
             if isinstance(error, providers.ProviderUnavailable)
@@ -168,7 +168,7 @@ def reconcile(conn, control=None):
 
             ready = reconcile_runtime(conn, control)
             runtime_ok = True
-        except Exception:
+        except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             control.log.error(
                 "Store consumer reconciliation failed error_type=RuntimeReconcileFailed"
             )
@@ -237,7 +237,7 @@ def loop(stop, control):
 
             with control.connect() as conn:
                 publish(conn)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             control.log.error(
                 "Store reconciliation failed error_type=%s", type(exc).__name__
             )

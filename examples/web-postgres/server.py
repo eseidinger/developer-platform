@@ -1,4 +1,5 @@
 """Small web/PostgreSQL example. The platform, not this app, handles ingress auth."""
+
 import html
 import json
 import os
@@ -9,9 +10,13 @@ import psycopg
 
 def visit_count() -> int:
     with psycopg.connect(connect_timeout=5) as conn:
-        conn.execute("CREATE TABLE IF NOT EXISTS demo_visits (id integer PRIMARY KEY, count bigint NOT NULL)")
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS demo_visits (id integer PRIMARY KEY, count bigint NOT NULL)"
+        )
         return conn.execute("""INSERT INTO demo_visits VALUES (1, 1)
-            ON CONFLICT (id) DO UPDATE SET count=demo_visits.count+1 RETURNING count""").fetchone()[0]
+            ON CONFLICT (id) DO UPDATE SET count=demo_visits.count+1 RETURNING count""").fetchone()[
+            0
+        ]
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -42,13 +47,21 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 count = visit_count()
             except psycopg.Error:
-                return self.reply(503, b'{"error":"database unavailable"}', "application/json")
-            return self.reply(200, json.dumps({"visits": count}).encode(), "application/json")
+                return self.reply(
+                    503, b'{"error":"database unavailable"}', "application/json"
+                )
+            return self.reply(
+                200, json.dumps({"visits": count}).encode(), "application/json"
+            )
         if self.path == "/":
-            identity = html.escape(self.headers.get("X-Platform-Principal-Name", "visitor"), quote=True)
-            page = ("<!doctype html><title>Developer Platform sample</title>"
-                    "<h1>Web + PostgreSQL</h1><p>Hello, " + identity + ".</p>"
-                    "<p><a href='/api/visits'>Increment the shared visit counter</a></p>")
+            identity = html.escape(
+                self.headers.get("X-Platform-Principal-Name", "visitor"), quote=True
+            )
+            page = (
+                "<!doctype html><title>Developer Platform sample</title>"
+                "<h1>Web + PostgreSQL</h1><p>Hello, " + identity + ".</p>"
+                "<p><a href='/api/visits'>Increment the shared visit counter</a></p>"
+            )
             return self.reply(200, page.encode(), "text/html; charset=utf-8")
         return self.reply(404, b"not found", "text/plain")
 

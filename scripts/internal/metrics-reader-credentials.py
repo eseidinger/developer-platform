@@ -1,7 +1,9 @@
+# ruff: noqa: N999 - Operator entry-point filenames use hyphens by repository convention.
 """Extract only the Prometheus Kubernetes proxy credential from a token secret."""
+
+import argparse
 import base64
 import json
-import argparse
 from pathlib import Path
 
 parser = argparse.ArgumentParser(description=__doc__)

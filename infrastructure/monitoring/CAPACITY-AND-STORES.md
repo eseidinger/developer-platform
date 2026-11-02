@@ -42,10 +42,9 @@ missing usage is not synthesized as healthy zero. Recording rules in
 ownership data.
 
 `scripts/tests/components/observability/check-monitoring.py` validates the
-configuration
-and executes `tests/capacity.test.yaml`: it covers namespace isolation, rolling
-ReplicaSets, sidecars, ordinary init exclusion, completed jobs, and incomplete
-limits.
+configuration and executes `tests/capacity.test.yaml`: it covers namespace
+isolation, rolling ReplicaSets, sidecars, ordinary init exclusion, completed
+jobs, and incomplete limits.
 
 ## PostgreSQL and host storage
 
@@ -97,12 +96,11 @@ uses capacity minus space available to an unprivileged process, including
 reserved blocks. Filesystems without inode capacity have no inode ratio.
 
 `scripts/tests/components/observability/check-postgres-monitoring.py` creates
-disposable
-PostgreSQL 18, exporter and Prometheus containers. It verifies repeatable role
-setup, denied application reads/writes, aggregate privacy, database selection,
-absent/unlimited values and dashboard query readback using production
-collectors, SQL and metric filters. It pauses the exporter to verify `up=0`,
-then resumes it and verifies `pg_up=1`.
+disposable PostgreSQL 18, exporter and Prometheus containers. It verifies
+repeatable role setup, denied application reads/writes, aggregate privacy,
+database selection, absent/unlimited values and dashboard query readback using
+production collectors, SQL and metric filters. It pauses the exporter to verify
+`up=0`, then resumes it and verifies `pg_up=1`.
 
 ## Phase 7 store performance
 
@@ -158,8 +156,7 @@ Shared-server CPU/I/O is labeled separately from attributable resource/workload
 signals.
 
 Run `scripts/tests/components/observability/verify-store-metric-pipeline.py` for
-real
-signed RustFS I/O through production Alloy into disposable Prometheus,
+real signed RustFS I/O through production Alloy into disposable Prometheus,
 sensitive-dimension exclusion and parsing all store-dashboard queries. Native
 OpenSearch/Qdrant fixtures additionally verify collector permissions and
 release-specific metric schemas. Alert fixtures include

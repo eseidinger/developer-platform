@@ -136,8 +136,8 @@ native deletion. Afterward, isolated repeated purge removes one resource while
 preserving the other. `console.PROVIDERS` includes OpenSearch and the portal
 advertises its launcher. Reproduce with `STORE_DASHBOARDS_FIXTURE=1` and
 `scripts/tests/components/stores/verify-shared-store-compose.py`; CI runs this
-separately
-from the RustFS/Qdrant browser fixture because their lease ports overlap.
+separately from the RustFS/Qdrant browser fixture because their lease ports
+overlap.
 
 The full production API image builds with all console assets and imports. These
 are synthetic local tests with disposable services; deployed OIDC/DNS/trusted

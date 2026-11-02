@@ -291,7 +291,7 @@ async def receive(request: Request):
         raise
     except (ValueError, DecodeError):
         raise HTTPException(422, "Invalid trace batch") from None
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         raise HTTPException(
             503, "Telemetry verification or collection unavailable"
         ) from None

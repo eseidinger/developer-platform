@@ -31,13 +31,17 @@ def check_env_name(key: Any, allow_secret_like: bool = False) -> None:
 def normalize_configuration(values: Any) -> dict[str, str]:
     """Validate configuration values before they can be stored or applied."""
     if not isinstance(values, dict):
-        raise ValueError("configuration must be a map of names to string values")
+        raise ValueError(  # noqa: TRY004 - Pydantic needs ValueError for validation responses.
+            "configuration must be a map of names to string values"
+        )
     if len(values) > MAX_VALUES:
         raise ValueError(f"configuration allows at most {MAX_VALUES} values")
     for key, value in values.items():
         check_env_name(key)
         if not isinstance(value, str):
-            raise ValueError(f"configuration value for {key} must be a string")
+            raise ValueError(  # noqa: TRY004 - Pydantic needs ValueError for validation responses.
+                f"configuration value for {key} must be a string"
+            )
         if len(value) > MAX_VALUE_LENGTH or "\x00" in value:
             raise ValueError(
                 f"configuration value for {key} is too long or contains NUL"
@@ -86,7 +90,7 @@ def observe_activation(
             "state": "unknown",
             "reason": "not_found" if exc.status == 404 else "unavailable",
         }
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         return {"state": "unknown", "reason": "unavailable"}
     template = _field(_field(deployment, "spec", {}), "template", {})
     containers = _field(_field(template, "spec", {}), "containers", []) or []

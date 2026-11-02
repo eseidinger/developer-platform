@@ -11,7 +11,8 @@ Choose the failure boundary that best matches the symptom:
 - [Security runbooks](security.md): compromised credentials and access
   revocation.
 
-Start with [inspect the current installation](platform.md#inspect-the-current-installation)
+Start with
+[inspect the current installation](platform.md#inspect-the-current-installation)
 when the boundary is unclear. Record the time, host, code revision, affected
 project, latest declaration, observed symptoms, and recovery result.
 

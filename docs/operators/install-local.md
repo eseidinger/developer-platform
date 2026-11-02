@@ -46,9 +46,9 @@ This creates an account using your local username (override with `--username`),
 writes its temporary password to mode-`0600` `.runtime/initial-admin.json`, and
 sets `PLATFORM_BOOTSTRAP_SUBJECT` to the new account's immutable ID. Keycloak
 requires a password change at first login. The command refuses to reset an
-existing account or overwrite a recovery file. A lost create response leaves
-the private recovery file intact for investigation. Automation uses separate
-test identities and never consumes this initial administrator password.
+existing account or overwrite a recovery file. A lost create response leaves the
+private recovery file intact for investigation. Automation uses separate test
+identities and never consumes this initial administrator password.
 
 Run `bash scripts/up.sh` next. After the first administrator grant has been
 persisted, clear `PLATFORM_BOOTSTRAP_SUBJECT` and recreate the API container so
@@ -76,13 +76,12 @@ uv run --project platform/app python scripts/tests/platform/smoke.py plan \
 ```
 
 The smoke plan is offline. For the explicit live command and credentials, see
-the [script test guide](../../scripts/tests/README.md). Live runs create a unique
-project and retire it afterward, retaining SQL data. `/healthz` proves only API
-process health
-and `/readyz` checks PostgreSQL plus Kubernetes connectivity; neither proves
-every workload. Use [platform acceptance](validation/acceptance.md) for the
-broader suite and [lifecycle](lifecycle.md) for stop, restart, recreation, and
-cleanup.
+the [script test guide](../../scripts/tests/README.md). Live runs create a
+unique project and retire it afterward, retaining SQL data. `/healthz` proves
+only API process health and `/readyz` checks PostgreSQL plus Kubernetes
+connectivity; neither proves every workload. Use
+[platform acceptance](validation/acceptance.md) for the broader suite and
+[lifecycle](lifecycle.md) for stop, restart, recreation, and cleanup.
 
 ## Noninteractive functional tests
 
@@ -93,9 +92,9 @@ private routing and public CA trust without exposing additional host ports.
 Local HTTPS uses Caddy's internal certificate authority, including native store
 consoles under `*.apps.localhost`. Bootstrap starts the proxy and runs
 `scripts/setup/prepare-local-trust.py` before starting pgAdmin. That isolated
-service receives only the public root certificate in a read-only mount and
-keeps OIDC certificate verification enabled. Public identity issuers continue
-to use the image's system certificate roots.
+service receives only the public root certificate in a read-only mount and keeps
+OIDC certificate verification enabled. Public identity issuers continue to use
+the image's system certificate roots.
 
 For your own clients, export its public root certificate:
 
@@ -105,8 +104,8 @@ docker compose cp proxy:/data/caddy/pki/authorities/local/root.crt \
   .runtime/trust/local-ca.pem
 ```
 
-Import that certificate into your browser's trusted authorities. Node-based
-test clients can use `NODE_EXTRA_CA_CERTS` with its absolute path; Python clients
+Import that certificate into your browser's trusted authorities. Node-based test
+clients can use `NODE_EXTRA_CA_CERTS` with its absolute path; Python clients
 need an SSL context that trusts it. Some system resolvers do not map
 `*.localhost` to loopback automatically, even when browsers do; configure local
 name resolution for API clients when necessary. These are client prerequisites,

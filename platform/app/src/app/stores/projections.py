@@ -370,7 +370,7 @@ def main():
         with psycopg.connect(connect_timeout=3) as conn:
             result = append(conn, json.loads(data))
         print(json.dumps(result))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         print(
             "Graph projection update failed: " + type(error).__name__, file=sys.stderr
         )

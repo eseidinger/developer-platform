@@ -2,8 +2,8 @@
 
 Status: selected on November 2, 2026; source implementation and disposable
 CouchDB fixture pass. Deployed acceptance has not started. This plan refines
-[Phase 8 package 8.3](phase-8-deferred-data-stores.md#83-document-stores)
-and [PLAN-033](../backlog.md#data-store-expansion-tasks). It does not select
+[Phase 8 package 8.3](phase-8-deferred-data-stores.md#83-document-stores) and
+[PLAN-033](../backlog.md#data-store-expansion-tasks). It does not select
 MongoDB. Phase 7's unfinished acceptance and other Phase 8 packages remain
 independent. The existing [store policies](data-store-expansion.md) apply.
 
@@ -24,8 +24,8 @@ reconnection is claimed by these checks.
 - Use the official Apache CouchDB distribution under Apache License 2.0. Record
   the exact image digest, bundled component notices and supported client version
   before installation. Pin upgrades under the shared-store maintenance policy.
-- Keep project data authoritative unless an application explicitly identifies
-  a recoverable source. Replication is optional and is not a substitute for a
+- Keep project data authoritative unless an application explicitly identifies a
+  recoverable source. Replication is optional and is not a substitute for a
   protected, point-in-time backup: deletions and conflicts can propagate.
 - Reuse project ownership, cross-project approval, explicit component bindings,
   human lease durations, application credential rotation and separate confirmed
@@ -39,14 +39,16 @@ can additionally manage design documents and database security. The native
 `_security` object therefore does not implement the platform's read-only grant.
 Mango index creation also requires administrator permission. See the
 [CouchDB security reference](https://docs.couchdb.org/en/stable/api/database/security.html)
-and [Mango API reference](https://docs.couchdb.org/en/stable/api/database/find.html).
+and
+[Mango API reference](https://docs.couchdb.org/en/stable/api/database/find.html).
 
 1. Give each resource private access to only its database, with separate
-   platform-managed human and application identities. Route every client request,
-   including read-write access, through the access gateway; only the operator
-   API and trusted relay may reach CouchDB directly. Verify that a credential cannot
-   enumerate or access another database, system database, server API or another
-   project's data. Database names alone provide no isolation.
+   platform-managed human and application identities. Route every client
+   request, including read-write access, through the access gateway; only the
+   operator API and trusted relay may reach CouchDB directly. Verify that a
+   credential cannot enumerate or access another database, system database,
+   server API or another project's data. Database names alone provide no
+   isolation.
 1. Design a fail-closed HTTP access gateway for read-only credentials. Allow
    only explicitly verified read operations, including any query endpoints that
    use `POST`; reject writes and administrative requests by route and operation,
@@ -87,15 +89,15 @@ and [Mango API reference](https://docs.couchdb.org/en/stable/api/database/find.h
 1. **Data and security tests:** Verify document create/update/delete, revision
    conflicts, authorized Mango index changes and schema evolution with
    representative JSON fixtures. Exercise same-project and cross-project grants,
-   reader/writer separation, system API denial, session fencing, service
-   restart and partial provisioning retries. Test browser access if implemented.
+   reader/writer separation, system API denial, session fencing, service restart
+   and partial provisioning retries. Test browser access if implemented.
 1. **Operations:** Integrate service and per-resource health, bounded metrics,
    alerts, capacity admission and quota reporting. Document any monitoring-only
    quota limit and compaction headroom; never call it a hard per-database quota.
-   Capture consistent encrypted off-host backups on the selected 12-hour schedule,
-   including data, design documents, security configuration and credential
-   reconciliation inputs. Preserve the existing purge backup gate and test
-   backup capture before Phase 8 acceptance.
+   Capture consistent encrypted off-host backups on the selected 12-hour
+   schedule, including data, design documents, security configuration and
+   credential reconciliation inputs. Preserve the existing purge backup gate and
+   test backup capture before Phase 8 acceptance.
 1. **Acceptance and handoff:** Run offline checks, focused component tests and
    bounded deployed tests for the activated provider. Record revision, image
    digest, environment, evidence and limitations in PLAN-033. The off-host
@@ -110,5 +112,5 @@ and [Mango API reference](https://docs.couchdb.org/en/stable/api/database/find.h
 Provisioning, isolation, read-only and read-write access, active revocation,
 bindings, retained-data lifecycle, monitoring, bounded capacity, backup capture
 and safe purge pass with recorded evidence. Any unsupported capability is
-rejected and documented. No deployed restore or performance result is claimed
-by this exit; those checks retain their Phase 10 and Phase 9 owners.
+rejected and documented. No deployed restore or performance result is claimed by
+this exit; those checks retain their Phase 10 and Phase 9 owners.

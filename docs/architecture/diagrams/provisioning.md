@@ -1,6 +1,8 @@
 # Provisioning Sequence
 
-Status: current queued-operation API and in-process worker. The second diagram records an optional Phase 6 service-extraction concept, not the selected delivery architecture. [Software architecture](../application-lifecycle.md).
+Status: current queued-operation API and in-process worker. The second diagram
+records an optional Phase 6 service-extraction concept, not the selected
+delivery architecture. [Software architecture](../application-lifecycle.md).
 
 ## Current asynchronous acceptance and execution
 
@@ -29,10 +31,15 @@ sequenceDiagram
     Note over Dev,K8s: Readiness is separate from the persisted apply outcome
 ```
 
-The worker reclaims a `running` operation when the prior process releases its session lock, retrying idempotent steps from the start. The monitoring-only thread also republishes discovery but does not reconcile workloads. Retirement pins a preview scope, commits the named-store access fence, deletes
-the managed namespace and records retained data/catalog state. It rejects active
-operations. Without a scope token, the compatibility path only acknowledges an
-already absent namespace. See [ADR-012](../decisions/ADR-012-admin-provisioning-baseline.md) and [ADR-014](../decisions/ADR-014-catalog-availability-monitoring.md).
+The worker reclaims a `running` operation when the prior process releases its
+session lock, retrying idempotent steps from the start. The monitoring-only
+thread also republishes discovery but does not reconcile workloads. Retirement
+pins a preview scope, commits the named-store access fence, deletes the managed
+namespace and records retained data/catalog state. It rejects active operations.
+Without a scope token, the compatibility path only acknowledges an already
+absent namespace. See
+[ADR-012](../decisions/ADR-012-admin-provisioning-baseline.md) and
+[ADR-014](../decisions/ADR-014-catalog-availability-monitoring.md).
 
 ## Optional Phase 6 extracted-service contract
 
@@ -76,4 +83,8 @@ sequenceDiagram
     API-->>Dev: Progress or redacted failure reason
 ```
 
-Routing and observability are also resumable steps; they are condensed here for readability. After a timeout, the worker observes provider state before attempting creation again. The worker cannot change the desired revision or expand the plan. Destructive work triggers control-plane reauthorization against the catalog before dispatch or commit.
+Routing and observability are also resumable steps; they are condensed here for
+readability. After a timeout, the worker observes provider state before
+attempting creation again. The worker cannot change the desired revision or
+expand the plan. Destructive work triggers control-plane reauthorization against
+the catalog before dispatch or commit.

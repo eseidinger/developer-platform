@@ -1,9 +1,9 @@
 # Docker-based Developer Platform Lab
 
 The Developer Platform is a single-host lab for deploying containerized
-applications through a platform API instead of managing Kubernetes and PostgreSQL
-resources directly. Docker Compose runs shared services and k3d/k3s runs
-application workloads.
+applications through a platform API instead of managing Kubernetes and
+PostgreSQL resources directly. Docker Compose runs shared services and k3d/k3s
+runs application workloads.
 
 ```text
 Internet → Caddy (TLS)
@@ -38,9 +38,9 @@ the [architecture overview](docs/architecture/README.md) for its boundaries.
 ## Quick start
 
 Requirements: Docker Engine with Compose 2.20.3 or newer, Python 3.10 or newer,
-Bash, `setfacl` (the Linux `acl` package), loopback-mount tools,
-kubectl 1.36.x (1.35.x–1.37.x supported), and internet access. Suggested
-capacity is 16 vCPUs and 32 GB RAM.
+Bash, `setfacl` (the Linux `acl` package), loopback-mount tools, kubectl 1.36.x
+(1.35.x–1.37.x supported), and internet access. Suggested capacity is 16 vCPUs
+and 32 GB RAM.
 
 ```bash
 python3 scripts/init.py
@@ -56,14 +56,12 @@ uv run --project platform/app python scripts/tests/platform/smoke.py plan \
 ```
 
 `init.py` creates a private `.env` without replacing existing values. The smoke
-plan is offline. A live run uses a unique project and retires it afterward;
-SQL data remains retained. See the [test guide](scripts/tests/README.md)
-for execution.
-The Python API and CLI packages
-require Python 3.12 or newer when run outside their containers. AI runs additionally
-require configured provider credentials, processing eligibility, and project
-classification. For prerequisites, identity
-bootstrap, checks, and cleanup, follow the complete
+plan is offline. A live run uses a unique project and retires it afterward; SQL
+data remains retained. See the [test guide](scripts/tests/README.md) for
+execution. The Python API and CLI packages require Python 3.12 or newer when run
+outside their containers. AI runs additionally require configured provider
+credentials, processing eligibility, and project classification. For
+prerequisites, identity bootstrap, checks, and cleanup, follow the complete
 [local installation guide](docs/operators/install-local.md).
 
 ## Documentation
@@ -87,8 +85,8 @@ implementation references. User and operator workflows are canonical under
 See the [script directory guide](scripts/README.md) for setup, generation,
 verification, and operational commands.
 
-Install the script dependencies and Python quality tools from the repository root
-with Python 3.12 or newer:
+Install the script dependencies and Python quality tools from the repository
+root with Python 3.12 or newer:
 
 ```bash
 python3 -m venv .venv
@@ -96,9 +94,10 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-This includes editable API and CLI packages, Ruff for linting and formatting, and
-pytest with coverage support. Run `ruff check scripts`, `ruff format --check scripts`,
-or `python3 -m pytest platform/cli/tests --cov=platform_cli` as needed.
+This includes editable API and CLI packages, Ruff for linting and formatting,
+and pytest with coverage support. Run `ruff check scripts`,
+`ruff format --check scripts`, or
+`python3 -m pytest platform/cli/tests --cov=platform_cli` as needed.
 
 ```bash
 docker compose config --quiet
@@ -108,7 +107,8 @@ python3 -m unittest discover -s ansible/tests/unit -v
 python3 scripts/tests/components/observability/check-monitoring.py
 python3 scripts/checks/check-doc-links.py
 python3 -m unittest discover -s operations/backup/tests -v
-uv run --project platform/app python -m compileall -q platform/app/src/app scripts operations
+uv run --project platform/app python -m compileall -q \
+  platform/app/src/app scripts operations
 bash -n scripts/up.sh scripts/down.sh
 ```
 

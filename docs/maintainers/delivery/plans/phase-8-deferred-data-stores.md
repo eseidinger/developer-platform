@@ -2,27 +2,27 @@
 
 Status: package 8.3 selected on November 2, 2026; source implementation and
 disposable fixture pass, with deployed acceptance open. Packages 8.1 and 8.2
-remain deferred and unscheduled.
-Measurements and comparisons for activated stores belong to
-[Phase 9](phase-9-store-measurement-and-comparison.md).
+remain deferred and unscheduled. Measurements and comparisons for activated
+stores belong to [Phase 9](phase-9-store-measurement-and-comparison.md).
 
 ## Goal and activation
 
 Keep TimescaleDB, ClickHouse and Valkey visible without committing to their
 deployment. CouchDB is the selected document-store candidate for package 8.3;
 MongoDB remains an unselected comparison option. Activate any package at the
-owner's discretion, with a named implementation owner and resource budget. No workload trigger, domain-need
-justification or benchmark success criteria are required for store selection.
-Use the PostgreSQL and analytical references from
+owner's discretion, with a named implementation owner and resource budget. No
+workload trigger, domain-need justification or benchmark success criteria are
+required for store selection. Use the PostgreSQL and analytical references from
 [Phase 7](phase-7-planned-data-stores.md). Completing Phase 9 comparisons or
 another deferred package is not required to activate a selected store.
 
-The [common acceptance and responsibilities](data-store-expansion.md#ownership-and-common-acceptance)
+The
+[common acceptance and responsibilities](data-store-expansion.md#ownership-and-common-acceptance)
 apply to every activated package. Track PLAN-031–033 in the
-[backlog](../backlog.md#data-store-expansion-tasks). Optional Phase 6 and unrelated
-Phase 10 leftovers are independent. Stores may be selected for permanent use at
-will, subject to the previously selected operational policies. See the
-[selection decision](data-store-expansion.md#store-selection-decision).
+[backlog](../backlog.md#data-store-expansion-tasks). Optional Phase 6 and
+unrelated Phase 10 leftovers are independent. Stores may be selected for
+permanent use at will, subject to the previously selected operational policies.
+See the [selection decision](data-store-expansion.md#store-selection-decision).
 
 ## Work packages
 
@@ -34,10 +34,10 @@ will, subject to the previously selected operational policies. See the
   provider support when selected, within the agreed resource budget. Verify
   scoped access, retention, backup capture and common operational acceptance.
 
-**Exit:** record selection; introduced providers demonstrate retention and common
-operational acceptance. Recovery is Phase 10 package 10.13; scaling comparisons
-are Phase 9 work.
-This package stays deferred until the owner schedules it.
+**Exit:** record selection; introduced providers demonstrate retention and
+common operational acceptance. Recovery is Phase 10 package 10.13; scaling
+comparisons are Phase 9 work. This package stays deferred until the owner
+schedules it.
 
 ### 8.2 — Caching and Realtime
 
@@ -45,37 +45,38 @@ This package stays deferred until the owner schedules it.
 Bot Social Core is needed only for its feed/profile/rate-limit scenarios.
 
 - If selected, add scoped Valkey provisioning and define whether its state is
-  disposable or requires persistence. Verify invalidation, stale-read
-  behavior, outage handling and common operational acceptance.
+  disposable or requires persistence. Verify invalidation, stale-read behavior,
+  outage handling and common operational acceptance.
 
-**Exit:** record selection; optional Valkey provisioning passes common acceptance
-with defined data retention. Cache rebuild or durable-state recovery is Phase 10
-package 10.13; comparative cost is Phase 9 work.
-This package stays deferred until the owner schedules it.
+**Exit:** record selection; optional Valkey provisioning passes common
+acceptance with defined data retention. Cache rebuild or durable-state recovery
+is Phase 10 package 10.13; comparative cost is Phase 9 work. This package stays
+deferred until the owner schedules it.
 
 ### 8.3 — Document Stores
 
-**Task:** PLAN-033. **Source:** phase 7. **Entry:** CouchDB selected for planning
-on November 2, 2026; no demonstration that PostgreSQL JSONB is inadequate is
-required. See the [CouchDB implementation plan](couchdb-provider.md).
+**Task:** PLAN-033. **Source:** phase 7. **Entry:** CouchDB selected for
+planning on November 2, 2026; no demonstration that PostgreSQL JSONB is
+inadequate is required. See the
+[CouchDB implementation plan](couchdb-provider.md).
 
-- Introduce the CouchDB provider under the common platform contract. Verify
-  the specific distribution's Apache 2.0 license and bundled notices, scoped
+- Introduce the CouchDB provider under the common platform contract. Verify the
+  specific distribution's Apache 2.0 license and bundled notices, scoped
   updates, indexing, schema changes, lifecycle, backup capture and isolation.
-  CouchDB members can write ordinary documents, so read-only access requires
-  a proven gateway; never expose it as native read-only membership.
+  CouchDB members can write ordinary documents, so read-only access requires a
+  proven gateway; never expose it as native read-only membership.
 
 **Exit:** CouchDB passes common lifecycle, scoped access, backup capture and
 isolation checks recorded in PLAN-033. Restore acceptance is Phase 10 package
-10.13; document-model comparison is Phase 9 work;
-selection has no domain-need or comparative-success requirement.
+10.13; document-model comparison is Phase 9 work; selection has no domain-need
+or comparative-success requirement.
 
 ## Phase disposition
 
 Unactivated packages remain deferred. For each activated package record the
-owner's selection and operational status. Any introduced
-provider must pass common lifecycle, isolation, monitoring and backup/purge acceptance.
-Deployed recovery acceptance is Phase 10 package 10.13.
-Measurements and comparisons are recorded in Phase 9.
-A completed experiment does not close the other deferred packages; record each
-package's disposition explicitly before closing this phase.
+owner's selection and operational status. Any introduced provider must pass
+common lifecycle, isolation, monitoring and backup/purge acceptance. Deployed
+recovery acceptance is Phase 10 package 10.13. Measurements and comparisons are
+recorded in Phase 9. A completed experiment does not close the other deferred
+packages; record each package's disposition explicitly before closing this
+phase.

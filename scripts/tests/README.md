@@ -4,8 +4,8 @@ Choose tests by execution environment. A `check-` or `verify-` prefix does not
 promise that a command is read-only.
 
 - **`unit/`**: offline configuration and deployment contracts; run in CI.
-- **`components/stores/`**: disposable provider, access, TLS, console, and recovery
-  fixtures; run in CI.
+- **`components/stores/`**: disposable provider, access, TLS, console, and
+  recovery fixtures; run in CI.
 - **`components/observability/`**: disposable metric, log, trace, and dashboard
   fixtures; run in CI.
 - **`components/ai/`**: SQL and driver checks in CI; model evaluation is an
@@ -16,7 +16,8 @@ promise that a command is read-only.
 - **`support/`**: importable fixtures called by component tests.
 
 API tests remain under `platform/app/tests`; Ansible tests have the same
-execution-environment distinction under [`ansible/tests/`](../../ansible/tests/README.md).
+execution-environment distinction under
+[`ansible/tests/`](../../ansible/tests/README.md).
 
 ## Offline regression tests
 
@@ -27,11 +28,11 @@ uv run --project platform/app python -m unittest discover \
   -s tests/platform/unit -v
 ```
 
-These use mocks and temporary files. They never deploy the platform.
-Ansible fixture cleanup, timed expiry evidence, and release-workflow checks
-also have offline regression tests under `unit/`. Their shared implementations
-live in `support/`; live Ansible callers pass credentials over private stdin.
-CI also checks deployment, operations, and platform-test Ansible playbooks.
+These use mocks and temporary files. They never deploy the platform. Ansible
+fixture cleanup, timed expiry evidence, and release-workflow checks also have
+offline regression tests under `unit/`. Their shared implementations live in
+`support/`; live Ansible callers pass credentials over private stdin. CI also
+checks deployment, operations, and platform-test Ansible playbooks.
 
 ## Disposable component tests
 
@@ -71,7 +72,8 @@ Use a digest-pinned `hashicorp/http-echo` image listening on port 5678. The full
 lifecycle runner uses the digest-pinned neutral image built from
 [`tests/fixtures/hosted-application/Dockerfile`](../../tests/fixtures/hosted-application/Dockerfile)
 and listening on port 8080. Protected `v1alpha2` application behavior remains in
-the [hosted-access harness](../../docs/operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness).
+the
+[hosted-access harness](../../docs/operators/validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness).
 
 The lifecycle runner checks the neutral fixture's identity endpoint without a
 database binding. It preserves any historical implicit database and role that
@@ -107,10 +109,10 @@ containing `access_token`, `refresh_token`, and `client_id`. The test-runner
 credential renews without interactive login; see the
 [bootstrap and permission boundaries](../../ansible/docs/test-runner.md#local-bootstrap-without-interactive-login).
 
-The other file contains a bearer token for an authenticated
-user with no project or platform grants. Both files must have private permissions
-(for example, mode `0600`). Full lifecycle execution requires both identities;
-authorization and audit assertions cannot silently skip themselves.
+The other file contains a bearer token for an authenticated user with no project
+or platform grants. Both files must have private permissions (for example, mode
+`0600`). Full lifecycle execution requires both identities; authorization and
+audit assertions cannot silently skip themselves.
 
 The full suite consolidates the former `config_drill.py`, `secret_drill.py`,
 `log_drill.py`, `retirement_drill.py`, and `access_audit_drill.py` commands:
@@ -124,13 +126,14 @@ The full suite consolidates the former `config_drill.py`, `secret_drill.py`,
 - Controller namespace confinement, stale retirement scope rejection, namespace
   removal, and retained database, role, and inventory.
 
-Each run refuses an existing project and owns only `lc-<run-id>`. Cleanup attempts
-retirement after success, assertion failure, or interruption; SQL data and catalog
-remain retained. It never purges a database. Private reports live under
-`.runtime/application-lifecycle/<run-id>/report.json`. A lost create response or
-failed cleanup produces a failed report requiring manual review; it does not
-adopt a project based solely on its name. Historical evidence retains the old
-command names at the recorded commits and does not prove the new runner live.
+Each run refuses an existing project and owns only `lc-<run-id>`. Cleanup
+attempts retirement after success, assertion failure, or interruption; SQL data
+and catalog remain retained. It never purges a database. Private reports live
+under `.runtime/application-lifecycle/<run-id>/report.json`. A lost create
+response or failed cleanup produces a failed report requiring manual review; it
+does not adopt a project based solely on its name. Historical evidence retains
+the old command names at the recorded commits and does not prove the new runner
+live.
 
 ## Other running-platform scenarios
 
@@ -142,14 +145,16 @@ Use their `plan` commands and consult the
 the platform directory as a batch.
 
 `check-operator-security.py` performs non-mutating operator inspection and audit
-redaction checks. Set `PLATFORM_ADMIN_TOKEN` and `PLATFORM_TEST_PROJECT`; setting
-`DEVELOPER_TOKEN` additionally enables developer-denial assertions. This diagnostic
-explicitly reports that optional coverage as skipped when no developer token exists.
+redaction checks. Set `PLATFORM_ADMIN_TOKEN` and `PLATFORM_TEST_PROJECT`;
+setting `DEVELOPER_TOKEN` additionally enables developer-denial assertions. This
+diagnostic explicitly reports that optional coverage as skipped when no
+developer token exists.
 
 `verify-application-data-flow.py` runs inside a short-lived pod with disposable
-`SOURCE_`, `ARTIFACT_`, and `SEARCH_` managed bindings and `FIXTURE_PARQUET_B64`.
-Pass `--confirm-disposable-bindings`. It provisions a unique test schema and
-synthetic artifacts/document, then removes its schema, exact object versions,
-and document even on failure. It never deletes the bound database, bucket, or
-index. The caller still owns provisioning and retirement of the project, pod,
-and three bound resources; this command does not install a platform.
+`SOURCE_`, `ARTIFACT_`, and `SEARCH_` managed bindings and
+`FIXTURE_PARQUET_B64`. Pass `--confirm-disposable-bindings`. It provisions a
+unique test schema and synthetic artifacts/document, then removes its schema,
+exact object versions, and document even on failure. It never deletes the bound
+database, bucket, or index. The caller still owns provisioning and retirement of
+the project, pod, and three bound resources; this command does not install a
+platform.

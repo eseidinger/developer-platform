@@ -7,6 +7,6 @@ optional extension or server privilege is needed.
 
 The disposable named-store fixture checks JSONB/FTS lookup, cycle-safe recursive
 reachability, partition/materialized-view reads, shared-writer DDL, and atomic
-rollback of data/outbox changes. Managed readers can query current/future objects
-but cannot mutate them. This is a neutral reference, not an external domain
-benchmark or deployment/recovery acceptance record.
+rollback of data/outbox changes. Managed readers can query current/future
+objects but cannot mutate them. This is a neutral reference, not an external
+domain benchmark or deployment/recovery acceptance record.

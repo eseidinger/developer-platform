@@ -33,6 +33,6 @@ responsibility:
 - [Watchdog](components/watchdog.md) detects stale heartbeat and backup signals
   outside the platform host.
 
-The topology is a single failure domain and is intended for a controlled lab.
-Do not infer production-grade availability or isolation from successful local
+The topology is a single failure domain and is intended for a controlled lab. Do
+not infer production-grade availability or isolation from successful local
 acceptance.

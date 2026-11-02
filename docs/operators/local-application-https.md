@@ -1,8 +1,8 @@
 # Local application-to-application HTTPS
 
-Local workloads can use managed service credentials to call another application's
-protected HTTPS endpoint. This mode retains the existing application authorization
-boundary and default-deny workload network policy.
+Local workloads can use managed service credentials to call another
+application's protected HTTPS endpoint. This mode retains the existing
+application authorization boundary and default-deny workload network policy.
 
 ## Enable and deploy
 
@@ -13,10 +13,10 @@ LOCAL_APPLICATION_HTTPS_ENABLED=true
 LOCAL_APPLICATION_EDGE_IP=172.30.80.32
 ```
 
-Keep `APPS_DOMAIN=apps.localhost` and `IDENTITY_DOMAIN=identity.localhost`, or use
-other configured domains ending in `.localhost`. The gateway address must be a
-distinct usable member of `PLATFORM_SUBNET`; reserve it alongside the other fixed
-addresses. Inventory's `platform_network.addresses.local-application-edge`
+Keep `APPS_DOMAIN=apps.localhost` and `IDENTITY_DOMAIN=identity.localhost`, or
+use other configured domains ending in `.localhost`. The gateway address must be
+a distinct usable member of `PLATFORM_SUBNET`; reserve it alongside the other
+fixed addresses. Inventory's `platform_network.addresses.local-application-edge`
 controls the same address. The mode defaults to disabled in `.env.example` and
 rejects public domains when enabled.
 
@@ -27,12 +27,12 @@ python3 scripts/setup/configure-platform.py --check
 bash scripts/up.sh
 ```
 
-Bootstrap starts the private `local-application-edge` service, exports its public
-CA certificate, and prepares the API's read-only workload trust bundle. The
-gateway has no published host ports. Its separate CA keys remain in its private
-Docker volume; only public certificates are copied to workloads. No host firewall
-opening or change to `EDGE_BIND_IP` is needed. The service's memory limit is
-128 MiB and its CPU limit is 0.5 cores.
+Bootstrap starts the private `local-application-edge` service, exports its
+public CA certificate, and prepares the API's read-only workload trust bundle.
+The gateway has no published host ports. Its separate CA keys remain in its
+private Docker volume; only public certificates are copied to workloads. No host
+firewall opening or change to `EDGE_BIND_IP` is needed. The service's memory
+limit is 128 MiB and its CPU limit is 0.5 cores.
 
 ## Declare outbound access on the caller
 
@@ -55,13 +55,14 @@ Do not add the gateway or platform subnet to `ALLOWED_EGRESS_CIDRS`; the scoped
 local DNS exception is independent of general outbound permission.
 
 The renderer supplies only declaring components with hostname mappings to the
-gateway, TCP/443 egress, and a read-only public CA ConfigMap. It groups names that
-share an address for Kubernetes server-side apply. The bundle retains system
-roots and adds the local certificates; `SSL_CERT_FILE`, `REQUESTS_CA_BUNDLE`, and
-`NODE_EXTRA_CA_CERTS` point to it. Applications must leave those variables under
-platform management. Clients that ignore these variables, such as a JVM with its
-own trust store, need equivalent CA configuration in the application image.
-Never disable certificate or hostname verification.
+gateway, TCP/443 egress, and a read-only public CA ConfigMap. It groups names
+that share an address for Kubernetes server-side apply. The bundle retains
+system roots and adds the local certificates; `SSL_CERT_FILE`,
+`REQUESTS_CA_BUNDLE`, and `NODE_EXTRA_CA_CERTS` point to it. Applications must
+leave those variables under platform management. Clients that ignore these
+variables, such as a JVM with its own trust store, need equivalent CA
+configuration in the application image. Never disable certificate or hostname
+verification.
 
 Request service access from the consumer project, approve it in the provider
 project with groups accepted by its bearer-token routes, and wait for active
@@ -106,7 +107,8 @@ python3 scripts/tests/components/networking/verify-local-https.py
 
 It verifies TLS and routing with permissive synthetic upstreams, so rejected
 admin, console, and mismatched-host requests prove the gateway's own boundary.
-The existing [hosted-access suite](validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness)
+The existing
+[hosted-access suite](validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness)
 adds real managed credentials, workload-to-workload HTTPS, database persistence,
 backend/egress isolation, and credential lifecycle against disposable projects.
 That live suite requires its usual explicit environment confirmation and private

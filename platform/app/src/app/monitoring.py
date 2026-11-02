@@ -172,7 +172,7 @@ def discovery_loop(stop, connect, log):
     while not stop.is_set():
         try:
             reconcile(connect)
-        except Exception:
+        except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             # Do not replace valid targets or log credentials on a database/filesystem failure.
             log.error(
                 "Application monitoring discovery failed; retaining previous targets"

@@ -196,7 +196,9 @@ def visit(kubectl, kubeconfig, project):
         VISIT,
     ]
     try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=35)
+        result = subprocess.run(
+            command, capture_output=True, text=True, timeout=35, check=False
+        )
         require(result.returncode == 0, "fixture_visit_failed")
         count = int(result.stdout.strip())
         require(count > 0, "invalid_fixture_visit_count")
@@ -373,7 +375,7 @@ def main(argv=None):
         error = None
         try:
             run(args, api, report)
-        except (Exception, KeyboardInterrupt) as exc:
+        except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
             error = (
                 str(exc)
                 if isinstance(exc, DrillError)
@@ -385,7 +387,7 @@ def main(argv=None):
             )
         try:
             retire(api, report)
-        except (Exception, KeyboardInterrupt):
+        except (Exception, KeyboardInterrupt):  # noqa: BLE001 - Record and clean up after any drill failure.
             report.data["cleanup"] = "incomplete-retry-required"
             report.save()
         report.data.update(
@@ -399,7 +401,7 @@ def main(argv=None):
         report.save()
         print("REPORT " + str(report.directory / "report.json"), flush=True)
         return 0 if report.data["result"] == "passed" else 1
-    except (Exception, KeyboardInterrupt) as exc:
+    except (Exception, KeyboardInterrupt) as exc:  # noqa: BLE001 - Record and clean up after any drill failure.
         code = (
             str(exc)
             if isinstance(exc, DrillError)

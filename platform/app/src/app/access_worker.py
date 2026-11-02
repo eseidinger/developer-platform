@@ -92,7 +92,7 @@ def proxy_ready(runtime, policy):
             and deployment.status.get("updatedReplicas", 0) == 1
             and deployment.status.get("readyReplicas", 0) == 1
         )
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         return False
 
 
@@ -374,7 +374,7 @@ def process_one(control, provider_factory=KeycloakAccessProvider):
                     {"project": row["project"]},
                     {"operationId": str(oid), "action": action},
                 )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             # Failed cleanup remains retryable and non-authorizing. No exception message is persisted or logged.
             permanent = isinstance(exc, HTTPException) and exc.status_code in {
                 403,
@@ -460,7 +460,7 @@ def loop(stop, control):
                 maintain(control)
                 last_maintenance = time.monotonic()
             process_one(control)
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             control.log.error(
                 "Hosted access reconciliation failed error_type=%s", type(exc).__name__
             )

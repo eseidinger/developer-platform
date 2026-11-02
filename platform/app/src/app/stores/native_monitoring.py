@@ -5,6 +5,7 @@ Failed samples retain last-good values with explicit health and freshness.
 """
 
 import json
+import logging
 import math
 import os
 import re
@@ -13,6 +14,8 @@ from pathlib import Path
 from urllib.request import Request
 
 from . import catalog, providers
+
+log = logging.getLogger(__name__)
 
 
 def line(name, value, labels):
@@ -296,7 +299,14 @@ def containers(resources):
     result = []
     for item in root["containers"]:
         provider = item["provider"]
-        if provider not in {"postgresql", "s3", "qdrant", "opensearch", "neo4j", "couchdb"}:
+        if provider not in {
+            "postgresql",
+            "s3",
+            "qdrant",
+            "opensearch",
+            "neo4j",
+            "couchdb",
+        }:
             raise ValueError()
         labels = {"provider": provider, "scope": "shared"}
         if item.get("resource_id"):
@@ -445,7 +455,7 @@ def postgres(provider, resources):
             )
             PG_CACHE[str(resource["resource_id"])] = readings
             PG_ERRORS[str(resource["resource_id"])] = False
-        except Exception:
+        except Exception:  # noqa: BLE001 - Preserve previous samples across any provider failure.
             # Keep old samples with their own original success time.
             PG_ERRORS[str(resource["resource_id"])] = True
     result = [item for readings in PG_CACHE.values() for item in readings]
@@ -515,8 +525,8 @@ def loop(stop, control):
                     )
                     cache[name] = (now, readings)
                     up = 1
-                except Exception:
-                    pass  # Native diagnostics can contain secrets/data.
+                except Exception:  # noqa: BLE001 - Provider failures must not stop monitoring.
+                    log.debug("Native provider collection failed")
                 stamp, readings = cache.get(name, (0, []))
                 lines.extend(readings)
                 lines.append(
@@ -533,7 +543,7 @@ def loop(stop, control):
                 readings = containers(resources)
                 cache["containers"] = (time.time(), readings)
                 container_up = 1
-            except Exception:
+            except Exception:  # noqa: BLE001 - Docker diagnostics may contain private data.
                 container_up = 0
             stamp, readings = cache.get("containers", (0, []))
             lines.extend(readings)
@@ -560,6 +570,6 @@ def loop(stop, control):
                 )
             )
             atomic_write(root / "stores-native.prom", "\n".join(lines) + "\n")
-        except Exception:
-            pass  # Leave the previous heartbeat to become visibly stale.
+        except Exception:  # noqa: BLE001 - Keep the previous heartbeat on any write failure.
+            log.debug("Native metric output unavailable")
         stop.wait(30)

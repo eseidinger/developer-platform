@@ -156,7 +156,7 @@ def observe_failure_signals(
                     pods.append((pod, has_previous))
                     break
         api = api or CoreV1Api(runtime.client)
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         return {**result, "state": "unavailable"}
     result["truncated"] = len(pods) > MAX_PODS
     codes = set()
@@ -189,14 +189,14 @@ def observe_failure_signals(
                 if codes and startup_only:
                     result.update(state="ok", failure_codes=sorted(codes))
                     return result
-            except Exception:
+            except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                 result["unavailable_reads"] += 1
             finally:
                 if response is not None:
                     try:
                         response.close()
                         response.release_conn()
-                    except Exception:
+                    except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
                         pass
     result["failure_codes"] = sorted(codes)
     result["state"] = (

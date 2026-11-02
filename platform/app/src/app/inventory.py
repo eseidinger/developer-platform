@@ -140,7 +140,7 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
         ]
         quotas = _items(runtime, "v1", "ResourceQuota", namespace)
         limits = _items(runtime, "v1", "LimitRange", namespace)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Project inventory query failed project=%s error_type=%s",
             project,
@@ -193,7 +193,7 @@ def observe_cluster_capacity(runtime: Any, log) -> dict:
     try:
         nodes = _items(runtime, "v1", "Node", "")
         metrics = _items(runtime, "metrics.k8s.io/v1beta1", "NodeMetrics", "")
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error("Capacity query failed error_type=%s", type(exc).__name__)
         return {
             "state": "unavailable",

@@ -16,13 +16,16 @@ from scripts.internal.env import settings
 def monitoring_sql(password):
     # SQL is sent on stdin, never in process arguments or diagnostic output.
     literal = "'" + password.replace("'", "''") + "'"
-    return """
+    return (
+        """
 DO $$ BEGIN
  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'platform_monitor') THEN
    CREATE ROLE platform_monitor;
  END IF;
 END $$;
-ALTER ROLE platform_monitor LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5 PASSWORD """ + literal + """;
+ALTER ROLE platform_monitor LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS CONNECTION LIMIT 5 PASSWORD """
+        + literal
+        + """;
 GRANT pg_monitor TO platform_monitor;
 GRANT CONNECT ON DATABASE platform TO platform_monitor;
 DO $$ DECLARE target record; BEGIN
@@ -37,17 +40,41 @@ ALTER ROLE platform_monitor SET default_transaction_read_only = on;
 ALTER ROLE platform_monitor SET statement_timeout = '5s';
 ALTER ROLE platform_monitor SET idle_in_transaction_session_timeout = '10s';
 """
+    )
 
 
 def main():
     password = settings().get("POSTGRES_MONITOR_PASSWORD", "")
     if len(password) < 32 or "\x00" in password or "\n" in password or "\r" in password:
-        raise SystemExit("Set a generated POSTGRES_MONITOR_PASSWORD using scripts/init.py")
+        raise SystemExit(
+            "Set a generated POSTGRES_MONITOR_PASSWORD using scripts/init.py"
+        )
     sql = monitoring_sql(password)
-    result = subprocess.run(["docker", "compose", "exec", "-T", "postgres", "psql", "-X", "-v", "ON_ERROR_STOP=1", "-U", "postgres", "-d", "platform"],
-                            input=sql, text=True, capture_output=True)
+    result = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-X",
+            "-v",
+            "ON_ERROR_STOP=1",
+            "-U",
+            "postgres",
+            "-d",
+            "platform",
+        ],
+        input=sql,
+        text=True,
+        capture_output=True,
+        check=False,
+    )
     if result.returncode:
-        raise SystemExit("PostgreSQL monitoring role setup failed; check database availability and administrator access.")
+        raise SystemExit(
+            "PostgreSQL monitoring role setup failed; check database availability and administrator access."
+        )
     runtime = Path(".runtime")
     runtime.mkdir(mode=0o700, exist_ok=True)
     path = runtime / "postgres-monitor.password"

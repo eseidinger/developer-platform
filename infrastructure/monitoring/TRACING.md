@@ -17,22 +17,23 @@ sudo bash scripts/setup/prepare-tempo-storage.sh
 bash scripts/up.sh
 ```
 
-On systemd hosts, preparation installs and enables a persistent mount unit and
-a Docker service dependency. After reboot, the trace filesystem mounts before
+On systemd hosts, preparation installs and enables a persistent mount unit and a
+Docker service dependency. After reboot, the trace filesystem mounts before
 Docker starts; a failed mount prevents Docker from starting. Installing these
 units reloads systemd without restarting Docker. Existing installations receive
-this configuration on the next remote deployment, or by rerunning the preparation
-command locally. Hosts without systemd must rerun preparation after each reboot,
-before Docker starts. The image and mount live in `/var/lib/developer-platform`,
-outside the source checkout and platform backup. Tempo retains blocks for 24
-hours; this is configuration, not proof that elapsed deletion has occurred. The
-same bounded filesystem is mounted at `/data/tempo` and `/var/tempo` inside
-Tempo; Tempo 3 writes live-store runtime files under the latter path. Bootstrap
-waits for Tempo's `/ready` endpoint before reporting success. The remote Ansible
-deployment transfers the script and prepares the mount before starting Compose.
-Bootstrap keeps Kubernetes bearer credentials owner only and grants read access
-by UID-specific ACL to the API, Alloy, Prometheus, and telemetry gateway as
-needed. The host needs the `acl` package; the deployment playbook installs it.
+this configuration on the next remote deployment, or by rerunning the
+preparation command locally. Hosts without systemd must rerun preparation after
+each reboot, before Docker starts. The image and mount live in
+`/var/lib/developer-platform`, outside the source checkout and platform backup.
+Tempo retains blocks for 24 hours; this is configuration, not proof that elapsed
+deletion has occurred. The same bounded filesystem is mounted at `/data/tempo`
+and `/var/tempo` inside Tempo; Tempo 3 writes live-store runtime files under the
+latter path. Bootstrap waits for Tempo's `/ready` endpoint before reporting
+success. The remote Ansible deployment transfers the script and prepares the
+mount before starting Compose. Bootstrap keeps Kubernetes bearer credentials
+owner only and grants read access by UID-specific ACL to the API, Alloy,
+Prometheus, and telemetry gateway as needed. The host needs the `acl` package;
+the deployment playbook installs it.
 
 `PLATFORM_TRACE_SAMPLE_RATE` sets the root probability from 0 to 1 and defaults
 to 1.0 (100%). Change it in `.env`, then recreate `platform-api` and reconcile

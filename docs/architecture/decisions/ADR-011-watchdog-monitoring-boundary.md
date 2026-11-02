@@ -1,6 +1,7 @@
 # ADR-011 – Lab Watchdog Monitoring Boundary
 
-Created and accepted: September 27, 2026. Status: **Accepted** by the project owner.
+Created and accepted: September 27, 2026. Status: **Accepted** by the project
+owner.
 
 ## Context
 
@@ -19,8 +20,8 @@ monitoring chain ends at the existing watchdog.
 Accept that watchdog hosting, scheduler, or notification-path failure may go
 unnoticed and that platform or backup incidents during that failure may produce
 no notification. Existing status-page freshness checks and manual runbook
-inspection remain useful diagnostics, but do not provide independent alerts.
-No new manual inspection schedule is imposed by this decision.
+inspection remain useful diagnostics, but do not provide independent alerts. No
+new manual inspection schedule is imposed by this decision.
 
 ## Specific backup-monitoring limitation
 
@@ -33,18 +34,18 @@ its target for an extended period; the owner declines that cost for this lab.
 
 Accept that this lab has no live evidence that the external backup watchdog
 continues to notify while local monitoring is down. This is an accepted coverage
-limit, not a passed check. It does not disable the external watchdog or alter its
-backup freshness rules. Revisit if monitoring availability or backup assurance
-becomes a commitment.
+limit, not a passed check. It does not disable the external watchdog or alter
+its backup freshness rules. Revisit if monitoring availability or backup
+assurance becomes a commitment.
 
 ## Notification-delivery limitation
 
 On September 28, 2026, the owner also accepted that this lab will not inject or
 exercise SMTP or other notification-delivery failures. Successful Alertmanager
 and external-watchdog alert/recovery receipt has been demonstrated, but there is
-no live evidence of operator-visible behaviour when either channel cannot deliver
-email. This avoids deliberately interrupting the only notification path for a
-side project with no additional responder or notification service.
+no live evidence of operator-visible behaviour when either channel cannot
+deliver email. This avoids deliberately interrupting the only notification path
+for a side project with no additional responder or notification service.
 
 Treat undetected or delayed notification-delivery failure as an accepted lab
 risk. This does not change SMTP configuration, normal logging, or successful
@@ -70,17 +71,21 @@ workloads or recovery commitments.
 
 An independent observer could detect watchdog failure but adds another service,
 configuration, and maintenance responsibility. The owner explicitly declines
-that tradeoff for this lab. Leaving the previous criterion open would incorrectly
-treat an accepted scope limit as unfinished implementation.
+that tradeoff for this lab. Leaving the previous criterion open would
+incorrectly treat an accepted scope limit as unfinished implementation.
 
 ## Consequences and acceptance
 
 Remove independent watchdog cron/hosting failure detection from Phase 1A and
 OPS-007-T01 acceptance. Record it as an accepted limitation, not a passed drill
-or deferred implementation task. OPS-007-T01 remains open for its other criteria.
+or deferred implementation task. OPS-007-T01 remains open for its other
+criteria.
 
-Platform host/cluster failure detection, public application checks, actual alert and recovery receipt and separate platform/pipeline/backup identities remain in scope. Notification-delivery-failure injection is an accepted limitation described above. This decision does
-not claim that every notification failure can be reported independently.
+Platform host/cluster failure detection, public application checks, actual alert
+and recovery receipt and separate platform/pipeline/backup identities remain in
+scope. Notification-delivery-failure injection is an accepted limitation
+described above. This decision does not claim that every notification failure
+can be reported independently.
 
 This decision narrows the lab acceptance scope described by ADR-005; it does not
 accept that ADR's remaining proposed capabilities or change the backup policy.

@@ -199,9 +199,9 @@ def read_json(path: str) -> dict:
             raise ValueError()
         result = json.loads(raw)
         if not isinstance(result, dict):
-            raise ValueError()
+            raise TypeError()
         return result
-    except (OSError, ValueError, UnicodeError):
+    except (OSError, TypeError, ValueError, UnicodeError):
         raise ConfigurationError(
             "Unable to read a JSON object from the selected file."
         ) from None

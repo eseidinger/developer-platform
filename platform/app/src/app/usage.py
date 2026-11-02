@@ -69,7 +69,7 @@ def observe_usage(
             api_version="metrics.k8s.io/v1beta1", kind="PodMetrics"
         ).get(namespace="project-" + project)
         items = _get(response, "items") or []
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Pod metrics query failed project=%s error_type=%s",
             project,
@@ -100,7 +100,7 @@ def observe_usage(
                     "sampled_at": sampled.isoformat(),
                 }
             )
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         log.error(
             "Pod metrics malformed project=%s error_type=%s",
             project,

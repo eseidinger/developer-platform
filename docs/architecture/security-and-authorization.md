@@ -4,21 +4,21 @@ Status: current consolidated security and authorization model. Keycloak
 authenticates callers; the Platform API owns platform grants and
 hosted-application group lifecycle; the application access boundary enforces
 group-protected public routes; and the API alone holds Kubernetes infrastructure
-authority. Historical design material was consolidated from the earlier
-security and authorization-principles pages.
+authority. Historical design material was consolidated from the earlier security
+and authorization-principles pages.
 
 ## The four control-plane layers
 
 1. **Keycloak authentication** proves the issuer and immutable subject of a
    human or machine caller with a short-lived OIDC access token.
-2. **Platform authorization** maps that issuer/subject pair to platform-owned
+1. **Platform authorization** maps that issuer/subject pair to platform-owned
    project or platform grants stored in PostgreSQL.
-3. **Kubernetes execution** occurs only through the Platform API's provisioner
+1. **Kubernetes execution** occurs only through the Platform API's provisioner
    ServiceAccount after a platform permission check succeeds.
-4. **PostgreSQL authorization** is a separate database connection and privilege
-   decision. Independent named resources and explicit grants supply scoped
-   lease credentials to bound components or humans; PostgreSQL never receives
-   Keycloak tokens.
+1. **PostgreSQL authorization** is a separate database connection and privilege
+   decision. Independent named resources and explicit grants supply scoped lease
+   credentials to bound components or humans; PostgreSQL never receives Keycloak
+   tokens.
 
 Keycloak roles and a valid JWT do not by themselves grant access to a project or
 to Kubernetes. Project users, CI clients, and application pods do not receive a
@@ -80,14 +80,13 @@ sessions, group claims, and secrets. A platform role never grants an application
 group implicitly.
 
 The reference deployment has one identity realm per platform environment, with
-separate clients and audiences per application or technical purpose. It does
-not create a realm per application. Application-group definitions and
-memberships are platform resources identified by opaque stable IDs; provider
-display names are implementation attributes. In the Keycloak reference adapter,
-each group is an application-resource-client role named with the stable group
-ID, and a protocol mapper emits relevant roles in a client-scoped `groups`
-claim. The platform limits each claim to memberships relevant to the target
-application.
+separate clients and audiences per application or technical purpose. It does not
+create a realm per application. Application-group definitions and memberships
+are platform resources identified by opaque stable IDs; provider display names
+are implementation attributes. In the Keycloak reference adapter, each group is
+an application-resource-client role named with the stable group ID, and a
+protocol mapper emits relevant roles in a client-scoped `groups` claim. The
+platform limits each claim to memberships relevant to the target application.
 
 Each public application receives a platform-managed OAuth2 Proxy deployment or
 configuration with its own browser client, callback, and cookie. Browser traffic
@@ -98,10 +97,18 @@ revocation overrides, and normalized headers for both modes.
 
 ### Authentication modes
 
-| Mode | Credential presented | Unauthenticated behavior | Principal |
-| --- | --- | --- | --- |
-| `browser-session` | Secure HTTP-only session cookie created after Authorization Code with PKCE | Redirect to login; an expired session is cleared and login restarts | `user` |
-| `bearer-token` | Short-lived access token obtained by a confidential client | Return `401`; never redirect and never create a browser session | `service` for `client_credentials` |
+- **Mode:** `browser-session`
+  - **Credential presented:** Secure HTTP-only session cookie created after
+    Authorization Code with PKCE
+  - **Unauthenticated behavior:** Redirect to login; an expired session is
+    cleared and login restarts
+  - **Principal:** `user`
+- **Mode:** `bearer-token`
+  - **Credential presented:** Short-lived access token obtained by a
+    confidential client
+  - **Unauthenticated behavior:** Return `401`; never redirect and never create
+    a browser session
+  - **Principal:** `service` for `client_credentials`
 
 Both modes produce the same normalized identity context. The platform access
 boundary authorizes the matched route from the principal's stable application
@@ -114,28 +121,28 @@ cookies and therefore do not use that CSRF mechanism.
 The identity provider, not the Developer Platform or hosted application, owns
 the human account, password, MFA, account recovery, invitation, registration,
 and federation lifecycle. Identity administrators create or federate accounts;
-project administrators cannot create realm users.
-The reference flow is:
+project administrators cannot create realm users. The reference flow is:
 
 1. An identity administrator creates the person in Keycloak, or the person is
    federated from an accepted external identity source. The provider assigns an
    immutable subject.
-2. An application owner creates project-scoped application groups and binds an
+1. An application owner creates project-scoped application groups and binds an
    explicit route/method match on the public component to `browser-session` and
    one or more allowed group IDs. The platform creates the client and derives
    its callback from the platform-owned hostname and callback path.
-3. OAuth2 Proxy completes Authorization Code with PKCE, validates the OIDC
+1. OAuth2 Proxy completes Authorization Code with PKCE, validates the OIDC
    response, and creates a secure browser session. The platform access layer
    maps the verified issuer and subject to an opaque principal ID.
-4. On first login, the access layer automatically creates or reuses one pending
+1. On first login, the access layer automatically creates or reuses one pending
    application-access request keyed by application, issuer, and subject, with no
    group. The request does not reach the application and receives a platform
-   pending page or safe `403 application_access_pending` problem with request ID.
-5. A provider project administrator reviews the request and assigns application
+   pending page or safe `403 application_access_pending` problem with request
+   ID.
+1. A provider project administrator reviews the request and assigns application
    groups through the platform control plane. Project administration permits
    this assignment but does not itself make the administrator an application
    user or application administrator.
-6. The platform reconciles the membership to the identity provider. After the
+1. The platform reconciles the membership to the identity provider. After the
    session or token is refreshed, the access boundary admits a request only when
    its stable group IDs satisfy the matched route policy.
 
@@ -148,11 +155,11 @@ normalizes provider claims. A compatible proxy or authorizer may replace this
 composition while preserving the same public resources and security contract.
 
 The platform keys a human by `(issuer, subject)` and supplies the resulting
-principal ID to the application. Email, username, display name, and group display
-names are mutable attributes and must not be used as unique authorization keys.
-The platform-generated principal and group IDs are the opaque authorization keys
-and always map back to the verified identity and platform-owned membership
-records.
+principal ID to the application. Email, username, display name, and group
+display names are mutable attributes and must not be used as unique
+authorization keys. The platform-generated principal and group IDs are the
+opaque authorization keys and always map back to the verified identity and
+platform-owned membership records.
 
 ```mermaid
 sequenceDiagram
@@ -177,8 +184,8 @@ sequenceDiagram
 ```
 
 The backend accepting access-boundary headers must be private. Network policy
-allows the edge to reach the boundary and the boundary to reach the backend,
-but does not allow another project workload to reach that backend around the
+allows the edge to reach the boundary and the boundary to reach the backend, but
+does not allow another project workload to reach that backend around the
 boundary. This is required even though project components share a credential
 boundary: an unsigned header is trustworthy only on the enforced
 boundary-to-backend path.
@@ -192,15 +199,15 @@ issued. The platform derives the audience from the target's stable identifier,
 creates the confidential service identity, reconciles the approved membership,
 returns its secret once through the managed project-secret path, and records
 only non-secret lifecycle metadata in ordinary state. The initial profile has no
-application-defined OAuth scopes; the provider's coarse permission vocabulary
-is expressed as project-scoped application groups.
+application-defined OAuth scopes; the provider's coarse permission vocabulary is
+expressed as project-scoped application groups.
 
-The calling application uses `client_credentials` to obtain a short-lived
-access token. The provider authentication boundary validates the token's
-signature, issuer, access-token type, audience, expiry and other validity times,
-subject, client identifier, and client-scoped group claim. It matches the route
-and method and forwards the request only if at least one allowed stable group ID
-is present. The Keycloak adapter assigns the application's client roles to the
+The calling application uses `client_credentials` to obtain a short-lived access
+token. The provider authentication boundary validates the token's signature,
+issuer, access-token type, audience, expiry and other validity times, subject,
+client identifier, and client-scoped group claim. It matches the route and
+method and forwards the request only if at least one allowed stable group ID is
+present. The Keycloak adapter assigns the application's client roles to the
 service-account identity and maps them to the same client-scoped `groups` claim
 used for humans.
 
@@ -221,14 +228,19 @@ sequenceDiagram
 
 The normalized application identity context is:
 
-| Field | Meaning |
-| --- | --- |
-| `principal_id` | Opaque stable platform mapping for the verified principal |
-| `principal_kind` | `user` or `service` |
-| `issuer` | Exact trusted OIDC/OAuth issuer |
-| `subject` | Immutable subject within that issuer |
-| `client_id` | Validated OAuth client identifier, when applicable |
-| `group_ids` | Stable IDs of relevant application groups asserted for this client |
+- **Field:** `principal_id`
+  - **Meaning:** Opaque stable platform mapping for the verified principal
+- **Field:** `principal_kind`
+  - **Meaning:** `user` or `service`
+- **Field:** `issuer`
+  - **Meaning:** Exact trusted OIDC/OAuth issuer
+- **Field:** `subject`
+  - **Meaning:** Immutable subject within that issuer
+- **Field:** `client_id`
+  - **Meaning:** Validated OAuth client identifier, when applicable
+- **Field:** `group_ids`
+  - **Meaning:** Stable IDs of relevant application groups asserted for this
+    client
 
 ### Upstream identity transport
 
@@ -237,16 +249,33 @@ token, or call Keycloak or the Platform API to discover the current caller. The
 authentication boundary writes the verified context into reserved request
 headers on every authenticated upstream request:
 
-| Header | Required | Value |
-| --- | --- | --- |
-| `X-Platform-Principal-Id` | Yes | Opaque stable platform principal ID |
-| `X-Platform-Principal-Kind` | Yes | `user` or `service` |
-| `X-Platform-Principal-Issuer` | Yes | Exact verified issuer |
-| `X-Platform-Principal-Subject` | Yes | Verified subject within the issuer |
-| `X-Platform-Principal-Group-Ids` | Yes | Space-delimited stable group IDs relevant to this application/client; may be empty only before denial and is never forwarded to a protected application as an authorization success |
-| `X-Platform-Principal-Client-Id` | For service principals | Verified confidential client ID |
-| `X-Platform-Principal-Name` | No | Display-only human name when the access policy opts in |
-| `X-Platform-Principal-Email` | No | Display-only human email when the access policy opts in and project classification covers personal data |
+- **Header:** `X-Platform-Principal-Id`
+  - **Required:** Yes
+  - **Value:** Opaque stable platform principal ID
+- **Header:** `X-Platform-Principal-Kind`
+  - **Required:** Yes
+  - **Value:** `user` or `service`
+- **Header:** `X-Platform-Principal-Issuer`
+  - **Required:** Yes
+  - **Value:** Exact verified issuer
+- **Header:** `X-Platform-Principal-Subject`
+  - **Required:** Yes
+  - **Value:** Verified subject within the issuer
+- **Header:** `X-Platform-Principal-Group-Ids`
+  - **Required:** Yes
+  - **Value:** Space-delimited stable group IDs relevant to this
+    application/client; may be empty only before denial and is never forwarded
+    to a protected application as an authorization success
+- **Header:** `X-Platform-Principal-Client-Id`
+  - **Required:** For service principals
+  - **Value:** Verified confidential client ID
+- **Header:** `X-Platform-Principal-Name`
+  - **Required:** No
+  - **Value:** Display-only human name when the access policy opts in
+- **Header:** `X-Platform-Principal-Email`
+  - **Required:** No
+  - **Value:** Display-only human email when the access policy opts in and
+    project classification covers personal data
 
 A browser-session request therefore reaches the application like:
 
@@ -312,14 +341,14 @@ or segment-aware path prefixes with explicit methods, for example
 `bearer-token` on `/machine-api/`. Query parameters do not participate; `HEAD`
 follows `GET`; and `OPTIONS` is denied unless explicitly configured. Invalid
 percent encoding, encoded slash or backslash, backslashes, and dot segments are
-rejected. Every externally reachable application route matches exactly one
-rule. Overlapping rules are rejected and unmatched routes are denied. Each rule
-has a non-empty `anyOfGroups`; hierarchy, negation, `allOfGroups`, anonymous
-routes, and general Boolean expressions are outside the initial profile. A
-general `session-or-bearer` mode on the same route is also outside the initial
-profile because it makes redirect behavior, CSRF enforcement, identity
-precedence, and auditing ambiguous. The boundary strips the bearer token before
-forwarding unless a future delegation capability explicitly requires it.
+rejected. Every externally reachable application route matches exactly one rule.
+Overlapping rules are rejected and unmatched routes are denied. Each rule has a
+non-empty `anyOfGroups`; hierarchy, negation, `allOfGroups`, anonymous routes,
+and general Boolean expressions are outside the initial profile. A general
+`session-or-bearer` mode on the same route is also outside the initial profile
+because it makes redirect behavior, CSRF enforcement, identity precedence, and
+auditing ambiguous. The boundary strips the bearer token before forwarding
+unless a future delegation capability explicitly requires it.
 
 PostgreSQL owns desired membership state and Keycloak is a reconciled
 projection. A grant remains non-authorizing in `provisioning` and becomes
@@ -353,8 +382,8 @@ only and never Platform API authority.
 
 Pending first-login requests expire after 30 days. Expired requests may be
 created again by a later login; rejected requests require explicit administrator
-reopening. Terminal requests and revoked membership records are removed after
-90 days, while minimized audit events follow the platform audit policy.
+reopening. Terminal requests and revoked membership records are removed after 90
+days, while minimized audit events follow the platform audit policy.
 
 Access-policy updates create immutable revisions. A complete revision is
 validated, compiled, loaded by every ready authorizer replica, and atomically
@@ -366,10 +395,10 @@ rollback.
 Normal machine credential rotation creates a replacement client for the same
 logical service principal and delivers a new managed-secret version. Both
 clients may work for at most 24 hours while the consumer confirms adoption; the
-old client is then revoked, or is automatically revoked with an
-adoption-timeout condition when the window expires. The principal ID remains
-stable and the client-ID header identifies the credential version. Emergency
-rotation revokes the old client without overlap.
+old client is then revoked, or is automatically revoked with an adoption-timeout
+condition when the window expires. The principal ID remains stable and the
+client-ID header identifies the credential version. Emergency rotation revokes
+the old client without overlap.
 
 After recovery, the restored platform catalog reconciles outward to Keycloak;
 Keycloak state is neither imported nor bidirectionally merged as authorization
@@ -403,13 +432,14 @@ database credentials, not Keycloak JWTs. The API uses trusted administrator
 authority to manage independent resource databases. A deployment never creates
 an implicit `project_<name>` database or `database` Secret.
 
-A named PostgreSQL resource has a stable UUID, database `resource_<uuid-without-hyphens>`,
-operator-controlled ownership and separate read-only/read-write resource roles.
-An approved component binding or explicit human grant produces independent
-credential generations. Only the bound component receives its Secret and relay
-egress. Platform administration permits grant management but confers no direct
-data access. A human must have their own grant and an interactive portal/CLI
-identity to obtain a lease; automation tokens cannot claim personal credentials.
+A named PostgreSQL resource has a stable UUID, database
+`resource_<uuid-without-hyphens>`, operator-controlled ownership and separate
+read-only/read-write resource roles. An approved component binding or explicit
+human grant produces independent credential generations. Only the bound
+component receives its Secret and relay egress. Platform administration permits
+grant management but confers no direct data access. A human must have their own
+grant and an interactive portal/CLI identity to obtain a lease; automation
+tokens cannot claim personal credentials.
 
 ```mermaid
 flowchart LR
@@ -432,12 +462,12 @@ Readers have existing/future table access without write authority. The relay
 checks the exact lease identity/database, its original deadline and current
 catalog state; expiry, downgrade, revocation and retirement fence held sessions.
 Application credentials rotate every 30 days with a component restart and at
-most one-hour predecessor overlap. Human leases last 24 hours; renewal does
-not extend older generations.
+most one-hour predecessor overlap. Human leases last 24 hours; renewal does not
+extend older generations.
 
 PostgreSQL transport inside the private relay boundary is plaintext. Remote
-native access uses restricted SSH; pgAdmin uses isolated networking and SSO.
-The console login grants no database authority and saved passwords are disabled.
+native access uses restricted SSH; pgAdmin uses isolated networking and SSO. The
+console login grants no database authority and saved passwords are disabled.
 Keep operator keys and the PostgreSQL administrator credential protected.
 Changing `DATABASE_KEY` requires coordinated provider credential maintenance;
 redeploying with a new key alone is not rotation.
@@ -451,11 +481,13 @@ Its relay independently fences platform leases even if native accounts change.
 Resource retirement retains data. Purge requires exact resource/owner/version
 confirmation, completed access cleanup and verified encrypted off-host backup
 intent. Restore quarantines recovered stores, revokes recovered grants and
-credentials, replays the latest verified purge intent, and requires fresh approval.
-See [named-store operations and recovery](../operators/data-stores.md) for limits
-and provider-specific evidence. [ADR-003](decisions/ADR-003-postgresql-provisioning.md)
-and [ADR-013](decisions/ADR-013-database-credential-lifecycle.md) preserve the
-earlier implicit-database decision and are historical baselines for that behavior.
+credentials, replays the latest verified purge intent, and requires fresh
+approval. See [named-store operations and recovery](../operators/data-stores.md)
+for limits and provider-specific evidence.
+[ADR-003](decisions/ADR-003-postgresql-provisioning.md) and
+[ADR-013](decisions/ADR-013-database-credential-lifecycle.md) preserve the
+earlier implicit-database decision and are historical baselines for that
+behavior.
 
 ## Kubernetes authority
 
@@ -479,8 +511,8 @@ flowchart LR
 
 RBAC grants namespace deletion because retirement needs it, but a
 `ValidatingAdmissionPolicy` restricts that action to the provisioner identity
-and managed labelled `project-*` namespaces. This compensates for RBAC’s lack
-of name/label-scoped delete rules.
+and managed labelled `project-*` namespaces. This compensates for RBAC’s lack of
+name/label-scoped delete rules.
 
 ## Workload restrictions
 
@@ -499,12 +531,13 @@ for exact resource bodies and the
 [installation/recovery runbook](../operators/identity-and-access.md#hosted-application-access-installation-and-recovery)
 for operational safeguards. Deployed core evidence is recorded in
 [EV-45](../maintainers/delivery/backlog.md#verification-register): human/machine
-access, IPv4 backend/egress isolation, rotation, timed expiry and existing-session/
-token revocation passed on node-01. This does not close PLAN-009/F-10; dependency
-outage, restored access, long timers, retention and other deferred checks remain
-open in the [dated run record](../operators/validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026).
-The existing legacy single-service route is not migrated
-implicitly; hosted protection requires `v1alpha2`.
+access, IPv4 backend/egress isolation, rotation, timed expiry and
+existing-session/ token revocation passed on node-01. This does not close
+PLAN-009/F-10; dependency outage, restored access, long timers, retention and
+other deferred checks remain open in the
+[dated run record](../operators/validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026).
+The existing legacy single-service route is not migrated implicitly; hosted
+protection requires `v1alpha2`.
 
 The boundary handles browser callback/start/logout itself. A browser policy
 includes a `GET` entry route; state-changing requests additionally require a
@@ -512,20 +545,27 @@ same-origin request and the readable platform CSRF cookie value in
 `X-Platform-CSRF-Token`. The identity token and access token remain at the
 boundary. Both authentication paths strip authorization and caller-supplied
 identity headers before forwarding; application responses cannot overwrite
-platform authentication cookies. Subject identity comes from OIDC `sub`, not
-an email claim. Optional display name/email release remains separately governed.
+platform authentication cookies. Subject identity comes from OIDC `sub`, not an
+email claim. Optional display name/email release remains separately governed.
 
-The supported isolated restore workflow quarantines the restored access
-catalog before starting application access. Explicit operator reconciliation
-rotates uncertain machine credentials and browser session epochs before the
-flag is cleared. Authorizers fail closed during this process and policies become
-active only after provider preparation and ready-replica acknowledgement.
+The supported isolated restore workflow quarantines the restored access catalog
+before starting application access. Explicit operator reconciliation rotates
+uncertain machine credentials and browser session epochs before the flag is
+cleared. Authorizers fail closed during this process and policies become active
+only after provider preparation and ready-replica acknowledgement.
 
-| Target | Immediate platform effect |
-|---|---|
-| Project/platform grant | Next request by the identity is denied |
-| Deployment credential | Platform grant is removed before Keycloak client cleanup |
-| Provisioner token | Delete `provisioner-token`, rerun bootstrap, restart API |
-| Application secret | Versioned Secret rotation rolls workloads; confirm/revert controls old value removal |
+- **Target:** Project/platform grant
+  - **Immediate platform effect:** Next request by the identity is denied
+- **Target:** Deployment credential
+  - **Immediate platform effect:** Platform grant is removed before Keycloak
+    client cleanup
+- **Target:** Provisioner token
+  - **Immediate platform effect:** Delete `provisioner-token`, rerun bootstrap,
+    restart API
+- **Target:** Application secret
+  - **Immediate platform effect:** Versioned Secret rotation rolls workloads;
+    confirm/revert controls old value removal
 
-See [platform application](platform-application.md), [Kubernetes infrastructure](../operators/infrastructure.md), and the [human authorization runbook](../operators/validation/access-and-authorization.md).
+See [platform application](platform-application.md),
+[Kubernetes infrastructure](../operators/infrastructure.md), and the
+[human authorization runbook](../operators/validation/access-and-authorization.md).

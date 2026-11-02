@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 """OpenSSH AuthorizedKeysCommand for the restricted human database account."""
+
 import re
 import sys
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
-
 
 TOKEN_FILE = Path("/etc/developer-platform/db-bastion-token")
 URL = "http://127.0.0.1:8000/internal/database-access/authorized-key"
@@ -19,11 +19,15 @@ def main() -> int:
         token = TOKEN_FILE.read_text(encoding="ascii").strip()
         if len(token) < 32:
             return 0
-        request = Request(URL + "?" + urlencode({"fingerprint": sys.argv[1]}),
-                          headers={"X-Database-Bastion-Token": token})
+        request = Request(
+            URL + "?" + urlencode({"fingerprint": sys.argv[1]}),
+            headers={"X-Database-Bastion-Token": token},
+        )
         with urlopen(request, timeout=3) as response:
             key = response.read(8192).decode("ascii")
-        if key.startswith("restrict,port-forwarding,permitopen=") and key.endswith("\n"):
+        if key.startswith("restrict,port-forwarding,permitopen=") and key.endswith(
+            "\n"
+        ):
             sys.stdout.write(key)
     except (OSError, UnicodeError, ValueError):
         # Deny when the API or catalog cannot be reached. No token or key in stderr.

@@ -20,8 +20,7 @@ canonical deployment sequence. Run Ansible commands from the repository root;
 Local operators and Ansible use `scripts/setup/configure-platform.py` and
 `scripts/operations/deploy-platform.py`. Shared configuration rules live in
 `scripts/internal`; see the
-[configuration and deployment
-guide](../docs/operators/configuration-and-deployment.md).
+[configuration and deployment guide](../docs/operators/configuration-and-deployment.md).
 
 ## Tests
 

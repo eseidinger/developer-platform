@@ -51,11 +51,11 @@ def issue_test_runner(control, body, created_by, actor):
             "client_id": provider["client_id"],
             "client_secret": provider["client_secret"],
         }
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         if provider:
             try:
                 control.delete_credential_client(provider["provider_resource_id"])
-            except Exception:
+            except Exception:  # noqa: BLE001, S110 - Translate unexpected dependency failures to a safe state.
                 pass
         control.required_audit(
             actor,

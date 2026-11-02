@@ -352,7 +352,7 @@ def _execute_locked(
                 },
             ):
                 apply(manifest)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         # Only the step, exception class and numeric HTTP status are kept; the message may hold secrets.
         trace: dict[str, Any] = {"step": step, "error_type": type(exc).__name__}
         status = getattr(exc, "status", None)
@@ -489,7 +489,7 @@ def operation_loop(
                 remove,
                 prepare_resources,
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             log.error(
                 "Operation worker iteration failed error_type=%s", type(exc).__name__
             )

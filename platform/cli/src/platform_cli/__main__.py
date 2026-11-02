@@ -113,7 +113,7 @@ def _read_json(path: str) -> dict[str, object]:
             sys.stdin.read() if path == "-" else Path(path).read_text(encoding="utf-8")
         )
         return application_body(json.loads(contents))
-    except (OSError, json.JSONDecodeError, ValueError) as error:
+    except (OSError, TypeError, json.JSONDecodeError, ValueError) as error:
         raise typer.BadParameter(
             f"unable to read a JSON application specification: {error}",
             param_hint="--file",
@@ -157,7 +157,7 @@ def auth_status(
                 "subject": session["subject"] if session else None,
             }
         _emit(result, _effective_output(ctx, output))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, output or _state(ctx).output or "table") from None
 
 
@@ -239,7 +239,7 @@ def deploy_apply(
             "Waiting interrupted; the durable platform operation continues.", err=True
         )
         raise typer.Exit(10) from None
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, output) from None
 
 
@@ -266,7 +266,7 @@ def profile_create(
             name, Profile(api_url, issuer, client_id, ca_bundle, project, output)
         )
         emit({"profile": name, "active": store.read().get("active") == name}, output)
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, output) from None
 
 
@@ -282,7 +282,7 @@ def profile_show(
         if profile is None:
             raise ConfigurationError("No profile selected.")
         emit({"name": selected, **asdict(profile)}, _effective_output(ctx, output))
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, output or _state(ctx).output or "table") from None
 
 
@@ -292,7 +292,7 @@ def profile_use(name: str):
     try:
         ProfileStore().use(name)
         emit({"active": name}, "table")
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error) from None
 
 
@@ -304,7 +304,7 @@ def profile_delete(name: str):
         SessionStore(name, profile).delete()
         ProfileStore().delete(name)
         emit({"deleted": name}, "table")
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error) from None
 
 
@@ -343,7 +343,7 @@ def auth_login(
             client.close()
     except KeyboardInterrupt:
         raise typer.Exit(10) from None
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, selected_output) from None
 
 
@@ -369,7 +369,7 @@ def auth_logout(
             )
         finally:
             client.close()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, selected_output) from None
 
 
@@ -451,7 +451,7 @@ def stores_access_tunnel(
         raise typer.Exit(10) from None
     except typer.Exit:
         raise
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error) from None
 
 
@@ -483,7 +483,7 @@ def status(
             emit({"project": row, "components": components}, selected_output)
         finally:
             client.close()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, selected_output) from None
 
 
@@ -512,7 +512,7 @@ def projects_show(
             emit(row, selected_output)
         finally:
             client.close()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, selected_output) from None
 
 
@@ -551,7 +551,7 @@ def operations_watch(
             emit(result.model_dump(), selected_output)
         finally:
             client.close()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, selected_output) from None
 
 
@@ -576,7 +576,7 @@ def access_operations_watch(
             )
         finally:
             client.close()
-    except Exception as error:
+    except Exception as error:  # noqa: BLE001 - Map all command failures to a safe CLI error.
         raise fail(error, selected_output) from None
 
 

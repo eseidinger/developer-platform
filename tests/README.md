@@ -6,8 +6,9 @@ packages. Operator commands remain under `scripts/tests/platform/`.
 - `platform/`: platform scenario implementations, CLI validation, and cleanup.
 - `platform/unit/`: offline regression tests for those runners. These use mocks,
   temporary files, and local HTTP fixtures; they never deploy a platform.
-- `fixtures/hosted-application/`: the neutral hosted application, its Dockerfile,
-  and its own dependency file. Its build context excludes the runner code.
+- `fixtures/hosted-application/`: the neutral hosted application, its
+  Dockerfile, and its own dependency file. Its build context excludes the runner
+  code.
 - `support/`: synthetic policy and identity data shared by API and runner tests.
 
 API unit tests remain under `platform/app/tests/`. Script regression tests live
@@ -41,9 +42,9 @@ docker build -t hosted-access-fixture:test tests/fixtures/hosted-application
 ```
 
 The fixture is deliberately free of authorization logic. It contains synthetic
-state only; the platform supplies authentication and authorization. Never use
-it for real application data. Publishing its image and running a live scenario
-are separate actions.
+state only; the platform supplies authentication and authorization. Never use it
+for real application data. Publishing its image and running a live scenario are
+separate actions.
 
 ## Running-platform commands
 

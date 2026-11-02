@@ -2,8 +2,8 @@
 
 Status: historical index.
 
-These documents preserve completed plans, earlier design analyses, and acceptance
-context. They are not current user or operator instructions.
+These documents preserve completed plans, earlier design analyses, and
+acceptance context. They are not current user or operator instructions.
 
 - [Phase 3 developer experience and access](phase-3-developer-experience.md)
 

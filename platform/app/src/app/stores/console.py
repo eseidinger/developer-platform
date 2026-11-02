@@ -314,7 +314,7 @@ def create_gateway(
             ):
                 raise ValueError("Inactive human lease")
             return row
-        except Exception:
+        except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             raise HTTPException(
                 401, "Open an active console lease from the platform portal"
             ) from None
@@ -388,7 +388,7 @@ def create_gateway(
                             authorize(socket.cookies.get(COOKIE), "session", port),
                             min(0.5, remaining),
                         )
-                    except Exception:
+                    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                         return
                     await asyncio.sleep(min(0.25, remaining))
 
@@ -409,7 +409,7 @@ def create_gateway(
                         else "guard",
                         type(error).__name__ if error else "Completed",
                     )
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
             if observe_socket:
                 observe_socket(phase, type(error).__name__)
         finally:
@@ -758,7 +758,7 @@ def create_gateway(
                             asyncio.to_thread(load, UUID(str(row["credential_id"]))),
                             min(0.5, remaining),
                         )
-                    except Exception:
+                    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
                         return
                     deadline = (
                         min(current["expires_at"], row["expires_at"])

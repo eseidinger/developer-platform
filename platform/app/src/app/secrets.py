@@ -60,7 +60,7 @@ def _get(runtime: Any, secret_name: str, project: str) -> dict[str, Any] | None:
         if exc.status == 404:
             return None
         raise SecretsUnavailable() from None
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         raise SecretsUnavailable() from None
 
 
@@ -278,7 +278,7 @@ def observe_secret_activation(
             "state": "unknown",
             "reason": "not_found" if exc.status == 404 else "unavailable",
         }
-    except Exception:
+    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         return {"state": "unknown", "reason": "unavailable"}
     template = _field(_field(deployment, "spec", {}), "template", {})
     annotations = _field(_field(template, "metadata", {}), "annotations", {}) or {}
