@@ -17,6 +17,7 @@ must not be read as proof that the corresponding source capability is absent:
 - [UI implementation](ui.md)
 - [Phase 7 planned data stores](phase-7-planned-data-stores.md) — baseline/integration, analytics/object storage, search, graphs and vectors
 - [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) — owner-scheduled time series/OLAP, caching and documents
+- [CouchDB provider](couchdb-provider.md) — selected next Phase 8 document-store increment; implementation and acceptance pending
 - [Phase 9 data store measurement and comparison](phase-9-store-measurement-and-comparison.md) — performance dashboards and reproducible comparisons
 - [Phase 10 anytime leftovers and store recovery — lowest priority](phase-10-anytime-leftovers.md)
 

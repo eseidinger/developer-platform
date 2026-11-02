@@ -14,7 +14,7 @@ provider phases 7 and 8 plus a separate measurement phase 9:
 | Phase | Scope | Tasks |
 |---|---|---|
 | [7 — Planned Data Stores](phase-7-planned-data-stores.md) | PostgreSQL baseline/integration, DuckDB/Parquet/S3, OpenSearch, AGE/Neo4j, pgvector/Qdrant | PLAN-026–030, PLAN-036 |
-| [8 — Deferred Data Stores](phase-8-deferred-data-stores.md) | TimescaleDB, ClickHouse, Valkey, MongoDB/CouchDB | PLAN-031–033 |
+| [8 — Deferred Data Stores](phase-8-deferred-data-stores.md) | CouchDB selected for planning; TimescaleDB, ClickHouse and Valkey deferred | PLAN-031–033 |
 | [9 — Data Store Measurement and Comparison](phase-9-store-measurement-and-comparison.md) | Eight performance dashboards and reproducible comparisons across selected stores | PLAN-037, with source evidence from PLAN-026–033 |
 
 Phase 7 incorporates source roadmap phases 0–4; Phase 8 incorporates source

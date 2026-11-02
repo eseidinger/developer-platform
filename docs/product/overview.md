@@ -42,7 +42,9 @@ The first usable vertical slice covers a project/environment, a containerized an
 independently and bound to consuming components; an empty project or unbound
 application creates no database.
 
-Labs comparing JSONB with MongoDB, relational with graph persistence, or pgvector with specialized vector stores remain extensions. They provide decision evidence but are not required MVP services.
+Labs comparing JSONB with the selected CouchDB provider, relational with graph
+persistence, or pgvector with specialized vector stores remain extensions. They
+provide decision evidence but are not required MVP services.
 
 AI supports development, delivery, and operations. Its initial value is explaining applications and incidents using platform context. A general-purpose coding assistant or a complete AI hosting offering is outside the initial scope.
 

@@ -351,8 +351,11 @@ or Phase 7/8 exit.
 4. For adopted pgvector/Qdrant resources, restore authoritative vectors or
    rebuild derived collections/indexes from protected sources, then verify
    scoped queries, deletion state and application reconnection. Apply the same
-   authoritative-versus-derived recovery rule to any activated Phase 8 provider;
-   unactivated providers need no recovery run.
+   authoritative-versus-derived recovery rule to any activated Phase 8 provider.
+   For selected CouchDB, restore data, design documents and database security
+   from an off-host backup; reconcile identities and verify fresh scoped HTTP
+   credentials, reader denial of writes and application reconnection. Unactivated
+   providers need no recovery run.
 
 **Exit evidence:** dated, versioned off-host restore or source-backed rebuild
 results for every adopted provider, with scoped access, application readback,

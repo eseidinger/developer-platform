@@ -1,14 +1,16 @@
 # Phase 8 — Deferred Data Stores
 
-Status: deferred, unscheduled as of October 18, 2026. No activation decision or
-additional provider implementation is recorded. Measurements and comparisons
-for activated stores belong to [Phase 9](phase-9-store-measurement-and-comparison.md).
+Status: package 8.3 selected for planning on November 2, 2026; implementation
+has not started. Packages 8.1 and 8.2 remain deferred and unscheduled.
+Measurements and comparisons for activated stores belong to
+[Phase 9](phase-9-store-measurement-and-comparison.md).
 
 ## Goal and activation
 
-Keep TimescaleDB, ClickHouse, Valkey and MongoDB/CouchDB visible without committing
-to their deployment. Activate any package at the owner's discretion, with a
-named implementation owner and resource budget. No workload trigger, domain-need
+Keep TimescaleDB, ClickHouse and Valkey visible without committing to their
+deployment. CouchDB is the selected document-store candidate for package 8.3;
+MongoDB remains an unselected comparison option. Activate any package at the
+owner's discretion, with a named implementation owner and resource budget. No workload trigger, domain-need
 justification or benchmark success criteria are required for store selection.
 Use the PostgreSQL and analytical references from
 [Phase 7](phase-7-planned-data-stores.md). Completing Phase 9 comparisons or
@@ -52,16 +54,19 @@ This package stays deferred until the owner schedules it.
 
 ### 8.3 — Document Stores
 
-**Task:** PLAN-033. **Source:** phase 7. **Entry:** owner selects the package;
-no demonstration that PostgreSQL JSONB is inadequate is required.
+**Task:** PLAN-033. **Source:** phase 7. **Entry:** CouchDB selected for planning
+on November 2, 2026; no demonstration that PostgreSQL JSONB is inadequate is
+required. See the [CouchDB implementation plan](couchdb-provider.md).
 
-- Check the specific distribution's license and introduce a generic provider
-  when selected by the owner. Verify scoped updates, indexing, schema changes,
-  lifecycle, backup capture and isolation.
+- Introduce the CouchDB provider under the common platform contract. Verify
+  the specific distribution's Apache 2.0 license and bundled notices, scoped
+  updates, indexing, schema changes, lifecycle, backup capture and isolation.
+  CouchDB members can write ordinary documents, so read-only access requires
+  a proven gateway; never expose it as native read-only membership.
 
-**Exit:** record selection; any adopted provider passes common lifecycle,
-backup capture and isolation checks. Restore acceptance is Phase 10 package 10.13;
-document-model comparison is Phase 9 work;
+**Exit:** CouchDB passes common lifecycle, scoped access, backup capture and
+isolation checks recorded in PLAN-033. Restore acceptance is Phase 10 package
+10.13; document-model comparison is Phase 9 work;
 selection has no domain-need or comparative-success requirement.
 
 ## Phase disposition

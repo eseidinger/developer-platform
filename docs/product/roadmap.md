@@ -1,6 +1,6 @@
 # Product Roadmap
 
-Status: current/next/later roadmap as of October 18, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
+Status: current/next/later roadmap updated November 2, 2026. No calendar deadlines or effort commitments have been confirmed. The sequence follows dependencies and verifiable outcomes.
 
 | Phase | State | User outcome | Acceptance gate |
 |---|---|---|---|
@@ -11,7 +11,7 @@ Status: current/next/later roadmap as of October 18, 2026. No calendar deadlines
 | [5 – AI Operations and Development](../maintainers/delivery/plans/phase-5-ai-operations.md) | In progress; AI portal (5.6) owner-accepted | Explain platform context, investigate incidents, and propose reviewable changes | Live explanation, startup diagnosis, approved rollback recovery and primary-provider corpus passed; broader security and acceptance remain open; OpenLIT instrumentation (5.7) and AI Grafana dashboards (5.8) deployed and functionally owner-verified; operational checks remain open |
 | [6 – Optional Architecture Expansion](../architecture/evolution.md) | Optional; no entry decision | Add a second compute provider or extract deployable services only for a recorded need | Provider parity and/or migration, behavior parity, rollback, and operational evidence for the activated package |
 | [7 – Planned Data Stores](../maintainers/delivery/plans/phase-7-planned-data-stores.md) | Implementation in progress | Extend the PostgreSQL baseline with DuckDB/Parquet/RustFS S3 and targeted OpenSearch, AGE/Neo4j and pgvector/Qdrant providers | Independent resource lifecycle, explicit bindings, scoped private/browser access, functional integration, backup capture and safe purge |
-| [8 – Deferred Data Stores](../maintainers/delivery/plans/phase-8-deferred-data-stores.md) | Deferred / owner-scheduled | Add TimescaleDB, ClickHouse, Valkey or MongoDB/CouchDB when selected | Owner selection and operational acceptance for activated providers |
+| [8 – Deferred Data Stores](../maintainers/delivery/plans/phase-8-deferred-data-stores.md) | CouchDB selected for planning; other packages deferred | Add CouchDB as the next provider; TimescaleDB, ClickHouse and Valkey remain owner-scheduled | CouchDB operational acceptance; owner selection and acceptance for other activated providers |
 | [9 – Data Store Measurement and Comparison](../maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md) | Planned, unscheduled | Measure selected stores and compare them on versioned workloads | Eight performance dashboards and reproducible quantitative/domain comparisons; no adoption threshold |
 | [10 – Anytime Leftovers](../maintainers/delivery/plans/phase-10-anytime-leftovers.md) | Open, unscheduled, lowest priority | Complete remaining generic acceptance and deployed store recovery when capacity allows | Outstanding task criteria remain open; store recovery does not gate Phases 7–8 |
 

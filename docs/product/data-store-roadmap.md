@@ -28,6 +28,12 @@ rebuild and reconnection checks join other anytime leftovers in
 [Phase 10](../maintainers/delivery/plans/phase-10-anytime-leftovers.md); they
 also do not gate provider selection or Phase 7/8 exit.
 
+**Document-store selection (2 November 2026):** CouchDB is selected for the next
+provider planning increment under [Phase 8 package 8.3](../maintainers/delivery/plans/phase-8-deferred-data-stores.md#83-document-stores).
+MongoDB is not selected. The [implementation plan](../maintainers/delivery/plans/couchdb-provider.md)
+defines access, isolation, backup and capacity checks; the imported alternatives
+and adoption restrictions below remain historical proposal context.
+
 ## Implementation checkpoint — October 18, 2026
 
 The current implementation has independent named PostgreSQL resources with

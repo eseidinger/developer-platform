@@ -69,7 +69,8 @@ agent state and conversation history. No relevance threshold gates adoption.
 For each owner-activated Phase 8 provider, compare PostgreSQL/TimescaleDB/
 ClickHouse time-series and OLAP workloads (DuckDB as a bounded reference), Valkey
 against indexed/precomputed PostgreSQL and local application caching, or
-MongoDB/CouchDB against PostgreSQL JSONB. Use reproducible loads and include
+CouchDB against PostgreSQL JSONB for the selected package 8.3; compare MongoDB
+only if selected later. Use reproducible loads and include
 invalidation, consistency, indexing/schema evolution, memory and operating cost
 as applicable. Unactivated providers require no benchmark.
 
