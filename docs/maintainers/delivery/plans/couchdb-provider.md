@@ -1,7 +1,8 @@
 # CouchDB Provider — Next Data Store Increment
 
-Status: selected on November 2, 2026; source implementation and disposable
-CouchDB fixture pass. Deployed acceptance has not started. This plan refines
+Status: selected on November 2, 2026; source implementation, disposable fixture
+and bounded deployed access checks pass. Backup capture and the remaining Phase 8
+acceptance checks are open. This plan refines
 [Phase 8 package 8.3](phase-8-deferred-data-stores.md#83-document-stores) and
 [PLAN-033](../backlog.md#data-store-expansion-tasks). It does not select
 MongoDB. Phase 7's unfinished acceptance and other Phase 8 packages remain
@@ -12,8 +13,29 @@ image, repeated provisioning, cross-database denial, document and Mango queries,
 administrator-only index changes, service restart, recovered security and native
 credential revocation. The relay's read-only and admin-index boundaries passed
 focused local tests. The PostgreSQL provider constraint migration passed twice
-in a disposable database. No deployed resource, off-host restore or application
-reconnection is claimed by these checks.
+in a disposable database.
+
+The deployed check on November 2 installed source revision
+`810e664e68bc2158cebdf47abece4b6645783ec0` on `node-01.eseidinger.de`
+with CouchDB 3.5.3 pinned to image digest
+`sha256:bed314d10cdf58c0fff63352db4c3f168df58a185a773c0e2295105375c5ef10`.
+The selected capacity allocation was 4 GiB; the container limit was 768 MiB
+memory and 0.5 CPU. CouchDB, PostgreSQL, the Platform API and the store relay
+were healthy after deployment. API readiness returned 200 and Prometheus
+reported `platform_native_couchdb_up=1`.
+
+A temporary project and resource passed deployed provisioning, document writes,
+reader reads, Mango queries, writer index creation, reader write and index
+denial, system API and cross-database denial, and active reader revocation.
+Both the test resource and project were retired. The first data-plane probe
+returned a generic failure; a retry with bounded polling passed.
+The deployment verification report is on the host at
+`/opt/developer-platform/.runtime/couchdb-deployment-verification.json`.
+The last verified backup capture was at 12:00 UTC, before this deployment.
+A new backup start was rejected by the automatic approval review because it
+would pause services and transfer platform data to the configured external S3
+repository. CouchDB backup capture, off-host restore, application reconnection
+and the remaining Phase 8 exit checks are therefore not claimed here.
 
 ## Scope and decisions
 

@@ -3984,9 +3984,10 @@ remain open. See the
   application/experiment owners. See
   [package 8.2](plans/phase-8-deferred-data-stores.md#82-caching-and-realtime).
 
-- [ ] **PLAN-033 · 8.3** — CouchDB provider. Source implementation and
-  disposable fixture pass; deployed acceptance remains open. Before
-  installation, the operator must select a capacity allocation. Required
+- [ ] **PLAN-033 · 8.3** — CouchDB provider. Source implementation, disposable
+  fixture and bounded deployed access checks pass; backup capture and remaining
+  deployed acceptance checks remain open. The selected capacity allocation is
+  4 GiB. Required
   outcome: named database lifecycle, scoped read-only/read-write access with a
   verified read-only gateway, credential/session revocation, isolation,
   monitoring, bounded capacity and backup capture. CouchDB membership alone
