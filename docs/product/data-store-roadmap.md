@@ -44,6 +44,18 @@ open. MongoDB is not selected. The
 access, isolation, backup and capacity checks; the imported alternatives and
 adoption restrictions below remain historical proposal context.
 
+**Graph-store selection (3 November 2026):** Apache HugeGraph is selected as the
+next provider under
+[Phase 8 package 8.4](../maintainers/delivery/plans/phase-8-deferred-data-stores.md#84-graph-stores),
+complementing the implemented AGE/Neo4j graph package 7.4. It runs as a shared
+service with one graph space per named resource. Planning only; no source
+implementation yet. Other graph stores (JanusGraph, NebulaGraph, Dgraph, Kuzu,
+Memgraph, ArangoDB and others) remain unselected comparison options. The
+[implementation plan](../maintainers/delivery/plans/hugegraph-provider.md)
+defines access, isolation, backup and capacity checks; the imported
+alternatives and adoption restrictions below remain historical proposal
+context.
+
 ## Implementation checkpoint — October 18, 2026
 
 The current implementation has independent named PostgreSQL resources with

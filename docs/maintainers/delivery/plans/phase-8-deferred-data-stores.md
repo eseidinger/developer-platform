@@ -1,15 +1,20 @@
 # Phase 8 — Deferred Data Stores
 
 Status: package 8.3 selected on November 2, 2026; source implementation and
-disposable fixture pass, with deployed acceptance open. Packages 8.1 and 8.2
-remain deferred and unscheduled. Measurements and comparisons for activated
-stores belong to [Phase 9](phase-9-store-measurement-and-comparison.md).
+disposable fixture pass, with deployed acceptance open. Package 8.4 selected on
+November 3, 2026 for planning only; no source implementation yet. Packages 8.1
+and 8.2 remain deferred and unscheduled. Measurements and comparisons for
+activated stores belong to
+[Phase 9](phase-9-store-measurement-and-comparison.md).
 
 ## Goal and activation
 
 Keep TimescaleDB, ClickHouse and Valkey visible without committing to their
 deployment. CouchDB is the selected document-store candidate for package 8.3;
-MongoDB remains an unselected comparison option. Activate any package at the
+MongoDB remains an unselected comparison option. Apache HugeGraph is the
+selected graph-store candidate for package 8.4, complementing the Phase 7
+graph package 7.4 (AGE/Neo4j); other graph stores remain unselected comparison
+options. Activate any package at the
 owner's discretion, with a named implementation owner and resource budget. No
 workload trigger, domain-need justification or benchmark success criteria are
 required for store selection. Use the PostgreSQL and analytical references from
@@ -18,7 +23,7 @@ another deferred package is not required to activate a selected store.
 
 The
 [common acceptance and responsibilities](data-store-expansion.md#ownership-and-common-acceptance)
-apply to every activated package. Track PLAN-031–033 in the
+apply to every activated package. Track PLAN-031–033 and PLAN-038 in the
 [backlog](../backlog.md#data-store-expansion-tasks). Optional Phase 6 and
 unrelated Phase 10 leftovers are independent. Stores may be selected for
 permanent use at will, subject to the previously selected operational policies.
@@ -70,6 +75,28 @@ inadequate is required. See the
 isolation checks recorded in PLAN-033. Restore acceptance is Phase 10 package
 10.13; document-model comparison is Phase 9 work; selection has no domain-need
 or comparative-success requirement.
+
+### 8.4 — Graph Stores
+
+**Task:** PLAN-038. **Source:** roadmap phase 3 extension. **Entry:** Apache
+HugeGraph selected for planning on November 3, 2026; no demonstration that
+AGE or Neo4j is inadequate is required. See the
+[HugeGraph implementation plan](hugegraph-provider.md).
+
+- Introduce the HugeGraph provider under the common platform contract as a
+  shared Compose service with the embedded RocksDB backend; each named resource
+  is a separate HugeGraph graph space, so the default shared-service model
+  applies and no dedicated-instance exception is needed. Verify the Apache 2.0
+  license and bundled notices of the pinned distribution, per-graph
+  read-only/read-write roles, credential/session revocation, indexing/schema
+  management, lifecycle, backup capture and isolation. Unlike Neo4j Community,
+  native per-graph read-only access exists; verify it across REST, Gremlin and
+  PQL before offering it.
+
+**Exit:** HugeGraph passes common lifecycle, scoped access, backup capture and
+isolation checks recorded in PLAN-038. Restore acceptance is Phase 10 package
+10.13; graph-model comparison against AGE/Neo4j is Phase 9 work; selection has
+no domain-need or comparative-success requirement.
 
 ## Phase disposition
 

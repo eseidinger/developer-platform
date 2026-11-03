@@ -324,7 +324,7 @@ and checkboxes below are authoritative.
     by each provider package)
 - **Gate:** 8, CouchDB source implemented; others deferred
   - **Tasks:** PLAN-031 (8.1 time series/OLAP), PLAN-032 (8.2 caching), PLAN-033
-    (8.3 CouchDB)
+    (8.3 CouchDB), PLAN-038 (8.4 HugeGraph, selected for planning 2026-11-03)
 - **Gate:** 9, measurement and comparison
   - **Tasks:** PLAN-037: eight store performance dashboards and reproducible
     comparisons across selected Phase 7/8 stores in the
@@ -3996,6 +3996,17 @@ remain open. See the
   platform API / operations, with external application/experiment owners. See
   the [implementation plan](plans/couchdb-provider.md) and
   [package 8.3](plans/phase-8-deferred-data-stores.md#83-document-stores).
+
+- [ ] **PLAN-038 · 8.4** — HugeGraph provider. Selected for planning on
+  November 3, 2026; no source implementation or fixture evidence yet. Required
+  outcome: shared-service HugeGraph with one graph space per named resource,
+  scoped native per-graph read-only/read-write access, credential/session
+  revocation, isolation, monitoring, bounded capacity and backup capture. No
+  dedicated-instance exception is requested. Restore is Phase 10 package 10.13;
+  HugeGraph/AGE/Neo4j graph comparison is PLAN-037 / Phase 9 work. Accountable
+  role: platform API / operations, with external application/experiment owners.
+  See the [implementation plan](plans/hugegraph-provider.md) and
+  [package 8.4](plans/phase-8-deferred-data-stores.md#84-graph-stores).
 
 - [ ] **PLAN-037 · 9** — Data Store Measurement and Comparison. Deliver the
   eight versioned performance dashboards and their deployed metric verification;

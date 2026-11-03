@@ -165,6 +165,22 @@ readiness is not deployed operational acceptance. See the
 and
 [operator workflow](../../../operators/data-stores.md#dedicated-neo4j-community-resources).
 
+## HugeGraph shared-service provisioning decision
+
+**Owner-selected model (November 3, 2026; PLAN-038):** Integrate Apache
+HugeGraph as a shared Compose service with the embedded RocksDB backend, one
+graph space per named resource, under the default
+[shared-service placement](#shared-service-placement-decision). Unlike the
+Neo4j Community exception above, no dedicated instance per resource is needed:
+HugeGraph supports multiple graph spaces per server and per-graph role
+permissions, including a native read-only role per graph. Verify that
+per-graph RBAC actually denies cross-graph and cross-project access across the
+REST, Gremlin and PQL surfaces before offering read-only grants; graph names
+alone provide no isolation. Server-level administration (users, roles, server
+configuration) stays operator-only. See the
+[HugeGraph implementation plan](hugegraph-provider.md) and
+[package 8.4](phase-8-deferred-data-stores.md#84-graph-stores).
+
 ## Shared-store upgrade decision
 
 **Owner-selected policy (October 17, 2026):** Shared data-store upgrades are
@@ -983,5 +999,5 @@ performance comparisons may use the local workstation. No result or success
 threshold gates adoption or permanent use.
 
 Execution and evidence:
-[PLAN-026–033, PLAN-036 and PLAN-037](../backlog.md#data-store-expansion-tasks).
+[PLAN-026–033, PLAN-036, PLAN-037 and PLAN-038](../backlog.md#data-store-expansion-tasks).
 Assign named platform and external experiment owners before each phase starts.

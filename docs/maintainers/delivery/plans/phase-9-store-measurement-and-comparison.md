@@ -54,10 +54,11 @@ tests.
 ### 9.3 — Graph
 
 Compare relational/recursive PostgreSQL queries, Apache AGE and Neo4j Community
-on equivalent VEF transitive dependencies, cycles and change-impact data. Add
-Energy, ODIP lineage and Bot Social scenarios when their fixtures exist. Record
-semantic equivalence, version/feature coverage and operational cost. VEF retains
-constraint evaluation and optimization responsibility.
+on equivalent VEF transitive dependencies, cycles and change-impact data; add
+Apache HugeGraph when Phase 8 package 8.4 is activated. Add Energy, ODIP lineage
+and Bot Social scenarios when their fixtures exist. Record semantic equivalence,
+version/feature coverage and operational cost. VEF retains constraint evaluation
+and optimization responsibility.
 
 ### 9.4 — Vector retrieval
 
@@ -71,9 +72,10 @@ gates adoption.
 
 For each owner-activated Phase 8 provider, compare PostgreSQL/TimescaleDB/
 ClickHouse time-series and OLAP workloads (DuckDB as a bounded reference),
-Valkey against indexed/precomputed PostgreSQL and local application caching, or
-CouchDB against PostgreSQL JSONB for the selected package 8.3; compare MongoDB
-only if selected later. Use reproducible loads and include invalidation,
+Valkey against indexed/precomputed PostgreSQL and local application caching,
+CouchDB against PostgreSQL JSONB for the selected package 8.3, or HugeGraph
+against AGE/Neo4j for the selected package 8.4; compare MongoDB or other graph
+stores only if selected later. Use reproducible loads and include invalidation,
 consistency, indexing/schema evolution, memory and operating cost as applicable.
 Unactivated providers require no benchmark.
 
