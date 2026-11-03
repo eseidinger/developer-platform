@@ -169,15 +169,18 @@ and
 
 **Owner-selected model (November 3, 2026; PLAN-038):** Integrate Apache
 HugeGraph as a shared Compose service with the embedded RocksDB backend, one
-graph space per named resource, under the default
-[shared-service placement](#shared-service-placement-decision). Unlike the
-Neo4j Community exception above, no dedicated instance per resource is needed:
-HugeGraph supports multiple graph spaces per server and per-graph role
-permissions, including a native read-only role per graph. Verify that
-per-graph RBAC actually denies cross-graph and cross-project access across the
-REST, Gremlin and PQL surfaces before offering read-only grants; graph names
-alone provide no isolation. Server-level administration (users, roles, server
-configuration) stays operator-only. See the
+graph per named resource within the `DEFAULT` graph space, under the default
+[shared-service placement](#shared-service-placement-decision). RocksDB does not
+support creating separate graph spaces; those require HStore/PD. Unlike the
+Neo4j Community exception above, a dedicated instance per resource is not
+planned: HugeGraph supports multiple graphs per server and graph-scoped
+authorization targets. The `observer` default role belongs to HStore graph
+spaces and is not available as an assumed RocksDB read-only role. Verify
+graph-scoped reader and writer grants, including Gremlin execution behavior,
+against the pinned release before enabling either mode. Verify cross-graph and
+cross-project denial across every exposed surface; graph names alone provide no
+isolation. Server-level administration (users, roles, server configuration)
+stays operator-only. See the
 [HugeGraph implementation plan](hugegraph-provider.md) and
 [package 8.4](phase-8-deferred-data-stores.md#84-graph-stores).
 

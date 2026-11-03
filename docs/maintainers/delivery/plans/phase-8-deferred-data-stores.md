@@ -85,13 +85,12 @@ AGE or Neo4j is inadequate is required. See the
 
 - Introduce the HugeGraph provider under the common platform contract as a
   shared Compose service with the embedded RocksDB backend; each named resource
-  is a separate HugeGraph graph space, so the default shared-service model
-  applies and no dedicated-instance exception is needed. Verify the Apache 2.0
-  license and bundled notices of the pinned distribution, per-graph
-  read-only/read-write roles, credential/session revocation, indexing/schema
-  management, lifecycle, backup capture and isolation. Unlike Neo4j Community,
-  native per-graph read-only access exists; verify it across REST, Gremlin and
-  PQL before offering it.
+  is a separate graph in the `DEFAULT` graph space, with its own store and data
+  paths. Verify the license, image provenance and bundled notices, graph-scoped
+  reader/writer permissions, credential/session revocation, indexing/schema
+  management, lifecycle, backup capture and isolation. Enable read-only access
+  only on surfaces where the pinned release and gateway enforce it; Gremlin
+  `EXECUTE` permission alone does not establish read-only execution.
 
 **Exit:** HugeGraph passes common lifecycle, scoped access, backup capture and
 isolation checks recorded in PLAN-038. Restore acceptance is Phase 10 package

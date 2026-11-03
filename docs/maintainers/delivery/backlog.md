@@ -3999,8 +3999,9 @@ remain open. See the
 
 - [ ] **PLAN-038 · 8.4** — HugeGraph provider. Selected for planning on
   November 3, 2026; no source implementation or fixture evidence yet. Required
-  outcome: shared-service HugeGraph with one graph space per named resource,
-  scoped native per-graph read-only/read-write access, credential/session
+  outcome: shared-service HugeGraph with one graph per named resource in the
+  `DEFAULT` graph space, verified graph-scoped reader/writer grants,
+  credential/session
   revocation, isolation, monitoring, bounded capacity and backup capture. No
   dedicated-instance exception is requested. Restore is Phase 10 package 10.13;
   HugeGraph/AGE/Neo4j graph comparison is PLAN-037 / Phase 9 work. Accountable

@@ -16,18 +16,25 @@ selection.
 
 - Add Apache HugeGraph (Apache top-level project, Apache License 2.0) as an
   optional, shared Docker Compose service with the embedded RocksDB backend.
-  Each named platform resource maps to a separate HugeGraph graph space;
+  Each named platform resource maps to a separate graph in the `DEFAULT`
+  graph space, with a distinct RocksDB store and data/WAL paths;
   application deployment never creates one implicitly. Unlike the
   [Neo4j Community dedicated-instance exception](data-store-expansion.md#neo4j-community-dedicated-instance-decision),
-  HugeGraph supports multiple graph spaces per server and per-graph role
-  permissions, so the default
+  HugeGraph supports multiple graphs per server and graph-scoped authorization
+  targets, so the default
   [shared-service model](data-store-expansion.md#shared-service-placement-decision)
-  applies; no dedicated-instance exception is requested. PostgreSQL remains
+  is the proposed model, subject to isolation tests. Graph spaces other than
+  `DEFAULT` require HStore/PD and are outside this RocksDB plan. The
+  [1.7 graph API](https://hugegraph.apache.org/versions/1.7/docs/clients/restful-api/graphs/)
+  documents creating RocksDB graphs with distinct paths. PostgreSQL remains
   the platform's own catalog and the reference for later comparisons.
-- Use the official `hugegraph/hugegraph` distribution under Apache License
-  2.0. Record the exact image digest, bundled component notices and supported
-  client versions before installation. Pin upgrades under the shared-store
-  maintenance policy.
+- Use a pinned `hugegraph/hugegraph` container image and verify its provenance,
+  license and bundled notices against the signed Apache release. HugeGraph's
+  Docker images are convenient project images, not official ASF release
+  artifacts, as the
+  [server quick start](https://hugegraph.apache.org/versions/1.7/docs/quickstart/hugegraph/hugegraph-server/)
+  notes. Record the exact image digest and supported client versions before
+  installation. Pin upgrades under the shared-store maintenance policy.
 - Keep project data authoritative unless an application explicitly identifies a
   recoverable source. The supported backup/restore tooling of the pinned
   distribution over the RocksDB backend must be verified; it is not a
@@ -37,34 +44,43 @@ selection.
   confirmed purge. Do not expose the server administrator, user/role
   management, Gremlin-Server administration or server configuration to
   project clients.
-- Query surfaces are the REST API and Gremlin (plus HugeGraph-PQL where
-  supported by the pinned release). Application bindings inject the private
-  REST/Gremlin endpoints, graph name and scoped credentials (for example
+- The REST API is the initial query surface. Expose Gremlin only after
+  validating its graph isolation, mutation permissions and script security in
+  the pinned release. Application bindings inject the private REST endpoint,
+  graph name and scoped credentials (for example
   `HUGEGRAPH_REST_URI`, `HUGEGRAPH_GREMLIN_URI`, `HUGEGRAPH_GRAPH`,
-  `HUGEGRAPH_USERNAME`, `HUGEGRAPH_PASSWORD`); the exact binding key set is
-  fixed during the platform-contract step below.
+  `HUGEGRAPH_USERNAME`, `HUGEGRAPH_PASSWORD`); include the Gremlin endpoint only
+  when enabled. The exact binding key set is fixed during the platform-contract
+  step below.
 
 ## Access boundary to resolve before enabling the provider
 
-HugeGraph's built-in auth manages users and roles with per-graph permissions;
-a native read-only role exists per graph space, so the common
-read-only/read-write distinction applies (unlike Neo4j Community). Verify the
-pinned release's actual role/permission semantics before relying on them; see
-the [HugeGraph security guide](https://hugegraph.apache.org/docs/guides/security/)
-and [auth API](https://hugegraph.apache.org/docs/clients/restful-api/auth/).
+HugeGraph's built-in auth supports graph-scoped targets with separate `READ`,
+`WRITE`, `DELETE` and `EXECUTE` permissions. The documented `observer` default
+role belongs to HStore graph spaces, so it cannot be assumed for this RocksDB
+deployment. Build and verify graph-scoped reader and writer grants in the pinned
+release before enabling either mode. In particular, `EXECUTE` covers Gremlin
+execution and must not be treated as read-only. See the
+[1.7 authentication API](https://hugegraph.apache.org/versions/1.7/docs/clients/restful-api/auth/),
+[graph-space prerequisites](https://hugegraph.apache.org/versions/1.7/docs/clients/restful-api/graphspace/)
+and [security guide](https://hugegraph.apache.org/docs/guides/security/).
 
-1. Give each resource private access to only its graph space, with separate
+1. Give each resource private access to only its graph, with separate
    platform-managed human and application identities. Route every client
    request through the access gateway; only the operator API and trusted relay
    may reach HugeGraph directly. Verify that a credential cannot enumerate or
    access another graph, another project's data, or server-level APIs.
-   Graph names alone provide no isolation.
-1. Map read-only grants to the verified native per-graph read role. Prove
-   enforcement for writes across all exposed surfaces (REST write APIs,
-   Gremlin mutations, PQL), including encoded paths, batch APIs and
-   administrative endpoints; reject by route and operation, not merely by
-   HTTP method or protocol. A read-only grant must never become a full-access
-   credential with an unrestricted network path.
+   Graph names alone provide no isolation; the gateway must also deny graph
+   listing, configuration and graph-management routes to project clients.
+1. Map read-only grants to verified graph-scoped `READ` permissions. Prove
+   enforcement for writes across every exposed surface, including REST write
+   and batch APIs, Gremlin mutations and administrative endpoints. Test encoded
+   paths and queries that use `POST`; reject by route and operation, not merely
+   by HTTP method. Expose Gremlin to readers only if the pinned release and
+   gateway can enforce read-only execution, including denial of script-based
+   mutation and cross-graph access; otherwise reject reader Gremlin requests.
+   A read-only grant must never become a full-access credential with an
+   unrestricted network path.
 1. Fence both new and established access at lease expiry, revocation, rotation
    and retirement, including HTTP keep-alive, Gremlin sessions and browser
    sessions. Keep service administrator credentials separate from resource
@@ -76,33 +92,36 @@ and [auth API](https://hugegraph.apache.org/docs/clients/restful-api/auth/).
    Validate allowed operations and audit changes; reject unsupported
    administrative operations explicitly instead of silently upgrading
    permissions.
-1. Provide private REST/Gremlin client access first. Add HugeGraph-Hubble (or
-   a platform browser console) only after proving the same scoped, revocable
-   behavior through the lease relay; otherwise advertise browser access as
-   unsupported.
+1. Provide private REST client access first. Add Gremlin access only after the
+   preceding graph isolation and script-security tests pass. Add
+   HugeGraph-Hubble (or a platform browser console) only after proving the same
+   scoped, revocable behavior through the lease relay; otherwise advertise
+   browser access as unsupported.
 
 ## Ordered implementation work
 
 1. **Compatibility and capacity:** Validate the pinned HugeGraph release and
-   official image in a disposable local fixture. Check license and bundled
-   notices, per-graph role/permission semantics, credential/session
+   container image in a disposable local fixture. Check image provenance,
+   license and bundled notices, graph-scoped permissions, credential/session
    invalidation, published security advisories, the distribution's supported
    backup/restore method over RocksDB, health and metrics endpoints, and
    CPU/memory/disk headroom with all selected stores running. Record the
    implementation owner and resource budget in PLAN-038.
 1. **Service foundation:** Add an opt-in Compose/Ansible service (`hugegraph`
-   profile) with persistent RocksDB storage, private networking, bounded
-   resources, health checks, pinned image, administrator secret management and
-   an operator runbook. No public HugeGraph REST/Gremlin port or Docker socket
-   reaches applications or the Platform API.
+   profile) with persistent RocksDB storage and configuration, distinct store
+   and data/WAL paths per graph, private networking, bounded resources, health
+   checks, pinned image, administrator secret management and an operator
+   runbook. Enable authentication explicitly: it is disabled by default. No
+   public HugeGraph REST/Gremlin port or Docker socket reaches applications or
+   the Platform API.
 1. **Platform contract:** Add `hugegraph` to the provider catalog, API schema,
-   generated UI types, CLI and portal. Implement named graph-space
+   generated UI types, CLI and portal. Implement named graph
    create/inspect, reconciliation, explicit component bindings, credential
    issue/revoke/rotate, retirement and confirmed purge. Set per-graph security
    at creation before granting client access; fail closed if setup is
    incomplete.
 1. **Data and security tests:** Verify vertex/edge create/update/delete,
-   Gremlin and PQL queries, schema and index management with representative
+   supported Gremlin queries, schema and index management with representative
    fixtures. Exercise same-project and cross-project grants, reader/writer
    separation, system API denial, session fencing, service restart and
    partial provisioning retries. Test browser access if implemented.
@@ -110,9 +129,12 @@ and [auth API](https://hugegraph.apache.org/docs/clients/restful-api/auth/).
    alerts, capacity admission and quota reporting. Record any monitoring-only
    quota limit explicitly; never call it a hard per-graph quota. Capture
    consistent encrypted off-host backups on the selected 12-hour schedule,
-   including graph data, auth configuration and credential reconciliation
-   inputs. Preserve the existing purge backup gate and test backup capture
-   before Phase 8 acceptance.
+   including every graph's data, graph configuration and the authentication
+   store, plus credential reconciliation inputs. Verify whether the selected
+   export or snapshot method produces a consistent capture under concurrent
+   writes; otherwise quiesce writes or stop the service for capture and record
+   the interruption. Preserve the existing purge backup gate and test backup
+   capture before Phase 8 acceptance.
 1. **Acceptance and handoff:** Run offline checks, focused component tests and
    bounded deployed tests for the activated provider. Record revision, image
    digest, environment, evidence and limitations in PLAN-038. The off-host
