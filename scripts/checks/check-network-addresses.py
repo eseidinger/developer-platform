@@ -65,17 +65,19 @@ def addresses(config):
             )
     search_subnet, _ = console_addresses(config)
     couchdb_subnet, _ = couchdb_addresses(config)
+    hugegraph_subnet, _ = hugegraph_addresses(config)
     if any(
         first.overlaps(second)
         for first, second in (
             (subnet, search_subnet),
             (subnet, couchdb_subnet),
+            (subnet, hugegraph_subnet),
             (search_subnet, couchdb_subnet),
+            (search_subnet, hugegraph_subnet),
+            (couchdb_subnet, hugegraph_subnet),
         )
     ):
-        raise ValueError(
-            "The platform, search-console and CouchDB subnets must not overlap."
-        )
+        raise ValueError("The platform and isolated store subnets must not overlap.")
     return subnet, result
 
 
@@ -127,6 +129,25 @@ def couchdb_addresses(config):
             "CouchDB address must be a usable IPv4 address in its isolated subnet, excluding its gateway."
         ) from None
     return subnet, {"couchdb": address}
+
+
+def hugegraph_addresses(config):
+    try:
+        subnet = ipaddress.IPv4Network(
+            config.get("STORE_HUGEGRAPH_SUBNET", "172.30.83.0/29")
+        )
+        address = ipaddress.IPv4Address(config.get("HUGEGRAPH_IP", "172.30.83.2"))
+        if address not in subnet or address in (
+            subnet.network_address,
+            subnet.broadcast_address,
+            subnet.network_address + 1,
+        ):
+            raise ValueError()
+    except ValueError:
+        raise ValueError(
+            "HugeGraph address must be usable in its isolated IPv4 subnet."
+        ) from None
+    return subnet, {"hugegraph": address}
 
 
 def conflicts(subnet, fixed, network, labels):
@@ -198,18 +219,21 @@ def check():
 
     search_subnet, search_fixed = console_addresses(config)
     couchdb_subnet, couchdb_fixed = couchdb_addresses(config)
+    hugegraph_subnet, hugegraph_fixed = hugegraph_addresses(config)
     errors = []
     for name, selected_subnet, selected_fixed in (
         (NETWORK, subnet, fixed),
         ("developer-platform-search-consoles", search_subnet, search_fixed),
         ("developer-platform-store-couchdb", couchdb_subnet, couchdb_fixed),
+        ("developer-platform-store-hugegraph", hugegraph_subnet, hugegraph_fixed),
     ):
         if name in existing:
             network = json.loads(docker("network", "inspect", name))[0]
-            if name == "developer-platform-store-couchdb" and not network.get(
-                "Internal"
-            ):
-                raise ValueError("Existing CouchDB network must be internal")
+            if name in {
+                "developer-platform-store-couchdb",
+                "developer-platform-store-hugegraph",
+            } and not network.get("Internal"):
+                raise ValueError("Existing store network must be internal")
             if args.validate_networks:
                 configured = network.get("IPAM", {}).get("Config", [])
                 if not any(

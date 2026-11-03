@@ -141,6 +141,10 @@ def validate_effective_settings(config, tempo_source):
                 "subnet": config["STORE_COUCHDB_SUBNET"],
                 "addresses": {"couchdb": config["COUCHDB_IP"]},
             },
+            "hugegraph_network": {
+                "subnet": config["STORE_HUGEGRAPH_SUBNET"],
+                "addresses": {"hugegraph": config["HUGEGRAPH_IP"]},
+            },
             "k3s_image": config["K3S_IMAGE"],
             "bootstrap_subject": config.get("PLATFORM_BOOTSTRAP_SUBJECT", ""),
         }

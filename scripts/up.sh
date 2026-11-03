@@ -65,6 +65,9 @@ for profile in "${store_profiles[@]}"; do
     couchdb)
       store_services+=(couchdb)
       ;;
+    hugegraph)
+      store_services+=(hugegraph)
+      ;;
     neo4j)
       docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 \
         infrastructure/persistence/neo4j

@@ -36,6 +36,7 @@ def get(name):
         "opensearch": ("OPENSEARCH_IP", ("OPENSEARCH_ADMIN_PASSWORD",)),
         "qdrant": ("QDRANT_IP", ("QDRANT_API_KEY",)),
         "couchdb": ("COUCHDB_IP", ("COUCHDB_ADMIN_PASSWORD",)),
+        "hugegraph": ("HUGEGRAPH_IP", ("HUGEGRAPH_ADMIN_PASSWORD",)),
     }
     if name not in definitions:
         raise ProviderUnavailable(
@@ -63,6 +64,10 @@ def get(name):
             from .couchdb import CouchDB
 
             return CouchDB()
+        if name == "hugegraph":
+            from .hugegraph import HugeGraph
+
+            return HugeGraph()
         from .opensearch import OpenSearch
 
         return OpenSearch()
@@ -73,7 +78,15 @@ def get(name):
 
 
 def capabilities(name):
-    if name not in {"postgresql", "s3", "opensearch", "qdrant", "neo4j", "couchdb"}:
+    if name not in {
+        "postgresql",
+        "s3",
+        "opensearch",
+        "qdrant",
+        "neo4j",
+        "couchdb",
+        "hugegraph",
+    }:
         raise ProviderUnavailable("Unknown provider")
     full = name == "neo4j"
     return {
@@ -87,7 +100,15 @@ def capabilities(name):
 
 def availability():
     result = []
-    for name in ("postgresql", "s3", "opensearch", "qdrant", "neo4j", "couchdb"):
+    for name in (
+        "postgresql",
+        "s3",
+        "opensearch",
+        "qdrant",
+        "neo4j",
+        "couchdb",
+        "hugegraph",
+    ):
         try:
             get(name)
             budget(name)
@@ -184,6 +205,7 @@ def connection(resource, credential):
             "qdrant": "QDRANT_URL",
             "opensearch": "OPENSEARCH_URL",
             "couchdb": "COUCHDB_URL",
+            "hugegraph": "HUGEGRAPH_REST_URI",
         }[resource["provider"]]
         fields[key] = endpoint
     return fields

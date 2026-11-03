@@ -158,6 +158,38 @@ class HTTPRelayTests(IsolatedAsyncioTestCase):
             self.assertEqual(await asyncio.wait_for(reader.read(), 1), b"")
         self.assertEqual(self.observed, [])
 
+    async def test_hugegraph_gateway_rejects_cross_graph_and_admin_paths(self):
+        import hashlib
+
+        self.lease["provider"] = "hugegraph"
+        self.lease["mode"] = "read-only"
+        self.lease["admission_sha256"] = hashlib.sha256(
+            b"synthetic-password"
+        ).hexdigest()
+        login = catalog.login(self.lease["credential_id"])
+        auth = base64.b64encode((login + ":synthetic-password").encode())
+        graph = catalog.identifier(self.lease["resource_id"])
+
+        def packet(target):
+            return (
+                b"GET "
+                + target.encode()
+                + b" HTTP/1.1\r\nHost: untrusted.example\r\nAuthorization: Basic "
+                + auth
+                + b"\r\n\r\n"
+            )
+
+        for target in ("/graphs", "/graphs/other/graph/vertices", "/auth/users"):
+            reader, _ = await self.client(packet(target))
+            self.assertEqual(await asyncio.wait_for(reader.read(), 1), b"")
+        self.assertEqual(self.observed, [])
+
+        reader, _ = await self.client(packet(f"/graphs/{graph}/graph/vertices"))
+        response_headers = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 1)
+        self.assertIn(b"HTTP/1.1 200", response_headers)
+        self.assertEqual(len(self.observed), 1)
+        self.assertNotIn(b"untrusted.example", self.observed[0])
+
     async def test_registered_child_session_revocation_closes_an_existing_stream_without_revoking_its_parent(
         self,
     ):

@@ -9,6 +9,7 @@ from app.stores import providers
 class ProviderSelectionTests(TestCase):
     def test_all_provider_quota_modes_are_available_to_resource_detail(self):
         from app.stores.couchdb import CouchDB
+        from app.stores.hugegraph import HugeGraph
         from app.stores.neo4j import Neo4j
         from app.stores.opensearch import OpenSearch
         from app.stores.postgres import Postgres
@@ -18,11 +19,20 @@ class ProviderSelectionTests(TestCase):
         self.assertEqual(
             [
                 kind.quota_enforcement
-                for kind in (Postgres, S3, OpenSearch, Qdrant, Neo4j, CouchDB)
+                for kind in (
+                    Postgres,
+                    S3,
+                    OpenSearch,
+                    Qdrant,
+                    Neo4j,
+                    CouchDB,
+                    HugeGraph,
+                )
             ],
             [
                 "advisory: PostgreSQL has no hard per-database byte quota",
                 "hard",
+                "advisory",
                 "advisory",
                 "advisory",
                 "advisory",
@@ -36,7 +46,7 @@ class ProviderSelectionTests(TestCase):
                 [p["id"] for p in providers.availability() if p["enabled"]],
                 ["postgresql"],
             )
-            for name in ("s3", "qdrant", "opensearch", "neo4j", "couchdb"):
+            for name in ("s3", "qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"):
                 with self.assertRaises(providers.ProviderUnavailable):
                     providers.get(name)
 
@@ -91,12 +101,35 @@ class ProviderSelectionTests(TestCase):
             with self.assertRaises(providers.ProviderUnavailable):
                 providers.get("couchdb")
 
+    def test_hugegraph_requires_selection_admin_secret_and_capacity(self):
+        env = {
+            "STORE_ENABLED_PROVIDERS": "postgresql,hugegraph",
+            "HUGEGRAPH_IP": "172.30.83.2",
+            "HUGEGRAPH_ADMIN_PASSWORD": "s" * 32,
+        }
+        with patch.dict(os.environ, env, clear=True):
+            selected = next(
+                p for p in providers.availability() if p["id"] == "hugegraph"
+            )
+            self.assertFalse(selected["enabled"])
+            os.environ["STORE_CAPACITY_BYTES"] = (
+                '{"postgresql":1073741824,"hugegraph":1073741824}'
+            )
+            selected = next(
+                p for p in providers.availability() if p["id"] == "hugegraph"
+            )
+            self.assertTrue(selected["enabled"])
+            del os.environ["HUGEGRAPH_ADMIN_PASSWORD"]
+            with self.assertRaises(providers.ProviderUnavailable):
+                providers.get("hugegraph")
+
     def test_every_http_binding_points_to_its_lease_not_the_raw_service(self):
         for name, variable in [
             ("s3", "AWS_ENDPOINT_URL_S3"),
             ("opensearch", "OPENSEARCH_URL"),
             ("qdrant", "QDRANT_URL"),
             ("couchdb", "COUCHDB_URL"),
+            ("hugegraph", "HUGEGRAPH_REST_URI"),
         ]:
             backend = Mock()
             backend.credentials.return_value = {

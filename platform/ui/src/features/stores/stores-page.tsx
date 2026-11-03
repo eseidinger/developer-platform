@@ -361,6 +361,7 @@ function Workspace({
                 'qdrant',
                 'neo4j',
                 'couchdb',
+                'hugegraph',
               ].includes(resource.provider) && (
                 <p>
                   {resource.provider} byte quotas are advisory; monitoring and

@@ -267,6 +267,7 @@ class Controller:
             "opensearch": "opensearch",
             "qdrant": "qdrant",
             "couchdb": "couchdb",
+            "hugegraph": "hugegraph",
         }
         result = []
         for item in self.engine.call("GET", "/containers/json?all=1"):

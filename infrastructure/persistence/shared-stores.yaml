@@ -1,5 +1,32 @@
 ---
 services:
+  hugegraph:
+    profiles: [hugegraph]
+    image:
+      "hugegraph/hugegraph:1.7.0@sha256:077b89e1f2d5e228d99598bdb537161\
+        fb2e8a7b5abedf4724d97cf4de11529ba"
+    restart: unless-stopped
+    environment:
+      PASSWORD: ${HUGEGRAPH_ADMIN_PASSWORD:?Run scripts/init.py}
+    volumes:
+      # The default graph holds native identities; resource graphs use /data.
+      - hugegraph_system:/hugegraph-server/rocksdb-data
+      - hugegraph_config:/hugegraph-server/conf/graphs
+      - hugegraph_data:/data
+    networks:
+      store-hugegraph:
+        ipv4_address: ${HUGEGRAPH_IP:-172.30.83.2}
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 1536m
+    cpus: 1
+    healthcheck:
+      test: [CMD, curl, --fail, --silent, http://127.0.0.1:8080/versions]
+      interval: 15s
+      timeout: 5s
+      start_period: 90s
+      retries: 8
+
   couchdb:
     profiles: [couchdb]
     image:

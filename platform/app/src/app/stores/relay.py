@@ -35,6 +35,7 @@ def backend_endpoint(lease):
         "opensearch": ("OPENSEARCH_IP", 9200),
         "qdrant": ("QDRANT_IP", 6333),
         "couchdb": ("COUCHDB_IP", 5984),
+        "hugegraph": ("HUGEGRAPH_IP", 8080),
     }
     setting, port = endpoints[lease["provider"]]
     import ipaddress

@@ -26,6 +26,7 @@ class RestoreRecoveryTests(unittest.TestCase):
                     {"provider": "qdrant", "state": "active"},
                     {"provider": "opensearch", "state": "purging"},
                     {"provider": "couchdb", "state": "active"},
+                    {"provider": "hugegraph", "state": "active"},
                     {"provider": "neo4j", "state": "purged"},
                 ]
             }
@@ -34,6 +35,9 @@ class RestoreRecoveryTests(unittest.TestCase):
                 restore.store_volume_restore_targets(bundle)
             for filename in (
                 "couchdb-data.tar.gz",
+                "hugegraph-data.tar.gz",
+                "hugegraph-rocksdb-data.tar.gz",
+                "hugegraph-graphs.tar.gz",
                 "rustfs-data.tar.gz",
                 "qdrant-storage.tar.gz",
                 "opensearch-data.tar.gz",
@@ -43,6 +47,9 @@ class RestoreRecoveryTests(unittest.TestCase):
                 restore.store_volume_restore_targets(bundle),
                 [
                     ("couchdb", "couchdb_data", "couchdb-data.tar.gz"),
+                    ("hugegraph", "hugegraph_data", "hugegraph-data.tar.gz"),
+                    ("hugegraph", "hugegraph_system", "hugegraph-rocksdb-data.tar.gz"),
+                    ("hugegraph", "hugegraph_config", "hugegraph-graphs.tar.gz"),
                     ("opensearch", "opensearch_data", "opensearch-data.tar.gz"),
                     ("qdrant", "qdrant_data", "qdrant-storage.tar.gz"),
                     ("rustfs", "rustfs_data", "rustfs-data.tar.gz"),

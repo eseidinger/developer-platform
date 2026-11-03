@@ -118,16 +118,21 @@ def store_volume_restore_targets(bundle):
         row["provider"] for row in manifest["resources"] if row["state"] != "purged"
     } - {"postgresql", "neo4j"}
     mapping = {
-        "couchdb": ("couchdb", "couchdb_data", "couchdb-data.tar.gz"),
-        "s3": ("rustfs", "rustfs_data", "rustfs-data.tar.gz"),
-        "qdrant": ("qdrant", "qdrant_data", "qdrant-storage.tar.gz"),
-        "opensearch": ("opensearch", "opensearch_data", "opensearch-data.tar.gz"),
+        "couchdb": [("couchdb", "couchdb_data", "couchdb-data.tar.gz")],
+        "hugegraph": [
+            ("hugegraph", "hugegraph_data", "hugegraph-data.tar.gz"),
+            ("hugegraph", "hugegraph_system", "hugegraph-rocksdb-data.tar.gz"),
+            ("hugegraph", "hugegraph_config", "hugegraph-graphs.tar.gz"),
+        ],
+        "s3": [("rustfs", "rustfs_data", "rustfs-data.tar.gz")],
+        "qdrant": [("qdrant", "qdrant_data", "qdrant-storage.tar.gz")],
+        "opensearch": [("opensearch", "opensearch_data", "opensearch-data.tar.gz")],
     }
     if providers - mapping.keys():
         raise RuntimeError(
             "No protected restore adapter for a retained data-store provider"
         )
-    result = [mapping[provider] for provider in sorted(providers)]
+    result = [item for provider in sorted(providers) for item in mapping[provider]]
     if any(not (bundle / filename).is_file() for _, _, filename in result):
         raise RuntimeError(
             "A retained data-store volume is missing from this recovery bundle"
@@ -457,7 +462,12 @@ https://*.apps.localhost {
     store_volumes = store_volume_restore_targets(bundle)
     run(
         compose
-        + ["create", "proxy", "grafana", *[service for service, _, _ in store_volumes]],
+        + [
+            "create",
+            "proxy",
+            "grafana",
+            *sorted({service for service, _, _ in store_volumes}),
+        ],
         ROOT,
         timeout=900,
     )

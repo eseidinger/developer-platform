@@ -97,6 +97,7 @@
       search_console_network: >-
         {{ platform_search_console_network | default(none) }}
       couchdb_network: "{{ platform_couchdb_network | default(none) }}"
+      hugegraph_network: "{{ platform_hugegraph_network | default(none) }}"
       k3s_image: "{{ platform_k3s_image | default(none) }}"
       kubectl_version: "{{ platform_kubectl_version }}"
       bootstrap_subject: "{{ platform_bootstrap_subject | default(none) }}"

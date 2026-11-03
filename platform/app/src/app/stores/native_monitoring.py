@@ -289,6 +289,13 @@ def couchdb(provider, resources):
     return [line("platform_native_couchdb_up", 1, {"provider": "couchdb"})]
 
 
+def hugegraph(provider, resources):
+    status = provider.root.request("GET", "/versions")
+    if status.get("versions", {}).get("core") != "1.7.0":
+        raise ValueError("HugeGraph release is unavailable or unexpected")
+    return [line("platform_native_hugegraph_up", 1, {"provider": "hugegraph"})]
+
+
 def containers(resources):
     from .neo4j import Neo4j
 
@@ -306,6 +313,7 @@ def containers(resources):
             "opensearch",
             "neo4j",
             "couchdb",
+            "hugegraph",
         }:
             raise ValueError()
         labels = {"provider": provider, "scope": "shared"}
@@ -505,6 +513,7 @@ def loop(stop, control):
                 ("qdrant", qdrant),
                 ("neo4j", neo4j),
                 ("couchdb", couchdb),
+                ("hugegraph", hugegraph),
             ]:
                 enabled = name == "postgresql" or name in selected
                 lines.append(

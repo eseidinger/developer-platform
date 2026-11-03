@@ -190,6 +190,7 @@ class BackupTests(unittest.TestCase):
                         ("qdrant", "active"),
                         ("opensearch", "purging"),
                         ("couchdb", "active"),
+                        ("hugegraph", "active"),
                         ("neo4j", "purged"),
                     ]
                 ]
@@ -201,6 +202,14 @@ class BackupTests(unittest.TestCase):
             volumes.call_args.args[1],
             [
                 ("couchdb", ["/opt/couchdb/data"]),
+                (
+                    "hugegraph",
+                    [
+                        "/data",
+                        "/hugegraph-server/rocksdb-data",
+                        "/hugegraph-server/conf/graphs",
+                    ],
+                ),
                 ("opensearch", ["/usr/share/opensearch/data"]),
                 ("qdrant", ["/qdrant/storage"]),
                 ("rustfs", ["/data"]),

@@ -49,6 +49,7 @@ def ssh_command(
         "opensearch",
         "neo4j",
         "couchdb",
+        "hugegraph",
     }:
         raise ConfigurationError("The credential has an unsupported store provider.")
     ssh = credential.get("ssh")

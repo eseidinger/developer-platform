@@ -37,7 +37,7 @@ def initialize(conn):
     conn.execute("REVOKE ALL ON store_project_retirements FROM PUBLIC")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_resources (
         resource_id UUID PRIMARY KEY, owner_project TEXT NOT NULL REFERENCES projects(name),
-        name TEXT NOT NULL, provider TEXT NOT NULL CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant','couchdb')),
+        name TEXT NOT NULL, provider TEXT NOT NULL CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant','couchdb','hugegraph')),
         extensions JSONB NOT NULL DEFAULT '[]', quota_bytes BIGINT NOT NULL CHECK(quota_bytes>0),
         state TEXT NOT NULL CHECK(state IN ('active','retired','purging','purged')),
         observed_state TEXT NOT NULL DEFAULT 'pending', error_code TEXT,
@@ -59,14 +59,14 @@ def initialize(conn):
         IF EXISTS (SELECT 1 FROM pg_constraint
             WHERE conrelid='store_resources'::regclass
             AND conname='store_resources_provider_check'
-            AND pg_get_constraintdef(oid) NOT LIKE '%couchdb%') THEN
+            AND pg_get_constraintdef(oid) NOT LIKE '%hugegraph%') THEN
             ALTER TABLE store_resources DROP CONSTRAINT store_resources_provider_check;
         END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_constraint
             WHERE conrelid='store_resources'::regclass
             AND conname='store_resources_provider_check') THEN
             ALTER TABLE store_resources ADD CONSTRAINT store_resources_provider_check
-                CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant','couchdb'));
+                CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant','couchdb','hugegraph'));
         END IF;
     END $$""")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_instances (
@@ -395,7 +395,7 @@ def issue(conn, row):
         VALUES (%s,%s,%s,%s,'issuing',now()+%s,%s)""",
         (identity, row["grant_id"], row["version"], row["mode"], lifetime, relay_port),
     )
-    if res["provider"] in {"neo4j", "couchdb"}:
+    if res["provider"] in {"neo4j", "couchdb", "hugegraph"}:
         conn.execute(
             "UPDATE store_credentials SET admission_sha256=%s WHERE credential_id=%s",
             (hashlib.sha256(secret_for(identity).encode()).hexdigest(), identity),

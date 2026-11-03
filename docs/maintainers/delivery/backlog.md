@@ -3998,7 +3998,8 @@ remain open. See the
   [package 8.3](plans/phase-8-deferred-data-stores.md#83-document-stores).
 
 - [ ] **PLAN-038 · 8.4** — HugeGraph provider. Selected for planning on
-  November 3, 2026; no source implementation or fixture evidence yet. Required
+  November 3, 2026; source provider and disposable fixture pass, with deployed
+  acceptance and off-host backup capture still open. Required
   outcome: shared-service HugeGraph with one graph per named resource in the
   `DEFAULT` graph space, verified graph-scoped reader/writer grants,
   credential/session

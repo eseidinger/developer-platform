@@ -1332,7 +1332,8 @@
               "opensearch",
               "neo4j",
               "qdrant",
-              "couchdb"
+              "couchdb",
+              "hugegraph"
             ],
             "title": "Provider",
             "type": "string"

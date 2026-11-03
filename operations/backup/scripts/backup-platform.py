@@ -215,6 +215,14 @@ class Job:
             providers.remove("neo4j")
         volumes = {
             "couchdb": ("couchdb", ["/opt/couchdb/data"]),
+            "hugegraph": (
+                "hugegraph",
+                [
+                    "/data",
+                    "/hugegraph-server/rocksdb-data",
+                    "/hugegraph-server/conf/graphs",
+                ],
+            ),
             "s3": ("rustfs", ["/data"]),
             "qdrant": ("qdrant", ["/qdrant/storage"]),
             "opensearch": ("opensearch", ["/usr/share/opensearch/data"]),

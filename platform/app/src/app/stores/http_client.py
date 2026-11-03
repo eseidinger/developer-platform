@@ -2,6 +2,7 @@
 
 import json
 import ssl
+import zlib
 from urllib.error import HTTPError
 from urllib.request import HTTPSHandler, ProxyHandler, Request, build_opener
 
@@ -34,6 +35,11 @@ class PrivateJSON:
                 raw = response.read(2 * 1024 * 1024 + 1)
                 if len(raw) > 2 * 1024 * 1024:
                     raise StoreError("Provider response exceeded its limit")
+                if response.headers.get("Content-Encoding", "").lower() == "gzip":
+                    inflater = zlib.decompressobj(wbits=16 + zlib.MAX_WBITS)
+                    raw = inflater.decompress(raw, 2 * 1024 * 1024 + 1)
+                    if len(raw) > 2 * 1024 * 1024 or not inflater.eof:
+                        raise StoreError("Provider response exceeded its limit")
                 return json.loads(raw) if raw else {}
         except HTTPError as error:
             if missing and error.code == 404:

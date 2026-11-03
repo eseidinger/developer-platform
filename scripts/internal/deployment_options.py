@@ -35,7 +35,7 @@ ADDRESSES = {
     "neo4j-controller": ("NEO4J_CONTROLLER_IP", 31),
     "local-application-edge": ("LOCAL_APPLICATION_EDGE_IP", 32),
 }
-PROFILES = {"s3", "qdrant", "opensearch", "neo4j", "couchdb"}
+PROFILES = {"s3", "qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"}
 
 
 def fail(message):
@@ -110,6 +110,7 @@ def platform_inventory_settings(options):
             "network",
             "search_console_network",
             "couchdb_network",
+            "hugegraph_network",
             "k3s_image",
             "bootstrap_subject",
             "store_ssh_host",
@@ -181,6 +182,12 @@ def platform_inventory_settings(options):
             29,
             "STORE_COUCHDB_SUBNET",
             {"couchdb": ("COUCHDB_IP", 2)},
+        ),
+        (
+            "hugegraph_network",
+            29,
+            "STORE_HUGEGRAPH_SUBNET",
+            {"hugegraph": ("HUGEGRAPH_IP", 2)},
         ),
     ]:
         config = options.get(field)

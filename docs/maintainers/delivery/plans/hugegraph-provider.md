@@ -1,7 +1,11 @@
 # HugeGraph Provider — Next Data Store Increment
 
-Status: selected on November 3, 2026; planning only, no source implementation
-or fixture evidence yet. This plan refines
+Status: selected on November 3, 2026; source provider, private REST relay,
+Compose service, API/CLI/UI contract, monitoring and backup/restore volume
+mapping implemented. The disposable pinned 1.7.0 fixture passes graph
+provisioning, schema, vertex and edge operations, reader write denial, relay path
+isolation, restart, container recreation, revocation and purge. Deployed
+acceptance and off-host backup capture remain open. This plan refines
 [Phase 8 package 8.4](phase-8-deferred-data-stores.md#84-graph-stores) and
 [PLAN-038](../backlog.md#data-store-expansion-tasks). It complements
 [package 7.4](phase-7-planned-data-stores.md#74-graph-data) (AGE/Neo4j); it does
@@ -11,6 +15,17 @@ other Phase 8 packages remain independent. The existing
 [store selection decision](data-store-expansion.md#store-selection-decision):
 no benchmark, domain-need or comparative-success requirement gates this
 selection.
+
+The fixture found that a native graph-scoped reader can still list graphs and
+read another graph directly. The relay therefore rejects graph enumeration and
+all paths outside the named graph for every client. Gremlin, Cypher, PQL and
+browser access remain unsupported; only the bounded REST graph and schema
+routes are exposed. See
+[`verify-hugegraph.py`](../../../../scripts/tests/components/stores/verify-hugegraph.py)
+for the reproducible fixture and
+[`hugegraph_access.py`](../../../../platform/app/src/app/stores/hugegraph_access.py)
+for the enforced path boundary. The image digest is
+`sha256:077b89e1f2d5e228d99598bdb537161fb2e8a7b5abedf4724d97cf4de11529ba`.
 
 ## Scope and decisions
 
@@ -33,7 +48,10 @@ selection.
   Docker images are convenient project images, not official ASF release
   artifacts, as the
   [server quick start](https://hugegraph.apache.org/versions/1.7/docs/quickstart/hugegraph/hugegraph-server/)
-  notes. Record the exact image digest and supported client versions before
+  notes. The pinned image has no top-level `LICENSE` or `NOTICE` file in the
+  inspected server tree. Compare its bundled components and notices with the
+  signed Apache release before selecting it for deployment; that review is
+  open. Record the exact image digest and supported client versions before
   installation. Pin upgrades under the shared-store maintenance policy.
 - Keep project data authoritative unless an application explicitly identifies a
   recoverable source. The supported backup/restore tooling of the pinned

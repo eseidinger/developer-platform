@@ -1,8 +1,9 @@
 # Phase 8 — Deferred Data Stores
 
 Status: package 8.3 selected on November 2, 2026; source implementation and
-disposable fixture pass, with deployed acceptance open. Package 8.4 selected on
-November 3, 2026 for planning only; no source implementation yet. Packages 8.1
+disposable fixture pass, with deployed acceptance open. Package 8.4 source
+implementation and disposable fixture pass; deployed acceptance and backup
+capture remain open. Packages 8.1
 and 8.2 remain deferred and unscheduled. Measurements and comparisons for
 activated stores belong to
 [Phase 9](phase-9-store-measurement-and-comparison.md).

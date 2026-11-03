@@ -91,7 +91,7 @@ def identity(request, lease):
             ):
                 raise ValueError("Lease identity mismatch")
             headers["_session"] = (key, session["token_sha256"])
-    elif lease["provider"] in {"opensearch", "neo4j", "couchdb"}:
+    elif lease["provider"] in {"opensearch", "neo4j", "couchdb", "hugegraph"}:
         if not auth.startswith("Basic "):
             raise ValueError("Basic authentication required")
         raw = base64.b64decode(auth[6:], validate=True)
@@ -100,7 +100,7 @@ def identity(request, lease):
             or raw.split(b":", 1)[0] != catalog.login(lease["credential_id"]).encode()
         ):
             raise ValueError("Lease identity mismatch")
-        if lease["provider"] in {"neo4j", "couchdb"}:
+        if lease["provider"] in {"neo4j", "couchdb", "hugegraph"}:
             from .neo4j import admission
 
             if lease["provider"] == "neo4j" and b"impersonated-user" in headers:
@@ -166,6 +166,23 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
             raise ValueError("Unsupported CouchDB request header")
         if admin_index and b"expect" in headers:
             raise ValueError("Index requests cannot use Expect")
+    if lease["provider"] == "hugegraph":
+        from .hugegraph_access import authorize
+
+        authorize(request.method, request.target, lease)
+        allowed_headers = {
+            b"host",
+            b"authorization",
+            b"content-type",
+            b"accept",
+            b"content-length",
+            b"transfer-encoding",
+            b"user-agent",
+            b"accept-encoding",
+            b"connection",
+        }
+        if any(key not in allowed_headers for key in headers):
+            raise ValueError("Unsupported HugeGraph request header")
     if authorized is not None:
         authorized(headers.get("_session"))
     # Forbid pipelining/reuse. Every subsequent request must open its own socket
@@ -205,7 +222,7 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
             raise ValueError("Index deletion has no request body")
     excluded = (
         hops
-        | ({b"host"} if lease["provider"] == "couchdb" else set())
+        | ({b"host"} if lease["provider"] in {"couchdb", "hugegraph"} else set())
         | (
             {b"authorization", b"content-type", b"content-length", b"transfer-encoding"}
             if admin_index
@@ -213,8 +230,8 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
         )
     )
     forwarded = [(k, v) for k, v in request.headers if k not in excluded]
-    if lease["provider"] == "couchdb":
-        # A client-chosen Host must not select a CouchDB virtual host.
+    if lease["provider"] in {"couchdb", "hugegraph"}:
+        # A client-chosen Host must not alter backend routing.
         forwarded.append((b"host", f"{backend[0]}:{backend[1]}".encode()))
     if admin_index:
         import os

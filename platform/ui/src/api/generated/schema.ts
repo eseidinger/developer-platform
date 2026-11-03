@@ -2379,7 +2379,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "postgresql" | "s3" | "opensearch" | "neo4j" | "qdrant" | "couchdb";
+            provider: "postgresql" | "s3" | "opensearch" | "neo4j" | "qdrant" | "couchdb" | "hugegraph";
             /**
              * Quota Bytes
              * @default 1073741824

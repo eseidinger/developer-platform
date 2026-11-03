@@ -35,7 +35,7 @@ def validate_manifest(value):
         owner_project: str = Field(pattern=NAME, max_length=32)
         name: str = Field(pattern=NAME, max_length=32)
         provider: Literal[
-            "postgresql", "s3", "opensearch", "neo4j", "qdrant", "couchdb"
+            "postgresql", "s3", "opensearch", "neo4j", "qdrant", "couchdb", "hugegraph"
         ]
         state: Literal["active", "retired", "purging", "purged"]
         version: int = Field(ge=1)

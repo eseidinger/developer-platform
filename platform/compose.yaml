@@ -110,6 +110,8 @@ services:
       COUCHDB_IP: ${COUCHDB_IP:-172.30.82.2}
       COUCHDB_ADMIN_USER: ${COUCHDB_ADMIN_USER:-platform_admin}
       COUCHDB_ADMIN_PASSWORD: ${COUCHDB_ADMIN_PASSWORD:-}
+      HUGEGRAPH_IP: ${HUGEGRAPH_IP:-172.30.83.2}
+      HUGEGRAPH_ADMIN_PASSWORD: ${HUGEGRAPH_ADMIN_PASSWORD:-}
       TELEMETRY_CATALOG_PASSWORD: >-
         ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
       DATABASE_BASTION_TOKEN: ${DATABASE_BASTION_TOKEN:?Run scripts/init.py}
@@ -186,6 +188,7 @@ services:
       search-consoles:
         ipv4_address: ${STORE_SEARCH_API_IP:-172.30.81.2}
       store-couchdb: {}
+      store-hugegraph: {}
     depends_on:
       host-capacity:
         condition: service_started
@@ -230,6 +233,7 @@ services:
       STORE_RELAY_PASSWORD: ${STORE_RELAY_PASSWORD:?Run scripts/init.py}
       COUCHDB_ADMIN_USER: ${COUCHDB_ADMIN_USER:-platform_admin}
       COUCHDB_ADMIN_PASSWORD: ${COUCHDB_ADMIN_PASSWORD:-}
+      HUGEGRAPH_IP: ${HUGEGRAPH_IP:-172.30.83.2}
     depends_on:
       platform-api:
         condition: service_healthy
@@ -240,6 +244,7 @@ services:
         ipv4_address: ${STORE_RELAY_IP:-172.30.80.15}
       store-consoles: {}
       store-couchdb: {}
+      store-hugegraph: {}
     read_only: true
     tmpfs: ["/tmp"]
     cap_drop: [ALL]
