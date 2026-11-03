@@ -116,6 +116,11 @@ and [security guide](https://hugegraph.apache.org/docs/guides/security/).
    scoped, revocable behavior through the lease relay; otherwise advertise
    browser access as unsupported.
 
+The platform browser console uses the existing human lease gateway and bounded
+REST routes. It previews graph pages and schema within one named graph; it does
+not run Gremlin or expose the upstream Hubble server. Its launch, cookie,
+revocation and cross-graph checks have focused gateway tests.
+
 ## Ordered implementation work
 
 1. **Compatibility and capacity:** Validate the pinned HugeGraph release and

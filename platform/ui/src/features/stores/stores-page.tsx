@@ -1082,6 +1082,27 @@ function HumanAccess({
                   </p>
                 </>
               )}
+              {resource.provider === 'hugegraph' && (
+                <>
+                  <p>
+                    The project console previews pages of vertices and edges,
+                    inspects graph objects, and shows schema. Read-write leases
+                    can create and delete graph objects. Access closes at lease
+                    expiry or revocation.
+                  </p>
+                  {resource.console_url && (
+                    <Button
+                      disabled={disabled}
+                      variant="outline"
+                      onClick={() =>
+                        void action(() => openConsole(credential.credential_id))
+                      }
+                    >
+                      Open HugeGraph console
+                    </Button>
+                  )}
+                </>
+              )}
               {['s3', 'qdrant', 'opensearch', 'neo4j'].includes(
                 resource.provider,
               ) &&

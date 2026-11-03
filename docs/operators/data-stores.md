@@ -190,7 +190,14 @@ graph space. Application bindings receive `HUGEGRAPH_REST_URI`,
 is the lease relay, not the server endpoint. Human users open the private SSH
 tunnel before using that URI. The supported client routes cover vertices,
 edges and graph schema. Graph enumeration, auth, server administration,
-Gremlin, Cypher, PQL and browser access are unavailable to project clients.
+Gremlin, Cypher and PQL are unavailable to project clients. An active human
+lease can launch the platform's project-scoped HugeGraph browser from **My
+store access**. It previews up to 50 vertices and edges per page, inspects
+objects and schema, and lets writers create or delete graph objects. It does
+not expose the upstream Hubble server or its Gremlin and administration routes.
+The browser requires a signed portal launch and an active lease on every
+request; sharing its URL does not grant access. Native credentials stay on the
+gateway and are checked again by the relay.
 
 The pinned image allows a graph-scoped native reader to read a different graph
 directly. Keep both the API and relay as the only members of the backend

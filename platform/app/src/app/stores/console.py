@@ -2,7 +2,8 @@
 
 Launch assertions travel only in POST bodies. Host-only cookies authorize one
 human credential generation; native requests still authenticate at the relay.
-The gateway never injects a backend credential or rewrites a signed S3 path.
+Native console requests retain their signed paths. The project-scoped CouchDB
+and HugeGraph browsers inject only their current lease's native credential.
 """
 
 import asyncio
@@ -36,7 +37,7 @@ from fastapi.responses import (
 from . import catalog, dashboards, recovery
 
 COOKIE = "__Host-store-console"
-PROVIDERS = {"s3", "qdrant", "opensearch", "neo4j", "couchdb"}
+PROVIDERS = {"s3", "qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"}
 ISSUER = "developer-platform-store-console"
 HOP = {
     "host",
@@ -173,6 +174,7 @@ def landing(provider):
         "opensearch": "/",
         "neo4j": "/browser/",
         "couchdb": "/__platform/couchdb/",
+        "hugegraph": "/__platform/hugegraph/",
     }[provider]
 
 
@@ -508,6 +510,10 @@ def create_gateway(
             from . import couchdb_console
 
             return couchdb_console.asset(path, request.method, row)
+        if row["provider"] == "hugegraph" and path.startswith("__platform/"):
+            from . import hugegraph_console
+
+            return hugegraph_console.asset(path, request.method, row)
         if row["provider"] == "neo4j" and path == "" and request.method == "GET":
             # Catalog-authorized connection discovery; never leak raw native addresses.
             return JSONResponse(
@@ -606,20 +612,24 @@ def create_gateway(
             else b""
         )
         authorization = {}
-        if row["provider"] == "couchdb":
-            from . import couchdb_console
+        if row["provider"] in {"couchdb", "hugegraph"}:
+            from . import couchdb_console, hugegraph_console
+
+            adapter = (
+                couchdb_console if row["provider"] == "couchdb" else hugegraph_console
+            )
 
             if request.headers.get("authorization"):
                 raise HTTPException(400, "Use the active platform console session")
             try:
-                couchdb_console.authorize(request.method.encode(), raw, row)
+                adapter.authorize(request.method.encode(), raw, row)
             except ValueError:
                 raise HTTPException(
-                    403, "CouchDB operation is outside this lease"
+                    403, "Store operation is outside this lease"
                 ) from None
-            couchdb_auth = couchdb_console.authorization(row)
+            scoped_auth = adapter.authorization(row)
         else:
-            couchdb_auth = None
+            scoped_auth = None
         if not static and not frontend:
             from .http_relay import identity
 
@@ -634,8 +644,8 @@ def create_gateway(
                                 for name, value in request.headers.raw
                                 if name != b"authorization"
                             ]
-                            + [(b"authorization", couchdb_auth)]
-                            if couchdb_auth
+                            + [(b"authorization", scoped_auth)]
+                            if scoped_auth
                             else request.headers.raw
                         ),
                     ),
@@ -683,7 +693,7 @@ def create_gateway(
             if name.lower() not in HOP
             and not name.lower().startswith(("x-forwarded-", "x-platform-store-"))
         ]
-        if row["provider"] == "couchdb":
+        if row["provider"] in {"couchdb", "hugegraph"}:
             # Browser metadata and cookies never enter the private data relay.
             headers = [
                 (name, value)
@@ -691,7 +701,7 @@ def create_gateway(
                 if name.lower()
                 in {"accept", "content-type", "if-match", "if-none-match"}
             ]
-            headers.append(("Authorization", couchdb_auth.decode()))
+            headers.append(("Authorization", scoped_auth.decode()))
         headers.append(("Host", request.headers["host"]))
         if frontend:
             from .opensearch import tenant
