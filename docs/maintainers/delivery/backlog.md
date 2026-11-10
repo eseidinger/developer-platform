@@ -5239,6 +5239,27 @@ Phase 9. |
     both selected Phase 8 stores. It does not establish the remaining deployed
     lifecycle, capacity-under-load or backup-related checks.
 
+- **Evidence ID / tasks:** EV-75 · PLAN-038 (HugeGraph anonymous volume backup integration)
+
+  - **Check:** November 10, 2026: source inspection identified the pinned
+    image's anonymous `/hugegraph-server` mount and its initialized
+    configuration, startup marker and audit logs. Backup and restore source
+    include the parent volume by mount destination. The 57 offline backup tests
+    passed with one skipped test. The updated backup runner was installed on
+    node-01 with matching local and remote SHA-256
+    `0f1d3d170de2985293c2e7ab481f779a06d9401a08fef82e9656aecc3a46ed58`.
+    Matching backup and restore source files were installed under
+    `/opt/developer-platform/operations/backup/scripts`, so the next recovery
+    bundle includes the updated restore adapter.
+    The read-only deployed Phase 8 smoke passed and confirmed the anonymous
+    mount; the backup timer was active.
+  - **Result:** Backup integration and restore source cover all three named
+    HugeGraph volumes and the anonymous image volume. No manual backup was
+    started. The next scheduled capture and off-host readback remain Phase
+    10.13 work.
+  - **What it establishes:** Source and deployed runner configuration, not an
+    observed off-host capture or recovery.
+
 [CI](../../../.github/workflows/validate.yaml) defines syntax/configuration/unit
 checks, including PHP freshness and local SMTP transport tests, but no live
 smoke, isolation, or recovery acceptance. Its definition is not evidence that a

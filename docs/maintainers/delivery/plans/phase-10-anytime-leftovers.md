@@ -354,7 +354,8 @@ exit.
    capture. Check its timestamp, manifest, protected data and configuration,
    required identities and successful repository readback. For CouchDB include
    data, design documents and database security; for HugeGraph include every
-   selected graph, its configuration and authentication store. Record the
+   selected graph, its configuration, authentication store and image-declared
+   `/hugegraph-server` volume. Record the
    capture method, any write interruption, backup ID and verification result in
    PLAN-031/032/033/038 as applicable. If Valkey state is disposable, record that
    decision instead of claiming a durable backup.

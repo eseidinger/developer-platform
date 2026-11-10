@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import tarfile
 import time
@@ -138,6 +139,71 @@ def store_volume_restore_targets(bundle):
             "A retained data-store volume is missing from this recovery bundle"
         )
     return result
+
+
+def hugegraph_parent_archive(bundle, store_volumes):
+    """Require the image-declared parent volume whenever HugeGraph is retained."""
+    if not any(service == "hugegraph" for service, _, _ in store_volumes):
+        return None
+    archive = bundle / "hugegraph-hugegraph-server.tar.gz"
+    if not archive.is_file():
+        raise RuntimeError("HugeGraph anonymous parent volume is missing")
+    return archive
+
+
+def restore_hugegraph_parent_volume(compose, archive):
+    """Restore the anonymous volume created for the stopped HugeGraph container."""
+    ids = run(compose + ["ps", "-a", "-q", "hugegraph"], ROOT).decode().split()
+    if len(ids) != 1:
+        raise RuntimeError("HugeGraph recovery container is unavailable")
+    containers = json.loads(run(["docker", "inspect", ids[0]]))
+    if len(containers) != 1 or containers[0]["State"]["Running"]:
+        raise RuntimeError("HugeGraph recovery container must be stopped")
+    mounts = [
+        mount
+        for mount in containers[0]["Mounts"]
+        if mount["Destination"] == "/hugegraph-server"
+        and mount["Type"] == "volume"
+        and re.fullmatch(r"[0-9a-f]{64}", mount.get("Name", ""))
+    ]
+    if len(mounts) != 1:
+        raise RuntimeError("HugeGraph anonymous parent volume is unavailable")
+    mount = mounts[0]
+    destination = Path(
+        run(
+            [
+                "docker",
+                "volume",
+                "inspect",
+                "--format",
+                "{{ .Mountpoint }}",
+                mount["Name"],
+            ]
+        )
+        .decode()
+        .strip()
+    )
+    if not destination.is_dir() or destination != Path(mount["Source"]):
+        raise RuntimeError("HugeGraph anonymous parent mountpoint mismatch")
+    if (destination / "docker/init_complete").exists():
+        raise RuntimeError("HugeGraph anonymous parent was already initialized")
+
+    # Docker copies image files into a new image-declared volume. Replace that
+    # initial tree with the captured state before any service can initialize it.
+    for entry in destination.iterdir():
+        if entry.is_dir() and not entry.is_symlink():
+            shutil.rmtree(entry)
+        else:
+            entry.unlink()
+    with tarfile.open(archive) as source:
+
+        def owned(member, path):
+            safe = tarfile.data_filter(member, path)
+            if safe is not None:
+                safe.uid, safe.gid = member.uid, member.gid
+            return safe
+
+        source.extractall(destination, filter=owned, numeric_owner=True)
 
 
 def neo4j_restore_sources(bundle):
@@ -460,6 +526,7 @@ https://*.apps.localhost {
 
     neo4j_restore_sources(bundle)
     store_volumes = store_volume_restore_targets(bundle)
+    hugegraph_parent = hugegraph_parent_archive(bundle, store_volumes)
     run(
         compose
         + [
@@ -471,6 +538,8 @@ https://*.apps.localhost {
         ROOT,
         timeout=900,
     )
+    if hugegraph_parent is not None:
+        restore_hugegraph_parent_volume(compose, hugegraph_parent)
     for volume, filename in [
         ("caddy_data", "proxy-data.tar.gz"),
         ("caddy_config", "proxy-config.tar.gz"),

@@ -18,6 +18,10 @@ STORE_VOLUMES = {
         "/hugegraph-server/conf/graphs",
     },
 }
+ANONYMOUS_STORE_VOLUMES = {
+    "couchdb": set(),
+    "hugegraph": {"/hugegraph-server"},
+}
 
 
 def require(condition, message):
@@ -71,21 +75,29 @@ def check_store(installation, service):
         if mount["Type"] == "volume"
         and not re.fullmatch(r"[0-9a-f]{64}", mount.get("Name", ""))
     }
-    # HugeGraph's image also declares an anonymous parent volume at
-    # /hugegraph-server. Check the explicitly named backup targets separately
-    # and report any anonymous image volumes for operator review.
+    # HugeGraph's image declares a parent volume that backup resolves by target.
+    # Its Docker-generated name changes when the container is recreated.
     require(
         named_volumes == STORE_VOLUMES[service],
         service + " named persistent volumes differ",
     )
-    anonymous = [
+    anonymous = {
         mount["Destination"]
         for mount in container["Mounts"]
         if mount["Type"] == "volume"
         and re.fullmatch(r"[0-9a-f]{64}", mount.get("Name", ""))
-    ]
+    }
+    require(
+        anonymous == ANONYMOUS_STORE_VOLUMES[service],
+        service + " anonymous persistent volumes differ",
+    )
     if anonymous:
-        print("INFO " + service + " anonymous image volumes: " + ", ".join(anonymous))
+        print(
+            "PASS "
+            + service
+            + " anonymous image volumes: "
+            + ", ".join(sorted(anonymous))
+        )
     print("PASS " + service + " container, limits, private ports and volumes")
 
 

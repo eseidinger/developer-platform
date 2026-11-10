@@ -23,8 +23,12 @@ On November 10, the Ansible deployment of revision
 Phase 8 host smoke verified HugeGraph container health, CPU/memory limits,
 private ports, its three named persistent volumes and a native-up Prometheus
 metric of 1. The image also declares an anonymous volume at
-`/hugegraph-server`; its contents need review before treating the backup volume
-inventory as complete. See [EV-73](../backlog.md#verification-register).
+`/hugegraph-server`. Inspection found initialized configuration, the startup
+marker and audit logs there; backup and restore source now include this parent
+volume. The updated backup runner was installed on November 10 and the deployed
+smoke confirmed the anonymous mount. A deployed off-host capture remains to be
+verified in Phase 10.13. See
+[EV-73 and EV-75](../backlog.md#verification-register).
 Scoped deployed lifecycle remains open. On November 10, the owner reported
 successful deployed browser checks with separate reader and writer identities,
 reader write denial and access denial after grant revocation; see

@@ -15,6 +15,56 @@ spec.loader.exec_module(restore)
 
 
 class RestoreRecoveryTests(unittest.TestCase):
+    def test_anonymous_hugegraph_parent_restores_into_created_container_volume(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            volume = root / "volume"
+            volume.mkdir()
+            (volume / "image-default.txt").write_text("image copy")
+            archive = root / "hugegraph-hugegraph-server.tar.gz"
+            with tarfile.open(archive, "w:gz") as output:
+                payload = root / "init_complete"
+                payload.write_text("captured marker")
+                output.add(payload, arcname="docker/init_complete")
+            name = "a" * 64
+            inspect = json.dumps(
+                [
+                    {
+                        "State": {"Running": False},
+                        "Mounts": [
+                            {
+                                "Destination": "/hugegraph-server",
+                                "Type": "volume",
+                                "Name": name,
+                                "Source": str(volume),
+                            }
+                        ],
+                    }
+                ]
+            ).encode()
+            with patch.object(
+                restore,
+                "run",
+                side_effect=[b"container-id", inspect, str(volume).encode()],
+            ) as run:
+                restore.restore_hugegraph_parent_volume(["docker", "compose"], archive)
+            self.assertEqual(
+                run.call_args_list[0].args[0][-4:], ["ps", "-a", "-q", "hugegraph"]
+            )
+            self.assertFalse((volume / "image-default.txt").exists())
+            self.assertEqual(
+                (volume / "docker/init_complete").read_text(), "captured marker"
+            )
+            with (
+                patch.object(
+                    restore,
+                    "run",
+                    side_effect=[b"container-id", inspect, str(volume).encode()],
+                ),
+                self.assertRaisesRegex(RuntimeError, "already initialized"),
+            ):
+                restore.restore_hugegraph_parent_volume(["docker", "compose"], archive)
+
     def test_retained_store_archives_are_required_before_creating_restore_services(
         self,
     ):
@@ -38,13 +88,15 @@ class RestoreRecoveryTests(unittest.TestCase):
                 "hugegraph-data.tar.gz",
                 "hugegraph-rocksdb-data.tar.gz",
                 "hugegraph-graphs.tar.gz",
+                "hugegraph-hugegraph-server.tar.gz",
                 "rustfs-data.tar.gz",
                 "qdrant-storage.tar.gz",
                 "opensearch-data.tar.gz",
             ):
                 (bundle / filename).write_bytes(b"synthetic archive identity")
+            store_volumes = restore.store_volume_restore_targets(bundle)
             self.assertEqual(
-                restore.store_volume_restore_targets(bundle),
+                store_volumes,
                 [
                     ("couchdb", "couchdb_data", "couchdb-data.tar.gz"),
                     ("hugegraph", "hugegraph_data", "hugegraph-data.tar.gz"),
@@ -55,6 +107,13 @@ class RestoreRecoveryTests(unittest.TestCase):
                     ("rustfs", "rustfs_data", "rustfs-data.tar.gz"),
                 ],
             )
+            self.assertEqual(
+                restore.hugegraph_parent_archive(bundle, store_volumes),
+                bundle / "hugegraph-hugegraph-server.tar.gz",
+            )
+            (bundle / "hugegraph-hugegraph-server.tar.gz").unlink()
+            with self.assertRaisesRegex(RuntimeError, "anonymous parent volume"):
+                restore.hugegraph_parent_archive(bundle, store_volumes)
             manifest["resources"].append({"provider": "unknown", "state": "active"})
             (bundle / "store-recovery.json").write_text(json.dumps(manifest))
             with self.assertRaisesRegex(RuntimeError, "No protected restore adapter"):

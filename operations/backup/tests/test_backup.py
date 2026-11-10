@@ -64,7 +64,49 @@ class BackupTests(unittest.TestCase):
                     for mount in compose["services"][service]["volumes"]
                     if not mount.startswith((".", "/"))
                 }
+                if service == "hugegraph":
+                    # This parent is declared by the pinned image, not Compose.
+                    persistent_mounts.add("/hugegraph-server")
                 self.assertEqual(set(captured[service]), persistent_mounts)
+
+    def test_hugegraph_anonymous_parent_is_archived_by_mount_destination(self):
+        bundle = self.root / "bundle"
+        bundle.mkdir()
+        parent = self.root / "dynamic-docker-volume"
+        parent.mkdir()
+        (parent / "init_complete").write_text("initialized")
+        inspected = json.dumps(
+            [
+                {
+                    "State": {"Running": True},
+                    "Mounts": [
+                        {
+                            "Destination": "/hugegraph-server",
+                            "Type": "volume",
+                            "Name": "a" * 64,
+                            "Source": str(parent),
+                        }
+                    ],
+                }
+            ]
+        ).encode()
+
+        def command(arguments, **_kwargs):
+            if arguments[1] == "inspect":
+                return inspected
+            return b""
+
+        with (
+            patch.object(self.job, "compose", return_value=b"container-id"),
+            patch.object(self.job, "command", side_effect=command),
+        ):
+            self.job.volume_state(bundle, [("hugegraph", ["/hugegraph-server"])])
+
+        archive = bundle / "hugegraph-hugegraph-server.tar.gz"
+        with backup.tarfile.open(archive) as source:
+            self.assertEqual(
+                source.extractfile("./init_complete").read(), b"initialized"
+            )
 
     def test_failed_upload_keeps_previous_success_and_skips_retention(self):
         backup.atomic_json(
@@ -244,6 +286,7 @@ class BackupTests(unittest.TestCase):
                         "/data",
                         "/hugegraph-server/rocksdb-data",
                         "/hugegraph-server/conf/graphs",
+                        "/hugegraph-server",
                     ],
                 ),
                 ("opensearch", ["/usr/share/opensearch/data"]),

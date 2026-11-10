@@ -156,7 +156,7 @@ class Job:
                     if m["Destination"] == target and m["Type"] == "volume"
                 ]
                 if len(found) != 1:
-                    raise BackupError("expected named volume missing")
+                    raise BackupError("expected service volume missing")
                 mounts.append(
                     (
                         service + "-" + target.rsplit("/", 1)[-1],
@@ -221,6 +221,9 @@ class Job:
                     "/data",
                     "/hugegraph-server/rocksdb-data",
                     "/hugegraph-server/conf/graphs",
+                    # The image declares this anonymous parent volume. It holds
+                    # the initialized server config, auth changes and audit logs.
+                    "/hugegraph-server",
                 ],
             ),
             "s3": ("rustfs", ["/data"]),

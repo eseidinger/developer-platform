@@ -20,7 +20,11 @@ unverified acceptance criteria stay open.
 
 Scheduled capture includes the full PostgreSQL catalog and Keycloak database,
 current application Secrets, generated store configuration, named native
-volumes, Neo4j instance/image inventory and verified purge intent. Native-store
+volumes, HugeGraph's image-declared anonymous `/hugegraph-server` volume,
+Neo4j instance/image inventory and verified purge intent. The HugeGraph parent
+archive contains initialized configuration, the startup marker and audit logs;
+the restore resolves its new anonymous volume from the created container before
+starting HugeGraph. Native-store
 bundles pause managed leases for at most 35 minutes and stop retained native
 instances for capture; applications must tolerate interruption and reconnect.
 Caddy and Grafana are also briefly stopped. See the
