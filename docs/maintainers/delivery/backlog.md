@@ -3602,9 +3602,10 @@ inherits the
 phase entry/exit criteria and external ownership boundaries. Named owners must
 be assigned before execution. Stores may be selected at will; comparison results
 and success criteria do not gate adoption. Introduced providers must pass
-lifecycle and backup/purge acceptance in Phase 7/8; deployed restore and rebuild
-acceptance is tracked in Phase 10. Record dated source/local/deployed evidence
-here and link external versioned benchmark results.
+lifecycle and backup/purge safeguards in Phase 7/8. Deployed backup verification
+for Phase 8 stores and deployed restore/rebuild acceptance are tracked in Phase
+10\. Record dated source/local/deployed evidence here and link external versioned
+benchmark results.
 
 **Owner-selected provisioning model (October 17, 2026):** Shared services with
 isolated project resources are the default across Phases 7–8. Use
@@ -3970,8 +3971,9 @@ remain open. See the
   [package 7.5](plans/phase-7-planned-data-stores.md#75-vector-retrieval-and-ai-memory).
 
 - [ ] **PLAN-031 · 8.1** — Time Series and OLAP. Required outcome: selected
-  provider license, scoped access, retention and backup capture. Recovery is
-  Phase 10 package 10.13; realistic-load PostgreSQL/TimescaleDB/ClickHouse
+  provider license, scoped access, retention and backup integration. Off-host
+  backup verification and recovery are Phase 10 package 10.13; realistic-load
+  PostgreSQL/TimescaleDB/ClickHouse
   comparison is PLAN-037 / Phase 9 work. Accountable role: platform API /
   operations, with external application/experiment owners. See
   [package 8.1](plans/phase-8-deferred-data-stores.md#81-time-series-and-olap).
@@ -3985,13 +3987,14 @@ remain open. See the
   [package 8.2](plans/phase-8-deferred-data-stores.md#82-caching-and-realtime).
 
 - [ ] **PLAN-033 · 8.3** — CouchDB provider. Source implementation, disposable
-  fixture and bounded deployed access checks pass; backup capture and remaining
-  deployed acceptance checks remain open. The selected capacity allocation is
-  4 GiB. Required
-  outcome: named database lifecycle, scoped read-only/read-write access with a
+  fixture and bounded deployed access checks pass; remaining Phase 8 deployed
+  acceptance checks are open. Off-host backup verification is Phase 10.13. The
+  selected capacity allocation is 4 GiB. Required outcome: named database
+  lifecycle, scoped read-only/read-write access with a
   verified read-only gateway, credential/session revocation, isolation,
-  monitoring, bounded capacity and backup capture. CouchDB membership alone
-  cannot provide read-only access. Restore is Phase 10 package 10.13; PostgreSQL
+  monitoring, bounded capacity, backup integration and the purge gate. CouchDB
+  membership alone cannot provide read-only access. Backup capture and restore
+  verification are Phase 10 package 10.13; PostgreSQL
   JSONB/CouchDB comparison is PLAN-037 / Phase 9 work. Accountable role:
   platform API / operations, with external application/experiment owners. See
   the [implementation plan](plans/couchdb-provider.md) and
@@ -3999,12 +4002,13 @@ remain open. See the
 
 - [ ] **PLAN-038 · 8.4** — HugeGraph provider. Selected for planning on
   November 3, 2026; source provider and disposable fixture pass, with deployed
-  acceptance and off-host backup capture still open. Required
+  acceptance still open. Off-host backup verification is Phase 10.13. Required
   outcome: shared-service HugeGraph with one graph per named resource in the
   `DEFAULT` graph space, verified graph-scoped reader/writer grants,
   credential/session
-  revocation, isolation, monitoring, bounded capacity and backup capture. No
-  dedicated-instance exception is requested. Restore is Phase 10 package 10.13;
+  revocation, isolation, monitoring, bounded capacity, backup integration and
+  the purge gate. No dedicated-instance exception is requested. Backup capture
+  and restore verification are Phase 10 package 10.13;
   HugeGraph/AGE/Neo4j graph comparison is PLAN-037 / Phase 9 work. Accountable
   role: platform API / operations, with external application/experiment owners.
   See the [implementation plan](plans/hugegraph-provider.md) and
@@ -5202,6 +5206,38 @@ it exports broader platform data and briefly interrupts shared services; this
 run did not repeat that action. Natural expiry/rotation and deployed
 restore/rebuild remain Phase 10 work; measurement/domain comparisons remain
 Phase 9. |
+
+- **Evidence ID / tasks:** EV-73 · PLAN-033/038 (Phase 8 deployment and
+  automated store health)
+
+  - **Check:** November 10, 2026, node-01: Ansible deployed checkout revision
+    `66a056d90b5be038e21c86b5a00aac267c8689a7+dirty` with zero failed or
+    unreachable tasks. The read-only
+    [Phase 8 host smoke](../../../scripts/tests/platform/check-phase8-store-health.py)
+    checked API readiness, CouchDB and HugeGraph container health, CPU/memory
+    limits, unpublished host ports, named persistent volumes and Prometheus
+    native-up metrics. The three-node k3d cluster reported Ready. Local tests
+    covered the backup-gated purge and Compose-to-backup volume mapping; the
+    disposable CouchDB and HugeGraph provider fixtures passed.
+  - **Result:** API readiness returned 200. Both providers were healthy and
+    reported native-up value 1. The host smoke passed all checks and reported
+    HugeGraph's additional anonymous image volume at `/hugegraph-server`.
+  - **What it establishes:** Deployment and automated infrastructure health for
+    the selected Phase 8 stores, plus local purge-gate and fixture coverage.
+    Scoped deployed resource lifecycle, human browser access, concurrent load,
+    off-host backup verification and recovery are not established by this run.
+
+- **Evidence ID / tasks:** EV-74 · PLAN-033/038 (owner-reported browser access)
+
+  - **Check:** November 10, 2026, after the EV-73 deployment: the owner reported
+    testing the deployed CouchDB and HugeGraph consoles with separate reader and
+    writer identities, reader write denial and access denial after grant
+    revocation.
+  - **Result:** The owner reported that both consoles behaved as expected. No
+    browser trace, run ID or redacted HTTP record was supplied with the report.
+  - **What it establishes:** Manual owner-reported console access coverage for
+    both selected Phase 8 stores. It does not establish the remaining deployed
+    lifecycle, capacity-under-load or backup-related checks.
 
 [CI](../../../.github/workflows/validate.yaml) defines syntax/configuration/unit
 checks, including PHP freshness and local SMTP transport tests, but no live

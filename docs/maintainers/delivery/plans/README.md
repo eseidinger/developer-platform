@@ -23,10 +23,11 @@ must not be read as proof that the corresponding source capability is absent:
 - [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) —
   CouchDB and HugeGraph selected; time series/OLAP and caching remain deferred
 - [CouchDB provider](couchdb-provider.md) — source, disposable fixture and
-  bounded deployed access checks pass; backup capture and full acceptance remain
-  open
+  bounded deployed access checks pass; Phase 8 acceptance remains open and
+  off-host backup verification belongs to Phase 10.13
 - [HugeGraph provider](hugegraph-provider.md) — source and disposable fixture
-  pass; deployed acceptance and off-host backup capture remain open
+  pass; Phase 8 deployed acceptance remains open and off-host backup
+  verification belongs to Phase 10.13
 - [Phase 9 data store measurement and comparison](phase-9-store-measurement-and-comparison.md)
   — performance dashboards and reproducible comparisons
 - [Phase 10 anytime leftovers and store recovery — lowest priority](phase-10-anytime-leftovers.md)

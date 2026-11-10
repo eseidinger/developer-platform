@@ -2,8 +2,8 @@
 
 Status: package 8.3 selected on November 2, 2026; source implementation and
 disposable fixture pass, with deployed acceptance open. Package 8.4 source
-implementation and disposable fixture pass; deployed acceptance and backup
-capture remain open. Packages 8.1
+implementation and disposable fixture pass; deployed acceptance remains open.
+Off-host backup verification belongs to Phase 10 package 10.13. Packages 8.1
 and 8.2 remain deferred and unscheduled. Measurements and comparisons for
 activated stores belong to
 [Phase 9](phase-9-store-measurement-and-comparison.md).
@@ -38,7 +38,8 @@ See the [selection decision](data-store-expansion.md#store-selection-decision).
 
 - Verify the selected TimescaleDB edition's license/features. Add optional
   provider support when selected, within the agreed resource budget. Verify
-  scoped access, retention, backup capture and common operational acceptance.
+  scoped access, retention, backup integration and common operational
+  acceptance.
 
 **Exit:** record selection; introduced providers demonstrate retention and
 common operational acceptance. Recovery is Phase 10 package 10.13; scaling
@@ -68,14 +69,14 @@ inadequate is required. See the
 
 - Introduce the CouchDB provider under the common platform contract. Verify the
   specific distribution's Apache 2.0 license and bundled notices, scoped
-  updates, indexing, schema changes, lifecycle, backup capture and isolation.
+  updates, indexing, schema changes, lifecycle, backup integration and isolation.
   CouchDB members can write ordinary documents, so read-only access requires a
   proven gateway; never expose it as native read-only membership.
 
-**Exit:** CouchDB passes common lifecycle, scoped access, backup capture and
-isolation checks recorded in PLAN-033. Restore acceptance is Phase 10 package
-10.13; document-model comparison is Phase 9 work; selection has no domain-need
-or comparative-success requirement.
+**Exit:** CouchDB passes common lifecycle, scoped access, backup configuration,
+purge-gate and isolation checks recorded in PLAN-033. Off-host backup capture
+and restore verification are Phase 10 package 10.13; document-model comparison
+is Phase 9 work; selection has no domain-need or comparative-success requirement.
 
 ### 8.4 — Graph Stores
 
@@ -89,21 +90,23 @@ AGE or Neo4j is inadequate is required. See the
   is a separate graph in the `DEFAULT` graph space, with its own store and data
   paths. Verify the license, image provenance and bundled notices, graph-scoped
   reader/writer permissions, credential/session revocation, indexing/schema
-  management, lifecycle, backup capture and isolation. Enable read-only access
-  only on surfaces where the pinned release and gateway enforce it; Gremlin
+  management, lifecycle, backup integration and isolation. Enable read-only
+  access only on surfaces where the pinned release and gateway enforce it; Gremlin
   `EXECUTE` permission alone does not establish read-only execution.
 
-**Exit:** HugeGraph passes common lifecycle, scoped access, backup capture and
-isolation checks recorded in PLAN-038. Restore acceptance is Phase 10 package
-10.13; graph-model comparison against AGE/Neo4j is Phase 9 work; selection has
-no domain-need or comparative-success requirement.
+**Exit:** HugeGraph passes common lifecycle, scoped access, backup configuration,
+purge-gate and isolation checks recorded in PLAN-038. Off-host backup capture
+and restore verification are Phase 10 package 10.13; graph-model comparison
+against AGE/Neo4j is Phase 9 work; selection has no domain-need or
+comparative-success requirement.
 
 ## Phase disposition
 
 Unactivated packages remain deferred. For each activated package record the
 owner's selection and operational status. Any introduced provider must pass
-common lifecycle, isolation, monitoring and backup/purge acceptance. Deployed
-recovery acceptance is Phase 10 package 10.13. Measurements and comparisons are
+common lifecycle, isolation, monitoring, backup integration and purge-gate
+acceptance. Deployed off-host backup and recovery verification are Phase 10
+package 10.13. Measurements and comparisons are
 recorded in Phase 9. A completed experiment does not close the other deferred
 packages; record each package's disposition explicitly before closing this
 phase.

@@ -68,8 +68,9 @@ dependencies and verifiable outcomes.
     fixtures; full deployed acceptance remains open
   - **User outcome:** Add CouchDB and HugeGraph; TimescaleDB, ClickHouse and
     Valkey remain owner-scheduled
-  - **Acceptance gate:** CouchDB and HugeGraph operational acceptance; owner
-    selection and acceptance for other activated providers
+  - **Acceptance gate:** CouchDB and HugeGraph operational acceptance, including
+    backup integration and purge safeguards; owner selection and acceptance for
+    other activated providers. Off-host backup verification is Phase 10 work
 - **Phase:**
   [9 – Data Store Measurement and Comparison](../maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md)
   - **State:** Planned, unscheduled

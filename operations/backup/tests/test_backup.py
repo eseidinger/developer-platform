@@ -8,6 +8,8 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
+import yaml
+
 spec = importlib.util.spec_from_file_location(
     "backup_platform", Path(__file__).parents[1] / "scripts/backup-platform.py"
 )
@@ -29,6 +31,40 @@ class BackupTests(unittest.TestCase):
                 "watchdog_token": "test-only",
             }
         )
+
+    def test_phase_eight_backup_covers_every_persistent_store_mount(self):
+        """A new store volume must be added to backup capture before deployment."""
+        compose = yaml.safe_load(
+            (
+                Path(__file__).parents[3]
+                / "infrastructure/persistence/shared-stores.yaml"
+            ).read_text()
+        )
+        bundle = self.root / "bundle"
+        bundle.mkdir()
+        (bundle / "store-recovery.json").write_text(
+            json.dumps(
+                {
+                    "resources": [
+                        {"provider": "couchdb", "state": "active"},
+                        {"provider": "hugegraph", "state": "retired"},
+                    ]
+                }
+            )
+        )
+
+        with patch.object(self.job, "volume_state") as volume_state:
+            self.job.data_store_state(bundle)
+
+        captured = dict(volume_state.call_args.args[1])
+        for service in ("couchdb", "hugegraph"):
+            with self.subTest(service=service):
+                persistent_mounts = {
+                    mount.split(":")[1]
+                    for mount in compose["services"][service]["volumes"]
+                    if not mount.startswith((".", "/"))
+                }
+                self.assertEqual(set(captured[service]), persistent_mounts)
 
     def test_failed_upload_keeps_previous_success_and_skips_retention(self):
         backup.atomic_json(

@@ -137,6 +137,18 @@ live.
 
 ## Other running-platform scenarios
 
+The read-only Phase 8 store smoke check verifies deployed CouchDB and HugeGraph
+container health, resource limits, private ports, persistent volumes, API
+readiness and Prometheus availability metrics. Run it on the platform host
+after deployment; it needs local Docker access and does not create resources:
+
+```bash
+python3 scripts/tests/platform/check-phase8-store-health.py
+```
+
+This check does not establish scoped access, browser login, backup capture or
+restore acceptance.
+
 Keep hosted access, human database access, data preservation, isolation, and
 interrupted provisioning separate: they exercise distinct platform guarantees.
 Use their `plan` commands and consult the

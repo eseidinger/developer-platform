@@ -11,8 +11,9 @@ package 10.9), deferred second AI model provider evaluation (`PLAN-012`
 follow-up, package 10.10), deployed named PostgreSQL restore acceptance
 (`PLAN-026` follow-up, package 10.11), and time-dependent/operator-reviewed
 PostgreSQL checks (`PLAN-026`/`PLAN-036` follow-up, package 10.12), and
-remaining store recovery checks (`PLAN-027`–`PLAN-033` follow-up, package
-10.13). It does not replace their acceptance criteria or create a new task ID.
+remaining store backup and recovery checks (`PLAN-027`–`PLAN-033` and
+`PLAN-038` follow-up, package 10.13). It does not replace their acceptance
+criteria or create a new task ID.
 The [delivery backlog](../backlog.md) remains the authoritative task and
 evidence register.
 
@@ -38,8 +39,9 @@ Exit: every acceptance criterion for `PLAN-016`, `PLAN-009`, `PLAN-017`,
 deployed portal journeys in `PLAN-020`, Phase 4 follow-ups in package 10.9,
 second AI model-provider evaluation in package 10.10, the deployed named
 PostgreSQL restore check in package 10.11, and deferred PostgreSQL checks in
-package 10.12, and store recovery checks in package 10.13 have dated source,
-local, and deployed evidence (or a new explicit owner-directed exception). The
+package 10.12, and store backup and recovery checks in package 10.13 have dated
+source, local, and deployed evidence (or a new explicit owner-directed
+exception). The
 generic and externally owned versioned results are recorded together. Only then
 may Phase 10 be closed; incomplete work here remains visible without blocking
 the other phases.
@@ -338,11 +340,24 @@ a deterministic Phase 7 test remains Phase 7 work and is not moved here.
 **Owner deferral (October 18, 2026):** Restore, projection/index rebuild and
 application reconnection acceptance for stores introduced in Phases 7 and 8
 moves here. Their local empty-volume and logical-restore fixtures remain source
-evidence, not deployed off-host recovery results. Phase 7/8 still require
-working backups, retained data, quarantine, verified-backup-gated purge and
-ordinary provider lifecycle checks. This package does not gate provider
-selection or Phase 7/8 exit.
+evidence, not deployed off-host recovery results.
 
+Verification of an actual encrypted off-host backup capture for Phase 8 stores
+also belongs here. Phase 8 still requires configured backup integration,
+retained data, quarantine, a purge gate that holds without a verified backup
+and ordinary provider lifecycle checks. Existing Phase 7 backup acceptance
+remains in Phase 7. This package does not gate provider selection or Phase 7/8
+exit.
+
+1. For every activated Phase 8 provider whose data must be retained, run or
+   observe the configured backup schedule and verify an encrypted off-host
+   capture. Check its timestamp, manifest, protected data and configuration,
+   required identities and successful repository readback. For CouchDB include
+   data, design documents and database security; for HugeGraph include every
+   selected graph, its configuration and authentication store. Record the
+   capture method, any write interruption, backup ID and verification result in
+   PLAN-031/032/033/038 as applicable. If Valkey state is disposable, record that
+   decision instead of claiming a durable backup.
 1. On an isolated restore host, restore a verified backup that contains the
    resource catalog, retained data and versioned application markers. Check
    quarantine, latest purge intent, old-credential denial, fresh approval and
@@ -367,11 +382,18 @@ selection or Phase 7/8 exit.
    from an off-host backup; reconcile identities and verify fresh scoped HTTP
    credentials, reader denial of writes and application reconnection.
    Unactivated providers need no recovery run.
+1. For selected HugeGraph, restore every protected graph and its configuration
+   and authentication store from the verified off-host backup. Verify graph
+   isolation, retained vertices and edges, schema, scoped credentials and
+   application reconnection. Confirm that the verified backup satisfies the
+   pending purge gate while separate authorization remains required.
 
-**Exit evidence:** dated, versioned off-host restore or source-backed rebuild
-results for every adopted provider, with scoped access, application readback,
-reconnection, purge-intent consistency and measured recovery targets; record
-limits or an explicit owner-directed exception per provider.
+**Exit evidence:** dated off-host backup capture and readback for every adopted
+Phase 8 provider with durable data, plus versioned off-host restore or
+source-backed rebuild results for every adopted provider, with scoped access,
+application readback, reconnection, purge-intent consistency and measured
+recovery targets; record limits or an explicit owner-directed exception per
+provider.
 
 ### 10.8 — Complete the lowest-priority human database leftovers (`PLAN-008`)
 
@@ -420,9 +442,10 @@ not gate Phase 5; primary-provider acceptance does not depend on its completion.
 Package 10.11 runs when an isolated restore host and verified backup are
 available; it does not gate package 7.1 acceptance. Package 10.12 follows the
 independent elapsed-time clocks and an operator-reviewed maintenance window; it
-does not gate deterministic package 7.1 acceptance. Package 10.13 runs when an
-isolated restore host and verified provider backups are available; it does not
-gate Phase 7/8 provider acceptance.
+does not gate deterministic package 7.1 acceptance. Package 10.13 runs when
+backup infrastructure and an isolated restore host are available; the backup
+verification step establishes the required provider backup before its restore.
+It does not gate Phase 7/8 provider acceptance.
 
 `PLAN-018` requires the implemented and accepted identity, contract, and
 monitoring outcomes. `PLAN-019` requires the completed deployed integration

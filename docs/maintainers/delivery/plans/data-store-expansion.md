@@ -30,9 +30,10 @@ into provider phases 7 and 8 plus a separate measurement phase 9:
 
 Phase 7 incorporates source roadmap phases 0–4; Phase 8 incorporates source
 phases 5–7. Their provider acceptance covers functional integration, backup
-safeguards and ordinary lifecycle checks. Deployed restore, rebuild and
-application reconnection acceptance belongs to Phase 10 packages 10.11 and
-10.13. Quantitative measurements, comparisons and eight performance dashboards
+safeguards and ordinary lifecycle checks. Off-host backup verification for Phase
+8 stores and deployed restore, rebuild and application reconnection acceptance
+belong to Phase 10 packages 10.11 and 10.13. Quantitative measurements,
+comparisons and eight performance dashboards
 belong to Phase 9 and do not gate provider selection or Phase 7/8 exit. Optional
 Phase 6 compute/service expansion is independent.
 [Phase 10 leftovers](phase-10-anytime-leftovers.md) remains last, anytime and
@@ -987,9 +988,11 @@ Every activated provider must demonstrate provisioning/reconciliation, retry and
 restart behavior, scoped access and revocation, managed secret
 rotation/redaction, network isolation, bounded capacity, health/alerts,
 upgrade/rollback, and retirement with explicit retention/deletion policy. Record
-working backups in Phase 7/8; measure authoritative-data recovery and
-demonstrate derived-index rebuild and retained-configuration reconciliation in
-Phase 10. Document supported versions, license, maturity, operating model, and
+working backups in Phase 7. For Phase 8 providers, verify backup integration
+and the purge gate in Phase 8; record actual off-host backup capture and readback
+in Phase 10. Measure authoritative-data recovery and demonstrate derived-index
+rebuild and retained-configuration reconciliation in Phase 10. Document
+supported versions, license, maturity, operating model, and
 recovery ownership before selection. Use the existing lab under its recorded
 validation policy, with bounded impact and recovery steps; do not provision
 another test environment. Keep selected shared stores running with bounded

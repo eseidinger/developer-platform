@@ -232,7 +232,8 @@ flowchart LR
     acceptance
 - **Phase:** [8 – Deferred Data Stores](plans/phase-8-deferred-data-stores.md)
   - **Entry condition:** CouchDB and HugeGraph source and disposable fixtures
-    pass; full deployed acceptance and HugeGraph backup capture remain open
+    pass; full Phase 8 deployed acceptance remains open, while off-host backup
+    verification belongs to Phase 10.13
   - **Outcome / dependency:** CouchDB and HugeGraph are selected providers;
     TimescaleDB/ClickHouse and Valkey remain deferred; operational policies
     still apply
@@ -256,9 +257,10 @@ Phase 8. Phase 9 owns quantitative measurements, dashboards and comparisons; it
 does not gate provider selection or Phase 7/8 exit. Phase 7 packages preserve
 the baseline → analytics/object storage → search → graph → vector sequence.
 Phase 8 packages activate independently at the owner's discretion. Provider
-lifecycle, backup capture and safe purge belong in Phases 7/8; deployed store
-restore, rebuild and reconnection acceptance belongs in Phase 10 packages 10.11
-and 10.13. Those Phase 10 recovery checks do not gate Phase 7/8 exit.
+lifecycle, backup integration and purge safeguards belong in Phases 7/8. Deployed
+backup verification for Phase 8 stores and deployed store restore, rebuild and
+reconnection acceptance belong in Phase 10 packages 10.11 and 10.13. Those
+Phase 10 checks do not gate Phase 7/8 exit.
 Reproducible domain benchmarks remain externally owned. Selected store services
 remain running together; check combined capacity before adding another service.
 

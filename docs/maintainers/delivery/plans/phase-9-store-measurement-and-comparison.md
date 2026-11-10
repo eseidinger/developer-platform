@@ -14,8 +14,9 @@ evidence; PLAN-037 tracks the moved measurement and comparison exit work.
 
 Phase 7 retains functional provisioning, scoped access, lifecycle, capacity
 admission, basic health/alerting and backup/purge safeguards for planned stores.
-Phase 8 retains the same operational acceptance for any owner-selected deferred
-store. Restore, rebuild and application reconnection acceptance belongs to
+Phase 8 retains operational acceptance, backup integration and purge safeguards
+for any owner-selected deferred store. Its off-host backup verification and
+restore, rebuild and application reconnection acceptance belong to
 [Phase 10 package 10.13](phase-10-anytime-leftovers.md#1013-verify-deployed-data-store-recovery-plan-027plan-033-follow-up),
 with PostgreSQL restore in package 10.11. Neither provider phase waits for
 benchmark scores, comparative results or the eight performance dashboards.

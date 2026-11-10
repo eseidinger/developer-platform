@@ -1,8 +1,9 @@
 # CouchDB Provider — Next Data Store Increment
 
 Status: selected on November 2, 2026; source implementation, disposable fixture
-and bounded deployed access checks pass. Backup capture and the remaining Phase 8
-acceptance checks are open. This plan refines
+and bounded deployed access checks pass. The remaining Phase 8 acceptance checks
+are open; off-host backup capture verification belongs to Phase 10.13. This
+plan refines
 [Phase 8 package 8.3](phase-8-deferred-data-stores.md#83-document-stores) and
 [PLAN-033](../backlog.md#data-store-expansion-tasks). It does not select
 MongoDB. Phase 7's unfinished acceptance and other Phase 8 packages remain
@@ -35,7 +36,8 @@ The last verified backup capture was at 12:00 UTC, before this deployment.
 A new backup start was rejected by the automatic approval review because it
 would pause services and transfer platform data to the configured external S3
 repository. CouchDB backup capture, off-host restore, application reconnection
-and the remaining Phase 8 exit checks are therefore not claimed here.
+and the remaining Phase 8 exit checks are therefore not claimed here. The
+capture and restore checks are tracked in Phase 10.13.
 
 The project-scoped browser console was deployed on November 2 from revision
 `30dd17e2ca159bbb16b465600b55eb93f20cadbf`. It uses the same active human
@@ -46,7 +48,16 @@ UI check and two browser scenarios covering reader and writer actions. On the
 host, console enablement and all three packaged browser assets were confirmed;
 CouchDB, the relay, PostgreSQL and the Platform API were healthy, and API
 readiness returned 200. A browser session with a real deployed human CouchDB
-lease remains to be exercised before claiming deployed console acceptance.
+lease had not yet been exercised at that point.
+
+On November 10, the Ansible deployment of revision
+`66a056d90b5be038e21c86b5a00aac267c8689a7+dirty` passed. The read-only
+Phase 8 host smoke verified CouchDB container health, CPU/memory limits, private
+ports, its named data volume and a native-up Prometheus metric of 1. See
+[EV-73](../backlog.md#verification-register). Scoped deployed lifecycle remains
+open. On November 10, the owner reported successful deployed browser checks
+with separate reader and writer identities, reader write denial and access
+denial after grant revocation; see [EV-74](../backlog.md#verification-register).
 
 ## Scope and decisions
 
@@ -127,14 +138,16 @@ and
 1. **Operations:** Integrate service and per-resource health, bounded metrics,
    alerts, capacity admission and quota reporting. Document any monitoring-only
    quota limit and compaction headroom; never call it a hard per-database quota.
-   Capture consistent encrypted off-host backups on the selected 12-hour
+   Configure consistent encrypted off-host backups on the selected 12-hour
    schedule, including data, design documents, security configuration and
    credential reconciliation inputs. Preserve the existing purge backup gate and
-   test backup capture before Phase 8 acceptance.
+   verify that purge remains blocked without a verified backup in Phase 8.
+   Verify actual off-host capture and readback in Phase 10.13.
 1. **Acceptance and handoff:** Run offline checks, focused component tests and
    bounded deployed tests for the activated provider. Record revision, image
-   digest, environment, evidence and limitations in PLAN-033. The off-host
-   restore, fresh credential issuance and application reconnection drill remains
+   digest, environment, evidence and limitations in PLAN-033. Off-host backup
+   capture, restore, fresh credential issuance and application reconnection
+   belong to
    [Phase 10 package 10.13](phase-10-anytime-leftovers.md#1013-verify-deployed-data-store-recovery-plan-027plan-033-follow-up).
    Compare CouchDB with PostgreSQL JSONB on versioned workloads in
    [Phase 9](phase-9-store-measurement-and-comparison.md#95-deferred-store-comparisons);
@@ -143,7 +156,7 @@ and
 ## Phase 8 exit for CouchDB
 
 Provisioning, isolation, read-only and read-write access, active revocation,
-bindings, retained-data lifecycle, monitoring, bounded capacity, backup capture
-and safe purge pass with recorded evidence. Any unsupported capability is
-rejected and documented. No deployed restore or performance result is claimed by
-this exit; those checks retain their Phase 10 and Phase 9 owners.
+bindings, retained-data lifecycle, monitoring, bounded capacity, backup
+configuration and the purge gate pass with recorded evidence. Any unsupported
+capability is rejected and documented. Off-host backup capture and restore
+verification belong to Phase 10.13; performance results belong to Phase 9.
