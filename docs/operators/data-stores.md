@@ -5,8 +5,9 @@ present. PostgreSQL named resources, the API/CLI, portal and private lease relay
 are implemented in source and disposable tests. The pinned AGE/pgvector image
 and pgAdmin SSO configuration are in source. Disposable console SSO/connection
 and encrypted empty-server restore fixtures pass; RustFS, OpenSearch, Qdrant,
-CouchDB and dedicated Neo4j Community have native providers and opt-in service
-selection with local isolation/recovery evidence. RustFS, Qdrant and OpenSearch
+CouchDB, HugeGraph and dedicated Neo4j Community have native providers and
+opt-in service selection. Their isolation and recovery evidence is scoped in
+the provider sections below. RustFS, Qdrant and OpenSearch
 Dashboards browser access, plus Neo4j Browser, pass local native-login,
 supported-mode/isolation and expiry/revocation fixtures. Deployed interactive
 browser checks now pass for all four providers with disposable human personas,

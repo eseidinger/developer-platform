@@ -2,12 +2,14 @@
 
 Status: design and delivery plan, originally recorded October 17, 2026. The
 earlier source assessment is historical: named PostgreSQL, RustFS, OpenSearch,
-Qdrant and dedicated Neo4j Community providers are now implemented. See the
-[Phase 7 checkpoint](phase-7-planned-data-stores.md) and
-[current operator contract](../../../operators/data-stores.md) for delivered
-behavior and scoped EV-67–72 evidence. Deferred Phase 8 providers and
-outstanding acceptance remain planned; this documentation review ran no
-deployment or benchmark.
+Qdrant and dedicated Neo4j Community providers are now implemented. CouchDB
+and HugeGraph are also implemented in source under Phase 8. Full deployed
+acceptance remains open for both. See the
+[Phase 7 checkpoint](phase-7-planned-data-stores.md),
+[Phase 8 status](phase-8-deferred-data-stores.md) and
+[current operator contract](../../../operators/data-stores.md) for behavior and
+evidence. TimescaleDB, ClickHouse and Valkey remain deferred.
+No deployment or benchmark was run for this documentation update.
 
 The [data store roadmap](../../../product/data-store-roadmap.md) is organized
 into provider phases 7 and 8 plus a separate measurement phase 9:
@@ -17,14 +19,14 @@ into provider phases 7 and 8 plus a separate measurement phase 9:
     AGE/Neo4j, pgvector/Qdrant
   - **Tasks:** PLAN-026–030, PLAN-036
 - **Phase:** [8 — Deferred Data Stores](phase-8-deferred-data-stores.md)
-  - **Scope:** CouchDB selected for planning; TimescaleDB, ClickHouse and Valkey
-    deferred
-  - **Tasks:** PLAN-031–033
+  - **Scope:** CouchDB and HugeGraph selected and implemented in source;
+    TimescaleDB, ClickHouse and Valkey deferred
+  - **Tasks:** PLAN-031–033, PLAN-038
 - **Phase:**
   [9 — Data Store Measurement and Comparison](phase-9-store-measurement-and-comparison.md)
   - **Scope:** Eight performance dashboards and reproducible comparisons across
     selected stores
-  - **Tasks:** PLAN-037, with source evidence from PLAN-026–033
+  - **Tasks:** PLAN-037, with source evidence from selected Phase 7/8 providers
 
 Phase 7 incorporates source roadmap phases 0–4; Phase 8 incorporates source
 phases 5–7. Their provider acceptance covers functional integration, backup

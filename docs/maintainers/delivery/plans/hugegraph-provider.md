@@ -4,7 +4,8 @@ Status: selected on November 3, 2026; source provider, private REST relay,
 Compose service, API/CLI/UI contract, monitoring and backup/restore volume
 mapping implemented. The disposable pinned 1.7.0 fixture passes graph
 provisioning, schema, vertex and edge operations, reader write denial, relay path
-isolation, restart, container recreation, revocation and purge. Deployed
+isolation, restart, container recreation, revocation and purge. Focused gateway
+tests cover the platform browser console. Deployed
 acceptance and off-host backup capture remain open. This plan refines
 [Phase 8 package 8.4](phase-8-deferred-data-stores.md#84-graph-stores) and
 [PLAN-038](../backlog.md#data-store-expansion-tasks). It complements
@@ -19,8 +20,8 @@ selection.
 The fixture found that a native graph-scoped reader can still list graphs and
 read another graph directly. The relay therefore rejects graph enumeration and
 all paths outside the named graph for every client. Gremlin, Cypher, PQL and
-browser access remain unsupported; only the bounded REST graph and schema
-routes are exposed. See
+upstream Hubble access remain unsupported; bounded REST graph/schema routes and
+the lease-scoped platform browser console are exposed. See
 [`verify-hugegraph.py`](../../../../scripts/tests/components/stores/verify-hugegraph.py)
 for the reproducible fixture and
 [`hugegraph_access.py`](../../../../platform/app/src/app/stores/hugegraph_access.py)
@@ -144,8 +145,9 @@ revocation and cross-graph checks have focused gateway tests.
    at creation before granting client access; fail closed if setup is
    incomplete.
 1. **Data and security tests:** Verify vertex/edge create/update/delete,
-   supported Gremlin queries, schema and index management with representative
-   fixtures. Exercise same-project and cross-project grants, reader/writer
+   supported REST queries, schema and index management with representative
+   fixtures. Test Gremlin only if it is enabled after separate security review.
+   Exercise same-project and cross-project grants, reader/writer
    separation, system API denial, session fencing, service restart and
    partial provisioning retries. Test browser access if implemented.
 1. **Operations:** Integrate service and per-resource health, bounded metrics,

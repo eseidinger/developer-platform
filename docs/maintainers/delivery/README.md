@@ -231,9 +231,9 @@ flowchart LR
     and targeted OpenSearch, AGE/Neo4j, pgvector/Qdrant functional provider
     acceptance
 - **Phase:** [8 – Deferred Data Stores](plans/phase-8-deferred-data-stores.md)
-  - **Entry condition:** CouchDB source and disposable fixture pass; deployed
-    acceptance and operator capacity allocation remain open
-  - **Outcome / dependency:** CouchDB is the next provider;
+  - **Entry condition:** CouchDB and HugeGraph source and disposable fixtures
+    pass; full deployed acceptance and HugeGraph backup capture remain open
+  - **Outcome / dependency:** CouchDB and HugeGraph are selected providers;
     TimescaleDB/ClickHouse and Valkey remain deferred; operational policies
     still apply
 - **Phase:**

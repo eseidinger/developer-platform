@@ -23,10 +23,11 @@ accounts and clients. See the
 [platform database model](../docs/platform-model/platform-database.md).
 
 Stores have an independent lifecycle. The default provider is PostgreSQL;
-operator-selected RustFS S3, OpenSearch, Qdrant and dedicated Neo4j Community
-providers are also implemented. No deployment format provisions an implicit
-project database or `database` Secret. New consumers use approved `v1alpha2`
-component bindings. Application removal and resource retirement retain data;
+operator-selected RustFS S3, OpenSearch, Qdrant, dedicated Neo4j Community,
+CouchDB and HugeGraph providers are also implemented. No deployment format
+provisions an implicit project database or `database` Secret. New consumers use
+approved `v1alpha2` component bindings. Application removal and resource
+retirement retain data;
 resource purge requires scoped confirmation and verified off-host backup intent.
 See the [named-store reference](../docs/operators/data-stores.md).
 

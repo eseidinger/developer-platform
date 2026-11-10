@@ -20,8 +20,8 @@ watchdog support operations around the platform.
 - Declarative, versioned application deployments through a REST API and CLI.
 - Multi-service applications and scheduled components on Kubernetes.
 - Independent named PostgreSQL resources, explicit component bindings, human
-  access leases, and pgAdmin SSO; optional RustFS S3, OpenSearch, Qdrant, and
-  dedicated Neo4j Community providers.
+  access leases, and pgAdmin SSO; optional RustFS S3, OpenSearch, Qdrant,
+  dedicated Neo4j Community, CouchDB, and HugeGraph providers.
 - OIDC authentication, platform-owned grants, revocable CI credentials, and
   redacted audit events.
 - Durable deployment operations, revision-aware updates, diagnostics, and
@@ -39,16 +39,17 @@ the [architecture overview](docs/architecture/README.md) for its boundaries.
 
 Requirements: Docker Engine with Compose 2.20.3 or newer, Python 3.10 or newer,
 Bash, `setfacl` (the Linux `acl` package), loopback-mount tools, kubectl 1.36.x
-(1.35.x–1.37.x supported), and internet access. Suggested capacity is 16 vCPUs
-and 32 GB RAM.
+(1.35.x–1.37.x supported), `uv` for the smoke plan, and internet access.
+Suggested capacity is 16 vCPUs and 32 GB RAM.
 
 ```bash
 python3 scripts/init.py
 python3 scripts/setup/install-k3d.py
 sudo bash scripts/setup/prepare-tempo-storage.sh
-docker compose up -d postgres keycloak-db-init keycloak proxy
-# Create the initial Keycloak user and put its immutable ID in
-# PLATFORM_BOOTSTRAP_SUBJECT in .env before starting the API.
+docker compose up -d postgres keycloak-db-init keycloak keycloak-realm-init proxy
+# Confirm that keycloak-realm-init has exited successfully before continuing.
+docker compose ps -a keycloak-realm-init
+python3 scripts/setup/bootstrap-local-admin.py
 bash scripts/up.sh
 # Set SMOKE_FIXTURE_IMAGE to a digest-pinned http-echo image first.
 uv run --project platform/app python scripts/tests/platform/smoke.py plan \
@@ -115,5 +116,6 @@ bash -n scripts/up.sh scripts/down.sh
 Live smoke and capability-specific recovery/failure drills are documented in
 [platform acceptance](docs/operators/validation/acceptance.md). They can alter a
 running lab and must be run only in the environment and scope described there.
-The [documentation review](docs/maintainers/documentation-review.md) records
-legacy database helpers that require adaptation to the current binding contract.
+The [documentation review](docs/maintainers/documentation-review.md#current-disposition)
+tracks the remaining legacy recovery check and the live verification still needed
+for the adapted named-resource drills.

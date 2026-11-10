@@ -1,6 +1,6 @@
 # Product overview and vision
 
-Status: current product overview and target vision. Last reviewed October 18,
+Status: current product overview and target vision. Last reviewed November 10,
 2026\.
 
 The Developer Platform allows developers to describe an application and its
@@ -26,8 +26,10 @@ provisions compute, persistence, configuration, access, and observability.**
 
 The React portal implements project lifecycle, hosted access, named stores and
 human leases, administration, and AI assistance. Optional RustFS S3, OpenSearch,
-Qdrant and dedicated Neo4j Community providers are implemented with scoped
-native and browser access. AI runs provide bounded project
+Qdrant, dedicated Neo4j Community, CouchDB and HugeGraph providers are
+implemented with scoped native and browser access. CouchDB has bounded deployed
+access checks; HugeGraph has disposable fixture checks. Full deployed acceptance
+for both remains open. AI runs provide bounded project
 explanations/investigations and curated guidance; a separate approved proposal
 can execute a rollback. The API and CLI provide automation. Source
 implementation and local tests do not establish every deployed acceptance

@@ -322,9 +322,9 @@ and checkboxes below are authoritative.
     analytics/object storage), PLAN-028 (7.3 search), PLAN-029 (7.4 graph),
     PLAN-030 (7.5 vector), PLAN-036 (7.1 common private/console access, extended
     by each provider package)
-- **Gate:** 8, CouchDB source implemented; others deferred
+- **Gate:** 8, CouchDB and HugeGraph source implemented; other providers deferred
   - **Tasks:** PLAN-031 (8.1 time series/OLAP), PLAN-032 (8.2 caching), PLAN-033
-    (8.3 CouchDB), PLAN-038 (8.4 HugeGraph, selected for planning 2026-11-03)
+    (8.3 CouchDB), PLAN-038 (8.4 HugeGraph)
 - **Gate:** 9, measurement and comparison
   - **Tasks:** PLAN-037: eight store performance dashboards and reproducible
     comparisons across selected Phase 7/8 stores in the

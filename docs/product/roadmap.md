@@ -64,12 +64,12 @@ dependencies and verifiable outcomes.
     safe purge
 - **Phase:**
   [8 – Deferred Data Stores](../maintainers/delivery/plans/phase-8-deferred-data-stores.md)
-  - **State:** CouchDB implemented in source with disposable fixture; deployed
-    acceptance open; other packages deferred
-  - **User outcome:** Add CouchDB as the next provider; TimescaleDB, ClickHouse
-    and Valkey remain owner-scheduled
-  - **Acceptance gate:** CouchDB operational acceptance; owner selection and
-    acceptance for other activated providers
+  - **State:** CouchDB and HugeGraph implemented in source with disposable
+    fixtures; full deployed acceptance remains open
+  - **User outcome:** Add CouchDB and HugeGraph; TimescaleDB, ClickHouse and
+    Valkey remain owner-scheduled
+  - **Acceptance gate:** CouchDB and HugeGraph operational acceptance; owner
+    selection and acceptance for other activated providers
 - **Phase:**
   [9 – Data Store Measurement and Comparison](../maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md)
   - **State:** Planned, unscheduled
@@ -116,7 +116,8 @@ synthetic artifact/outbox/search integration (EV-71), and deployed human
 console/session checks (EV-72). Seven EV-71/72 resource purges remain awaiting
 verified scheduled backup; zero active leases is not evidence of completed
 deletion. Deployed restore/rebuild and natural expiry/operator reviews remain
-Phase 10 work. Phase 8 providers remain deferred. These statuses reflect
+Phase 10 work. CouchDB and HugeGraph have Phase 8 source implementations;
+their remaining acceptance is tracked separately. These statuses reflect
 inspected source and the recorded
 [backlog evidence](../maintainers/delivery/backlog.md).
 

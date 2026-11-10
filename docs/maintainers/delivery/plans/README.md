@@ -21,11 +21,12 @@ must not be read as proof that the corresponding source capability is absent:
 - [Phase 7 planned data stores](phase-7-planned-data-stores.md) —
   baseline/integration, analytics/object storage, search, graphs and vectors
 - [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) —
-  owner-scheduled time series/OLAP, caching and documents
-- [CouchDB provider](couchdb-provider.md) — source implementation and disposable
-  fixture pass; deployed acceptance pending
-- [HugeGraph provider](hugegraph-provider.md) — selected November 3, 2026;
-  planning only, no source implementation yet
+  CouchDB and HugeGraph selected; time series/OLAP and caching remain deferred
+- [CouchDB provider](couchdb-provider.md) — source, disposable fixture and
+  bounded deployed access checks pass; backup capture and full acceptance remain
+  open
+- [HugeGraph provider](hugegraph-provider.md) — source and disposable fixture
+  pass; deployed acceptance and off-host backup capture remain open
 - [Phase 9 data store measurement and comparison](phase-9-store-measurement-and-comparison.md)
   — performance dashboards and reproducible comparisons
 - [Phase 10 anytime leftovers and store recovery — lowest priority](phase-10-anytime-leftovers.md)

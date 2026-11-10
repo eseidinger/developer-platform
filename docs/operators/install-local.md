@@ -1,12 +1,13 @@
 # Local installation
 
-Status: current. Last reviewed October 18, 2026.
+Status: current. Last reviewed November 10, 2026.
 
 ## Prerequisites
 
 - Linux or WSL2 with Docker Engine and Compose 2.20.3 or newer
 - Python 3.10 or newer for host scripts, Bash, `setfacl` (Linux `acl` package),
   and kubectl 1.35.x–1.37.x; API/CLI source development requires Python 3.12+
+- `uv` for the source-based smoke plan in the verification steps
 - Root access and `mount`, `findmnt`, `mountpoint`, `mkfs.ext4`, and `truncate`
   to prepare the bounded Tempo filesystem
 - Internet access and access to Linux cgroups/privileged k3d containers
@@ -18,7 +19,7 @@ Run from the repository root:
 python3 scripts/init.py
 python3 scripts/setup/install-k3d.py
 sudo bash scripts/setup/prepare-tempo-storage.sh
-docker compose up -d postgres keycloak-db-init keycloak proxy
+docker compose up -d postgres keycloak-db-init keycloak keycloak-realm-init proxy
 ```
 
 `init.py` creates missing secrets in the git-ignored `.env` and preserves
@@ -35,10 +36,12 @@ Ansible. Routine startup remains `bash scripts/up.sh`.
 
 ## Bootstrap identity
 
-For noninteractive local setup, wait until the `keycloak-realm-init` service has
-finished successfully, then run:
+For noninteractive local setup, check that the explicitly started
+`keycloak-realm-init` service has exited with status 0, then create the first
+administrator:
 
 ```bash
+docker compose ps -a keycloak-realm-init
 python3 scripts/setup/bootstrap-local-admin.py
 ```
 
