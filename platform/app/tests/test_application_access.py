@@ -18,6 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from app.access_contract import PolicyCreate, canonical_path, match_route
 from app.access_gateway import (
     Snapshot,
+    admitted_group_names,
     admitted_identity,
     create_gateway,
     new_session,
@@ -28,7 +29,7 @@ from app.access_runtime import browser_manifests
 from app.access_tokens import TokenVerifier
 from app.access_worker import roll_services
 from app.manifests import component_resources
-from tests.support.application_access import GROUP, POLICY, claims, data
+from tests.support.application_access import GROUP, OTHER_GROUP, POLICY, claims, data
 
 
 class AccessContractTests(unittest.TestCase):
@@ -134,6 +135,8 @@ class AccessContractTests(unittest.TestCase):
         raw = [
             (b"authorization", b"Bearer stolen"),
             (b"x-platform-principal-id", b"forged"),
+            (b"x-platform-principal-group-names", b"admins"),
+            (b"x-platform-principal-username", b"forged"),
             (b"x-auth-request-user", b"forged"),
             (b"x-forwarded-user", b"forged"),
             (
@@ -144,13 +147,21 @@ class AccessContractTests(unittest.TestCase):
             (b"baggage", b"secret=value"),
             (b"cookie", b"__Host-platform-session=secret; app-theme=dark"),
         ]
-        identity, groups = admitted_identity(data(), POLICY, claims(), "bearer-token")
+        snapshot = data()
+        identity, groups = admitted_identity(snapshot, POLICY, claims(), "bearer-token")
         headers = dict(
             upstream_headers(
-                raw, identity, claims(), groups, POLICY["spec"]["identityAttributes"]
+                raw,
+                identity,
+                claims(),
+                groups,
+                admitted_group_names(snapshot, POLICY, groups),
+                POLICY["spec"]["identityAttributes"],
             )
         )
         self.assertEqual(headers["X-Platform-Principal-Id"], "prn_machine")
+        self.assertEqual(headers["X-Platform-Principal-Group-Names"], "readers")
+        self.assertNotIn("X-Platform-Principal-Username", headers)
         self.assertEqual(headers["cookie"], "app-theme=dark")
         self.assertNotIn("authorization", headers)
         self.assertNotIn("x-auth-request-user", headers)
@@ -158,6 +169,48 @@ class AccessContractTests(unittest.TestCase):
         self.assertNotIn("tracestate", headers)
         self.assertNotIn("baggage", headers)
         self.assertNotIn("X-Platform-Principal-Email", headers)
+
+    def test_group_names_follow_verified_ids_and_missing_metadata_denies_forwarding(
+        self,
+    ):
+        snapshot = data()
+        snapshot["groups"].append(
+            {
+                "id": OTHER_GROUP,
+                "project": "provider",
+                "name": "editors",
+                "state": "active",
+            }
+        )
+        self.assertEqual(
+            admitted_group_names(snapshot, POLICY, [OTHER_GROUP, GROUP]),
+            ["editors", "readers"],
+        )
+        with self.assertRaises(HTTPException) as error:
+            admitted_group_names(snapshot, POLICY, [GROUP, "grp_missing"])
+        self.assertEqual(error.exception.status_code, 503)
+
+        snapshot["groups"][0]["state"] = "revoked"
+        with self.assertRaises(HTTPException):
+            admitted_group_names(snapshot, POLICY, [GROUP])
+
+    def test_unsafe_username_is_not_forwarded(self):
+        snapshot = data()
+        identity, groups = admitted_identity(
+            snapshot, POLICY, claims("user"), "browser-session"
+        )
+        user_claims = {**claims("user"), "preferred_username": "alice\r\nforged: yes"}
+        headers = dict(
+            upstream_headers(
+                [],
+                identity,
+                user_claims,
+                groups,
+                admitted_group_names(snapshot, POLICY, groups),
+                POLICY["spec"]["identityAttributes"],
+            )
+        )
+        self.assertNotIn("X-Platform-Principal-Username", headers)
 
     def test_session_idle_absolute_and_recovery_epoch(self):
         key = "k" * 32
@@ -426,6 +479,10 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(
             self.backend[-1].headers["x-platform-principal-id"], "prn_machine"
         )
+        self.assertEqual(
+            self.backend[-1].headers["x-platform-principal-group-names"], "readers"
+        )
+        self.assertNotIn("x-platform-principal-username", self.backend[-1].headers)
         self.assertNotIn("authorization", self.backend[-1].headers)
         self.assertFalse(
             any("=forged" in v for v in response.headers.get_list("set-cookie"))
@@ -444,6 +501,7 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(self.backend, [])
 
     async def test_browser_redirect_first_login_and_csrf(self):
+        self.human_claims["preferred_username"] = "alice"
         response = await self.client.get("/app/")
         self.assertEqual(response.status_code, 302)
         state = new_session(POLICY)
@@ -462,6 +520,12 @@ class GatewayTests(unittest.IsolatedAsyncioTestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            self.backend[-1].headers["x-platform-principal-username"], "alice"
+        )
+        self.assertEqual(
+            self.backend[-1].headers["x-platform-principal-group-names"], "readers"
+        )
         self.assertNotIn("x-platform-csrf-token", self.backend[-1].headers)
         self.gateway.state.snapshot.value["memberships"][1]["state"] = (
             "revocation-pending"

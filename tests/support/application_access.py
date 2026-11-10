@@ -68,6 +68,14 @@ def data():
                 "subject": "human",
             },
         ],
+        "groups": [
+            {
+                "id": GROUP,
+                "project": "provider",
+                "name": "readers",
+                "state": "active",
+            }
+        ],
         "memberships": [
             {
                 "state": "active",

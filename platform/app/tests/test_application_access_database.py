@@ -692,7 +692,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(store.listing(conn, "membership"), [])
 
     async def test_snapshot_quarantine_recovery_and_changed_backend_fail_closed(self):
-        policy, _group = await self.policy()
+        policy, group = await self.policy()
         headers = {"Authorization": "Bearer " + derived_secret("platform", "internal")}
         unauthorized = await self.client.get("/internal/application-access/snapshot")
         self.assertEqual(unauthorized.status_code, 401)
@@ -701,6 +701,10 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertEqual(current.status_code, 200, current.text)
         self.assertEqual(len(current.json()["policies"]), 1)
+        self.assertEqual(
+            [(item["id"], item["name"]) for item in current.json()["groups"]],
+            [(group["id"], "readers")],
+        )
         with self.connect() as conn:
             conn.execute(
                 "INSERT INTO hosted_access_metadata(key,value) VALUES ('recovery-required','true')"

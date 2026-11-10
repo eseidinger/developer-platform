@@ -241,6 +241,11 @@ The normalized application identity context is:
 - **Field:** `group_ids`
   - **Meaning:** Stable IDs of relevant application groups asserted for this
     client
+- **Field:** `group_names`
+  - **Meaning:** Platform group names corresponding to `group_ids` in the same
+    order; presentation only
+- **Field:** `username`
+  - **Meaning:** Optional human `preferred_username` claim; presentation only
 
 ### Upstream identity transport
 
@@ -266,6 +271,14 @@ headers on every authenticated upstream request:
   - **Value:** Space-delimited stable group IDs relevant to this
     application/client; may be empty only before denial and is never forwarded
     to a protected application as an authorization success
+- **Header:** `X-Platform-Principal-Group-Names`
+  - **Required:** Yes
+  - **Value:** Space-delimited platform group names in the same order as the
+    group IDs. These are the group `name` slugs, not `displayName` labels.
+- **Header:** `X-Platform-Principal-Username`
+  - **Required:** No; human principals only
+  - **Value:** Verified OIDC `preferred_username` when present and safe for an
+    HTTP header. It may differ from the identifier entered at login.
 - **Header:** `X-Platform-Principal-Client-Id`
   - **Required:** For service principals
   - **Value:** Verified confidential client ID
@@ -285,6 +298,8 @@ X-Platform-Principal-Kind: user
 X-Platform-Principal-Issuer: https://identity.example.org/realms/platform
 X-Platform-Principal-Subject: 53ca4128-297c-4984-b855-4292329d75da
 X-Platform-Principal-Group-Ids: grp_7ae814 grp_ee0912
+X-Platform-Principal-Group-Names: readers editors
+X-Platform-Principal-Username: alice
 ```
 
 A client-credentials request reaches it like:
@@ -296,25 +311,28 @@ X-Platform-Principal-Issuer: https://identity.example.org/realms/platform
 X-Platform-Principal-Subject: service-account-8eb77d7a
 X-Platform-Principal-Client-Id: consumer-project-client
 X-Platform-Principal-Group-Ids: grp_5b92d1
+X-Platform-Principal-Group-Names: readers
 ```
 
 Application middleware reads these headers once per request, rejects a missing
 or malformed required context, and stores the resulting principal in the
 framework's request-local security context. The route has already passed the
-platform's group policy. `name`, `email`, and group display names are never
-lookup or authorization keys. An application may use the stable principal and
-group IDs for presentation or for finer object/row authorization, but it must
-not repeat the platform's coarse route check. An application without finer
-domain rules needs no application-specific authorization store. Missing optional
-name or email attributes never cause authentication or authorization failure,
-and they are excluded from telemetry and authorization audit details unless an
-explicit requirement permits them.
+platform's group policy. Username, human name, email, group names, and group
+display names are never lookup or authorization keys. An application may use the
+stable principal and group IDs for presentation or finer object/row
+authorization, but it must not repeat the platform's coarse route check. An
+application without finer domain rules needs no application-specific
+authorization store. Missing optional username, name, or email attributes never
+cause authentication or authorization failure, and they are excluded from
+telemetry and authorization audit details unless an explicit requirement permits
+them.
 
 The platform makes this unsigned upstream-header contract trustworthy by:
 
 - deleting all inbound `X-Platform-Principal-*` headers before authentication;
 - adding exactly one normalized value for each applicable header only after
-  authentication and route authorization succeed;
+  authentication and route authorization succeed; group names come from the
+  platform catalog snapshot for those authorized group IDs;
 - reserving the `X-Platform-*` header namespace for platform use;
 - allowing the edge to reach the authentication boundary and the boundary to
   reach the private backend, while denying direct backend access;

@@ -249,3 +249,8 @@ release requires `personalData:true` before policy acceptance. Applications read
 the normalized headers described in the
 [security architecture](../architecture/security-and-authorization.md#upstream-identity-transport);
 they do not receive the bearer token or implement the platform group check.
+The gateway also supplies `X-Platform-Principal-Group-Names` with the catalog
+group-name slugs aligned to `X-Platform-Principal-Group-Ids`. Human requests
+include `X-Platform-Principal-Username` when the verified OIDC token contains a
+safe `preferred_username`. These names are for display; use stable IDs for
+application authorization and lookups.

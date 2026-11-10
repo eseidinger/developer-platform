@@ -993,6 +993,11 @@ def install(app, control):
                 ),
                 "policies": [] if recovery_required else policies,
                 "recoveryRequired": recovery_required,
+                "groups": [
+                    r
+                    for r in rows
+                    if r["kind"] == "group" and r["project"] not in retired
+                ],
                 "memberships": [
                     r
                     for r in rows

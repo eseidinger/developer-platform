@@ -134,7 +134,21 @@ def admitted_identity(data, policy, claims, mode, now=None):
     return identity, sorted(set(claims["groups"]) & live_groups)
 
 
-def upstream_headers(raw_headers, identity, claims, groups, attributes):
+def admitted_group_names(data, policy, group_ids):
+    # Names come from the same bounded catalog snapshot as active memberships,
+    # never from an untrusted token claim or an incoming request header.
+    names_by_id = {
+        group["id"]: group["name"]
+        for group in data.get("groups", [])
+        if group["project"] == policy["project"] and group["state"] == "active"
+    }
+    try:
+        return [names_by_id[group_id] for group_id in group_ids]
+    except KeyError:
+        raise HTTPException(503, "Application group metadata is unavailable") from None
+
+
+def upstream_headers(raw_headers, identity, claims, groups, group_names, attributes):
     connections = set()
     for name, value in raw_headers:
         if name.lower() == b"connection":
@@ -174,9 +188,18 @@ def upstream_headers(raw_headers, identity, claims, groups, attributes):
         "Issuer": claims["iss"],
         "Subject": claims["sub"],
         "Group-Ids": " ".join(groups),
+        "Group-Names": " ".join(group_names),
     }
     if identity["kind"] == "service":
         fields["Client-Id"] = claims["azp"]
+    elif isinstance(claims.get("preferred_username"), str):
+        username = claims["preferred_username"]
+        if (
+            username
+            and len(username) <= 256
+            and all(32 <= ord(c) <= 126 for c in username)
+        ):
+            fields["Username"] = username
     for option, claim, header in (
         ("displayName", "name", "Name"),
         ("email", "email", "Email"),
@@ -583,6 +606,7 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
             identity,
             claims,
             groups,
+            admitted_group_names(data, policy, groups),
             policy["spec"]["identityAttributes"],
         )
         if tracing.propagation_traceparent():
