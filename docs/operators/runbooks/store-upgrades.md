@@ -61,6 +61,17 @@ requires rebuilding a projection or restoring a database, follow its tested
 procedure. Do not silently run extension migrations from the lifecycle
 controller.
 
+For the PLAN-040 image, install TimescaleDB before pg_duckdb. The reverse order
+collides on `time_bucket`; the resource provisioner enforces the tested order.
+Restore a TimescaleDB database into an image containing the pinned extension
+versions, call `timescaledb_pre_restore()` before `pg_restore`, and call
+`timescaledb_post_restore()` after it. Verify application values, pgmq queue
+state, spatial queries, DuckDB queries, AGE projections and grants before
+opening access. The local old → new → old image rehearsal covers an unchanged
+PostgreSQL 18 database with existing pgvector data. Once a new extension writes
+data, the previous image cannot serve it and a simple image switch is not a
+valid rollback. Use the verified backup and an image with the required binaries.
+
 Verify PostgreSQL/API readiness, each resource's selected extensions, scoped
 reader/writer schema and data queries, graph/vector queries, and a bound
 application's reconnection or controlled restart. Exercise both private and

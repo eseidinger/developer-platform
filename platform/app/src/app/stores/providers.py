@@ -57,6 +57,20 @@ def capabilities(name):
         "supported_modes": ["read-write"] if full else ["read-only", "read-write"],
         "native_account_management": full,
         "dedicated_instance": full,
+        **(
+            {
+                "extensions": [
+                    "vector",
+                    "age",
+                    "timescaledb",
+                    "postgis",
+                    "pgmq",
+                    "pg_duckdb",
+                ]
+            }
+            if name == "postgresql"
+            else {}
+        ),
         **({"max_resources_per_project": 1} if full else {}),
     }
 

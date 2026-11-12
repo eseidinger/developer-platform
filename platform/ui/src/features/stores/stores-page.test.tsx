@@ -132,6 +132,33 @@ test('creating a resource does not implicitly bind an application', async () => 
   expect(api.requestBinding).not.toHaveBeenCalled()
   expect(api.createHuman).not.toHaveBeenCalled()
 })
+test('creation sends the selected PostgreSQL extension set', async () => {
+  vi.mocked(api.getContext).mockResolvedValue({
+    manage: true,
+    platform_admin: false,
+    providers: [{ id: 'postgresql', enabled: true }],
+  })
+  vi.mocked(api.createResource).mockResolvedValue(resource)
+  const { user } = setup()
+  await user.type(await screen.findByLabelText('Resource name'), 'analytics')
+  for (const label of [
+    'TimescaleDB (time series)',
+    'PostGIS (spatial)',
+    'pgmq (queues)',
+    'pg_duckdb (analytics)',
+  ]) {
+    await user.click(screen.getByRole('checkbox', { name: label }))
+  }
+  await user.click(screen.getByRole('button', { name: 'Create resource' }))
+  await waitFor(() =>
+    expect(api.createResource).toHaveBeenCalledWith('alpha', {
+      name: 'analytics',
+      provider: 'postgresql',
+      quota_bytes: 1073741824,
+      extensions: ['timescaledb', 'postgis', 'pgmq', 'pg_duckdb'],
+    }),
+  )
+})
 test('creation shows only PostgreSQL and S3 even with stale provider capabilities', async () => {
   vi.mocked(api.getContext).mockResolvedValue({
     manage: true,

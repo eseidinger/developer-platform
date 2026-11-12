@@ -1,12 +1,14 @@
 import importlib.util
 import io
 import json
+import sys
 import tarfile
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 spec = importlib.util.spec_from_file_location(
     "restore", Path(__file__).parents[1] / "scripts/restore-recovery.py"
 )
@@ -15,6 +17,66 @@ spec.loader.exec_module(restore)
 
 
 class RestoreRecoveryTests(unittest.TestCase):
+    def test_preloaded_postgres_is_inspected_and_not_rebuilt(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = {
+                "services": {
+                    "postgres": {"image": "developer-platform-postgres:18.6-old"}
+                }
+            }
+            with (
+                patch.object(restore, "ROOT", root),
+                patch.object(
+                    restore, "run", side_effect=[json.dumps(source).encode(), b""]
+                ) as run,
+            ):
+                restore.configure_compose(True)
+            self.assertEqual(
+                run.call_args_list[1].args[0],
+                ["docker", "image", "inspect", "developer-platform-postgres:18.6-old"],
+            )
+            override = (root / "compose.override.yaml").read_text()
+            self.assertIn("postgres:\n    build: !reset null", override)
+            self.assertIn('GF_SMTP_ENABLED: "false"', override)
+
+    def test_preloaded_candidate_image_replaces_source_image(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = {
+                "services": {
+                    "postgres": {"image": "developer-platform-postgres:18.6-old"}
+                }
+            }
+            with (
+                patch.object(restore, "ROOT", root),
+                patch.object(
+                    restore, "run", side_effect=[json.dumps(source).encode(), b""]
+                ) as run,
+            ):
+                restore.configure_compose(
+                    True, "developer-platform-postgres:18.6-extensions-20261112"
+                )
+            self.assertEqual(
+                run.call_args_list[1].args[0],
+                [
+                    "docker",
+                    "image",
+                    "inspect",
+                    "developer-platform-postgres:18.6-extensions-20261112",
+                ],
+            )
+            self.assertIn(
+                "image: developer-platform-postgres:18.6-extensions-20261112",
+                (root / "compose.override.yaml").read_text(),
+            )
+
+    def test_candidate_image_requires_explicit_preload(self):
+        with self.assertRaisesRegex(RuntimeError, "preloaded image"):
+            restore.configure_compose(
+                False, "developer-platform-postgres:18.6-extensions-20261112"
+            )
+
     def test_retained_s3_archive_required_and_legacy_live_data_needs_pinned_release(
         self,
     ):
@@ -87,7 +149,7 @@ class RestoreRecoveryTests(unittest.TestCase):
         ) as run:
             self.assertEqual(restore.latest_store_intents(), intent)
         self.assertEqual(
-            run.call_args_list[1].args[0][-2:], ["b" * 64, "/safe/bundle/manifest.json"]
+            run.call_args_list[1].args[0][-2:], ["b" * 64, "/bundle/manifest.json"]
         )
         with (
             patch.object(
@@ -107,6 +169,11 @@ class RestoreRecoveryTests(unittest.TestCase):
         restore.check_import_errors(
             'ERROR:  role "postgres" already exists\nERROR:  database "platform" already exists\n'
         )
+        warning = (
+            "WARNING:  time_bucket function already exists, use duckdb.time_bucket "
+            "instead. This is usually because the timescale extension is installed."
+        )
+        restore.check_import_errors(warning + "\n" + warning + "\n")
         restore.check_import_errors("")
         for message in [
             "ERROR: permission denied",
@@ -164,3 +231,57 @@ class RestoreRecoveryTests(unittest.TestCase):
             with self.assertRaises(tarfile.FilterError):
                 restore.extract(archive, target)
             self.assertFalse((root / "outside").exists())
+
+    def test_legacy_virtualenv_symlink_is_skipped_but_sources_restore(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            archive = root / "legacy.tar.gz"
+            with tarfile.open(archive, "w:gz") as output:
+                source_dir = tarfile.TarInfo("platform/app/src/app")
+                source_dir.type = tarfile.DIRTYPE
+                source_dir.mode = 0o755
+                output.addfile(source_dir)
+
+                secret_dir = tarfile.TarInfo(".runtime/stores")
+                secret_dir.type = tarfile.DIRTYPE
+                secret_dir.mode = 0o700
+                output.addfile(secret_dir)
+
+                interpreter = tarfile.TarInfo("platform/.venv/bin/python")
+                interpreter.type = tarfile.SYMTYPE
+                interpreter.linkname = "/usr/bin/python3"
+                output.addfile(interpreter)
+
+                content = b"services: {}\n"
+                compose = tarfile.TarInfo("infrastructure/proxy/compose.yaml")
+                compose.size = len(content)
+                output.addfile(compose, io.BytesIO(content))
+
+            target = root / "restored"
+            target.mkdir()
+            restore.extract(archive, target)
+            self.assertFalse((target / "platform/.venv").exists())
+            self.assertEqual(
+                (target / "platform/app/src/app").stat().st_mode & 0o777, 0o755
+            )
+            self.assertEqual((target / ".runtime/stores").stat().st_mode & 0o777, 0o700)
+            self.assertEqual(
+                (target / "infrastructure/proxy/compose.yaml").read_bytes(), content
+            )
+
+    def test_legacy_bundle_requires_matching_staged_environment_defaults(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            target = root / "platform"
+            target.mkdir()
+            bundle = root / "recovery" / "bundle"
+            bundle.mkdir(parents=True)
+            with patch.object(restore, "ROOT", target):
+                with self.assertRaisesRegex(RuntimeError, "matching .env.example"):
+                    restore.ensure_environment_example(bundle)
+
+                (bundle.parent / "env.example").write_text("EXAMPLE=default\n")
+                restore.ensure_environment_example(bundle)
+                self.assertEqual(
+                    (target / ".env.example").read_text(), "EXAMPLE=default\n"
+                )

@@ -158,6 +158,34 @@ class StoreApiTests(TestCase):
         create.assert_not_called()
         selected.assert_not_called()
 
+    def test_invalid_extension_selection_is_rejected_before_provider_access(self):
+        with (
+            patch.object(catalog, "create_resource") as create,
+            patch.object(api.providers, "get") as selected,
+            patch.object(
+                self.control,
+                "connect",
+                side_effect=AssertionError("Unexpected catalog access"),
+            ),
+        ):
+            for provider, extensions in (
+                ("postgresql", ["postgis", "postgis"]),
+                ("postgresql", ["unreviewed"]),
+                ("s3", ["pgmq"]),
+            ):
+                with self.subTest(provider=provider, extensions=extensions):
+                    response = self.client.post(
+                        "/v1/projects/alpha/resources",
+                        json={
+                            "name": "invalid",
+                            "provider": provider,
+                            "extensions": extensions,
+                        },
+                    )
+                    self.assertEqual(response.status_code, 422)
+        create.assert_not_called()
+        selected.assert_not_called()
+
     def test_catalog_rejects_direct_legacy_create_before_query(self):
         from app.stores.contract import StoredResourceConfiguration
 

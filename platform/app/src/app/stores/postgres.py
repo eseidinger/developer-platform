@@ -7,6 +7,8 @@ from psycopg import sql
 
 from . import catalog
 
+EXTENSION_ORDER = ("vector", "age", "timescaledb", "postgis", "pgmq", "pg_duckdb")
+
 
 class Postgres:
     quota_enforcement = "advisory: PostgreSQL has no hard per-database byte quota"
@@ -32,6 +34,8 @@ class Postgres:
         return str(ipaddress.ip_address(os.environ["POSTGRES_IP"])), 5432
 
     def provision(self, resource):
+        if not set(resource["extensions"]).issubset(EXTENSION_ORDER):
+            raise ValueError("Unapproved PostgreSQL extension")
         name = catalog.identifier(resource["resource_id"])
         owner, reader = name + "_owner", name + "_reader"
         with self.connection("postgres") as conn:
@@ -44,6 +48,19 @@ class Postgres:
                             "CREATE ROLE {} NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS"
                         ).format(sql.Identifier(role))
                     )
+            if "pg_duckdb" in resource["extensions"]:
+                # pg_duckdb gates execution on one cluster role. Membership is
+                # limited to writers of databases that selected the extension.
+                conn.execute("""DO $$ BEGIN
+                    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname='platform_duckdb_user') THEN
+                        CREATE ROLE platform_duckdb_user NOLOGIN NOSUPERUSER NOCREATEDB NOCREATEROLE;
+                    END IF;
+                END $$""")
+                conn.execute(
+                    sql.SQL(
+                        "GRANT platform_duckdb_user TO {} WITH ADMIN FALSE, INHERIT TRUE, SET FALSE"
+                    ).format(sql.Identifier(owner))
+                )
             if not conn.execute(
                 "SELECT 1 FROM pg_database WHERE datname=%s", (name,)
             ).fetchone():
@@ -144,10 +161,10 @@ class Postgres:
                     "ALTER DEFAULT PRIVILEGES FOR ROLE {} GRANT USAGE ON SCHEMAS TO {}"
                 ).format(sql.Identifier(owner), sql.Identifier(reader))
             )
-            for extension in resource["extensions"]:
-                if extension not in {"vector", "age"}:
-                    raise ValueError("Unapproved PostgreSQL extension")
-                if extension == "vector":
+            # pg_duckdb defines time_bucket in public; TimescaleDB must be
+            # installed first even if the client sent the names in reverse.
+            for extension in sorted(resource["extensions"], key=EXTENSION_ORDER.index):
+                if extension in {"vector", "postgis"}:
                     conn.execute(
                         "CREATE SCHEMA IF NOT EXISTS platform_extensions AUTHORIZATION postgres"
                     )
@@ -160,12 +177,43 @@ class Postgres:
                         ).format(sql.Identifier(owner), sql.Identifier(reader))
                     )
                     conn.execute(
-                        "CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA platform_extensions"
+                        sql.SQL(
+                            "CREATE EXTENSION IF NOT EXISTS {} WITH SCHEMA platform_extensions"
+                        ).format(sql.Identifier(extension))
                     )
                 else:
                     conn.execute(
                         sql.SQL("CREATE EXTENSION IF NOT EXISTS {}").format(
                             sql.Identifier(extension)
+                        )
+                    )
+                if extension == "pgmq":
+                    # Queue creation uses invoker rights and writes pgmq.meta.
+                    conn.execute(
+                        sql.SQL("GRANT USAGE,CREATE ON SCHEMA pgmq TO {}").format(
+                            sql.Identifier(owner)
+                        )
+                    )
+                    conn.execute(
+                        sql.SQL("GRANT ALL ON ALL TABLES IN SCHEMA pgmq TO {}").format(
+                            sql.Identifier(owner)
+                        )
+                    )
+                    conn.execute(
+                        sql.SQL(
+                            "GRANT ALL ON ALL SEQUENCES IN SCHEMA pgmq TO {}"
+                        ).format(sql.Identifier(owner))
+                    )
+                if extension == "pg_duckdb":
+                    # The upstream SQL grants raw_query to PUBLIC. Keep its
+                    # administration entry points unavailable to project roles.
+                    conn.execute(
+                        "REVOKE ALL ON FUNCTION duckdb.raw_query(text) FROM PUBLIC"
+                    )
+                    conn.execute("REVOKE ALL ON SCHEMA duckdb FROM PUBLIC")
+                    conn.execute(
+                        sql.SQL("GRANT USAGE ON SCHEMA duckdb TO {}").format(
+                            sql.Identifier(owner)
                         )
                     )
             if "age" in resource["extensions"]:

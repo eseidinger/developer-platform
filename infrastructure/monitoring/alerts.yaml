@@ -282,6 +282,18 @@ groups:
             Retained values may be stale. Inspect private collector
             configuration, permissions and provider readiness.
 
+      - alert: PostgreSQLExtensionMissing
+        expr: platform_native_postgresql_extension_installed == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: >-
+            Selected PostgreSQL extension {{ $labels.extension }} is missing
+          description: >-
+            Inspect the named resource and installed image before reopening
+            application access or recovery quarantine.
+
       - alert: RustFSTelemetryUnavailable
         expr: >-
           (platform_native_selected{provider="s3"} == 1) unless on(provider)

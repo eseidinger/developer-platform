@@ -40,7 +40,9 @@ def validate_manifest(value):
         state: Literal["active", "retired", "purging", "purged"]
         version: int = Field(ge=1)
         quota_bytes: int = Field(gt=0)
-        extensions: list[Literal["vector", "age"]]
+        extensions: list[
+            Literal["vector", "age", "timescaledb", "postgis", "pgmq", "pg_duckdb"]
+        ]
         configuration: dict = Field(default_factory=dict)
 
     class Manifest(BaseModel):

@@ -27,7 +27,14 @@ class BackupError(Exception):
 
 def configuration_sources(root):
     """Capture either checkout layout without requiring obsolete root folders."""
-    sources = ["compose.yaml", ".env", "scripts", "platform", "infrastructure"]
+    sources = [
+        "compose.yaml",
+        ".env",
+        ".env.example",
+        "scripts",
+        "platform",
+        "infrastructure",
+    ]
     for component in ("identity", "persistence"):
         # infrastructure/ already captures these services in current checkouts.
         if not (root / "infrastructure" / component).is_dir():
@@ -35,6 +42,14 @@ def configuration_sources(root):
     if any(not (root / name).exists() for name in sources):
         raise BackupError("required source missing")
     return sources
+
+
+def source_archive_filter(item):
+    """Skip rebuildable Python environments that cannot be safely restored."""
+    parts = Path(item.name).parts
+    if ".venv" in parts or "__pycache__" in parts:
+        return None
+    return item
 
 
 def atomic_json(path, data):
@@ -504,15 +519,16 @@ END $$;
         self.stage = "project secret capture"
         self.project_secrets(bundle)
         self.stage = "configuration capture"
+        # Installed Python environments contain absolute interpreter symlinks.
+        # They are rebuildable and cannot pass the safe recovery extraction
+        # filter, so omit them from future source bundles.
         with tarfile.open(bundle / "platform-files.tar.gz", "w:gz") as archive:
             for name in configuration_sources(self.root):
                 source = self.root / name
                 archive.add(
                     source,
                     arcname=name,
-                    filter=lambda item: (
-                        None if "__pycache__" in Path(item.name).parts else item
-                    ),
+                    filter=source_archive_filter,
                 )
             # Older deployed checkouts retain the manual helper in scripts/.
             backup_scripts = self.root / "operations/backup/scripts"
@@ -520,9 +536,7 @@ END $$;
                 archive.add(
                     backup_scripts,
                     arcname="operations/backup/scripts",
-                    filter=lambda item: (
-                        None if "__pycache__" in Path(item.name).parts else item
-                    ),
+                    filter=source_archive_filter,
                 )
             store_configuration = self.root / ".runtime/stores"
             if store_configuration.exists():

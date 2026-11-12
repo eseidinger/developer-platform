@@ -15,10 +15,14 @@
       private: true
   vars:
     recovery_work: /root/platform-recovery
-    backup_restic_repository: s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform
+    backup_restic_repository: >-
+      s3:https://hel1.your-objectstorage.com/eseidinger/developer-platform
     backup_s3_region: hel1
-    recovery_projects: [smoke]
     recovery_kubectl_version: v1.36.4
+    recovery_kubectl_archive_path: >-
+      {{ recovery_kubectl_version }}/bin/linux/amd64/kubectl
+    recovery_kubectl_checksum_url: >-
+      https://dl.k8s.io/release/{{ recovery_kubectl_archive_path }}.sha256
   pre_tasks:
     - name: Require an explicitly isolated local Ubuntu VM and snapshot
       ansible.builtin.assert:
@@ -31,14 +35,38 @@
           - ansible_facts['distribution_version'] is version('24.04', '>=')
           - ansible_facts['architecture'] == 'x86_64'
           - recovery_snapshot | default('') is match('^[a-f0-9]{8,64}$')
-          - recovery_projects | length > 0
-          - recovery_marker_file | default('') | length == 0 or recovery_projects | length == 1
+          - >-
+            (recovery_projects | length > 0) !=
+            (recovery_named_store_project | default('') | length > 0)
+          - >-
+            recovery_marker_file | default('') | length == 0 or
+            recovery_projects | length == 1 or
+            recovery_named_store_project | default('') | length > 0
           - recovery_kubectl_version is match('^v1\.(35|36|37)\.[0-9]+$')
-        fail_msg: Use the disposable platform-recovery VM at 127.0.0.1:2222 and an explicit snapshot ID. Check mode is unsupported; use syntax-check.
+          - >-
+            recovery_postgres_image_override | default('') | length == 0 or
+            recovery_postgres_image_archive | default('') | length > 0
+          - >-
+            recovery_postgres_image_override | default('') | length == 0 or
+            recovery_postgres_image_override is
+            match('^developer-platform-postgres:[A-Za-z0-9._-]+$')
+        fail_msg: >-
+          Use the disposable platform-recovery VM at 127.0.0.1:2222 and an
+          explicit snapshot ID. Check mode is unsupported; use syntax-check.
     - name: Validate selected projects
       ansible.builtin.assert:
         that: item is match('^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$')
       loop: "{{ recovery_projects }}"
+    - name: Validate optional named PostgreSQL recovery selection
+      ansible.builtin.assert:
+        that:
+          - >-
+            recovery_named_store_project is
+            match('^[a-z]([a-z0-9-]{0,30}[a-z0-9])?$')
+          - >-
+            recovery_named_store_resource_id | default('') is
+            match('^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$')
+      when: recovery_named_store_project | default('') | length > 0
     - name: Inspect recovery destination and production sender units
       ansible.builtin.stat:
         path: "{{ item }}"
@@ -51,14 +79,18 @@
     - name: Refuse previous installation or recovery attempt
       ansible.builtin.assert:
         that: not item.stat.exists
-        fail_msg: Use a fresh VM. This playbook never overwrites an existing installation or resumes a partial restore.
+        fail_msg: >-
+          Use a fresh VM. This playbook never overwrites an existing
+          installation or resumes a partial restore.
       loop: "{{ recovery_paths.results }}"
       loop_control:
         label: "{{ item.item }}"
     - name: Validate repository settings and credentials privately
       ansible.builtin.assert:
         that:
-          - backup_restic_repository is match('^s3:https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._-]+/[A-Za-z0-9/_-]+$')
+          - >-
+            backup_restic_repository is
+            match('^s3:https://[A-Za-z0-9.-]+(:[0-9]+)?/[A-Za-z0-9._-]+/[A-Za-z0-9/_-]+$')
           - backup_s3_region is match('^[A-Za-z0-9-]+$')
           - backup_s3_access_key | length > 0
           - backup_s3_secret_key | length > 0
@@ -75,11 +107,12 @@
     - name: Require empty Docker daemon
       ansible.builtin.assert:
         that: recovery_existing_docker.stdout | trim | length == 0
-        fail_msg: Docker contains existing containers or volumes; use a fresh VM.
+        fail_msg: >-
+          Docker contains existing containers or volumes; use a fresh VM.
   tasks:
     - name: Install recovery prerequisites
       ansible.builtin.apt:
-        name: [ca-certificates, python3, restic]
+        name: [acl, ca-certificates, python3, restic]
         update_cache: true
         state: present
     - name: Create private recovery configuration and staging directories
@@ -110,7 +143,15 @@
         mode: '0700'
     - name: Resolve explicitly selected verified source snapshot
       ansible.builtin.command:
-        argv: [/usr/local/sbin/platform-restic, snapshots, --json, --host, node-01, --tag, 'developer-platform,verified', '{{ recovery_snapshot }}']
+        argv:
+          - /usr/local/sbin/platform-restic
+          - snapshots
+          - --json
+          - --host
+          - node-01
+          - --tag
+          - developer-platform,verified
+          - "{{ recovery_snapshot }}"
       register: recovery_snapshots
       changed_when: false
       no_log: true
@@ -123,11 +164,17 @@
         dest: "{{ recovery_work }}/snapshot.json"
         mode: '0600'
       no_log: true
-    - name: Retrieve recovery bundle without repository initialization or retention
+    - name: Retrieve verified recovery bundle
       ansible.builtin.command:
-        argv: [/usr/local/sbin/platform-restic, restore, '{{ (recovery_snapshots.stdout | from_json)[0].id }}', --target, '{{ recovery_work }}']
+        argv:
+          - /usr/local/sbin/platform-restic
+          - restore
+          - "{{ (recovery_snapshots.stdout | from_json)[0].id }}"
+          - --target
+          - "{{ recovery_work }}"
       async: 3600
       poll: 10
+      changed_when: true
       no_log: true
     - name: Locate bundle manifest
       ansible.builtin.find:
@@ -141,6 +188,12 @@
     - name: Set restored bundle path
       ansible.builtin.set_fact:
         recovery_bundle: "{{ recovery_manifests.files[0].path | dirname }}"
+    - name: Stage matching defaults for a legacy recovery bundle
+      ansible.builtin.copy:
+        src: "{{ recovery_env_example }}"
+        dest: "{{ recovery_work }}/env.example"
+        mode: '0600'
+      when: recovery_env_example | default('') | length > 0
     - name: Create Docker key directory
       ansible.builtin.file:
         path: /etc/apt/keyrings
@@ -164,7 +217,12 @@
           Signed-By: /etc/apt/keyrings/docker.asc
     - name: Install Docker and Compose
       ansible.builtin.apt:
-        name: [docker-ce, docker-ce-cli, containerd.io, docker-buildx-plugin, docker-compose-plugin]
+        name:
+          - docker-ce
+          - docker-ce-cli
+          - containerd.io
+          - docker-buildx-plugin
+          - docker-compose-plugin
         update_cache: true
         state: present
     - name: Start Docker
@@ -172,10 +230,31 @@
         name: docker
         enabled: true
         state: started
+    - name: Stage optional pinned source PostgreSQL image
+      ansible.builtin.copy:
+        src: "{{ recovery_postgres_image_archive }}"
+        dest: "{{ recovery_work }}/postgres-source-image.tar"
+        mode: '0600'
+      when: recovery_postgres_image_archive | default('') | length > 0
+    - name: Load optional pinned source PostgreSQL image
+      ansible.builtin.command:
+        argv:
+          - docker
+          - load
+          - --input
+          - "{{ recovery_work }}/postgres-source-image.tar"
+      when: recovery_postgres_image_archive | default('') | length > 0
+      changed_when: true
+      no_log: true
+    - name: Remove staged PostgreSQL image archive
+      ansible.builtin.file:
+        path: "{{ recovery_work }}/postgres-source-image.tar"
+        state: absent
+      when: recovery_postgres_image_archive | default('') | length > 0
     - name: Install checksum-verified kubectl
       ansible.builtin.get_url:
-        url: "https://dl.k8s.io/release/{{ recovery_kubectl_version }}/bin/linux/amd64/kubectl"
-        checksum: "sha256:https://dl.k8s.io/release/{{ recovery_kubectl_version }}/bin/linux/amd64/kubectl.sha256"
+        url: "https://dl.k8s.io/release/{{ recovery_kubectl_archive_path }}"
+        checksum: "sha256:{{ recovery_kubectl_checksum_url }}"
         dest: /usr/local/bin/kubectl
         mode: '0755'
     - name: Install recovery helpers
@@ -183,15 +262,31 @@
         src: "../scripts/{{ item }}"
         dest: "{{ recovery_work }}/{{ item }}"
         mode: '0700'
-      loop: [restore-recovery.py, test-recovery.py]
+      loop: [recovery_auth.py, restore-recovery.py, test-recovery.py]
     - name: Build explicit project arguments
       ansible.builtin.set_fact:
-        recovery_project_args: "{{ recovery_projects | map('regex_replace', '^', '--project=') | list }}"
+        recovery_project_args: >-
+          {{ recovery_projects
+             | map('regex_replace', '^', '--project=')
+             | list }}
+        recovery_report_destination: >-
+          {{ playbook_dir ~ '/../../../.runtime/recovery-evidence/'
+             ~ inventory_hostname ~ '/'
+             ~ ansible_facts['date_time']['iso8601_basic_short'] ~ '/' }}
     - name: Restore SQL, service volumes, cluster and selected projects
       ansible.builtin.command:
-        argv: "{{ ['python3', recovery_work ~ '/restore-recovery.py', '--bundle', recovery_bundle] + recovery_project_args }}"
-      async: 3600
+        argv: >-
+          {{ ['python3', recovery_work ~ '/restore-recovery.py',
+              '--bundle', recovery_bundle] + recovery_project_args }}
+      environment:
+        RECOVERY_POSTGRES_IMAGE_PRELOADED: >-
+          {{ 'true' if recovery_postgres_image_archive | default('')
+             | length > 0 else 'false' }}
+        RECOVERY_POSTGRES_IMAGE_OVERRIDE: >-
+          {{ recovery_postgres_image_override | default('') }}
+      async: 7200
       poll: 10
+      changed_when: true
       no_log: true
     - name: Copy optional independent marker receipt
       ansible.builtin.copy:
@@ -202,7 +297,13 @@
       no_log: true
     - name: Run acceptance checks for each selected project
       ansible.builtin.command:
-        argv: "{{ ['python3', recovery_work ~ '/test-recovery.py', 'check', '--bundle', recovery_bundle, '--project', item, '--report', recovery_work ~ '/checks-' ~ item ~ '.json'] + (['--marker', recovery_work ~ '/marker.json'] if recovery_marker_file | default('') | length > 0 else []) }}"
+        argv: >-
+          {{ ['python3', recovery_work ~ '/test-recovery.py',
+              'check', '--bundle', recovery_bundle,
+              '--project', item,
+              '--report', recovery_work ~ '/checks-' ~ item ~ '.json']
+              + (['--marker', recovery_work ~ '/marker.json']
+              if recovery_marker_file | default('') | length > 0 else []) }}
       loop: "{{ recovery_projects }}"
       register: recovery_checks
       failed_when: false
@@ -210,13 +311,41 @@
     - name: Fetch private acceptance reports to controller
       ansible.builtin.fetch:
         src: "{{ recovery_work }}/checks-{{ item }}.json"
-        dest: "{{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/{{ ansible_facts['date_time']['iso8601_basic_short'] }}/"
+        dest: "{{ recovery_report_destination }}"
         flat: true
       loop: "{{ recovery_projects }}"
+    - name: Check restored named PostgreSQL catalog and SQL
+      ansible.builtin.command:
+        argv: >-
+          {{ ['python3', recovery_work ~ '/test-recovery.py',
+              'check-named-store', '--bundle', recovery_bundle,
+              '--project', recovery_named_store_project,
+              '--resource-id', recovery_named_store_resource_id,
+              '--report', recovery_work ~ '/checks-named-postgres.json']
+              + (['--marker', recovery_work ~ '/marker.json']
+              if recovery_marker_file | default('') | length > 0 else []) }}
+      register: recovery_named_check
+      failed_when: false
+      changed_when: false
+      when: recovery_named_store_project | default('') | length > 0
+    - name: Fetch private named PostgreSQL report to controller
+      ansible.builtin.fetch:
+        src: "{{ recovery_work }}/checks-named-postgres.json"
+        dest: "{{ recovery_report_destination }}"
+        flat: true
+      when: recovery_named_store_project | default('') | length > 0
+    - name: Require named PostgreSQL acceptance to pass
+      ansible.builtin.assert:
+        that: recovery_named_check.rc == 0
+        fail_msg: >-
+          Named PostgreSQL recovery failed; inspect the fetched report.
+      when: recovery_named_store_project | default('') | length > 0
     - name: Require all acceptance suites to pass
       ansible.builtin.assert:
         that: item.rc == 0
-        fail_msg: Recovery check failed; inspect the fetched report. Do not rerun restoration over this VM.
+        fail_msg: >-
+          Recovery check failed; inspect the fetched report. Do not rerun
+          restoration over this VM.
       loop: "{{ recovery_checks.results }}"
       loop_control:
         label: "{{ item.item }}"

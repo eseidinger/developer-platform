@@ -2374,7 +2374,7 @@ export interface components {
          */
         ResourceCreate: {
             /** Extensions */
-            extensions?: ("vector" | "age")[];
+            extensions?: ("vector" | "age" | "timescaledb" | "postgis" | "pgmq" | "pg_duckdb")[];
             /** Name */
             name: string;
             /**

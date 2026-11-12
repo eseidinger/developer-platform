@@ -969,11 +969,22 @@ cp operations/backup/ansible/inventory.recovery.example.yml \
 
 Edit the copied inventory: set `recovery_snapshot` to an explicit verified
 snapshot ID (for example, the full ID corresponding to `c03a2bcc` in the first
-drill), and select `recovery_projects`. The default is `[smoke]`. Review stored
+drill), and select `recovery_projects`. The example selects `[smoke]`; replace
+it with a project present in the chosen snapshot. Review stored
 project images before selecting them: starting applications can cause external
 side effects. An optional `recovery_marker_file` is a controller-side path to
 the independently saved receipt; when using it, select only the matching
 project.
+
+When every retained application has a store binding, select a named PostgreSQL
+resource instead: set `recovery_projects: []`,
+`recovery_named_store_project: <owner>`, and
+`recovery_named_store_resource_id: <canonical UUID>`. The helper then restores
+the catalog and data without automatically reapplying a bound application.
+Supply `recovery_marker_file` for that exact resource to prove pre-backup data
+survived. The named-store check verifies catalog ownership, SQL readback, and
+that all recovered grants and credentials were revoked. It does not establish
+application reconnection; that needs fresh owner approval and a separate test.
 
 Run from **WSL**:
 
@@ -982,6 +993,32 @@ ansible-playbook \
   -i operations/backup/ansible/inventory.recovery.yml \
   operations/backup/ansible/restore-recovery.yml
 ```
+
+If the matching source PostgreSQL image was already reviewed and exported to a
+private controller file, pass its absolute path as
+`-e recovery_postgres_image_archive=/absolute/path/to/image.tar`. The playbook
+loads it after installing Docker and removes the staged VM copy before the
+restore. Later Compose steps reuse this image without rebuilding it. Verify
+the image ID against the source installation and inspect the image for embedded
+credentials before transfer. Without this option, Compose builds the
+PostgreSQL image from the restored source files.
+
+For a reviewed extension upgrade rehearsal, load the candidate image archive
+and also set `recovery_postgres_image_override` to its exact local image tag,
+for example `developer-platform-postgres:18.6-extensions-20261112`. The
+restore still uses the source backup's platform code and data, but starts
+PostgreSQL from that candidate image. Verify the loaded image ID and the SQL
+report before treating this as compatibility evidence. Use another fresh VM
+for each image; the playbook never overwrites a previous restore.
+
+Verified bundles created before the backup source list included `.env.example`
+need that exact non-secret file staged separately. Supply
+`-e recovery_env_example=/absolute/path/to/matching/.env.example` after
+comparing it with the source checkout used for the selected snapshot. New
+bundles contain the file themselves. The recovery VM sets platform, application,
+and identity domains to `*.localhost` and binds the edge to loopback. It
+disables production capacity admission in the smaller disposable guest;
+deployed capacity must be checked separately against the host reserve.
 
 Enter S3 credentials and the **existing** repository password at the private
 prompts. There is no repository initialization, prune, or backup scheduling
@@ -999,11 +1036,26 @@ domains; Grafana alerting/SMTP and Alertmanager delivery are disabled. Host
 service/config archives are preserved in the bundle but not installed, so
 production heartbeat and backup timers stay absent. PostgreSQL and workload
 image versions come from the restored files/specs.
+Project checks skip the legacy database pod when the selected project has no
+implicit `database` Secret. Use the named-store check for PostgreSQL data on
+the current platform. Application metric targets from projects deliberately
+withheld after grant revocation are reported as an acceptance limit; other
+scrape targets must be healthy.
+
+Once the isolated API is ready, the restore helper uses the documented local
+test-runner bootstrap command through trusted Docker access. It stores a
+one-day recovery credential in the VM's private `.runtime/recovery/` directory
+and renews short-lived access tokens through the VM's private identity address
+for project reapply and acceptance. No token or client secret appears in
+Ansible output. This credential and its administrator grant exist only in the
+disposable recovery VM; remove the VM after collecting evidence.
 
 SQL import keeps private stdout/stderr under
 `/opt/developer-platform/.runtime/recovery/`. Only the known bootstrap duplicate
-errors for role `postgres` and database `platform` are accepted; any other
-nonempty diagnostic or repeated duplicate stops restoration. Service volumes may
+errors for role `postgres` and databases `platform`/`postgres`, plus the exact
+pg_duckdb warning when TimescaleDB already owns `time_bucket`, are accepted;
+any other diagnostic or repeated bootstrap duplicate stops restoration. Service
+volumes may
 contain image-created directories but must contain no files/links before
 restore. The entire process is bounded by Ansible asynchronous task timeouts.
 

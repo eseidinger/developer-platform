@@ -2,6 +2,7 @@ import importlib.util
 import json
 import os
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from contextlib import contextmanager
@@ -29,6 +30,28 @@ class BackupTests(unittest.TestCase):
                 "watchdog_token": "test-only",
             }
         )
+
+    def test_source_archive_omits_rebuildable_python_environment(self):
+        for name in (
+            "platform/.venv",
+            "platform/app/.venv/bin/python",
+            "scripts/__pycache__/helper.pyc",
+        ):
+            self.assertIsNone(backup.source_archive_filter(tarfile.TarInfo(name)))
+        source = tarfile.TarInfo("infrastructure/proxy/compose.yaml")
+        self.assertIs(backup.source_archive_filter(source), source)
+
+    def test_source_bundle_contains_configuration_defaults(self):
+        for name in (
+            "scripts",
+            "platform",
+            "infrastructure/identity",
+            "infrastructure/persistence",
+        ):
+            (self.root / name).mkdir(parents=True)
+        for name in ("compose.yaml", ".env", ".env.example"):
+            (self.root / name).touch()
+        self.assertIn(".env.example", backup.configuration_sources(self.root))
 
     def test_failed_upload_keeps_previous_success_and_skips_retention(self):
         backup.atomic_json(

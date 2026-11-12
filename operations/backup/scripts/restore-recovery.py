@@ -14,6 +14,8 @@ import time
 import urllib.request
 from pathlib import Path
 
+from recovery_auth import access_token as recovery_access_token
+
 ROOT = Path("/opt/developer-platform")
 
 
@@ -29,8 +31,34 @@ def run(args, cwd=None, data=None, timeout=300):
 
 
 def extract(archive, target):
+    def safe_source(member, destination):
+        # Older verified bundles may contain a rebuildable virtualenv with an
+        # absolute Python symlink. Skip only that directory, then keep the
+        # standard data filter for every retained source entry.
+        if ".venv" in Path(member.name).parts:
+            return None
+        safe = tarfile.data_filter(member, destination)
+        if safe is not None and safe.isdir():
+            # Python's data filter clears directory modes. With the private
+            # recovery umask, that would turn public application package
+            # directories into root-only paths in Docker build contexts.
+            # Restore only the archive's read/execute bits; never grant write.
+            safe.mode = member.mode & 0o755
+        return safe
+
     with tarfile.open(archive) as stream:
-        stream.extractall(target, filter="data")
+        stream.extractall(target, filter=safe_source)
+
+
+def ensure_environment_example(bundle):
+    """Fill the non-secret defaults file omitted by older verified bundles."""
+    example = ROOT / ".env.example"
+    if example.is_file():
+        return
+    staged_example = bundle.parent / "env.example"
+    if not staged_example.is_file():
+        raise RuntimeError("Legacy bundle requires matching .env.example")
+    shutil.copy2(staged_example, example)
 
 
 def verify(bundle):
@@ -98,13 +126,24 @@ def restore_project_secrets(bundle, name):
 
 
 def check_import_errors(stderr):
-    # pg_dumpall meets the two objects created by the postgres image bootstrap.
-    allowed = {
+    # pg_dumpall meets roles and databases already created by the image bootstrap.
+    allowed_once = {
         'ERROR:  role "postgres" already exists',
         'ERROR:  database "platform" already exists',
+        'ERROR:  database "postgres" already exists',
+    }
+    # pg_duckdb emits this once for each restored database that already has
+    # TimescaleDB's time_bucket; the fixed install order preserves TimescaleDB.
+    allowed_repeated = {
+        (
+            "WARNING:  time_bucket function already exists, use duckdb.time_bucket "
+            "instead. This is usually because the timescale extension is installed."
+        )
     }
     lines = [line.strip() for line in stderr.splitlines() if line.strip()]
-    if any(line not in allowed for line in lines) or len(lines) != len(set(lines)):
+    if any(line not in allowed_once | allowed_repeated for line in lines) or any(
+        lines.count(line) > 1 for line in allowed_once
+    ):
         raise RuntimeError(
             "Unexpected SQL restore diagnostics; inspect private SQL logs"
         )
@@ -194,7 +233,9 @@ def latest_store_intents(instance="node-01"):
         or len(latest.get("paths", [])) != 1
     ):
         raise RuntimeError("Ambiguous recovery intent snapshot")
-    prefix = latest["paths"][0].rstrip("/")
+    # Restic records the original absolute source path in snapshot metadata,
+    # but stores a directory backup under its basename in the snapshot tree.
+    prefix = "/" + Path(latest["paths"][0]).name
     manifest = json.loads(
         run([restic, "dump", latest["id"], prefix + "/manifest.json"])
     )
@@ -204,6 +245,48 @@ def latest_store_intents(instance="node-01"):
     ):
         raise RuntimeError("Latest verified store intent checksum mismatch")
     return data
+
+
+def configure_compose(preloaded_postgres, postgres_image_override=""):
+    """Disable notifications and reuse an explicitly loaded PostgreSQL image."""
+    if postgres_image_override and not preloaded_postgres:
+        raise RuntimeError("A PostgreSQL image override requires a preloaded image")
+    postgres_override = ""
+    if preloaded_postgres:
+        # A reviewed archive has already been loaded by the playbook. Prevent
+        # later `docker compose up --build` steps from rebuilding that image.
+        source_compose = json.loads(
+            run(
+                [
+                    "docker",
+                    "compose",
+                    "-f",
+                    "compose.yaml",
+                    "config",
+                    "--format",
+                    "json",
+                ],
+                ROOT,
+            )
+        )
+        image = (
+            postgres_image_override or source_compose["services"]["postgres"]["image"]
+        )
+        if not re.fullmatch(r"developer-platform-postgres:[a-zA-Z0-9._-]+", image):
+            raise RuntimeError("Recovery PostgreSQL image has an unexpected name")
+        run(["docker", "image", "inspect", image])
+        postgres_override = "  postgres:\n    build: !reset null\n" + (
+            f"    image: {image}\n" if postgres_image_override else ""
+        )
+    (ROOT / "compose.override.yaml").write_text(
+        "services:\n"
+        + postgres_override
+        + """  grafana:
+    environment:
+      GF_UNIFIED_ALERTING_ENABLED: "false"
+      GF_SMTP_ENABLED: "false"
+"""
+    )
 
 
 def recover(bundle, projects):
@@ -223,6 +306,9 @@ def recover(bundle, projects):
     ROOT.mkdir(mode=0o700, parents=True)
     extract(bundle / "platform-files.tar.gz", ROOT)
     ROOT.chmod(0o700)
+    # The operator must stage a matching version for historical bundles;
+    # future bundles carry the file directly.
+    ensure_environment_example(bundle)
     env = ROOT / ".env"
     values = dict(
         line.split("=", 1)
@@ -233,6 +319,8 @@ def recover(bundle, projects):
         EDGE_BIND_IP="127.0.0.1",
         PLATFORM_DOMAIN="platform.localhost",
         APPS_DOMAIN="apps.localhost",
+        IDENTITY_DOMAIN="identity.localhost",
+        CAPACITY_ADMISSION_ENABLED="false",
         TLS_EMAIL="admin@example.com",
         ALERTMANAGER_CONFIG_DIR=".",
     )
@@ -245,6 +333,10 @@ https://platform.localhost {
  tls internal
  reverse_proxy platform-api:8000
 }
+https://identity.localhost {
+ tls internal
+ reverse_proxy keycloak:8080
+}
 http://*.apps.localhost {
  reverse_proxy k3d-workloads-serverlb:80
 }
@@ -256,12 +348,10 @@ https://*.apps.localhost {
     (ROOT / "infrastructure/monitoring/alertmanager.yaml").write_text(
         "route:\n  receiver: recovery-no-notifications\nreceivers:\n  - name: recovery-no-notifications\n"
     )
-    (ROOT / "compose.override.yaml").write_text("""services:
-  grafana:
-    environment:
-      GF_UNIFIED_ALERTING_ENABLED: "false"
-      GF_SMTP_ENABLED: "false"
-""")
+    configure_compose(
+        os.environ.get("RECOVERY_POSTGRES_IMAGE_PRELOADED") == "true",
+        os.environ.get("RECOVERY_POSTGRES_IMAGE_OVERRIDE", ""),
+    )
     compose = ["docker", "compose"]
     run(compose + ["config", "--quiet"], ROOT)
     run(
@@ -385,7 +475,25 @@ https://*.apps.localhost {
 
             archive.extractall(destination, filter=owned, numeric_owner=True)
     run(["python3", "scripts/setup/install-k3d.py"], ROOT, timeout=300)
-    run(["bash", "scripts/up.sh"], ROOT, timeout=1200)
+    run(["bash", "scripts/setup/prepare-tempo-storage.sh"], ROOT, timeout=120)
+    run(["bash", "scripts/up.sh"], ROOT, timeout=3600)
+    # The database probe runs inside k3d. Make the exact recovered PostgreSQL
+    # image available there instead of allowing an unreviewed registry pull.
+    postgres_image = json.loads(run(compose + ["config", "--format", "json"], ROOT))[
+        "services"
+    ]["postgres"]["image"]
+    run(
+        [
+            str(ROOT / ".runtime/bin/k3d"),
+            "image",
+            "import",
+            postgres_image,
+            "-c",
+            "workloads",
+        ],
+        ROOT,
+        timeout=900,
+    )
     for _ in range(45):
         try:
             with urllib.request.urlopen(
@@ -400,11 +508,21 @@ https://*.apps.localhost {
         time.sleep(2)
     else:
         raise RuntimeError("API readiness timed out")
-    access_token = os.environ.get("PLATFORM_ACCESS_TOKEN")
-    if not access_token:
-        raise RuntimeError(
-            "PLATFORM_ACCESS_TOKEN is required for authorized project recovery"
-        )
+    run(
+        [
+            "python3",
+            "scripts/setup/bootstrap-test-runner.py",
+            "--name",
+            "recovery-acceptance",
+            "--confirm-environment",
+            "http://127.0.0.1:8000",
+            "--output",
+            str(logs / "test-runner.json"),
+        ],
+        ROOT,
+        timeout=150,
+    )
+    access_token = recovery_access_token(ROOT)
     headers = {
         "Authorization": "Bearer " + access_token,
         "Content-Type": "application/json",
@@ -458,6 +576,7 @@ https://*.apps.localhost {
             accepted = json.load(response)
         deadline = time.monotonic() + 300
         while time.monotonic() < deadline:
+            headers["Authorization"] = "Bearer " + recovery_access_token(ROOT)
             status_request = urllib.request.Request(
                 "http://127.0.0.1:8000" + accepted["status_url"], headers=headers
             )
@@ -485,7 +604,7 @@ https://*.apps.localhost {
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--bundle", type=Path, required=True)
-    parser.add_argument("--project", action="append", required=True)
+    parser.add_argument("--project", action="append", default=[])
     args = parser.parse_args()
     if any(
         not re.fullmatch("[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?", n) for n in args.project

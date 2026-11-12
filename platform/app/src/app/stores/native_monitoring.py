@@ -80,6 +80,17 @@ def postgres(provider, resources):
                         row,
                     )
                 ]
+                installed = {
+                    name for (name,) in conn.execute("SELECT extname FROM pg_extension")
+                }
+                readings.extend(
+                    line(
+                        "platform_native_postgresql_extension_installed",
+                        int(extension in installed),
+                        {**labels, "extension": extension},
+                    )
+                    for extension in resource["extensions"]
+                )
                 indexes = conn.execute("""SELECT a.amname,coalesce(sum(s.idx_scan),0),coalesce(sum(pg_relation_size(s.indexrelid)),0)
                     FROM pg_stat_user_indexes s JOIN pg_class c ON c.oid=s.indexrelid JOIN pg_am a ON a.oid=c.relam
                     WHERE a.amname IN ('hnsw','ivfflat') GROUP BY a.amname""").fetchall()

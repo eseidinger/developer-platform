@@ -44,6 +44,20 @@ For S3, use `"provider":"s3"` and an empty `extensions` list. Submit with
 identifies the database or bucket even if its display name changes. PostgreSQL
 extensions must already exist in the operator-installed image.
 
+The reviewed PostgreSQL extension selections are `vector` (pgvector), `age`,
+`timescaledb`, `postgis`, `pgmq`, and `pg_duckdb`. For example:
+
+```json
+{"name":"events","provider":"postgresql","quota_bytes":1073741824,"extensions":["timescaledb","postgis","pgmq"]}
+```
+
+Installation occurs in a fixed operator-controlled order. A project writer
+cannot create, drop, or upgrade extensions. pgmq queue functions mutate queue
+state, so queue use is reserved for writers. `pg_duckdb` execution is reserved
+for writers of resources selecting it; local files, network URLs, and S3 are
+disabled in DuckDB SQL. Applications needing S3 use a separately granted S3
+resource and its scoped credentials.
+
 Request component access with
 `devplat stores bindings request --project NAME --file binding.json`:
 
@@ -158,6 +172,13 @@ the current restore refuses them before mutating the host. See the
 
 Run the PostgreSQL component fixture against a disposable database and the
 application, CLI, backup, and UI test suites before a controlled deployment.
+For PLAN-040, also run
+`scripts/tests/components/stores/verify-postgres-extension-expansion.py`
+against the reviewed image. It tests all selectable extension subsets and the
+managed writer/reader contract. The
+[PLAN-040 evidence](validation/postgresql-extensions-2026-11-12.md) records
+the chosen versions, creation-order requirement, and remaining deployment
+gates.
 The fixture covers isolation, grants, rotation, read-only permissions, and
 recovery quarantine. The S3 console and relay tests cover signed identity,
 scoped browser access, revocation, and expiry. Compare deployed CPU and RAM

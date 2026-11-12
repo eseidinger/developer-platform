@@ -28,9 +28,9 @@ class ResourceCreate(Strict):
     name: str = Field(pattern=NAME, max_length=32)
     provider: CreateProvider
     quota_bytes: int = Field(default=1_073_741_824, ge=1_048_576, le=1_099_511_627_776)
-    extensions: list[Literal["vector", "age"]] = Field(
-        default_factory=list, max_length=2
-    )
+    extensions: list[
+        Literal["vector", "age", "timescaledb", "postgis", "pgmq", "pg_duckdb"]
+    ] = Field(default_factory=list, max_length=6)
 
     @model_validator(mode="after")
     def extensions_only_on_postgres(self):

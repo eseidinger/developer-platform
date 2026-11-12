@@ -1,11 +1,13 @@
 """Backup and restore must support checkout layouts on both sides of the move."""
 
 import importlib.util
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
+sys.path.insert(0, str(SCRIPTS))
 
 
 def load_script(name, filename):
@@ -24,7 +26,7 @@ class ConfigurationLayoutTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
-        for name in ("compose.yaml", ".env"):
+        for name in ("compose.yaml", ".env", ".env.example"):
             (self.root / name).touch()
         for name in ("scripts", "platform", "infrastructure"):
             (self.root / name).mkdir()
@@ -34,7 +36,14 @@ class ConfigurationLayoutTests(unittest.TestCase):
             (self.root / "infrastructure" / component).mkdir()
         self.assertEqual(
             backup.configuration_sources(self.root),
-            ["compose.yaml", ".env", "scripts", "platform", "infrastructure"],
+            [
+                "compose.yaml",
+                ".env",
+                ".env.example",
+                "scripts",
+                "platform",
+                "infrastructure",
+            ],
         )
 
     def test_older_checkout_still_captures_both_service_directories(self):

@@ -1302,11 +1302,15 @@
             "items": {
               "enum": [
                 "vector",
-                "age"
+                "age",
+                "timescaledb",
+                "postgis",
+                "pgmq",
+                "pg_duckdb"
               ],
               "type": "string"
             },
-            "maxItems": 2,
+            "maxItems": 6,
             "title": "Extensions",
             "type": "array"
           },

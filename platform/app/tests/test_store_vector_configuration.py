@@ -39,6 +39,32 @@ class VectorConfigurationTests(TestCase):
         )
         self.assertEqual(ResourceCreate(name="objects", provider="s3").provider, "s3")
 
+    def test_postgresql_extensions_are_unique_and_provider_specific(self):
+        supported = [
+            "vector",
+            "age",
+            "timescaledb",
+            "postgis",
+            "pgmq",
+            "pg_duckdb",
+        ]
+        self.assertEqual(
+            ResourceCreate(
+                name="analytics", provider="postgresql", extensions=supported
+            ).extensions,
+            supported,
+        )
+        for provider, extensions in (
+            ("postgresql", ["postgis", "postgis"]),
+            ("postgresql", ["unreviewed"]),
+            ("s3", ["pgmq"]),
+        ):
+            with (
+                self.subTest(provider=provider, extensions=extensions),
+                self.assertRaises(ValidationError),
+            ):
+                ResourceCreate(name="invalid", provider=provider, extensions=extensions)
+
     def test_recovery_preserves_and_validates_the_vector_schema(self):
         from uuid import uuid4
 

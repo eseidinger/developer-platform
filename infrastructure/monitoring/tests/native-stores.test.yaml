@@ -43,3 +43,27 @@ tests:
       - eval_time: 5m
         alertname: NativeStoreCollectionUnavailable
         exp_alerts: []
+
+  - name: selected PostgreSQL extension disappears
+    interval: 1m
+    input_series:
+      - series: >-
+          platform_native_postgresql_extension_installed{provider="postgresql",
+          project="alpha",resource_id="fixture",scope="resource",extension="pgmq"}
+        values: '0+0x7'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: PostgreSQLExtensionMissing
+        exp_alerts:
+          - exp_labels:
+              severity: warning
+              provider: postgresql
+              project: alpha
+              resource_id: fixture
+              scope: resource
+              extension: pgmq
+            exp_annotations:
+              summary: Selected PostgreSQL extension pgmq is missing
+              description: >-
+                Inspect the named resource and installed image before reopening
+                application access or recovery quarantine.

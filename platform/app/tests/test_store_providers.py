@@ -49,6 +49,12 @@ class ProviderSelectionTests(TestCase):
         self.assertTrue(capabilities["dedicated_instance"])
         self.assertEqual(capabilities["supported_modes"], ["read-write"])
 
+    def test_postgresql_capabilities_advertise_reviewed_extensions(self):
+        self.assertEqual(
+            providers.capabilities("postgresql")["extensions"],
+            ["vector", "age", "timescaledb", "postgis", "pgmq", "pg_duckdb"],
+        )
+
     def test_s3_connection_uses_scoped_lease_relay(self):
         backend = Mock()
         backend.credentials.return_value = {"SCOPED_SECRET": "synthetic-secret"}
@@ -56,10 +62,6 @@ class ProviderSelectionTests(TestCase):
             patch.object(providers, "get", return_value=backend),
             patch.dict(os.environ, {"STORE_RELAY_IP": "172.30.80.15"}),
         ):
-            fields = providers.connection(
-                {"provider": "s3"}, {"relay_port": 20017}
-            )
-        self.assertEqual(
-            fields["AWS_ENDPOINT_URL_S3"], "http://172.30.80.15:20017"
-        )
+            fields = providers.connection({"provider": "s3"}, {"relay_port": 20017})
+        self.assertEqual(fields["AWS_ENDPOINT_URL_S3"], "http://172.30.80.15:20017")
         self.assertEqual(fields["SCOPED_SECRET"], "synthetic-secret")

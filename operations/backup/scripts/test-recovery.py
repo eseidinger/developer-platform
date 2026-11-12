@@ -13,6 +13,8 @@ import urllib.request
 import uuid
 from pathlib import Path
 
+from recovery_auth import access_token as recovery_access_token
+
 
 def command(args, root, data=None, timeout=30):
     result = subprocess.run(
@@ -62,11 +64,22 @@ def check_grafana():
         raise RuntimeError("Grafana database unhealthy")
 
 
-def check_targets():
+def check_targets(selected_project):
     data = json.loads(request("http://127.0.0.1:9090/api/v1/targets"))
     targets = data["data"]["activeTargets"]
-    if not targets or any(t["health"] != "up" for t in targets):
+    # Restored projects with store bindings remain deliberately unstarted until
+    # owners issue fresh grants. Their application scrapes are expected down;
+    # every infrastructure target and the selected project must still be up.
+    unhealthy = [target for target in targets if target["health"] != "up"]
+    unexpected = [
+        target
+        for target in unhealthy
+        if target["labels"].get("job") != "application-metrics"
+        or target["labels"].get("project") == selected_project
+    ]
+    if not targets or unexpected:
         raise RuntimeError("Prometheus targets unhealthy")
+    return len(unhealthy)
 
 
 def verify_bundle(bundle):
@@ -206,6 +219,29 @@ def check_pod(root, project, image, marker):
             )
 
 
+def has_legacy_database_secret(root, project):
+    """Older projects had a default database; named-store projects do not."""
+    result = command(
+        [
+            str(root / ".runtime/bin/kubectl"),
+            "--kubeconfig",
+            str(root / ".runtime/admin.kubeconfig"),
+            "-n",
+            "project-" + project,
+            "get",
+            "secret",
+            "database",
+            "--ignore-not-found",
+            "-o",
+            "name",
+        ],
+        root,
+    ).strip()
+    if result not in {"", "secret/database"}:
+        raise RuntimeError("Unexpected database secret lookup result")
+    return bool(result)
+
+
 def seed(root, project, receipt):
     marker = {
         "project": project,
@@ -308,15 +344,23 @@ def seed_named(root, project, resource_id, receipt):
 def check_named_sql(root, project, resource_id, marker):
     database = named_database(resource_id)
     check_named_catalog(root, project, resource_id)
-    if (
-        postgres_sql(
-            root,
-            "platform",
-            "SELECT recovery_required FROM store_control WHERE singleton=true;",
-        ).strip()
-        != "t"
-    ):
-        raise RuntimeError("Named-store check requires active restore quarantine")
+    # Reconciliation clears the global guard only after invalidating every
+    # recovered lease. Verify that final state, not the earlier transient flag.
+    guard = postgres_sql(
+        root,
+        "platform",
+        "SELECT recovery_required FROM store_control WHERE singleton=true;",
+    ).strip()
+    grants = postgres_sql(
+        root, "platform", "SELECT count(*) FROM store_grants WHERE state<>'revoked';"
+    ).strip()
+    credentials = postgres_sql(
+        root,
+        "platform",
+        "SELECT count(*) FROM store_credentials WHERE state<>'revoked';",
+    ).strip()
+    if (guard, grants, credentials) != ("f", "0", "0"):
+        raise RuntimeError("Recovered store access was not fully revoked")
     sql = """BEGIN;
 CREATE TEMP TABLE recovery_probe(value text);
 INSERT INTO recovery_probe VALUES ('recovery-ok');
@@ -408,11 +452,7 @@ def main():
     stage = "recovery configuration guard"
     try:
         cfg = settings(root)
-        access_token = os.environ.get("PLATFORM_ACCESS_TOKEN")
-        if not access_token:
-            raise RuntimeError(
-                "PLATFORM_ACCESS_TOKEN is required for authorized recovery checks"
-            )
+        access_token = recovery_access_token(root)
         if (
             cfg.get("EDGE_BIND_IP") != "127.0.0.1"
             or cfg.get("APPS_DOMAIN") != "apps.localhost"
@@ -476,7 +516,13 @@ def main():
             retry(check_grafana, seconds=180)
             report["checks"].append(stage)
             stage = "monitoring: Prometheus scrape targets"
-            retry(check_targets, seconds=180)
+            skipped_scrapes = retry(lambda: check_targets(args.project), seconds=180)
+            if skipped_scrapes:
+                report["limits"].append(
+                    "Application metrics for unreapplied projects were excluded: "
+                    + str(skipped_scrapes)
+                    + " targets"
+                )
             report["checks"].append(stage)
         stage = (
             "named PostgreSQL catalog and SQL readback"
@@ -502,14 +548,27 @@ def main():
         if named:
             check_named_sql(root, args.project, args.resource_id, marker)
             report["quarantine_verified"] = True
+            report["checks"].append(stage)
         else:
-            compose = json.loads(
-                command(["docker", "compose", "config", "--format", "json"], root)
-            )
-            check_pod(
-                root, args.project, compose["services"]["postgres"]["image"], marker
-            )
-        report["checks"].append(stage)
+            if has_legacy_database_secret(root, args.project):
+                compose = json.loads(
+                    command(["docker", "compose", "config", "--format", "json"], root)
+                )
+                check_pod(
+                    root,
+                    args.project,
+                    compose["services"]["postgres"]["image"],
+                    marker,
+                )
+                report["checks"].append(stage)
+            else:
+                if marker:
+                    raise RuntimeError(
+                        "Legacy marker cannot be checked without a project database"
+                    )
+                report["limits"].append(
+                    "No legacy project database; run check-named-store for named PostgreSQL recovery"
+                )
         report["historical_data_verified"] = marker is not None
         report["result"] = "passed"
     except Exception as error:  # noqa: BLE001 - The operational drill must record any failure.

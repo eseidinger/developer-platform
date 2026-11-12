@@ -241,6 +241,14 @@ function Workspace({
                         ? [
                             ...(d.has('vector') ? ['vector' as const] : []),
                             ...(d.has('age') ? ['age' as const] : []),
+                            ...(d.has('timescaledb')
+                              ? ['timescaledb' as const]
+                              : []),
+                            ...(d.has('postgis') ? ['postgis' as const] : []),
+                            ...(d.has('pgmq') ? ['pgmq' as const] : []),
+                            ...(d.has('pg_duckdb')
+                              ? ['pg_duckdb' as const]
+                              : []),
                           ]
                         : [],
                   }),
@@ -288,6 +296,19 @@ function Workspace({
               </label>
               <label>
                 <input type="checkbox" name="age" /> AGE (PostgreSQL projection)
+              </label>
+              <label>
+                <input type="checkbox" name="timescaledb" /> TimescaleDB (time
+                series)
+              </label>
+              <label>
+                <input type="checkbox" name="postgis" /> PostGIS (spatial)
+              </label>
+              <label>
+                <input type="checkbox" name="pgmq" /> pgmq (queues)
+              </label>
+              <label>
+                <input type="checkbox" name="pg_duckdb" /> pg_duckdb (analytics)
               </label>
               <Button type="submit">Create resource</Button>
             </Form>

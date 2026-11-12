@@ -1,7 +1,12 @@
 # PostgreSQL Extension Expansion
 
-Status: planned November 12, 2026. Task: **PLAN-040**. Implementation and
-deployment start after
+Status: local implementation and compatibility checks complete November 12,
+2026; the encrypted off-host backup was restored in separate disposable VMs
+with the prior and candidate PostgreSQL images, including historical SQL
+marker and quarantine checks. Deployed acceptance remains open. Evidence is
+tracked in the
+[PLAN-040 validation record](../../../operators/validation/postgresql-extensions-2026-11-12.md).
+Task: **PLAN-040**. Implementation and deployment start after
 [PLAN-039 storage scope reduction](storage-scope-reduction.md) is complete.
 Decision: [ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md).
 

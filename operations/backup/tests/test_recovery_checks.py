@@ -2,11 +2,13 @@ import hashlib
 import importlib.util
 import json
 import subprocess
+import sys
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
 spec = importlib.util.spec_from_file_location(
     "checks", Path(__file__).parents[1] / "scripts/test-recovery.py"
 )
@@ -15,19 +17,57 @@ spec.loader.exec_module(checks)
 
 
 class RecoveryChecks(unittest.TestCase):
-    def test_named_store_requires_matching_catalog_and_quarantine(self):
+    def test_named_store_project_has_no_implicit_database_secret(self):
+        with patch.object(checks, "command", return_value="") as command:
+            self.assertFalse(checks.has_legacy_database_secret(Path("/tmp"), "smoke"))
+        self.assertIn("--ignore-not-found", command.call_args.args[0])
+        with patch.object(checks, "command", return_value="secret/database\n"):
+            self.assertTrue(checks.has_legacy_database_secret(Path("/tmp"), "smoke"))
+
+    def test_monitoring_excludes_only_unreapplied_application_scrapes(self):
+        targets = [
+            {"health": "up", "labels": {"job": "postgres"}},
+            {
+                "health": "down",
+                "labels": {"job": "application-metrics", "project": "withheld"},
+            },
+        ]
+        response = json.dumps({"data": {"activeTargets": targets}}).encode()
+        with patch.object(checks, "request", return_value=response):
+            self.assertEqual(checks.check_targets("smoke"), 1)
+            with self.assertRaisesRegex(RuntimeError, "targets unhealthy"):
+                checks.check_targets("withheld")
+            targets[1]["labels"]["job"] = "postgres"
+            response = json.dumps({"data": {"activeTargets": targets}}).encode()
+        with (
+            patch.object(checks, "request", return_value=response),
+            self.assertRaisesRegex(RuntimeError, "targets unhealthy"),
+        ):
+            checks.check_targets("smoke")
+
+    def test_named_store_requires_matching_catalog_and_revoked_access(self):
         resource_id = "12345678-1234-4234-8234-123456789abc"
         calls = []
 
         def sql(root, database, statement):
             calls.append((database, statement))
-            return "1\n" if "count(*)" in statement else "t\n"
+            if "owner_project='smoke'" in statement:
+                return "1\n"
+            if "recovery_required" in statement:
+                return "f\n"
+            return "0\n" if database == "platform" else ""
 
         with patch.object(checks, "postgres_sql", side_effect=sql):
             checks.check_named_sql(Path("/tmp"), "smoke", resource_id, None)
         self.assertEqual(
             [db for db, _ in calls],
-            ["platform", "platform", "resource_12345678123442348234123456789abc"],
+            [
+                "platform",
+                "platform",
+                "platform",
+                "platform",
+                "resource_12345678123442348234123456789abc",
+            ],
         )
         self.assertIn("owner_project='smoke'", calls[0][1])
         self.assertIn("recovery_required", calls[1][1])
@@ -37,8 +77,17 @@ class RecoveryChecks(unittest.TestCase):
         ):
             checks.check_named_sql(Path("/tmp"), "smoke", resource_id, None)
         with (
-            patch.object(checks, "postgres_sql", side_effect=["1\n", "f\n"]),
-            self.assertRaisesRegex(RuntimeError, "quarantine"),
+            patch.object(
+                checks, "postgres_sql", side_effect=["1\n", "t\n", "0\n", "0\n"]
+            ),
+            self.assertRaisesRegex(RuntimeError, "not fully revoked"),
+        ):
+            checks.check_named_sql(Path("/tmp"), "smoke", resource_id, None)
+        with (
+            patch.object(
+                checks, "postgres_sql", side_effect=["1\n", "f\n", "1\n", "0\n"]
+            ),
+            self.assertRaisesRegex(RuntimeError, "not fully revoked"),
         ):
             checks.check_named_sql(Path("/tmp"), "smoke", resource_id, None)
         with self.assertRaisesRegex(RuntimeError, "Invalid resource ID"):
@@ -133,7 +182,12 @@ class RecoveryChecks(unittest.TestCase):
         self.assertFalse(any("delete" in c for c in calls))
 
     def test_monitoring_waits_for_first_successful_scrape(self):
-        states = [[], [{"health": "unknown"}], [{"health": "down"}], [{"health": "up"}]]
+        states = [
+            [],
+            [{"health": "unknown", "labels": {"job": "postgres"}}],
+            [{"health": "down", "labels": {"job": "postgres"}}],
+            [{"health": "up", "labels": {"job": "postgres"}}],
+        ]
         replies = [
             json.dumps({"data": {"activeTargets": targets}}).encode()
             for targets in states
@@ -142,7 +196,7 @@ class RecoveryChecks(unittest.TestCase):
             patch.object(checks, "request", side_effect=replies) as request,
             patch.object(checks.time, "sleep"),
         ):
-            checks.retry(checks.check_targets, seconds=180)
+            checks.retry(lambda: checks.check_targets("smoke"), seconds=180)
         self.assertEqual(request.call_count, 4)
 
     def test_unhealthy_monitoring_fails_at_deadline(self):
