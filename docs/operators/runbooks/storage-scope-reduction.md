@@ -2,9 +2,11 @@
 
 Use this record with the [delivery plan](../../maintainers/delivery/plans/storage-scope-reduction.md)
 for each installation. PostgreSQL and S3 remain the project data stores.
-OpenSearch, Qdrant, Neo4j, CouchDB, and HugeGraph remain available only for
-existing-resource migration and retirement until their data and backup gates
-are complete. The separate storage lab is outside this platform rollout.
+On an installation still running a pre-removal revision, OpenSearch, Qdrant,
+Neo4j, CouchDB, and HugeGraph may be used only for existing-resource migration
+and retirement until their data and backup gates are complete. The
+[node-01 validation](../validation/storage-scope-2026-11-12.md) records completed
+removal. The separate storage lab is outside this platform rollout.
 
 ## Inventory before changing services
 

@@ -1,9 +1,8 @@
 # Storage Scope Reduction
 
-Status: implementing November 12, 2026. All 11 retired legacy resources were
-purged after verified backup and owner approval. Their containers and volumes
-were removed; source and deployment checks are in progress. The sustained
-capacity comparison remains open.
+Status: implemented November 12, 2026. The live cutover, retained-store
+checks, and measured light-load CPU/RAM comparison are recorded in the
+[validation evidence](../../../operators/validation/storage-scope-2026-11-12.md).
 Task: **PLAN-039**. Decision:
 [ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md).
 
