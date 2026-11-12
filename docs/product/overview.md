@@ -38,7 +38,8 @@ criterion; see the [roadmap](roadmap.md).
 [ADR-022](../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
 narrows the target store set to PostgreSQL with its extensions and S3-compatible
 object storage. Other implemented providers are pending removal, with storage
-experiments moving to a planned separate lab. After that reduction,
+experiments moving to a planned separate lab outside this repository. After that
+reduction,
 [PLAN-040](../maintainers/delivery/plans/postgresql-extension-expansion.md)
 adds TimescaleDB, PostGIS, pgmq, and pg_duckdb to PostgreSQL.
 
@@ -72,8 +73,8 @@ independently and bound to consuming components; an empty project or unbound
 application creates no database.
 
 Comparisons with other storage options belong in the planned separate storage
-lab. PostgreSQL extension experiments may remain here within the retained
-service's capacity and operational safeguards.
+lab outside this repository. PostgreSQL extension experiments may remain here
+within the retained service's capacity and operational safeguards.
 
 AI supports development, delivery, and operations. Its initial value is
 explaining applications and incidents using platform context. A general-purpose

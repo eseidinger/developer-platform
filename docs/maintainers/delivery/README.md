@@ -113,8 +113,8 @@ proposals without confirmed dates.
   - **Significance:**
     [ADR-022](../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
     supersedes non-retained store expansion; PLAN-039 owns migration, removal,
-    capacity verification, and the separate storage lab; PLAN-040 adds
-    TimescaleDB, PostGIS, pgmq, and pg_duckdb afterward
+    and capacity verification; PLAN-040 adds TimescaleDB, PostGIS, pgmq, and
+    pg_duckdb afterward
 - **Date:** November 12, 2026
   - **Milestone:** Mantine portal migration planned after PostgreSQL extensions
   - **Significance:**
@@ -240,8 +240,7 @@ flowchart LR
   - **Entry condition:** ADR-022 accepted; inventory and owner assignment begin
     before live changes
   - **Outcome / dependency:** PostgreSQL and S3 retained, other providers
-    migrated and retired, measured CPU/RAM returned to workloads, separate
-    storage lab established
+    migrated and retired, measured CPU/RAM returned to workloads
 - **Work package:** [PLAN-040](plans/postgresql-extension-expansion.md)
   - **Entry condition:** PLAN-039 complete with measured post-reduction capacity
   - **Outcome / dependency:** TimescaleDB, PostGIS, pgmq, and pg_duckdb added as
@@ -264,8 +263,8 @@ flowchart LR
   [9 – Data Store Measurement and Comparison](plans/phase-9-store-measurement-and-comparison.md)
   - **Entry condition:** Historical plan; cross-store comparisons superseded by
     ADR-022
-  - **Outcome / dependency:** Other-store comparisons move to the planned
-    separate storage lab
+  - **Outcome / dependency:** Other-store comparisons are outside this
+    repository's delivery scope
 - **Phase:** [10 – Anytime Leftovers](plans/phase-10-anytime-leftovers.md)
   - **Entry condition:** Phase 2C foundation; schedule independently when
     capacity allows
@@ -278,7 +277,7 @@ The [data-store expansion plan](plans/data-store-expansion.md) and Phase 7–9
 plans preserve earlier decisions and evidence. The current
 [storage scope reduction plan](plans/storage-scope-reduction.md) controls new
 store work: retain PostgreSQL with extensions and S3, safely retire other
-providers, verify reclaimed CPU/RAM, and create a separate storage lab.
+providers, and verify reclaimed CPU/RAM.
 Recovery checks for affected stores remain relevant while their data is retained;
 they do not justify new provider adoption. After PLAN-039,
 [PLAN-040](plans/postgresql-extension-expansion.md) expands PostgreSQL with

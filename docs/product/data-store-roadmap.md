@@ -15,7 +15,8 @@ export.
 [ADR-022](../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
 retains PostgreSQL with its extensions and S3-compatible object storage on the
 Developer Platform. Other project data-store providers are to be removed, and
-their experiments belong in a planned separate storage lab. The roadmap and
+their experiments belong in a planned separate storage lab outside this
+repository. The roadmap and
 provider selections below record earlier direction; they no longer authorize
 new provider work on this platform. Removal and migration have not yet been
 completed; see the

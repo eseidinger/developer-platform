@@ -319,8 +319,8 @@ and checkboxes below are authoritative.
   - **Tasks:** PLAN-004, PLAN-005
 - **Gate:** Storage scope reduction
   - **Tasks:** PLAN-039: inventory, creation freeze, migration, safe retirement,
-    source and service removal, capacity verification, and separate storage lab
-    in the [current plan](plans/storage-scope-reduction.md)
+    source and service removal, and capacity verification in the
+    [current plan](plans/storage-scope-reduction.md)
 - **Gate:** PostgreSQL extension expansion, after PLAN-039
   - **Tasks:** PLAN-040: add TimescaleDB, PostGIS, pgmq, and pg_duckdb through
     the [extension plan](plans/postgresql-extension-expansion.md)
@@ -3606,7 +3606,7 @@ application owners before live work.
   and its data owner; reject new non-retained resources; migrate consumers or
   document blockers; verify backups and authorized retirement/purge; remove
   unused provider code, services, and volumes; keep PostgreSQL/extensions and S3
-  working; measure CPU/RAM before and after; create the separate storage lab.
+  working; measure CPU/RAM before and after.
   Record source, local, and deployed evidence for each package. No stopped
   service or missing lease is proof of data deletion.
 

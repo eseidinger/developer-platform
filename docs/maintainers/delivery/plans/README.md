@@ -11,7 +11,7 @@ must not be read as proof that the corresponding source capability is absent:
 supersedes non-PostgreSQL, non-S3 provider expansion and comparison work in the
 Phase 7–9 plans below. Those plans remain for implementation history and
 evidence. [PLAN-039](storage-scope-reduction.md) now owns retirement, migration,
-source cleanup, capacity verification, and the separate storage lab.
+source cleanup, and capacity verification.
 [PLAN-040](postgresql-extension-expansion.md) follows it with four PostgreSQL
 extensions. [PLAN-041](mantine-ui-migration.md) follows PLAN-040 with the
 portal's Mantine migration.
@@ -30,8 +30,7 @@ portal's Mantine migration.
 - [Mantine UI migration](mantine-ui-migration.md) — PLAN-041; follows PLAN-040
   while preserving portal behavior and API boundaries
 - [Storage scope reduction](storage-scope-reduction.md) — PLAN-039; retain
-  PostgreSQL and S3, retire other providers, verify workload capacity, and
-  establish the separate storage lab
+  PostgreSQL and S3, retire other providers, and verify workload capacity
 - [PostgreSQL extension expansion](postgresql-extension-expansion.md) — PLAN-040;
   after PLAN-039, add TimescaleDB, PostGIS, pgmq, and pg_duckdb
 - [Phase 7 planned data stores](phase-7-planned-data-stores.md) —

@@ -18,7 +18,9 @@ data-store providers and their dedicated services from the platform. Do not add
 new non-PostgreSQL, non-S3 project stores to this platform.
 
 Create a **separate storage lab project** for experiments with other storage
-options. That project is planned; this decision does not claim it exists yet.
+options. That project is outside this repository's implementation and delivery
+plan. It is planned; this decision does not claim it exists yet, and its creation
+does not gate the platform's storage scope reduction.
 PostgreSQL extension experiments can remain on the platform when they fit the
 PostgreSQL service's capacity and operational safeguards.
 

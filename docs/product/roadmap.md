@@ -8,8 +8,8 @@ dependencies and verifiable outcomes.
 [ADR-022](../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
 retains PostgreSQL with extensions and S3-compatible object storage. Other
 project data-store providers are to be removed to simplify the platform and
-free CPU and RAM for workloads. A separate storage lab is planned for other
-options. The linked Phase 7–9 plans record earlier delivery scope;
+free CPU and RAM for workloads. A separate storage lab is planned outside this
+repository. The linked Phase 7–9 plans record earlier delivery scope;
 non-retained provider expansion and comparisons are superseded. Removal and
 migration are tracked in
 [PLAN-039](../maintainers/delivery/plans/storage-scope-reduction.md). After it
@@ -69,8 +69,7 @@ adds TimescaleDB, PostGIS, pgmq, and pg_duckdb to PostgreSQL.
 - **Work package:**
   [Storage Scope Reduction](../maintainers/delivery/plans/storage-scope-reduction.md)
   - **State:** Planned under ADR-022; implementation and migration pending
-  - **User outcome:** Keep PostgreSQL and S3, free CPU and RAM for workloads,
-    and establish a separate storage lab
+  - **User outcome:** Keep PostgreSQL and S3 and free CPU and RAM for workloads
   - **Acceptance gate:** Safe migration and retirement, retained-store parity,
     removed-provider denial, and measured capacity gain
 - **Work package:**
@@ -97,12 +96,12 @@ adds TimescaleDB, PostGIS, pgmq, and pg_duckdb to PostgreSQL.
 - **Phase:**
   [8 – Deferred Data Stores](../maintainers/delivery/plans/phase-8-deferred-data-stores.md)
   - **State:** Superseded by ADR-022; prior implementation evidence retained
-  - **User outcome:** Move non-retained storage experiments to a separate lab
+  - **User outcome:** Stop adding non-retained stores to this platform
   - **Acceptance gate:** No new non-retained provider acceptance on this platform
 - **Phase:**
   [9 – Data Store Measurement and Comparison](../maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md)
   - **State:** Cross-store comparison scope superseded by ADR-022
-  - **User outcome:** Compare other storage options in the planned storage lab
+  - **User outcome:** Keep other-store comparisons outside this repository
   - **Acceptance gate:** No cross-store comparison gate on this platform
 - **Phase:**
   [10 – Anytime Leftovers](../maintainers/delivery/plans/phase-10-anytime-leftovers.md)

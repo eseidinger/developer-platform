@@ -3,8 +3,8 @@
 [ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
 supersedes this phase's non-PostgreSQL provider work on the Developer Platform.
 The plan and implementation evidence below are historical;
-[PLAN-039](storage-scope-reduction.md) owns migration, retirement, and creation
-of the separate storage lab.
+[PLAN-039](storage-scope-reduction.md) owns migration and retirement of the
+non-retained providers.
 
 Status: package 8.3 selected on November 2, 2026; source implementation and
 disposable fixture pass, with deployed acceptance open. Package 8.4 source

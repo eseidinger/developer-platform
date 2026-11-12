@@ -4,7 +4,7 @@
 supersedes expansion beyond PostgreSQL with extensions and S3-compatible object
 storage. The selections and implementation notes below are retained as history;
 the [storage scope reduction plan](storage-scope-reduction.md) owns removal,
-migration, capacity verification, and the separate storage lab.
+migration, and capacity verification.
 After PLAN-039, the
 [PostgreSQL extension plan](postgresql-extension-expansion.md) adds TimescaleDB,
 PostGIS, pgmq, and pg_duckdb. The older TimescaleDB deferral and compatibility

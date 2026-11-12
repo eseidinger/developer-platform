@@ -14,10 +14,8 @@ backup, recovery, and monitoring behavior. Keep platform dependencies such as
 identity, telemetry, and backup infrastructure; they are outside ADR-022's
 project data-store scope.
 
-Create a separate storage lab project for other storage options and comparisons.
-Do not transfer live project data or credentials to that lab as part of source
-cleanup. The existing Phase 7–9 provider and comparison plans remain historical
-evidence, not active acceptance gates for this platform.
+The existing Phase 7–9 provider and comparison plans remain historical evidence,
+not active acceptance gates for this platform.
 
 Platform maintainers own the contract and source changes; operators own live
 inventory, backup, retirement, service shutdown, and capacity evidence.
@@ -115,22 +113,16 @@ PostgreSQL and S3 as project data-store options; no unresolved live resource
 depends on removed code or volumes. Old catalog and audit history remain
 readable. Source, local, and controlled deployed checks pass.
 
-### 5. Verify capacity and establish the storage lab
+### 5. Verify reclaimed capacity
 
 1. Repeat the baseline CPU/RAM measurement with comparable workloads and the
    same observability settings. Record which service reservations and actual
    usage were removed, the resulting host reserve, and the workload capacity
    available. Investigate any missing gain before claiming the decision's
    capacity objective is met.
-1. Create the separate storage lab project with its own infrastructure and
-   operating budget. Move or recreate comparison instructions and disposable
-   fixtures there as appropriate, without live credentials or project data.
-   Link the lab from the product roadmap when it exists; until then, keep its
-   status explicitly planned.
 
-**Exit evidence:** reproducible before/after capacity results and a working,
-separately owned storage lab. The lab's creation does not gate safe retirement
-of unused providers on this platform.
+**Exit evidence:** reproducible before/after capacity results showing the
+service reservations and measured capacity returned to platform workloads.
 
 ## Release and recovery rules
 
@@ -144,8 +136,7 @@ retirement and keep its protected data and service available until resolved.
 
 Do not mark PLAN-039 complete until all non-retained resources and services have
 the recorded disposition, retained-store checks pass, before/after capacity
-evidence is published, and the separate storage lab exists with its own
-completion evidence under work package 5.
+evidence is published.
 
 After this gate, PLAN-040 may add TimescaleDB, PostGIS, pgmq, and pg_duckdb to
 PostgreSQL. Its installation and capacity results are separate from PLAN-039's

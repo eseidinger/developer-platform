@@ -2,9 +2,8 @@
 
 [ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
 supersedes cross-store comparisons on the Developer Platform. This plan is
-retained as historical scope; comparisons involving other storage options belong
-in the separate storage lab planned by
-[PLAN-039](storage-scope-reduction.md).
+retained as historical scope; comparisons involving other storage options are
+outside this repository's delivery plan.
 
 Status: planned, unscheduled as of October 18, 2026. This phase owns the
 quantitative performance work and comparative experiments previously embedded in
