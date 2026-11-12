@@ -40,6 +40,36 @@
         dest: "{{ platform_install_dir }}"
         owner: root
         group: root
+
+    - name: Remove source files retired with PLAN-039
+      ansible.builtin.file:
+        path: "{{ platform_install_dir }}/{{ item }}"
+        state: absent
+      loop:
+        - platform/app/src/app/stores/bolt_relay.py
+        - platform/app/src/app/stores/couchdb.py
+        - platform/app/src/app/stores/couchdb_access.py
+        - platform/app/src/app/stores/couchdb_console.py
+        - platform/app/src/app/stores/dashboards.py
+        - platform/app/src/app/stores/hugegraph.py
+        - platform/app/src/app/stores/hugegraph_access.py
+        - platform/app/src/app/stores/hugegraph_console.py
+        - platform/app/src/app/stores/neo4j.py
+        - platform/app/src/app/stores/neo4j_controller.py
+        - platform/app/src/app/stores/opensearch.py
+        - platform/app/src/app/stores/qdrant.py
+        - platform/app/src/app/stores/console_assets/couchdb
+        - platform/app/src/app/stores/console_assets/hugegraph
+        - platform/ui/scripts/verify-deployed-store-consoles.mjs
+        - platform/ui/scripts/verify-http-store-consoles.mjs
+        - platform/ui/e2e/couchdb-console.spec.ts
+        - infrastructure/monitoring/dashboards/neo4j-community.json
+        - infrastructure/monitoring/dashboards/opensearch-performance.json
+        - infrastructure/monitoring/dashboards/qdrant-performance.json
+        - infrastructure/persistence/couchdb.ini
+        - infrastructure/persistence/opensearch-bootstrap.sh
+        - infrastructure/persistence/opensearch-dashboards.yaml
+        - infrastructure/persistence/neo4j
   always:
 
     - name: Remove local source archive

@@ -105,23 +105,10 @@ the [human database access guide](../../docs/developers/database-access.md).
 
 - **`platform_stores`**
   - **Default when omitted:** Preserve remote selection/settings
-  - **Purpose:** Explicit `profiles` list, `capacity_bytes` mapping and optional
-    `neo4j` limits
+  - **Purpose:** Explicit S3 selection and PostgreSQL/S3 `capacity_bytes`
 - **`platform_network`**
   - **Default when omitted:** Preserve remote settings
   - **Purpose:** Private IPv4 `/24` and optional fixed service-address overrides
-- **`platform_search_console_network`**
-  - **Default when omitted:** Preserve remote settings
-  - **Purpose:** Separate private IPv4 `/29` and optional console-address
-    overrides
-- **`platform_couchdb_network`**
-  - **Default when omitted:** Preserve remote settings
-  - **Purpose:** Isolated private IPv4 `/29` for CouchDB with an optional fixed
-    CouchDB address override
-- **`platform_hugegraph_network`**
-  - **Default when omitted:** Preserve remote settings
-  - **Purpose:** Isolated private IPv4 `/29` for HugeGraph with an optional
-    HugeGraph address override
 - **`platform_k3s_image`**
   - **Default when omitted:** Preserve remote pin
   - **Purpose:** Supported `rancher/k3s:v1.35/36/37.<patch>-k3s<release>` pin,
@@ -157,42 +144,30 @@ the [human database access guide](../../docs/developers/database-access.md).
   - **Purpose:** API readiness retry window, range 5–3600 seconds; probes run
     every five seconds
 
-For example, select all optional providers with explicit data budgets:
+For example, select S3 with an explicit data budget:
 
 ```yaml
 platform_stores:
-  profiles: [s3, qdrant, opensearch, neo4j, couchdb, hugegraph]
+  profiles: [s3]
   capacity_bytes:
     postgresql: 17179869184
     s3: 8589934592
-    qdrant: 4294967296
-    opensearch: 4294967296
-    neo4j: 4294967296
-    couchdb: 4294967296
-    hugegraph: 4294967296
-  neo4j:
-    max_instances: 4
-    memory_bytes: 1610612736
 ```
 
 These are example data allocations, not a host sizing guarantee. Every selected
-provider and PostgreSQL require positive integer byte budgets. Profiles must be
-a list containing only `s3`, `qdrant`, `opensearch`, `neo4j`, `couchdb`,
-`hugegraph`, with no
-duplicates. `profiles: []` selects PostgreSQL only. Neo4j limits apply to
-retained instances platform-wide (1–64) and memory per instance (1–16 GiB).
+provider and PostgreSQL require positive integer byte budgets. Profiles may
+contain only `s3` or be empty for PostgreSQL only.
 Review combined service, workload, telemetry and recovery requirements before
 enabling them. Removing a selection does not purge data or authorize bypassing
 resource retirement.
 
 Network groups require `subnet` and accept an optional `addresses` mapping keyed
-by Compose service name, such as `postgres`, `store-access` or
-`neo4j-controller`, and `local-application-edge`. Unspecified addresses are
+by Compose service name, such as `postgres`, `store-access`, and
+`local-application-edge`. Unspecified addresses are
 derived from standard offsets in the selected subnet; the full service list is
 in [the inventory renderer](../filter_plugins/platform_inventory.py). The
-search-console group accepts `platform-api` and `opensearch-dashboards`.
 Addresses must be distinct, inside their subnet, and exclude the network,
-broadcast and gateway addresses. The two subnets must not overlap. Deployment
+broadcast and gateway addresses. Deployment
 validates the merged remote configuration before its outage and refuses to
 change an existing Docker network's subnet. Choose networks before first
 installation; later network migration needs a separate operator procedure.

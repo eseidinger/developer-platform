@@ -8,24 +8,6 @@ include:
   - infrastructure/identity/compose.yaml
   - platform/compose.yaml
 networks:
-  store-hugegraph:
-    name: developer-platform-store-hugegraph
-    internal: true
-    ipam:
-      config:
-        - subnet: ${STORE_HUGEGRAPH_SUBNET:-172.30.83.0/29}
-  search-consoles:
-    name: developer-platform-search-consoles
-    internal: true
-    ipam:
-      config:
-        - subnet: ${STORE_SEARCH_CONSOLE_SUBNET:-172.30.81.0/29}
-  store-couchdb:
-    name: developer-platform-store-couchdb
-    internal: true
-    ipam:
-      config:
-        - subnet: ${STORE_COUCHDB_SUBNET:-172.30.82.0/29}
   store-consoles:
     internal: true
   platform:
@@ -34,14 +16,8 @@ networks:
       config:
         - subnet: ${PLATFORM_SUBNET:-172.30.80.0/24}
 volumes:
-  hugegraph_system:
-  hugegraph_config:
-  hugegraph_data:
   host_capacity:
   rustfs_data:
-  qdrant_data:
-  couchdb_data:
-  opensearch_data:
   postgres_console:
   postgres:
   caddy_data:

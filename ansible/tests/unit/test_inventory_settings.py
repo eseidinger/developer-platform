@@ -28,11 +28,8 @@ render = plugin.platform_inventory_settings
 class InventorySettingsTests(unittest.TestCase):
     def stores(self):
         return {
-            "profiles": ["s3", "qdrant", "opensearch", "neo4j"],
-            "capacity_bytes": {
-                p: 2**32 for p in ["postgresql", "s3", "qdrant", "opensearch", "neo4j"]
-            },
-            "neo4j": {"max_instances": 4, "memory_bytes": 1610612736},
+            "profiles": ["s3"],
+            "capacity_bytes": {p: 2**32 for p in ["postgresql", "s3"]},
         }
 
     def test_omitted_options_preserve_existing_environment(self):
@@ -44,12 +41,10 @@ class InventorySettingsTests(unittest.TestCase):
     def test_profiles_and_capacity_render_as_compose_and_json(self):
         source = self.stores()
         result = render({"stores": source})
-        self.assertEqual(result["COMPOSE_PROFILES"], "s3,qdrant,opensearch,neo4j")
+        self.assertEqual(result["COMPOSE_PROFILES"], "s3")
         self.assertEqual(
             json.loads(result["STORE_CAPACITY_BYTES"]), source["capacity_bytes"]
         )
-        self.assertEqual(result["NEO4J_INSTANCE_MEMORY_BYTES"], "1610612736")
-        self.assertEqual(result["NEO4J_MAX_INSTANCES"], "4")
         self.assertEqual(
             render({"stores": {"profiles": [], "capacity_bytes": {"postgresql": 1}}})[
                 "COMPOSE_PROFILES"
@@ -60,7 +55,7 @@ class InventorySettingsTests(unittest.TestCase):
     def test_invalid_or_incomplete_store_selection_is_rejected(self):
         for change in [
             {"profiles": "neo4j"},
-            {"profiles": ["neo4j", "neo4j"]},
+            {"profiles": ["s3", "s3"]},
             {"profiles": ["unknown"]},
             {"capacity_bytes": {"postgresql": 1}},
             {"capacity_bytes": {"postgresql": True}},
@@ -85,15 +80,12 @@ class InventorySettingsTests(unittest.TestCase):
                     "subnet": "10.55.8.0/24",
                     "addresses": {"postgres": "10.55.8.90"},
                 },
-                "search_console_network": {"subnet": "10.55.9.0/29"},
             }
         )
         self.assertEqual(result["POSTGRES_IP"], "10.55.8.90")
         self.assertEqual(result["STORE_RELAY_IP"], "10.55.8.15")
-        self.assertEqual(result["NEO4J_CONTROLLER_IP"], "10.55.8.31")
         self.assertEqual(result["LOCAL_APPLICATION_EDGE_IP"], "10.55.8.32")
-        self.assertEqual(result["STORE_SEARCH_API_IP"], "10.55.9.2")
-        self.assertEqual(len([k for k in result if k.endswith("_IP")]), 25)
+        self.assertEqual(len([k for k in result if k.endswith("_IP")]), 19)
 
     def test_inventory_address_defaults_match_the_runtime_validator(self):
         tree = ast.parse(
@@ -115,10 +107,7 @@ class InventorySettingsTests(unittest.TestCase):
 
     def test_networks_reject_overlap_bad_addresses_and_typographical_keys(self):
         for options in [
-            {
-                "network": {"subnet": "10.55.8.0/24"},
-                "search_console_network": {"subnet": "10.55.8.0/29"},
-            },
+            {"search_console_network": {"subnet": "10.55.8.0/29"}},
             {"network": {"subnet": "10.55.8.0/25"}},
             {"network": {"subnet": "8.8.8.0/24"}},
             {"network": {"subnet": "10.55.8.1/24"}},
@@ -222,7 +211,7 @@ class InventorySettingsTests(unittest.TestCase):
             "ansible.builtin.assert": {
                 "that": [
                     "platform_managed_settings['COMPOSE_PROFILES'] == ''",
-                    "platform_managed_settings['NEO4J_CONTROLLER_IP'] == '172.30.80.31'",
+                    "platform_managed_settings['RUSTFS_IP'] == '172.30.80.16'",
                     "platform_managed_settings['STORE_SSH_PORT'] == '2222'",
                     "platform_settings['PLATFORM_TRACE_SAMPLE_RATE'] == '1.0'",
                     "(platform_settings | combine(platform_managed_settings))['K3S_IMAGE'] == 'rancher/k3s:v1.36.4-k3s1'",
@@ -276,11 +265,11 @@ class InventorySettingsTests(unittest.TestCase):
                 elif mode == "all":
                     configured["platform_stores"] = self.stores()
                     expected["ansible.builtin.assert"]["that"][0] = (
-                        "platform_managed_settings['COMPOSE_PROFILES'] == 's3,qdrant,opensearch,neo4j'"
+                        "platform_managed_settings['COMPOSE_PROFILES'] == 's3'"
                     )
                     expected["ansible.builtin.assert"]["that"] += [
                         "platform_managed_settings['STORE_CAPACITY_BYTES'] is string",
-                        "(platform_managed_settings['STORE_CAPACITY_BYTES'] | from_json)['neo4j'] == 4294967296",
+                        "(platform_managed_settings['STORE_CAPACITY_BYTES'] | from_json)['s3'] == 4294967296",
                     ]
                 elif mode == "tracing":
                     configured["platform_trace_sample_rate"] = 0.25
@@ -292,8 +281,6 @@ class InventorySettingsTests(unittest.TestCase):
                     for key in [
                         "platform_stores",
                         "platform_network",
-                        "platform_search_console_network",
-                        "platform_couchdb_network",
                         "platform_k3s_image",
                         "platform_store_ssh_host",
                         "platform_database_bastion_bind_ip",

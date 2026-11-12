@@ -39,10 +39,8 @@ read another graph directly. The relay therefore rejects graph enumeration and
 all paths outside the named graph for every client. Gremlin, Cypher, PQL and
 upstream Hubble access remain unsupported; bounded REST graph/schema routes and
 the lease-scoped platform browser console are exposed. See
-[`verify-hugegraph.py`](../../../../scripts/tests/components/stores/verify-hugegraph.py)
-for the reproducible fixture and
-[`hugegraph_access.py`](../../../../platform/app/src/app/stores/hugegraph_access.py)
-for the enforced path boundary. The image digest is
+the PLAN-039 pre-removal Git commit `632b921` for the reproducible fixture and
+`hugegraph_access.py` path boundary. The image digest is
 `sha256:077b89e1f2d5e228d99598bdb537161fb2e8a7b5abedf4724d97cf4de11529ba`.
 
 ## Scope and decisions

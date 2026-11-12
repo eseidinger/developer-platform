@@ -17,7 +17,6 @@ from scripts.internal.env import settings
 NETWORK = "developer-platform"
 FIXED_SERVICES = {
     "local-application-edge": ("LOCAL_APPLICATION_EDGE_IP", "172.30.80.32"),
-    "neo4j-controller": ("NEO4J_CONTROLLER_IP", "172.30.80.31"),
     "postgres-exporter": ("POSTGRES_EXPORTER_IP", "172.30.80.30"),
     "postgres": ("POSTGRES_IP", "172.30.80.10"),
     "platform-api": ("PLATFORM_API_IP", "172.30.80.11"),
@@ -26,9 +25,6 @@ FIXED_SERVICES = {
     "alloy": ("ALLOY_IP", "172.30.80.14"),
     "store-access": ("STORE_RELAY_IP", "172.30.80.15"),
     "rustfs": ("RUSTFS_IP", "172.30.80.16"),
-    "opensearch": ("OPENSEARCH_IP", "172.30.80.17"),
-    "qdrant": ("QDRANT_IP", "172.30.80.18"),
-    "opensearch-init": ("OPENSEARCH_INIT_IP", "172.30.80.19"),
     "proxy": ("PROXY_IP", "172.30.80.20"),
     "blackbox-exporter": ("BLACKBOX_EXPORTER_IP", "172.30.80.21"),
     "prometheus": ("PROMETHEUS_IP", "172.30.80.22"),
@@ -63,91 +59,7 @@ def addresses(config):
             raise ValueError(
                 f"The fixed address for {service} must be a usable address in PLATFORM_SUBNET."
             )
-    search_subnet, _ = console_addresses(config)
-    couchdb_subnet, _ = couchdb_addresses(config)
-    hugegraph_subnet, _ = hugegraph_addresses(config)
-    if any(
-        first.overlaps(second)
-        for first, second in (
-            (subnet, search_subnet),
-            (subnet, couchdb_subnet),
-            (subnet, hugegraph_subnet),
-            (search_subnet, couchdb_subnet),
-            (search_subnet, hugegraph_subnet),
-            (couchdb_subnet, hugegraph_subnet),
-        )
-    ):
-        raise ValueError("The platform and isolated store subnets must not overlap.")
     return subnet, result
-
-
-def console_addresses(config):
-    try:
-        subnet = ipaddress.IPv4Network(
-            config.get("STORE_SEARCH_CONSOLE_SUBNET", "172.30.81.0/29")
-        )
-        result = {
-            "platform-api": ipaddress.IPv4Address(
-                config.get("STORE_SEARCH_API_IP", "172.30.81.2")
-            ),
-            "opensearch-dashboards": ipaddress.IPv4Address(
-                config.get("OPENSEARCH_DASHBOARDS_IP", "172.30.81.3")
-            ),
-        }
-        if len(set(result.values())) != 2 or any(
-            address not in subnet
-            or address
-            in (
-                subnet.network_address,
-                subnet.broadcast_address,
-                subnet.network_address + 1,
-            )
-            for address in result.values()
-        ):
-            raise ValueError()
-    except ValueError:
-        raise ValueError(
-            "Search-console addresses must be distinct usable IPv4 addresses in their isolated subnet, excluding its gateway."
-        ) from None
-    return subnet, result
-
-
-def couchdb_addresses(config):
-    try:
-        subnet = ipaddress.IPv4Network(
-            config.get("STORE_COUCHDB_SUBNET", "172.30.82.0/29")
-        )
-        address = ipaddress.IPv4Address(config.get("COUCHDB_IP", "172.30.82.2"))
-        if address not in subnet or address in (
-            subnet.network_address,
-            subnet.broadcast_address,
-            subnet.network_address + 1,
-        ):
-            raise ValueError()
-    except ValueError:
-        raise ValueError(
-            "CouchDB address must be a usable IPv4 address in its isolated subnet, excluding its gateway."
-        ) from None
-    return subnet, {"couchdb": address}
-
-
-def hugegraph_addresses(config):
-    try:
-        subnet = ipaddress.IPv4Network(
-            config.get("STORE_HUGEGRAPH_SUBNET", "172.30.83.0/29")
-        )
-        address = ipaddress.IPv4Address(config.get("HUGEGRAPH_IP", "172.30.83.2"))
-        if address not in subnet or address in (
-            subnet.network_address,
-            subnet.broadcast_address,
-            subnet.network_address + 1,
-        ):
-            raise ValueError()
-    except ValueError:
-        raise ValueError(
-            "HugeGraph address must be usable in its isolated IPv4 subnet."
-        ) from None
-    return subnet, {"hugegraph": address}
 
 
 def conflicts(subnet, fixed, network, labels):
@@ -217,35 +129,17 @@ def check():
             or {}
         )
 
-    search_subnet, search_fixed = console_addresses(config)
-    couchdb_subnet, couchdb_fixed = couchdb_addresses(config)
-    hugegraph_subnet, hugegraph_fixed = hugegraph_addresses(config)
     errors = []
-    for name, selected_subnet, selected_fixed in (
-        (NETWORK, subnet, fixed),
-        ("developer-platform-search-consoles", search_subnet, search_fixed),
-        ("developer-platform-store-couchdb", couchdb_subnet, couchdb_fixed),
-        ("developer-platform-store-hugegraph", hugegraph_subnet, hugegraph_fixed),
-    ):
-        if name in existing:
-            network = json.loads(docker("network", "inspect", name))[0]
-            if name in {
-                "developer-platform-store-couchdb",
-                "developer-platform-store-hugegraph",
-            } and not network.get("Internal"):
-                raise ValueError("Existing store network must be internal")
-            if args.validate_networks:
-                configured = network.get("IPAM", {}).get("Config", [])
-                if not any(
-                    item.get("Subnet") == str(selected_subnet) for item in configured
-                ):
-                    raise ValueError(
-                        "Existing Docker network subnet differs from configuration; network changes require a separate migration before deployment."
-                    )
-            else:
-                errors.extend(
-                    conflicts(selected_subnet, selected_fixed, network, labels)
+    if NETWORK in existing:
+        network = json.loads(docker("network", "inspect", NETWORK))[0]
+        if args.validate_networks:
+            configured = network.get("IPAM", {}).get("Config", [])
+            if not any(item.get("Subnet") == str(subnet) for item in configured):
+                raise ValueError(
+                    "Existing Docker network subnet differs from configuration; network changes require a separate migration before deployment."
                 )
+        else:
+            errors.extend(conflicts(subnet, fixed, network, labels))
     if errors:
         raise ValueError(
             "Fixed Docker address conflict: " + "; ".join(errors) + ". "

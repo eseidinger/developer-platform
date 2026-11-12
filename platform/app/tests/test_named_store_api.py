@@ -132,6 +132,40 @@ class StoreApiTests(TestCase):
         create.assert_not_called()
         issue.assert_not_called()
 
+    def test_removed_provider_create_is_rejected_before_catalog_or_native_access(self):
+        with (
+            patch.object(catalog, "create_resource") as create,
+            patch.object(api.providers, "get") as selected,
+            patch.object(
+                self.control,
+                "connect",
+                side_effect=AssertionError("Unexpected catalog access"),
+            ),
+        ):
+            for provider in (
+                "opensearch",
+                "qdrant",
+                "neo4j",
+                "couchdb",
+                "hugegraph",
+            ):
+                with self.subTest(provider=provider):
+                    response = self.client.post(
+                        "/v1/projects/alpha/resources",
+                        json={"name": "legacy", "provider": provider},
+                    )
+                    self.assertEqual(response.status_code, 422)
+        create.assert_not_called()
+        selected.assert_not_called()
+
+    def test_catalog_rejects_direct_legacy_create_before_query(self):
+        from app.stores.contract import StoredResourceConfiguration
+
+        body = StoredResourceConfiguration(name="legacy", provider="qdrant")
+        with self.assertRaisesRegex(catalog.Conflict, "PostgreSQL or S3"):
+            catalog.create_resource(self.conn, "alpha", body)
+        self.conn.execute.assert_not_called()
+
     def test_unregistered_service_client_is_not_treated_as_human(self):
         self.principal = Principal(
             "https://fixture.invalid", "service", authorized_party="custom-service"

@@ -2,8 +2,7 @@
 
 Launch assertions travel only in POST bodies. Host-only cookies authorize one
 human credential generation; native requests still authenticate at the relay.
-Native console requests retain their signed paths. The project-scoped CouchDB
-and HugeGraph browsers inject only their current lease's native credential.
+Native S3 requests retain their signed paths and lease-bound credentials.
 """
 
 import asyncio
@@ -15,7 +14,6 @@ import os
 import re
 import time
 from datetime import UTC, datetime
-from http.cookies import SimpleCookie
 from pathlib import Path
 from urllib.parse import parse_qs
 from uuid import UUID
@@ -24,7 +22,7 @@ from xml.etree import ElementTree
 import h11
 import httpx2 as httpx
 import jwt
-from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import (
     FileResponse,
     HTMLResponse,
@@ -34,10 +32,10 @@ from fastapi.responses import (
     StreamingResponse,
 )
 
-from . import catalog, dashboards, recovery
+from . import catalog, recovery
 
 COOKIE = "__Host-store-console"
-PROVIDERS = {"s3", "qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"}
+PROVIDERS = {"s3"}
 ISSUER = "developer-platform-store-console"
 HOP = {
     "host",
@@ -154,36 +152,15 @@ def assertion(row, kind, lifetime):
 
 
 def backend(row, static):
-    if row["provider"] == "neo4j":
-        return row["native_host"], 7474
-    if row["provider"] == "opensearch":
-        return os.environ["OPENSEARCH_DASHBOARDS_IP"], 5601
     if not static:
         return os.environ["STORE_RELAY_IP"], row["relay_port"]
-    return (
-        (os.environ["RUSTFS_IP"], 9001)
-        if row["provider"] == "s3"
-        else (os.environ["QDRANT_IP"], 6333)
-    )
+    return os.environ["RUSTFS_IP"], 9001
 
 
 def landing(provider):
-    return {
-        "s3": "/rustfs/console/",
-        "qdrant": "/dashboard/",
-        "opensearch": "/",
-        "neo4j": "/browser/",
-        "couchdb": "/__platform/couchdb/",
-        "hugegraph": "/__platform/hugegraph/",
-    }[provider]
-
-
-def dashboards_cookie(value):
-    # Exactly one native encrypted cookie, never the portal cookie or a caller's
-    # arbitrary cookie. Scope/security attributes are set by the gateway.
-    if len(value) > 16384 or any(character in value for character in "\r\n;"):
-        raise ValueError("Invalid native console cookie")
-    return value
+    if provider != "s3":
+        raise ValueError("Unsupported console provider")
+    return "/rustfs/console/"
 
 
 def session_metadata(raw, row):
@@ -260,7 +237,6 @@ def create_gateway(
     destination=backend,
     register=None,
     acknowledge=acknowledged,
-    observe_socket=None,
 ):
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None)
     slots = asyncio.Semaphore(32)
@@ -276,13 +252,6 @@ def create_gateway(
             result.headers["Clear-Site-Data"] = '"cache", "storage"'
             result.delete_cookie(
                 COOKIE, secure=True, httponly=True, samesite="strict", path="/"
-            )
-            result.delete_cookie(
-                dashboards.COOKIE,
-                secure=True,
-                httponly=True,
-                samesite="strict",
-                path="/",
             )
         return result
 
@@ -322,110 +291,6 @@ def create_gateway(
             raise HTTPException(
                 401, "Open an active console lease from the platform portal"
             ) from None
-
-    @app.websocket("/{path:path}")
-    async def bolt_socket(socket: WebSocket, path: str):
-        upstream = None
-        tasks = []
-        acquired = False
-        phase = "request-boundary"
-        try:
-            port = int(socket.path_params["port"])
-            base = origin(port)
-            proxied = (
-                socket.client
-                and socket.client.host == os.environ.get("PROXY_IP")
-                and socket.headers.get("x-forwarded-proto") == "https"
-            )
-            for phase, valid in [
-                ("request-path", not path),
-                (
-                    "request-host",
-                    socket.headers.get("host") in {base[8:], base[8:] + ":443"},
-                ),
-                ("request-origin", socket.headers.get("origin") == base),
-                ("request-tls", socket.url.scheme == "wss" or proxied),
-                (
-                    "request-subprotocol",
-                    socket.headers.get("sec-websocket-protocol") in {None, "bolt"},
-                ),
-            ]:
-                if not valid:
-                    raise ValueError()
-            phase = "catalog-authentication"
-            row = await authorize(socket.cookies.get(COOKIE), "session", port)
-            if row["provider"] != "neo4j":
-                raise ValueError()
-            await asyncio.wait_for(slots.acquire(), 0.1)
-            acquired = True
-            address = str(ipaddress.IPv4Address(os.environ["STORE_RELAY_IP"]))
-            phase = "private-relay-connect"
-            reader, upstream = await asyncio.wait_for(
-                asyncio.open_connection(address, port), 3
-            )
-            phase = "protocol-forwarding"
-            await socket.accept(
-                subprotocol="bolt"
-                if socket.headers.get("sec-websocket-protocol")
-                else None
-            )
-
-            async def requests():
-                while True:
-                    data = await socket.receive_bytes()
-                    if not data or len(data) > 1056768:
-                        return
-                    upstream.write(data)
-                    await upstream.drain()
-
-            async def responses():
-                while data := await reader.read(65536):
-                    await socket.send_bytes(data)
-
-            async def guard():
-                while True:
-                    remaining = row["expires_at"].timestamp() - time.time()
-                    if remaining <= 0:
-                        return
-                    try:
-                        await asyncio.wait_for(
-                            authorize(socket.cookies.get(COOKIE), "session", port),
-                            min(0.5, remaining),
-                        )
-                    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
-                        return
-                    await asyncio.sleep(min(0.25, remaining))
-
-            tasks = [
-                asyncio.create_task(requests()),
-                asyncio.create_task(responses()),
-                asyncio.create_task(guard()),
-            ]
-            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
-            if observe_socket:
-                for task in done:
-                    error = task.exception()
-                    observe_socket(
-                        "request"
-                        if task is tasks[0]
-                        else "response"
-                        if task is tasks[1]
-                        else "guard",
-                        type(error).__name__ if error else "Completed",
-                    )
-        except Exception as error:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
-            if observe_socket:
-                observe_socket(phase, type(error).__name__)
-        finally:
-            for task in tasks:
-                task.cancel()
-            await asyncio.gather(*tasks, return_exceptions=True)
-            if upstream:
-                upstream.close()
-            with contextlib.suppress(Exception):
-                await socket.close(code=1008)
-            if acquired:
-                slots.release()
 
     @app.api_route(
         "/{path:path}",
@@ -495,34 +360,8 @@ def create_gateway(
                 path="/",
                 max_age=max(0, int(row["expires_at"].timestamp() - time.time())),
             )
-            if row["provider"] == "opensearch":
-                response.delete_cookie(
-                    dashboards.COOKIE,
-                    secure=True,
-                    httponly=True,
-                    samesite="strict",
-                    path="/",
-                )
             return response
         row = await authorize(request.cookies.get(COOKIE), "session", port)
-        frontend = row["provider"] == "opensearch"
-        if row["provider"] == "couchdb" and path.startswith("__platform/"):
-            from . import couchdb_console
-
-            return couchdb_console.asset(path, request.method, row)
-        if row["provider"] == "hugegraph" and path.startswith("__platform/"):
-            from . import hugegraph_console
-
-            return hugegraph_console.asset(path, request.method, row)
-        if row["provider"] == "neo4j" and path == "" and request.method == "GET":
-            # Catalog-authorized connection discovery; never leak raw native addresses.
-            return JSONResponse(
-                {
-                    "bolt_direct": "bolt+s://" + base[8:] + ":443",
-                    "bolt_routing": "bolt+s://" + base[8:] + ":443",
-                },
-                headers={"Cache-Control": "no-store"},
-            )
         if row["provider"] == "s3" and path == "rustfs/admin/v3/is-admin":
             # Every platform console identity is a non-administrator. Native
             # admin discovery itself requires global rights in this release;
@@ -546,31 +385,12 @@ def create_gateway(
             raise HTTPException(403, "Console origin required")
         if request.headers.get("upgrade") or request.method == "OPTIONS":
             raise HTTPException(400, "Unsupported console protocol")
-        static = (
-            (
-                row["provider"] == "neo4j"
-                and (path == "browser" or path.startswith("browser/"))
-            )
-            or (
-                row["provider"] == "s3"
-                and (path == "rustfs/console" or path.startswith("rustfs/console/"))
-            )
-            or (
-                row["provider"] == "qdrant"
-                and (path == "dashboard" or path.startswith("dashboard/"))
-            )
-        )
+        static = path == "rustfs/console" or path.startswith("rustfs/console/")
         native_auth = (
             request.headers.get("authorization")
-            or request.headers.get("api-key")
             or b"X-Amz-Credential=" in request.scope["query_string"]
         )
-        if (
-            path == ""
-            and request.method in {"GET", "HEAD"}
-            and not native_auth
-            and not frontend
-        ):
+        if path == "" and request.method in {"GET", "HEAD"} and not native_auth:
             return RedirectResponse(landing(row["provider"]), 303)
         if static:
             if any(part in {".", ".."} for part in path.split("/")):
@@ -612,25 +432,7 @@ def create_gateway(
             else b""
         )
         authorization = {}
-        if row["provider"] in {"couchdb", "hugegraph"}:
-            from . import couchdb_console, hugegraph_console
-
-            adapter = (
-                couchdb_console if row["provider"] == "couchdb" else hugegraph_console
-            )
-
-            if request.headers.get("authorization"):
-                raise HTTPException(400, "Use the active platform console session")
-            try:
-                adapter.authorize(request.method.encode(), raw, row)
-            except ValueError:
-                raise HTTPException(
-                    403, "Store operation is outside this lease"
-                ) from None
-            scoped_auth = adapter.authorization(row)
-        else:
-            scoped_auth = None
-        if not static and not frontend:
+        if not static:
             from .http_relay import identity
 
             try:
@@ -638,16 +440,7 @@ def create_gateway(
                     h11.Request(
                         method=request.method,
                         target=raw,
-                        headers=(
-                            [
-                                (name, value)
-                                for name, value in request.headers.raw
-                                if name != b"authorization"
-                            ]
-                            + [(b"authorization", scoped_auth)]
-                            if scoped_auth
-                            else request.headers.raw
-                        ),
+                        headers=request.headers.raw,
                     ),
                     row,
                 )
@@ -693,36 +486,7 @@ def create_gateway(
             if name.lower() not in HOP
             and not name.lower().startswith(("x-forwarded-", "x-platform-store-"))
         ]
-        if row["provider"] in {"couchdb", "hugegraph"}:
-            # Browser metadata and cookies never enter the private data relay.
-            headers = [
-                (name, value)
-                for name, value in headers
-                if name.lower()
-                in {"accept", "content-type", "if-match", "if-none-match"}
-            ]
-            headers.append(("Authorization", scoped_auth.decode()))
         headers.append(("Host", request.headers["host"]))
-        if frontend:
-            from .opensearch import tenant
-
-            headers.append((dashboards.HEADER, str(row["credential_id"])))
-            headers = [
-                (name, value)
-                for name, value in headers
-                if name.lower() != "securitytenant"
-            ]
-            headers.append(("securitytenant", tenant(row)))
-            headers.append(("X-Forwarded-Proto", "https"))
-            if dashboards.COOKIE in request.cookies:
-                headers.append(
-                    (
-                        "Cookie",
-                        dashboards.COOKIE
-                        + "="
-                        + dashboards_cookie(request.cookies[dashboards.COOKIE]),
-                    )
-                )
         if request.method in {"GET", "HEAD"} and (
             request.headers.get("transfer-encoding")
             or request.headers.get("content-length", "0") != "0"
@@ -740,7 +504,6 @@ def create_gateway(
             timeout=httpx.Timeout(60, connect=3),
         )
         upstream = None
-        native_cookies = []
         try:
             upstream = await transport.send(
                 transport.build_request(
@@ -781,14 +544,6 @@ def create_gateway(
                 await transport.aclose()
                 slots.release()
                 return result
-            if frontend:
-                for raw_cookie in upstream.headers.get_list("set-cookie"):
-                    parsed = SimpleCookie()
-                    parsed.load(raw_cookie)
-                    if dashboards.COOKIE in parsed:
-                        native_cookies.append(
-                            dashboards_cookie(parsed[dashboards.COOKIE].value)
-                        )
         except BaseException as error:
             slots.release()
             with contextlib.suppress(asyncio.CancelledError, TimeoutError):
@@ -798,58 +553,21 @@ def create_gateway(
             raise HTTPException(502, "Console connection unavailable") from None
 
         async def stream():
-            async def alive():
-                while True:
-                    remaining = (row["expires_at"] - datetime.now(UTC)).total_seconds()
-                    if remaining <= 0:
-                        return
-                    try:
-                        current = await asyncio.wait_for(
-                            asyncio.to_thread(load, UUID(str(row["credential_id"]))),
-                            min(0.5, remaining),
-                        )
-                    except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
-                        return
-                    deadline = (
-                        min(current["expires_at"], row["expires_at"])
-                        if current
-                        else datetime.now(UTC)
-                    )
-                    if deadline <= datetime.now(UTC):
-                        return
-                    await asyncio.sleep(
-                        min(0.5, max(0, (deadline - datetime.now(UTC)).total_seconds()))
-                    )
-
-            # Dashboards loads dozens of immutable frontend bundles at once.
-            # They contain no tenant data and are authorized when requested;
-            # repeated catalog probes can truncate a bundle under burst load.
-            asset = path.startswith(("9054/bundles/", "ui/")) or path in {
-                "startup.js",
-                "bootstrap.js",
-            }
-            guard = asyncio.create_task(alive()) if frontend and not asset else None
             pending = None
             try:
                 iterator = upstream.aiter_raw().__aiter__()
                 while True:
                     pending = asyncio.create_task(anext(iterator))
-                    if guard:
-                        done, _ = await asyncio.wait(
-                            (guard, pending), return_when=asyncio.FIRST_COMPLETED
-                        )
-                        if guard in done:
-                            return
                     try:
                         yield await pending
                     except StopAsyncIteration:
                         break
             finally:
-                for task in (guard, pending):
+                for task in (pending,):
                     if task:
                         task.cancel()
                 await asyncio.gather(
-                    *(task for task in (guard, pending) if task), return_exceptions=True
+                    *(task for task in (pending,) if task), return_exceptions=True
                 )
                 slots.release()
 
@@ -888,27 +606,15 @@ def create_gateway(
         )
         policy = (
             "frame-ancestors 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'"
-            if static or frontend
+            if static
             else "sandbox; default-src 'none'; frame-ancestors 'none'"
         )
-        if (static or frontend) and upstream.headers.get("content-security-policy"):
+        if static and upstream.headers.get("content-security-policy"):
             # Multiple policies intersect: retain the official console's script,
             # worker and nonce restrictions while adding the platform boundary.
             result.headers.append("Content-Security-Policy", policy)
         else:
             result.headers["Content-Security-Policy"] = policy
-        for value in native_cookies:
-            result.set_cookie(
-                dashboards.COOKIE,
-                value,
-                path="/",
-                secure=True,
-                httponly=True,
-                samesite="strict",
-                max_age=max(0, int(row["expires_at"].timestamp() - time.time()))
-                if value
-                else 0,
-            )
         if (
             not static
             and row["provider"] == "s3"

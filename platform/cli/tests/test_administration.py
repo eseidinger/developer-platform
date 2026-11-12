@@ -528,9 +528,7 @@ def test_obsolete_database_issuance_commands_are_excluded():
     assert ("POST", "/projects/{name}/database-access/me/credential") in EXCLUSIONS
 
 
-@pytest.mark.parametrize(
-    "provider", ["postgresql", "s3", "qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"]
-)
+@pytest.mark.parametrize("provider", ["postgresql", "s3"])
 def test_store_tunnel_uses_verified_host_and_does_not_print_credential(
     monkeypatch, tmp_path, provider
 ):

@@ -73,12 +73,10 @@ class PlatformConfigurationTests(unittest.TestCase):
         spec.loader.exec_module(plugin)
         options = {
             "stores": {
-                "profiles": ["qdrant"],
-                "capacity_bytes": {"postgresql": 4096, "qdrant": 2048},
+                "profiles": ["s3"],
+                "capacity_bytes": {"postgresql": 4096, "s3": 2048},
             },
             "network": {"subnet": "10.55.8.0/24"},
-            "search_console_network": {"subnet": "10.55.9.0/29"},
-            "couchdb_network": {"subnet": "10.55.10.0/29"},
         }
         specification = {
             "environment": {"PLATFORM_DOMAIN": "platform.fixture.example"},
@@ -100,11 +98,11 @@ class PlatformConfigurationTests(unittest.TestCase):
 
     def test_omissions_preserve_custom_settings_comments_and_secrets(self):
         content = self.environment.read_text().replace(
-            "COMPOSE_PROFILES=", "COMPOSE_PROFILES=qdrant"
+            "COMPOSE_PROFILES=", "COMPOSE_PROFILES=s3"
         )
         content = content.replace(
             'STORE_CAPACITY_BYTES={"postgresql":17179869184}',
-            'STORE_CAPACITY_BYTES={"postgresql":100,"qdrant":200}',
+            'STORE_CAPACITY_BYTES={"postgresql":100,"s3":200}',
         )
         self.environment.write_text(
             content + "# retained operator setting\nCUSTOM_SETTING=value\n"
@@ -116,7 +114,7 @@ class PlatformConfigurationTests(unittest.TestCase):
             self.root, {"environment": {"PLATFORM_DOMAIN": "new.fixture.example"}}
         )
         after = self.environment.read_text()
-        self.assertIn("COMPOSE_PROFILES=qdrant\n", after)
+        self.assertIn("COMPOSE_PROFILES=s3\n", after)
         self.assertIn("# retained operator setting\nCUSTOM_SETTING=value\n", after)
         self.assertIn("DATABASE_KEY=fixture-secret\n", after)
         self.assertEqual(self.environment.stat().st_mode & 0o777, 0o600)

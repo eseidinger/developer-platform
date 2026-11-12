@@ -22,12 +22,6 @@ class HostCapacityTests(unittest.TestCase):
                 "Labels": {"com.docker.compose.project": "developer-platform"},
             },
             {
-                "Id": "retained",
-                "Names": ["/native-retained"],
-                "State": "exited",
-                "Labels": {"developer-platform.neo4j-resource": "synthetic"},
-            },
-            {
                 "Id": "init",
                 "Names": ["/init"],
                 "State": "exited",
@@ -49,7 +43,6 @@ class HostCapacityTests(unittest.TestCase):
             for name, allocation, cpu, restart in [
                 ("node", 4 * 1073741824, 0, "unless-stopped"),
                 ("shared", memory, 0, "unless-stopped"),
-                ("retained", 1610612736, 1000000000, "unless-stopped"),
                 ("init", 0, 0, "no"),
             ]
         }
@@ -64,7 +57,7 @@ class HostCapacityTests(unittest.TestCase):
 
         return request
 
-    def test_projection_omits_credentials_counts_retained_instances_and_excludes_initializers(
+    def test_projection_omits_credentials_and_excludes_initializers(
         self,
     ):
         result = collect(self.engine())
@@ -76,9 +69,9 @@ class HostCapacityTests(unittest.TestCase):
             {"k3d-workloads-agent-0": {"cpu_millicores": 16000, "memory_mib": 4096}},
         )
         self.assertEqual(
-            [s["name"] for s in result["services"]], ["shared", "native-retained"]
+            [s["name"] for s in result["services"]], ["shared"]
         )
-        self.assertEqual(sum(s["memory_mib"] for s in result["services"]), 2048)
+        self.assertEqual(sum(s["memory_mib"] for s in result["services"]), 512)
         self.assertTrue(result["services"][0]["cpu_unbounded"])
         self.assertNotIn("MUST_NOT_APPEAR", json.dumps(result))
 

@@ -102,79 +102,33 @@ database selection, absent/unlimited values and dashboard query readback using
 production collectors, SQL and metric filters. It pauses the exporter to verify
 `up=0`, then resumes it and verifies `pg_up=1`.
 
-## Phase 7 store performance
+## Named-store performance
 
-The named-resource overview links to PostgreSQL, RustFS S3, OpenSearch, Qdrant,
-Apache AGE, pgvector, DuckDB/Parquet and dedicated Neo4j Community dashboards.
-Regenerate reviewed definitions with
-`python3 scripts/generate/generate-dashboards.py`. Native collection runs
-independently of lifecycle reconciliation and publishes bounded textfile metrics
-through the existing node exporter. Last-good readings remain visible after
-failure, with separate collection health/freshness. The operator-only
-dedicated-instance controller reads Docker statistics; API/relay containers do
-not receive its Docker socket. This operator service has host-level Docker
-authority and must be restricted to the fixed API source and private key.
+The named-resource overview links to PostgreSQL, RustFS S3, Apache AGE,
+pgvector, and application-owned DuckDB/Parquet dashboards. Regenerate reviewed
+definitions with `python3 scripts/generate/generate-dashboards.py`.
 
-OpenSearch uses the `platform_monitor` native role for selected cluster/index
-statistics, with document and identity administration denied. Qdrant uses the
-separate `STORE_MONITOR_PASSWORD` as a native read-only key for metrics; its
-edition does not provide a metrics-only key, so keep that operator credential
-private. Resource mappings come from the catalog, not arbitrary native labels.
-All OTLP memory limiters use a common 192 MiB hard / 144 MiB soft process-heap
-budget inside Alloy's 256 MiB light-load container limit. The limiter observes
-the whole collector heap, not just its named pipeline; smaller per-signal limits
-refused RustFS telemetry in the deployed multi-pipeline collector. Body limits,
-label allowlists, aggregation and batching still apply. See the
-[Alloy limiter semantics](https://grafana.com/docs/alloy/latest/reference/components/otelcol/otelcol.processor.memory_limiter/).
+The PostgreSQL native collector connects read-only as `platform_monitor` to
+named databases, at most eight per pass. It publishes aggregate table, vacuum,
+vector-index, and index-build statistics without SQL, user, or index-name labels.
+Last-good values keep their original timestamps after a failure; collection
+health is separate. The PostgreSQL dashboard also displays shared WAL and
+checkpoint statistics.
 
-The native collector prepares OpenSearch's restricted monitoring account once
-per process before collecting, including on an installation with no named
-resources. Failed setup is retried on the next pass; subsequent statistics
-requests use the restricted account, without requiring a project to provision an
-index first. RustFS 1.0.2 exports metrics over OTLP/HTTP to Alloy's private port
-4320; the allowlist aggregates away unreviewed dimensions before export. Its
-object keys, paths, logs and trace payloads do not enter this new metrics
-pipeline.
+RustFS 1.0.2 exports S3 metrics over OTLP/HTTP to Alloy's private port 4320. The
+allowlist removes unreviewed dimensions before Prometheus export. Object keys,
+paths, logs, and trace payloads are excluded from the metrics pipeline. Alloy's
+memory limiter uses a 192 MiB hard and 144 MiB soft process-heap budget within
+its 256 MiB light-load container limit; the limit covers the entire collector.
 
-The PostgreSQL dashboard now includes shared WAL/checkpoint statistics. The
-separate collector connects read-only as `platform_monitor` to named databases,
-at most eight per pass, and publishes aggregate table/vacuum/vector-index and
-index-build statistics without SQL, user or index-name labels. Named-resource
-provisioning grants this operator identity CONNECT when present; prepare
-existing named databases through reviewed operator maintenance. These additions
-extend the earlier platform-only exporter scope described above.
-
-AGE/pgvector/Neo4j query latency and DuckDB/job profiling require explicit
-application instrumentation. The
+Application query latency and DuckDB job profiles require explicit application
+instrumentation. The
 [collector example and integration guide](../../examples/store-observability/README.md)
-opens no listener and returns Prometheus text for an application's existing
-protected metrics route. Enable the normal application metrics opt-in; its
-reviewed allowlist now accepts these bounded metric families. Only numeric
-DuckDB profile fields are exported. Missing application observations are
-unknown, not proof of zero traffic or completed external integration.
-Shared-server CPU/I/O is labeled separately from attributable resource/workload
-signals.
+opens no listener and returns bounded Prometheus text for an application's
+protected metrics route. Missing observations mean unknown, not zero traffic.
 
 Run `scripts/tests/components/observability/verify-store-metric-pipeline.py` for
-real signed RustFS I/O through production Alloy into disposable Prometheus,
-sensitive-dimension exclusion and parsing all store-dashboard queries. Native
-OpenSearch/Qdrant fixtures additionally verify collector permissions and
-release-specific metric schemas. Alert fixtures include
-`tests/native-stores.test.yaml`; thresholds are operational starting points to
-tune against observed workloads, not store-adoption requirements.
-
-Neo4j Community's pinned image includes a checksum-verified standard JVM agent;
-heap, live threads and normalized GC seconds do not require Enterprise metrics.
-The agent flag is set once in the image configuration: passing it through the
-entrypoint's repeatable environment setting broke restarts by duplicating it.
-Native JVM collection and clean restart are fixture-verified. A separate private
-relay scrape exposes aggregate resource connection counts without credential
-IDs. The operator controller also reattaches replaced infrastructure to running
-owned instance networks; it never starts retired/stopped instances.
-
-Collection timestamps/health remain separate from retained last-good values.
-PostgreSQL resource health includes never-sampled and failed database attempts;
-its bounded round robin must not be mistaken for continuous per-resource
-sampling. Run `examples/store-observability/verify.py` with the optional
-analytics fixture group for actual DuckDB profiling and numeric-only export
-evidence.
+signed RustFS I/O through production Alloy into disposable Prometheus, sensitive
+dimension exclusion, and dashboard query parsing. Alert fixtures include
+`tests/native-stores.test.yaml`. PostgreSQL round-robin sampling is bounded;
+never-sampled and failed resources remain explicit in health and freshness.

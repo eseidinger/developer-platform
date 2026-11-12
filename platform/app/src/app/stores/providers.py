@@ -14,63 +14,26 @@ class ProviderUnavailable(Exception):
 def get(name):
     if name == "postgresql":
         return Postgres()
+    if name != "s3":
+        raise ProviderUnavailable("Only PostgreSQL and S3 are supported")
     selected = {
         value.strip()
         for value in os.environ.get("STORE_ENABLED_PROVIDERS", "postgresql").split(",")
     }
     if name not in selected:
         raise ProviderUnavailable("Provider is not selected by the operator")
-    if name == "neo4j":
-        if len(os.environ.get("NEO4J_CONTROLLER_KEY", "")) < 32:
-            raise ProviderUnavailable("Dedicated instance controller is not configured")
-        from .neo4j import Neo4j
-
-        try:
-            return Neo4j()
-        except (ValueError, KeyError):
-            raise ProviderUnavailable(
-                "Dedicated instance controller configuration is invalid"
-            ) from None
-    definitions = {
-        "s3": ("RUSTFS_IP", ("RUSTFS_ACCESS_KEY", "RUSTFS_SECRET_KEY")),
-        "opensearch": ("OPENSEARCH_IP", ("OPENSEARCH_ADMIN_PASSWORD",)),
-        "qdrant": ("QDRANT_IP", ("QDRANT_API_KEY",)),
-        "couchdb": ("COUCHDB_IP", ("COUCHDB_ADMIN_PASSWORD",)),
-        "hugegraph": ("HUGEGRAPH_IP", ("HUGEGRAPH_ADMIN_PASSWORD",)),
-    }
-    if name not in definitions:
-        raise ProviderUnavailable(
-            "Provider cannot satisfy the configured resource contract"
-        )
     try:
         import ipaddress
 
-        address, secrets = definitions[name]
-        ipaddress.IPv4Address(os.environ[address])
-        if any(
-            len(os.environ[key]) < (20 if key == "RUSTFS_ACCESS_KEY" else 32)
-            for key in secrets
+        ipaddress.IPv4Address(os.environ["RUSTFS_IP"])
+        if (
+            len(os.environ["RUSTFS_ACCESS_KEY"]) < 20
+            or len(os.environ["RUSTFS_SECRET_KEY"]) < 32
         ):
             raise ValueError("Unconfigured administration credentials")
-        if name == "s3":
-            from .s3 import S3
+        from .s3 import S3
 
-            return S3()
-        if name == "qdrant":
-            from .qdrant import Qdrant
-
-            return Qdrant()
-        if name == "couchdb":
-            from .couchdb import CouchDB
-
-            return CouchDB()
-        if name == "hugegraph":
-            from .hugegraph import HugeGraph
-
-            return HugeGraph()
-        from .opensearch import OpenSearch
-
-        return OpenSearch()
+        return S3()
     except (KeyError, ValueError, OSError, StoreError):
         raise ProviderUnavailable(
             "Selected provider configuration is incomplete"
@@ -98,17 +61,17 @@ def capabilities(name):
     }
 
 
+def quota_enforcement(name):
+    """Report historical rows without reopening a removed native provider."""
+    if name in {"postgresql", "s3"}:
+        return get(name).quota_enforcement
+    capabilities(name)
+    return "advisory"
+
+
 def availability():
     result = []
-    for name in (
-        "postgresql",
-        "s3",
-        "opensearch",
-        "qdrant",
-        "neo4j",
-        "couchdb",
-        "hugegraph",
-    ):
+    for name in ("postgresql", "s3"):
         try:
             get(name)
             budget(name)
@@ -137,26 +100,8 @@ def budget(name):
 
 
 def check_capacity(conn, provider, quota, resource_id=None):
-    if provider == "neo4j" and resource_id is None:
-        try:
-            limit = int(os.environ.get("NEO4J_MAX_INSTANCES", "4"))
-        except ValueError:
-            raise ProviderUnavailable(
-                "Dedicated instance allocation is invalid"
-            ) from None
-        if not 1 <= limit <= 64:
-            raise ProviderUnavailable("Dedicated instance allocation is invalid")
-        if (
-            conn.execute(
-                "SELECT count(*) FROM store_resources WHERE provider='neo4j' AND state<>'purged'"
-            ).fetchone()[0]
-            >= limit
-        ):
-            from .catalog import Conflict
-
-            raise Conflict(
-                "Operator dedicated instance allocation exhausted, including retained resources"
-            )
+    if provider not in {"postgresql", "s3"}:
+        raise ProviderUnavailable("Only PostgreSQL and S3 are supported")
     used = conn.execute(
         """SELECT COALESCE(sum(GREATEST(quota_bytes,COALESCE(used_bytes,0))),0) FROM store_resources
         WHERE provider=%s AND state<>'purged' AND (%s::uuid IS NULL OR resource_id<>%s)""",
@@ -190,24 +135,12 @@ def connection(resource, credential):
                 "PGSSLMODE": "disable",
             }
         )
-    elif resource["provider"] == "neo4j":
-        address = str(
-            ipaddress.ip_address(os.environ.get("STORE_RELAY_IP", "172.30.80.15"))
-        )
-        fields["NEO4J_URI"] = f"bolt://{address}:{credential['relay_port']}"
     else:
         address = str(
             ipaddress.ip_address(os.environ.get("STORE_RELAY_IP", "172.30.80.15"))
         )
         endpoint = f"http://{address}:{credential['relay_port']}"
-        key = {
-            "s3": "AWS_ENDPOINT_URL_S3",
-            "qdrant": "QDRANT_URL",
-            "opensearch": "OPENSEARCH_URL",
-            "couchdb": "COUCHDB_URL",
-            "hugegraph": "HUGEGRAPH_REST_URI",
-        }[resource["provider"]]
-        fields[key] = endpoint
+        fields["AWS_ENDPOINT_URL_S3"] = endpoint
     return fields
 
 

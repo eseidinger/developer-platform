@@ -13,7 +13,7 @@ class InitializationTests(unittest.TestCase):
             root = Path(directory)
             path = root / ".env"
             path.write_text(
-                "# Preserve this comment\nPOSTGRES_PASSWORD=\nDATABASE_KEY=existing-secret\nCOMPOSE_PROFILES=s3,qdrant\n"
+                "# Preserve this comment\nPOSTGRES_PASSWORD=\nDATABASE_KEY=existing-secret\nCOMPOSE_PROFILES=s3\nQDRANT_API_KEY=discarded-test-secret\n"
             )
             changed = initialize(root)
             self.assertIn("POSTGRES_PASSWORD", changed)
@@ -22,7 +22,8 @@ class InitializationTests(unittest.TestCase):
             self.assertNotIn("POSTGRES_PASSWORD=\n", content)
             self.assertIn("DATABASE_KEY=existing-secret\n", content)
             self.assertIn("# Preserve this comment\n", content)
-            self.assertIn("COMPOSE_PROFILES=s3,qdrant\n", content)
+            self.assertIn("COMPOSE_PROFILES=s3\n", content)
+            self.assertNotIn("QDRANT_API_KEY", content)
             self.assertEqual(path.stat().st_mode & 0o777, 0o600)
             self.assertEqual(initialize(root), [])
             self.assertEqual(path.read_text(), content)

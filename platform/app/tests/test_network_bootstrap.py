@@ -100,61 +100,8 @@ class NetworkBootstrapTests(unittest.TestCase):
         ):
             network_addresses.check()
 
-    def test_search_console_network_is_separate_and_has_fixed_non_gateway_members(self):
-        subnet, fixed = network_addresses.console_addresses({})
-        self.assertFalse(subnet.overlaps(self.subnet))
-        self.assertEqual(str(fixed["opensearch-dashboards"]), "172.30.81.3")
-        for config in (
-            {"STORE_SEARCH_API_IP": "172.30.81.3"},
-            {"OPENSEARCH_DASHBOARDS_IP": "172.30.81.1"},
-            {"OPENSEARCH_DASHBOARDS_IP": "172.30.80.31"},
-            {"STORE_SEARCH_CONSOLE_SUBNET": "private-value"},
-            {
-                "STORE_SEARCH_CONSOLE_SUBNET": "172.30.80.0/24",
-                "STORE_SEARCH_API_IP": "172.30.80.2",
-                "OPENSEARCH_DASHBOARDS_IP": "172.30.80.3",
-            },
-        ):
-            with self.assertRaises(ValueError) as denied:
-                network_addresses.addresses(config)
-            self.assertNotIn("private-value", str(denied.exception))
 
-    def test_couchdb_network_is_isolated_and_rejects_gateway_or_overlap(self):
-        subnet, fixed = network_addresses.couchdb_addresses({})
-        self.assertEqual(str(subnet), "172.30.82.0/29")
-        self.assertEqual(str(fixed["couchdb"]), "172.30.82.2")
-        for config in (
-            {"COUCHDB_IP": "172.30.82.1"},
-            {"COUCHDB_IP": "172.30.80.33"},
-            {"STORE_COUCHDB_SUBNET": "172.30.80.0/29", "COUCHDB_IP": "172.30.80.2"},
-            {"STORE_COUCHDB_SUBNET": "private-value"},
-        ):
-            with self.subTest(config=config), self.assertRaises(ValueError) as denied:
-                network_addresses.addresses(config)
-            self.assertNotIn("private-value", str(denied.exception))
 
-    def test_existing_couchdb_network_must_remain_internal(self):
-        couchdb = {
-            "Internal": False,
-            "IPAM": {"Config": [{"Subnet": "172.30.82.0/29"}]},
-            "Containers": {},
-        }
-        with (
-            patch.object(network_addresses, "settings", return_value={}),
-            patch.object(
-                sys, "argv", ["check-network-addresses.py", "--validate-networks"]
-            ),
-            patch.object(
-                network_addresses,
-                "docker",
-                side_effect=[
-                    "developer-platform-store-couchdb",
-                    json.dumps([couchdb]),
-                ],
-            ),
-            self.assertRaisesRegex(ValueError, "must be internal"),
-        ):
-            network_addresses.check()
 
     def test_daemon_failure_never_forwards_arbitrary_diagnostics(self):
         with (

@@ -24,7 +24,7 @@ class PlatformDeploymentTests(unittest.TestCase):
             patch.object(deployment.shutil, "which", return_value="fixture-tool")
         )
 
-    def test_check_mode_cannot_stop_services_or_prepare_stores(self):
+    def test_check_mode_cannot_stop_services(self):
         calls = []
         self.preflight_patches(lambda args, **kwargs: calls.append(args) or "")
         deployment.deploy(check=True)
@@ -41,9 +41,6 @@ class PlatformDeploymentTests(unittest.TestCase):
         self.assertTrue(any(args[0] == "systemctl" for args in calls))
         self.assertFalse(
             any("stop" in args or "rm" in args or "bash" in args for args in calls)
-        )
-        self.assertFalse(
-            any("scripts/setup/prepare-stores.py" in args for args in calls)
         )
 
     def test_maintenance_or_invalid_configuration_refuses_outage(self):
@@ -75,7 +72,7 @@ class PlatformDeploymentTests(unittest.TestCase):
                     deployment.deploy()
                 self.assertFalse(any("stop" in args or "rm" in args for args in calls))
 
-    def test_store_preparation_then_stop_remove_bootstrap_and_readiness(self):
+    def test_configuration_then_stop_remove_bootstrap_and_readiness(self):
         calls = []
         self.preflight_patches(lambda args, **kwargs: calls.append(args) or "")
         with patch.object(
@@ -84,26 +81,26 @@ class PlatformDeploymentTests(unittest.TestCase):
             side_effect=lambda timeout: calls.append(["ready", timeout]),
         ):
             deployment.deploy(readiness_timeout=15)
-        prepare = next(
+        configure = next(
             i
             for i, args in enumerate(calls)
-            if "scripts/setup/prepare-stores.py" in args
+            if "scripts/setup/configure-platform.py" in args
         )
         stop = calls.index(["docker", "compose", "stop", "--timeout", "60"])
         remove = calls.index(["docker", "compose", "rm", "--force"])
         bootstrap = calls.index(["bash", "scripts/up.sh"])
-        self.assertLess(prepare, stop)
+        self.assertLess(configure, stop)
         self.assertLess(stop, remove)
         self.assertLess(remove, bootstrap)
         self.assertLess(bootstrap, calls.index(["ready", 15]))
         self.assertFalse(any("down" in args or "--volumes" in args for args in calls))
 
-    def test_failed_store_preparation_does_not_stop_services(self):
+    def test_failed_configuration_does_not_stop_services(self):
         calls = []
 
         def command(args, **kwargs):
             calls.append(args)
-            if "scripts/setup/prepare-stores.py" in args:
+            if "scripts/setup/configure-platform.py" in args:
                 raise deployment.DeploymentError("fixture failure")
             return ""
 

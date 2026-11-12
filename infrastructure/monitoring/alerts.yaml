@@ -292,33 +292,3 @@ groups:
         annotations:
           summary: >-
             Selected RustFS has no healthy native telemetry observation
-
-      - alert: StoreContainerMemoryPressure
-        expr: >-
-          platform_native_container_memory_bytes /
-          (platform_native_container_memory_limit_bytes > 0) > 0.9
-        for: 5m
-        labels:
-          severity: warning
-        annotations:
-          summary: >-
-            Store {{ $labels.provider }} container memory is near its limit
-
-      - alert: OpenSearchThreadPoolRejected
-        expr: >-
-          rate(platform_native_opensearch_thread_pool_rejected_total[5m]) > 0
-        for: 2m
-        labels:
-          severity: warning
-        annotations:
-          summary: 'OpenSearch {{ $labels.pool }} work is being rejected'
-
-      - alert: OpenSearchCircuitBreakerTripped
-        expr: >-
-          increase(platform_native_opensearch_breaker_tripped_total[5m]) > 0
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: >-
-            OpenSearch {{ $labels.breaker }} memory circuit breaker tripped

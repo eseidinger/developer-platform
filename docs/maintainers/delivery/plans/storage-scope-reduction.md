@@ -1,7 +1,10 @@
 # Storage Scope Reduction
 
-Status: planned November 12, 2026; no migration, deployment change, or data
-deletion is recorded by this plan. Task: **PLAN-039**. Decision:
+Status: implementing November 12, 2026. All 11 retired legacy resources were
+purged after verified backup and owner approval. Their containers and volumes
+were removed; source and deployment checks are in progress. The sustained
+capacity comparison remains open.
+Task: **PLAN-039**. Decision:
 [ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md).
 
 ## Outcome and boundary
@@ -24,6 +27,15 @@ workloads. Record an owner and disposition for each affected resource before
 changing its service.
 
 ## Work packages
+
+The [operator inventory and cutover runbook](../../../operators/runbooks/storage-scope-reduction.md)
+provides the evidence record for the live work packages. Source changes alone
+do not satisfy their exit gates.
+
+The [November 12 initial live inventory](../../../operators/validation/storage-scope-2026-11-12.md)
+found 11 retired but unpurged legacy resources. The same evidence record now
+includes their owner-approved purge, verified snapshots, service removal, and
+initial capacity point samples.
 
 ### 1. Inventory and establish the baseline
 

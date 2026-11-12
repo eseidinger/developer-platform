@@ -1296,17 +1296,8 @@
       },
       "ResourceCreate": {
         "additionalProperties": false,
+        "description": "New resources are limited to the supported platform storage scope.",
         "properties": {
-          "configuration": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/VectorConfiguration"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
           "extensions": {
             "items": {
               "enum": [
@@ -1328,12 +1319,7 @@
           "provider": {
             "enum": [
               "postgresql",
-              "s3",
-              "opensearch",
-              "neo4j",
-              "qdrant",
-              "couchdb",
-              "hugegraph"
+              "s3"
             ],
             "title": "Provider",
             "type": "string"
@@ -1971,31 +1957,6 @@
           "type"
         ],
         "title": "ValidationError",
-        "type": "object"
-      },
-      "VectorConfiguration": {
-        "additionalProperties": false,
-        "properties": {
-          "distance": {
-            "default": "Cosine",
-            "enum": [
-              "Cosine",
-              "Dot",
-              "Euclid",
-              "Manhattan"
-            ],
-            "title": "Distance",
-            "type": "string"
-          },
-          "vector_size": {
-            "default": 384,
-            "maximum": 65536.0,
-            "minimum": 1.0,
-            "title": "Vector Size",
-            "type": "integer"
-          }
-        },
-        "title": "VectorConfiguration",
         "type": "object"
       },
       "Version": {

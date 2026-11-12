@@ -119,31 +119,12 @@ def validate_effective_settings(config, tempo_source):
             "stores": {
                 "profiles": profiles.split(",") if profiles else [],
                 "capacity_bytes": json.loads(config["STORE_CAPACITY_BYTES"]),
-                "neo4j": {
-                    "max_instances": int(config["NEO4J_MAX_INSTANCES"]),
-                    "memory_bytes": int(config["NEO4J_INSTANCE_MEMORY_BYTES"]),
-                },
             },
             "network": {
                 "subnet": config["PLATFORM_SUBNET"],
                 "addresses": {
                     service: config[key] for service, (key, _) in ADDRESSES.items()
                 },
-            },
-            "search_console_network": {
-                "subnet": config["STORE_SEARCH_CONSOLE_SUBNET"],
-                "addresses": {
-                    "platform-api": config["STORE_SEARCH_API_IP"],
-                    "opensearch-dashboards": config["OPENSEARCH_DASHBOARDS_IP"],
-                },
-            },
-            "couchdb_network": {
-                "subnet": config["STORE_COUCHDB_SUBNET"],
-                "addresses": {"couchdb": config["COUCHDB_IP"]},
-            },
-            "hugegraph_network": {
-                "subnet": config["STORE_HUGEGRAPH_SUBNET"],
-                "addresses": {"hugegraph": config["HUGEGRAPH_IP"]},
             },
             "k3s_image": config["K3S_IMAGE"],
             "bootstrap_subject": config.get("PLATFORM_BOOTSTRAP_SUBJECT", ""),

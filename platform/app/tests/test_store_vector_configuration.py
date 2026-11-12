@@ -1,7 +1,7 @@
 from unittest import TestCase
 
 from app.stores import recovery
-from app.stores.contract import ResourceCreate
+from app.stores.contract import ResourceCreate, StoredResourceConfiguration
 from pydantic import ValidationError
 
 
@@ -18,10 +18,10 @@ class VectorConfigurationTests(TestCase):
                 self.subTest(provider=provider, configuration=configuration),
                 self.assertRaises(ValidationError),
             ):
-                ResourceCreate(
+                StoredResourceConfiguration(
                     name="vectors", provider=provider, configuration=configuration
                 )
-        body = ResourceCreate(
+        body = StoredResourceConfiguration(
             name="vectors",
             provider="qdrant",
             configuration={"vector_size": 4, "distance": "Dot"},
@@ -29,6 +29,15 @@ class VectorConfigurationTests(TestCase):
         self.assertEqual(
             body.configuration.model_dump(), {"vector_size": 4, "distance": "Dot"}
         )
+
+    def test_new_resources_reject_legacy_providers(self):
+        for provider in ("qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"):
+            with self.subTest(provider=provider), self.assertRaises(ValidationError):
+                ResourceCreate(name="legacy", provider=provider)
+        self.assertEqual(
+            ResourceCreate(name="db", provider="postgresql").extensions, []
+        )
+        self.assertEqual(ResourceCreate(name="objects", provider="s3").provider, "s3")
 
     def test_recovery_preserves_and_validates_the_vector_schema(self):
         from uuid import uuid4

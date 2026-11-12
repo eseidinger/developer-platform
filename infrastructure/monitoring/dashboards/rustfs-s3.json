@@ -55,181 +55,6 @@
     {
       "id": 2,
       "type": "timeseries",
-      "title": "Container CPU cores used",
-      "description": "Docker counter; shared services are not attributed to the selected project. Missing data means collection or target discovery needs checking.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 0
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(platform_native_container_cpu_seconds_total{provider=\"s3\",scope=\"shared\"}[5m])",
-          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "cores"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
-    },
-    {
-      "id": 3,
-      "type": "timeseries",
-      "title": "Container memory / limit",
-      "description": "Docker memory excluding inactive file cache; instance/container scope. Missing data means collection or target discovery needs checking.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "platform_native_container_memory_bytes{provider=\"s3\",scope=\"shared\"} / (platform_native_container_memory_limit_bytes{provider=\"s3\",scope=\"shared\"} > 0)",
-          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
-    },
-    {
-      "id": 4,
-      "type": "timeseries",
-      "title": "Container restarts",
-      "description": "Daemon restart count; replacement containers reset this gauge. Missing data means collection or target discovery needs checking.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "platform_native_container_restarts{provider=\"s3\",scope=\"shared\"}",
-          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "short"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
-    },
-    {
-      "id": 5,
-      "type": "timeseries",
-      "title": "Container block I/O read",
-      "description": "Docker block I/O counters; page-cache hits are not physical reads. Missing data means collection or target discovery needs checking.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 0,
-        "y": 16
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(platform_native_container_read_bytes_total{provider=\"s3\",scope=\"shared\"}[5m])",
-          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
-    },
-    {
-      "id": 6,
-      "type": "timeseries",
-      "title": "Container block I/O write",
-      "description": "Docker block I/O counters; shared store activity is not per resource. Missing data means collection or target discovery needs checking.",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 16
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "rate(platform_native_container_write_bytes_total{provider=\"s3\",scope=\"shared\"}[5m])",
-          "legendFormat": "{{project}} {{resource_id}} {{operation}} {{pool}} {{status}} {{scope}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {
-          "unit": "Bps"
-        },
-        "overrides": []
-      },
-      "options": {
-        "legend": {
-          "displayMode": "list",
-          "placement": "bottom"
-        }
-      }
-    },
-    {
-      "id": 7,
-      "type": "timeseries",
       "title": "Native request throughput",
       "description": "Native RustFS OTLP through the separate allowlisted Alloy metrics pipeline; shared service scope. Missing data means collection or target discovery needs checking.",
       "datasource": {
@@ -239,8 +64,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 24
+        "x": 12,
+        "y": 0
       },
       "targets": [
         {
@@ -263,7 +88,7 @@
       }
     },
     {
-      "id": 8,
+      "id": 3,
       "type": "timeseries",
       "title": "Native request p95 latency",
       "description": "Native histogram; per-operation dimensions depend on the verified release schema. Missing data means collection or target discovery needs checking.",
@@ -274,8 +99,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 24
+        "x": 0,
+        "y": 8
       },
       "targets": [
         {
@@ -298,7 +123,7 @@
       }
     },
     {
-      "id": 9,
+      "id": 4,
       "type": "timeseries",
       "title": "Native request errors",
       "description": "HTTP response class. Authentication/permission denials are distinct from service failures. Missing data means collection or target discovery needs checking.",
@@ -309,8 +134,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 32
+        "x": 12,
+        "y": 8
       },
       "targets": [
         {
@@ -333,7 +158,7 @@
       }
     },
     {
-      "id": 10,
+      "id": 5,
       "type": "timeseries",
       "title": "Native uploaded bytes",
       "description": "Native shared HTTP request bodies. Missing data means collection or target discovery needs checking.",
@@ -344,8 +169,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 32
+        "x": 0,
+        "y": 16
       },
       "targets": [
         {
@@ -368,7 +193,7 @@
       }
     },
     {
-      "id": 11,
+      "id": 6,
       "type": "timeseries",
       "title": "Native downloaded bytes",
       "description": "Native shared HTTP response bodies. Missing data means collection or target discovery needs checking.",
@@ -379,8 +204,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 40
+        "x": 12,
+        "y": 16
       },
       "targets": [
         {
@@ -403,7 +228,7 @@
       }
     },
     {
-      "id": 12,
+      "id": 7,
       "type": "timeseries",
       "title": "Native export age",
       "description": "Age of the last native readiness observation accepted by Prometheus. Missing is unavailable. Missing data means collection or target discovery needs checking.",
@@ -414,8 +239,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 40
+        "x": 0,
+        "y": 24
       },
       "targets": [
         {
@@ -438,7 +263,7 @@
       }
     },
     {
-      "id": 13,
+      "id": 8,
       "type": "timeseries",
       "title": "Native free storage",
       "description": "Native storage capacity, distinct from logical bucket quotas. Missing data means collection or target discovery needs checking.",
@@ -449,8 +274,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 48
+        "x": 12,
+        "y": 24
       },
       "targets": [
         {
@@ -473,7 +298,7 @@
       }
     },
     {
-      "id": 14,
+      "id": 9,
       "type": "timeseries",
       "title": "Native storage usage",
       "description": "Native cluster storage usage. Missing data means collection or target discovery needs checking.",
@@ -484,8 +309,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 48
+        "x": 0,
+        "y": 32
       },
       "targets": [
         {
@@ -508,7 +333,7 @@
       }
     },
     {
-      "id": 15,
+      "id": 10,
       "type": "timeseries",
       "title": "Native I/O timeouts",
       "description": "Only emitted when the native operation has observations. Missing data means collection or target discovery needs checking.",
@@ -519,8 +344,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 56
+        "x": 12,
+        "y": 32
       },
       "targets": [
         {
@@ -543,7 +368,7 @@
       }
     },
     {
-      "id": 16,
+      "id": 11,
       "type": "timeseries",
       "title": "Backpressure rejections",
       "description": "Native backpressure counter; absence is not an observed zero. Missing data means collection or target discovery needs checking.",
@@ -554,8 +379,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 56
+        "x": 0,
+        "y": 40
       },
       "targets": [
         {
@@ -578,7 +403,7 @@
       }
     },
     {
-      "id": 17,
+      "id": 12,
       "type": "timeseries",
       "title": "Scanner cycles",
       "description": "Native maintenance throughput. Missing data means collection or target discovery needs checking.",
@@ -589,8 +414,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 0,
-        "y": 64
+        "x": 12,
+        "y": 40
       },
       "targets": [
         {
@@ -613,7 +438,7 @@
       }
     },
     {
-      "id": 18,
+      "id": 13,
       "type": "timeseries",
       "title": "Healing backlog",
       "description": "Native healing work queue. Missing data means collection or target discovery needs checking.",
@@ -624,8 +449,8 @@
       "gridPos": {
         "h": 8,
         "w": 12,
-        "x": 12,
-        "y": 64
+        "x": 0,
+        "y": 48
       },
       "targets": [
         {

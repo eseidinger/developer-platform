@@ -28,15 +28,15 @@ tests:
   - name: collector failure fires and resolves
     interval: 1m
     input_series:
-      - series: 'platform_native_collection_up{provider="qdrant"}'
+      - series: 'platform_native_collection_up{provider="postgresql"}'
         values: '0+0x4 1 1'
     alert_rule_test:
       - eval_time: 3m
         alertname: NativeStoreCollectionUnavailable
         exp_alerts:
-          - exp_labels: {severity: warning, provider: qdrant}
+          - exp_labels: {severity: warning, provider: postgresql}
             exp_annotations:
-              summary: Native qdrant statistics collection failed
+              summary: Native postgresql statistics collection failed
               description: >-
                 Retained values may be stale. Inspect private collector
                 configuration, permissions and provider readiness.

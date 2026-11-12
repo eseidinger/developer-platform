@@ -111,212 +111,26 @@ def check_import_errors(stderr):
 
 
 def store_volume_restore_targets(bundle):
+    """Restore retained S3 data only; older live stores use the pinned release."""
     path = bundle / "store-recovery.json"
     if not path.exists():
         return []
     manifest = json.loads(path.read_text())
     providers = {
         row["provider"] for row in manifest["resources"] if row["state"] != "purged"
-    } - {"postgresql", "neo4j"}
-    mapping = {
-        "couchdb": [("couchdb", "couchdb_data", "couchdb-data.tar.gz")],
-        "hugegraph": [
-            ("hugegraph", "hugegraph_data", "hugegraph-data.tar.gz"),
-            ("hugegraph", "hugegraph_system", "hugegraph-rocksdb-data.tar.gz"),
-            ("hugegraph", "hugegraph_config", "hugegraph-graphs.tar.gz"),
-        ],
-        "s3": [("rustfs", "rustfs_data", "rustfs-data.tar.gz")],
-        "qdrant": [("qdrant", "qdrant_data", "qdrant-storage.tar.gz")],
-        "opensearch": [("opensearch", "opensearch_data", "opensearch-data.tar.gz")],
-    }
-    if providers - mapping.keys():
+    } - {"postgresql"}
+    if providers - {"s3"}:
         raise RuntimeError(
-            "No protected restore adapter for a retained data-store provider"
+            "Legacy data requires the pinned pre-removal Git commit 632b921"
         )
-    result = [item for provider in sorted(providers) for item in mapping[provider]]
-    if any(not (bundle / filename).is_file() for _, _, filename in result):
-        raise RuntimeError(
-            "A retained data-store volume is missing from this recovery bundle"
-        )
-    return result
-
-
-def hugegraph_parent_archive(bundle, store_volumes):
-    """Require the image-declared parent volume whenever HugeGraph is retained."""
-    if not any(service == "hugegraph" for service, _, _ in store_volumes):
-        return None
-    archive = bundle / "hugegraph-hugegraph-server.tar.gz"
-    if not archive.is_file():
-        raise RuntimeError("HugeGraph anonymous parent volume is missing")
-    return archive
-
-
-def restore_hugegraph_parent_volume(compose, archive):
-    """Restore the anonymous volume created for the stopped HugeGraph container."""
-    ids = run(compose + ["ps", "-a", "-q", "hugegraph"], ROOT).decode().split()
-    if len(ids) != 1:
-        raise RuntimeError("HugeGraph recovery container is unavailable")
-    containers = json.loads(run(["docker", "inspect", ids[0]]))
-    if len(containers) != 1 or containers[0]["State"]["Running"]:
-        raise RuntimeError("HugeGraph recovery container must be stopped")
-    mounts = [
-        mount
-        for mount in containers[0]["Mounts"]
-        if mount["Destination"] == "/hugegraph-server"
-        and mount["Type"] == "volume"
-        and re.fullmatch(r"[0-9a-f]{64}", mount.get("Name", ""))
-    ]
-    if len(mounts) != 1:
-        raise RuntimeError("HugeGraph anonymous parent volume is unavailable")
-    mount = mounts[0]
-    destination = Path(
-        run(
-            [
-                "docker",
-                "volume",
-                "inspect",
-                "--format",
-                "{{ .Mountpoint }}",
-                mount["Name"],
-            ]
-        )
-        .decode()
-        .strip()
-    )
-    if not destination.is_dir() or destination != Path(mount["Source"]):
-        raise RuntimeError("HugeGraph anonymous parent mountpoint mismatch")
-    if (destination / "docker/init_complete").exists():
-        raise RuntimeError("HugeGraph anonymous parent was already initialized")
-
-    # Docker copies image files into a new image-declared volume. Replace that
-    # initial tree with the captured state before any service can initialize it.
-    for entry in destination.iterdir():
-        if entry.is_dir() and not entry.is_symlink():
-            shutil.rmtree(entry)
-        else:
-            entry.unlink()
-    with tarfile.open(archive) as source:
-
-        def owned(member, path):
-            safe = tarfile.data_filter(member, path)
-            if safe is not None:
-                safe.uid, safe.gid = member.uid, member.gid
-            return safe
-
-        source.extractall(destination, filter=owned, numeric_owner=True)
-
-
-def neo4j_restore_sources(bundle):
-    path = bundle / "store-recovery.json"
-    if not path.exists():
+    if "s3" not in providers:
         return []
-    from uuid import UUID
-
-    result = []
-    for row in json.loads(path.read_text())["resources"]:
-        if row["provider"] != "neo4j" or row["state"] == "purged":
-            continue
-        rid = str(UUID(row["resource_id"]))
-        name = "platform-neo4j-" + UUID(rid).hex + "-data"
-        source = bundle / (name + ".tar.gz")
-        if not source.is_file():
-            raise RuntimeError("Retained dedicated instance archive missing")
-        result.append((rid, name, source))
-    if result:
-        inventory = bundle / "neo4j-instances.json"
-        if not inventory.is_file():
-            raise RuntimeError("Dedicated instance version inventory missing")
-        rows = json.loads(inventory.read_text())
-        if (
-            len(rows) != len(result)
-            or {r["resource_id"] for r in rows} != {r[0] for r in result}
-            or any(
-                r.get("configured_image")
-                != "developer-platform-neo4j:2026.09.0-community-jmx1.6.0"
-                for r in rows
-            )
-        ):
-            raise RuntimeError(
-                "Dedicated instance version inventory requires operator review"
-            )
-    return result
-
-
-def restore_neo4j_volumes(bundle):
-    identities = []
-    for rid, name, source in neo4j_restore_sources(bundle):
-        run(
-            [
-                "docker",
-                "volume",
-                "create",
-                "--label",
-                "developer-platform.neo4j-resource=" + rid,
-                name,
-            ]
+    filename = "rustfs-data.tar.gz"
+    if not (bundle / filename).is_file():
+        raise RuntimeError(
+            "The retained S3 volume is missing from this recovery bundle"
         )
-        destination = Path(
-            run(["docker", "volume", "inspect", "--format", "{{.Mountpoint}}", name])
-            .decode()
-            .strip()
-        )
-        if any(destination.iterdir()):
-            raise RuntimeError("Dedicated recovery volume is not empty")
-        with tarfile.open(source) as archive:
-
-            def owned(member, path):
-                safe = tarfile.data_filter(member, path)
-                if safe is not None:
-                    safe.uid, safe.gid = member.uid, member.gid
-                return safe
-
-            archive.extractall(destination, filter=owned, numeric_owner=True)
-        identities.append(rid)
-    return identities
-
-
-def start_recovered_neo4j(compose, identities):
-    if not identities:
-        return
-    # Access remains quarantined. Recreate operator-managed instances before the
-    # API's recovered-identity cleanup; no recovered human lease is activated.
-    # Older recovery bundles retain the former top-level persistence directory.
-    build_context = Path("infrastructure/persistence/neo4j")
-    if not (ROOT / build_context).is_dir():
-        build_context = Path("persistence/neo4j")
-    run(
-        [
-            "docker",
-            "build",
-            "-t",
-            "developer-platform-neo4j:2026.09.0-community-jmx1.6.0",
-            str(build_context),
-        ],
-        ROOT,
-        timeout=600,
-    )
-    run(
-        compose + ["create", "platform-api", "store-access", "neo4j-controller"],
-        ROOT,
-        timeout=900,
-    )
-    run(compose + ["up", "-d", "--no-deps", "neo4j-controller"], ROOT, timeout=120)
-    code = """from app.stores.neo4j_controller import Controller
-import json,sys,time
-c=Controller()
-for rid in json.loads(sys.stdin.read()):
- c.ensure(rid)
- for _ in range(120):
-  try: c.query(rid,'RETURN 1',database='neo4j'); break
-  except Exception: time.sleep(.5)
- else: raise RuntimeError('Recovered dedicated instance readiness failed')
-"""
-    run(
-        compose + ["exec", "-T", "neo4j-controller", "python", "-c", code],
-        ROOT,
-        data=json.dumps(identities).encode(),
-        timeout=900,
-    )
+    return [("rustfs", "rustfs_data", filename)]
 
 
 def quarantine_hosted_access(compose):
@@ -394,6 +208,9 @@ def latest_store_intents(instance="node-01"):
 
 def recover(bundle, projects):
     verify(bundle)
+    # Refuse unsupported historical live stores before creating a recovery VM
+    # directory or changing Docker state. The pre-removal release remains pinned.
+    store_volume_restore_targets(bundle)
     if ROOT.exists():
         raise RuntimeError("Platform directory exists; use a fresh recovery VM")
     if (
@@ -455,7 +272,6 @@ https://*.apps.localhost {
     logs = ROOT / ".runtime/recovery"
     logs.mkdir(mode=0o700, parents=True)
     (ROOT / ".runtime/bin").mkdir(mode=0o700, exist_ok=True)
-    import shutil
 
     shutil.copy2("/usr/local/bin/kubectl", ROOT / ".runtime/bin/kubectl")
     # Stream a private SQL dump to psql; retain every diagnostic and check the whitelist.
@@ -524,9 +340,7 @@ https://*.apps.localhost {
             )
         store_intents = latest_store_intents()
 
-    neo4j_restore_sources(bundle)
     store_volumes = store_volume_restore_targets(bundle)
-    hugegraph_parent = hugegraph_parent_archive(bundle, store_volumes)
     run(
         compose
         + [
@@ -538,8 +352,6 @@ https://*.apps.localhost {
         ROOT,
         timeout=900,
     )
-    if hugegraph_parent is not None:
-        restore_hugegraph_parent_volume(compose, hugegraph_parent)
     for volume, filename in [
         ("caddy_data", "proxy-data.tar.gz"),
         ("caddy_config", "proxy-config.tar.gz"),
@@ -573,8 +385,6 @@ https://*.apps.localhost {
 
             archive.extractall(destination, filter=owned, numeric_owner=True)
     run(["python3", "scripts/setup/install-k3d.py"], ROOT, timeout=300)
-    recovered_neo4j = restore_neo4j_volumes(bundle)
-    start_recovered_neo4j(compose, recovered_neo4j)
     run(["bash", "scripts/up.sh"], ROOT, timeout=1200)
     for _ in range(45):
         try:

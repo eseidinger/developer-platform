@@ -8,8 +8,6 @@ from contextlib import contextmanager
 from pathlib import Path
 from unittest.mock import patch
 
-import yaml
-
 spec = importlib.util.spec_from_file_location(
     "backup_platform", Path(__file__).parents[1] / "scripts/backup-platform.py"
 )
@@ -31,82 +29,6 @@ class BackupTests(unittest.TestCase):
                 "watchdog_token": "test-only",
             }
         )
-
-    def test_phase_eight_backup_covers_every_persistent_store_mount(self):
-        """A new store volume must be added to backup capture before deployment."""
-        compose = yaml.safe_load(
-            (
-                Path(__file__).parents[3]
-                / "infrastructure/persistence/shared-stores.yaml"
-            ).read_text()
-        )
-        bundle = self.root / "bundle"
-        bundle.mkdir()
-        (bundle / "store-recovery.json").write_text(
-            json.dumps(
-                {
-                    "resources": [
-                        {"provider": "couchdb", "state": "active"},
-                        {"provider": "hugegraph", "state": "retired"},
-                    ]
-                }
-            )
-        )
-
-        with patch.object(self.job, "volume_state") as volume_state:
-            self.job.data_store_state(bundle)
-
-        captured = dict(volume_state.call_args.args[1])
-        for service in ("couchdb", "hugegraph"):
-            with self.subTest(service=service):
-                persistent_mounts = {
-                    mount.split(":")[1]
-                    for mount in compose["services"][service]["volumes"]
-                    if not mount.startswith((".", "/"))
-                }
-                if service == "hugegraph":
-                    # This parent is declared by the pinned image, not Compose.
-                    persistent_mounts.add("/hugegraph-server")
-                self.assertEqual(set(captured[service]), persistent_mounts)
-
-    def test_hugegraph_anonymous_parent_is_archived_by_mount_destination(self):
-        bundle = self.root / "bundle"
-        bundle.mkdir()
-        parent = self.root / "dynamic-docker-volume"
-        parent.mkdir()
-        (parent / "init_complete").write_text("initialized")
-        inspected = json.dumps(
-            [
-                {
-                    "State": {"Running": True},
-                    "Mounts": [
-                        {
-                            "Destination": "/hugegraph-server",
-                            "Type": "volume",
-                            "Name": "a" * 64,
-                            "Source": str(parent),
-                        }
-                    ],
-                }
-            ]
-        ).encode()
-
-        def command(arguments, **_kwargs):
-            if arguments[1] == "inspect":
-                return inspected
-            return b""
-
-        with (
-            patch.object(self.job, "compose", return_value=b"container-id"),
-            patch.object(self.job, "command", side_effect=command),
-        ):
-            self.job.volume_state(bundle, [("hugegraph", ["/hugegraph-server"])])
-
-        archive = bundle / "hugegraph-hugegraph-server.tar.gz"
-        with backup.tarfile.open(archive) as source:
-            self.assertEqual(
-                source.extractfile("./init_complete").read(), b"initialized"
-            )
 
     def test_failed_upload_keeps_previous_success_and_skips_retention(self):
         backup.atomic_json(
@@ -251,7 +173,7 @@ class BackupTests(unittest.TestCase):
                 ],
             )
 
-    def test_retained_shared_store_volumes_are_required_and_unknown_providers_fail_closed(
+    def test_only_retained_s3_volume_is_captured_and_legacy_live_data_fails_closed(
         self,
     ):
         bundle = self.root / "bundle"
@@ -261,109 +183,25 @@ class BackupTests(unittest.TestCase):
             path,
             {
                 "resources": [
-                    {"provider": provider, "state": state}
-                    for provider, state in [
-                        ("postgresql", "active"),
-                        ("s3", "retired"),
-                        ("qdrant", "active"),
-                        ("opensearch", "purging"),
-                        ("couchdb", "active"),
-                        ("hugegraph", "active"),
-                        ("neo4j", "purged"),
-                    ]
+                    {"provider": "postgresql", "state": "active"},
+                    {"provider": "s3", "state": "retired"},
+                    {"provider": "neo4j", "state": "purged"},
                 ]
             },
         )
         with patch.object(self.job, "volume_state") as volumes:
             self.job.data_store_state(bundle)
-        self.assertEqual(
-            volumes.call_args.args[1],
-            [
-                ("couchdb", ["/opt/couchdb/data"]),
-                (
-                    "hugegraph",
-                    [
-                        "/data",
-                        "/hugegraph-server/rocksdb-data",
-                        "/hugegraph-server/conf/graphs",
-                        "/hugegraph-server",
-                    ],
-                ),
-                ("opensearch", ["/usr/share/opensearch/data"]),
-                ("qdrant", ["/qdrant/storage"]),
-                ("rustfs", ["/data"]),
-            ],
-        )
+        self.assertEqual(volumes.call_args.args[1], [("rustfs", ["/data"])])
+
         backup.atomic_json(
-            path, {"resources": [{"provider": "unknown", "state": "active"}]}
+            path, {"resources": [{"provider": "qdrant", "state": "active"}]}
         )
         with (
             patch.object(self.job, "volume_state") as volumes,
-            self.assertRaises(backup.BackupError),
+            self.assertRaisesRegex(backup.BackupError, "pinned pre-removal"),
         ):
             self.job.data_store_state(bundle)
         volumes.assert_not_called()
-
-    def test_dedicated_capture_failure_restarts_only_previously_running_instances(self):
-        from uuid import uuid4
-
-        rid = str(uuid4())
-        name = "platform-neo4j-" + rid.replace("-", "")
-        data = self.root / "native-data"
-        data.mkdir()
-        (data / "value").write_text("synthetic graph")
-        running = True
-        calls = []
-
-        def command(args, **kwargs):
-            nonlocal running
-            calls.append(args)
-            if args[1] == "inspect":
-                return json.dumps(
-                    [
-                        {
-                            "Id": name,
-                            "Image": "sha256:fixture",
-                            "Config": {
-                                "Image": "developer-platform-neo4j:2026.09.0-community-jmx1.6.0",
-                                "Labels": {"developer-platform.neo4j-resource": rid},
-                            },
-                            "State": {"Running": running, "ExitCode": 0},
-                            "Mounts": [
-                                {
-                                    "Destination": "/data",
-                                    "Type": "volume",
-                                    "Name": name + "-data",
-                                    "Source": str(data),
-                                }
-                            ],
-                        }
-                    ]
-                ).encode()
-            if args[1] == "stop":
-                running = False
-            if args[1] == "start":
-                running = True
-            return b""
-
-        bundle = self.root / "bundle"
-        bundle.mkdir()
-        with (
-            patch.object(self.job, "command", side_effect=command),
-            patch.object(backup.tarfile, "open", side_effect=OSError("disk full")),
-            self.assertRaises(OSError),
-        ):
-            self.job.neo4j_state(
-                bundle,
-                {
-                    "resources": [
-                        {"resource_id": rid, "provider": "neo4j", "state": "active"}
-                    ]
-                },
-            )
-        self.assertTrue(running)
-        self.assertIn([self.job.docker, "start", name], calls)
-        self.assertFalse((self.job.state / "resume.json").exists())
 
     def test_shared_data_capture_and_sql_dump_share_the_pause_and_lifecycle_lock(self):
         events = []

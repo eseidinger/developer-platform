@@ -7,19 +7,15 @@ No URL, header, body or provider diagnostic is logged.
 """
 
 import asyncio
-import base64
 import contextlib
 import hashlib
 import hmac
-import json
 import re
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlsplit
 from uuid import UUID
 
 import h11
-
-from . import catalog
 
 
 def access_key(credential_id):
@@ -91,36 +87,6 @@ def identity(request, lease):
             ):
                 raise ValueError("Lease identity mismatch")
             headers["_session"] = (key, session["token_sha256"])
-    elif lease["provider"] in {"opensearch", "neo4j", "couchdb", "hugegraph"}:
-        if not auth.startswith("Basic "):
-            raise ValueError("Basic authentication required")
-        raw = base64.b64decode(auth[6:], validate=True)
-        if (
-            b":" not in raw
-            or raw.split(b":", 1)[0] != catalog.login(lease["credential_id"]).encode()
-        ):
-            raise ValueError("Lease identity mismatch")
-        if lease["provider"] in {"neo4j", "couchdb", "hugegraph"}:
-            from .neo4j import admission
-
-            if lease["provider"] == "neo4j" and b"impersonated-user" in headers:
-                raise ValueError("Impersonation unavailable")
-            admission(raw.split(b":", 1)[1].decode("ascii"), lease)
-    elif lease["provider"] == "qdrant":
-        token = headers.get(b"api-key")
-        if token and auth:
-            raise ValueError("Ambiguous JWT authentication")
-        token = token.decode("ascii") if token else auth.removeprefix("Bearer ")
-        pieces = token.split(".")
-        if len(pieces) != 3:
-            raise ValueError("JWT required")
-        payload = json.loads(
-            base64.urlsafe_b64decode(pieces[1] + "=" * (-len(pieces[1]) % 4))
-        )
-        if payload.get("jti") != str(lease["credential_id"]):
-            raise ValueError("Lease identity mismatch")
-        # This untrusted inspection never grants authentication. The native
-        # Qdrant service must verify the JWT signature and collection permissions.
     else:
         raise ValueError("Unsupported HTTP provider")
     return headers
@@ -141,48 +107,6 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
     if not isinstance(request, h11.Request):
         raise TypeError("HTTP request required")
     headers = identity(request, lease)
-    admin_index = False
-    if lease["provider"] == "couchdb":
-        from .couchdb_access import authorize, validate_index
-
-        admin_index = bool(authorize(request.method, request.target, lease))
-        allowed_headers = {
-            b"host",
-            b"authorization",
-            b"content-type",
-            b"accept",
-            b"content-length",
-            b"transfer-encoding",
-            b"if-match",
-            b"if-none-match",
-            b"user-agent",
-            b"accept-encoding",
-            b"range",
-            b"prefer",
-            b"connection",
-            b"expect",
-        }
-        if any(key not in allowed_headers for key in headers if isinstance(key, bytes)):
-            raise ValueError("Unsupported CouchDB request header")
-        if admin_index and b"expect" in headers:
-            raise ValueError("Index requests cannot use Expect")
-    if lease["provider"] == "hugegraph":
-        from .hugegraph_access import authorize
-
-        authorize(request.method, request.target, lease)
-        allowed_headers = {
-            b"host",
-            b"authorization",
-            b"content-type",
-            b"accept",
-            b"content-length",
-            b"transfer-encoding",
-            b"user-agent",
-            b"accept-encoding",
-            b"connection",
-        }
-        if any(key not in allowed_headers for key in headers):
-            raise ValueError("Unsupported HugeGraph request header")
     if authorized is not None:
         authorized(headers.get("_session"))
     # Forbid pipelining/reuse. Every subsequent request must open its own socket
@@ -203,54 +127,7 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
     }
     if named - {b"", b"close", b"keep-alive"}:
         raise ValueError("Unsupported connection options")
-    index_body = None
-    if admin_index:
-        index_body = bytearray()
-        while True:
-            event = await _event(front, reader)
-            if isinstance(event, h11.Data):
-                index_body.extend(event.data)
-                if len(index_body) > 16384:
-                    raise ValueError("CouchDB index definition is too large")
-            elif isinstance(event, h11.EndOfMessage):
-                break
-            else:
-                raise TypeError("Unexpected index request event")
-        if request.method == b"POST":
-            validate_index(index_body)
-        elif index_body:
-            raise ValueError("Index deletion has no request body")
-    excluded = (
-        hops
-        | ({b"host"} if lease["provider"] in {"couchdb", "hugegraph"} else set())
-        | (
-            {b"authorization", b"content-type", b"content-length", b"transfer-encoding"}
-            if admin_index
-            else set()
-        )
-    )
-    forwarded = [(k, v) for k, v in request.headers if k not in excluded]
-    if lease["provider"] in {"couchdb", "hugegraph"}:
-        # A client-chosen Host must not alter backend routing.
-        forwarded.append((b"host", f"{backend[0]}:{backend[1]}".encode()))
-    if admin_index:
-        import os
-
-        from .couchdb import basic
-
-        forwarded.extend(
-            [
-                (
-                    b"authorization",
-                    basic(
-                        os.environ.get("COUCHDB_ADMIN_USER", "platform_admin"),
-                        os.environ["COUCHDB_ADMIN_PASSWORD"],
-                    ).encode(),
-                ),
-                (b"content-type", b"application/json"),
-                (b"content-length", str(len(index_body)).encode()),
-            ]
-        )
+    forwarded = [(k, v) for k, v in request.headers if k not in hops]
     forwarded.append((b"connection", b"close"))
     remote_reader, remote_writer = await asyncio.wait_for(
         asyncio.open_connection(*backend, ssl=tls), 3
@@ -274,12 +151,6 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
             raise ValueError("Unsupported expectation")
 
         async def upload():
-            if admin_index:
-                if index_body:
-                    remote_writer.write(remote.send(h11.Data(data=bytes(index_body))))
-                remote_writer.write(remote.send(h11.EndOfMessage()))
-                await remote_writer.drain()
-                return
             while True:
                 event = await _event(front, reader)
                 if isinstance(event, h11.Data):
@@ -299,12 +170,7 @@ async def exchange(reader, writer, lease, backend, tls=None, authorized=None):
                     safe = [
                         (k, v)
                         for k, v in event.headers
-                        if k
-                        not in (
-                            {b"connection", b"keep-alive", b"set-cookie", b"location"}
-                            if admin_index
-                            else {b"connection", b"keep-alive"}
-                        )
+                        if k not in {b"connection", b"keep-alive"}
                     ]
                     event = h11.Response(
                         status_code=event.status_code,

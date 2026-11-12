@@ -37,7 +37,7 @@ def initialize(conn):
     conn.execute("REVOKE ALL ON store_project_retirements FROM PUBLIC")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_resources (
         resource_id UUID PRIMARY KEY, owner_project TEXT NOT NULL REFERENCES projects(name),
-        name TEXT NOT NULL, provider TEXT NOT NULL CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant','couchdb','hugegraph')),
+        name TEXT NOT NULL, provider TEXT NOT NULL CHECK(provider IN ('postgresql','s3') OR state='purged'),
         extensions JSONB NOT NULL DEFAULT '[]', quota_bytes BIGINT NOT NULL CHECK(quota_bytes>0),
         state TEXT NOT NULL CHECK(state IN ('active','retired','purging','purged')),
         observed_state TEXT NOT NULL DEFAULT 'pending', error_code TEXT,
@@ -53,28 +53,27 @@ def initialize(conn):
         ADD COLUMN IF NOT EXISTS purge_backup_version BIGINT,
         ADD COLUMN IF NOT EXISTS purge_backup_snapshot TEXT,
         ADD COLUMN IF NOT EXISTS configuration JSONB NOT NULL DEFAULT '{}'""")
-    # Migrate the old provider check once. Revalidating it on every API start
-    # would scan the resource table and take an unnecessary DDL lock.
+    # Historical purged rows remain readable, but no live legacy provider can
+    # survive this migration or be inserted by a stale client.
     conn.execute("""DO $$ BEGIN
         IF EXISTS (SELECT 1 FROM pg_constraint
             WHERE conrelid='store_resources'::regclass
             AND conname='store_resources_provider_check'
-            AND pg_get_constraintdef(oid) NOT LIKE '%hugegraph%') THEN
+            AND pg_get_constraintdef(oid) NOT LIKE '%state = ''purged''%') THEN
             ALTER TABLE store_resources DROP CONSTRAINT store_resources_provider_check;
         END IF;
         IF NOT EXISTS (SELECT 1 FROM pg_constraint
             WHERE conrelid='store_resources'::regclass
             AND conname='store_resources_provider_check') THEN
             ALTER TABLE store_resources ADD CONSTRAINT store_resources_provider_check
-                CHECK(provider IN ('postgresql','s3','opensearch','neo4j','qdrant','couchdb','hugegraph'));
+                CHECK(provider IN ('postgresql','s3') OR state='purged');
         END IF;
     END $$""")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_instances (
         resource_id UUID PRIMARY KEY REFERENCES store_resources(resource_id),
         host INET NOT NULL, port INTEGER NOT NULL CHECK(port=7687))""")
     conn.execute("REVOKE ALL ON store_instances FROM PUBLIC")
-    conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_neo4j_project
-        ON store_resources(owner_project) WHERE provider='neo4j' AND state<>'purged'""")
+    conn.execute("DROP INDEX IF EXISTS store_neo4j_project")
     conn.execute("""CREATE UNIQUE INDEX IF NOT EXISTS store_resource_names
         ON store_resources(owner_project,name) WHERE state<>'purged'""")
     conn.execute("""CREATE TABLE IF NOT EXISTS store_grants (
@@ -175,17 +174,11 @@ def active_project(conn, project):
 
 
 def create_resource(conn, project, body):
+    # Keep this guard at the catalog boundary as well as in the public schema.
+    # Direct callers must not bypass the storage-scope admission freeze.
+    if body.provider not in {"postgresql", "s3"}:
+        raise Conflict("New resources require PostgreSQL or S3")
     active_project(conn, project)
-    if (
-        body.provider == "neo4j"
-        and conn.execute(
-            "SELECT 1 FROM store_resources WHERE owner_project=%s AND provider='neo4j' AND state<>'purged'",
-            (project,),
-        ).fetchone()
-    ):
-        raise Conflict(
-            "Only one retained Neo4j Community resource is supported per project"
-        )
     resource_id = uuid4()
     conn.execute(
         """INSERT INTO store_resources(resource_id,owner_project,name,provider,extensions,quota_bytes,configuration,state)
@@ -197,11 +190,7 @@ def create_resource(conn, project, body):
             body.provider,
             Jsonb(body.extensions),
             body.quota_bytes,
-            Jsonb(
-                body.configuration.model_dump()
-                if body.configuration is not None
-                else {}
-            ),
+            Jsonb({}),
         ),
     )
     return resource(conn, resource_id)
@@ -218,9 +207,6 @@ def check_grant_capacity(conn, resource_id):
 
 
 def create_human_grant(conn, res, body, actor):
-    from .neo4j import require_mode
-
-    require_mode(res["provider"], body.mode)
     if res["state"] != "active":
         raise Conflict("Resource is not active")
     active_project(conn, res["owner_project"])
@@ -245,9 +231,6 @@ def create_human_grant(conn, res, body, actor):
 def request_binding(conn, consumer, body, actor):
     active_project(conn, consumer)
     res = resource(conn, body.resource_id, lock=True)
-    from .neo4j import require_mode
-
-    require_mode(res["provider"], body.mode)
     active_project(conn, res["owner_project"])
     if res["state"] != "active":
         raise Conflict("Resource is not active")
@@ -337,9 +320,6 @@ def issue(conn, row):
     if recovery.required(conn):
         raise Conflict("Named-store recovery reconciliation is required")
     res = resource(conn, row["resource_id"], lock=True)
-    from .neo4j import require_mode
-
-    require_mode(res["provider"], row["mode"])
     if (
         row["state"] != "active"
         or res["state"] != "active"
@@ -395,11 +375,6 @@ def issue(conn, row):
         VALUES (%s,%s,%s,%s,'issuing',now()+%s,%s)""",
         (identity, row["grant_id"], row["version"], row["mode"], lifetime, relay_port),
     )
-    if res["provider"] in {"neo4j", "couchdb", "hugegraph"}:
-        conn.execute(
-            "UPDATE store_credentials SET admission_sha256=%s WHERE credential_id=%s",
-            (hashlib.sha256(secret_for(identity).encode()).hexdigest(), identity),
-        )
     return _object(conn, "store_credentials", "credential_id", identity)
 
 
@@ -443,9 +418,6 @@ def revoke(conn, row, version):
 
 
 def change_mode(conn, row, body, actor):
-    from .neo4j import require_mode
-
-    require_mode(resource(conn, row["resource_id"])["provider"], body.mode)
     assert_version(row, body.version)
     if row["state"] != "active":
         raise Conflict("Grant is not active")

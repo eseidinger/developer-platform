@@ -719,7 +719,6 @@ def main():
                         "STORE_ENABLED_PROVIDERS": "postgresql,s3",
                     },
                 ),
-                patch.object(store_console, "PROVIDERS", {"s3", "qdrant"}),
             ):
                 conn.execute(
                     "UPDATE store_resources SET provider='s3' WHERE resource_id=%s",

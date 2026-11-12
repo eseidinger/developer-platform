@@ -16,11 +16,8 @@ OPERATIONS = {
     "postgresql": {"query", "write", "schema"},
     "pgvector": {"search", "upsert", "index"},
     "age": {"query", "write", "rebuild", "validate"},
-    "neo4j": {"query", "write", "schema"},
     "duckdb": {"query", "transfer", "checksum", "publish"},
     "s3": {"get", "put"},
-    "opensearch": {"search", "index"},
-    "qdrant": {"search", "upsert"},
 }
 PROFILE = {
     "cpu_seconds",

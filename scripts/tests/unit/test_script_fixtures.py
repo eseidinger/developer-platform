@@ -3,13 +3,11 @@
 import contextlib
 import importlib.util
 import os
-import subprocess
 import sys
 import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
-import yaml
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT))
@@ -23,47 +21,6 @@ def load(name, path):
 
 
 class ScriptFixtureTests(unittest.TestCase):
-    def test_compose_opensearch_mounts_resolve_inside_disposable_fixture(self):
-        module = load(
-            "shared_store_fixture",
-            "scripts/tests/components/stores/verify-shared-store-compose.py",
-        )
-        observed = []
-
-        def command(arguments, **kwargs):
-            if "up" in arguments:
-                file = Path(arguments[arguments.index("-f") + 1])
-                config = yaml.safe_load(file.read_text())
-                for name in ("opensearch", "opensearch-init"):
-                    for mount in config["services"][name]["volumes"]:
-                        source = mount.split(":", 1)[0]
-                        if (
-                            "store-security" in mount
-                            or "/usr/share/opensearch/config/" in mount
-                        ):
-                            self.assertTrue(Path(source).is_absolute(), mount)
-                            self.assertTrue(
-                                Path(source).is_relative_to(file.parent / "stores"),
-                                mount,
-                            )
-                            observed.append(source)
-                return subprocess.CompletedProcess(arguments, 1, b"", b"")
-            return subprocess.CompletedProcess(
-                arguments, 0, "" if kwargs.get("text") else b"", b""
-            )
-
-        with (
-            patch.dict(
-                os.environ,
-                {"STORE_DASHBOARDS_FIXTURE": "0", "STORE_CONSOLE_FIXTURE": "0"},
-            ),
-            patch.object(module.preparation, "prepare"),
-            patch.object(module.subprocess, "run", command),
-            self.assertRaisesRegex(RuntimeError, "Compose operation failed"),
-        ):
-            module.main()
-        self.assertGreaterEqual(len(observed), 7)
-
     def test_partial_artifact_setup_deletes_only_versions_already_created(self):
         module = load(
             "application_data_fixture",

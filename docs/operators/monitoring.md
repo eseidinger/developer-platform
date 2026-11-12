@@ -59,7 +59,7 @@ Application metrics require opt-in instrumentation; tracing uses an
 authenticated Pod-local forwarder. See
 [trace setup](../../infrastructure/monitoring/TRACING.md),
 [AI telemetry](../../infrastructure/monitoring/AI.md), and
-[store performance](../../infrastructure/monitoring/CAPACITY-AND-STORES.md#phase-7-store-performance).
+[store performance](../../infrastructure/monitoring/CAPACITY-AND-STORES.md#named-store-performance).
 Missing data requires checking collection health and freshness before
 interpreting it as zero activity. The known Tempo filesystem metric permission
 issue and unexecuted retention/outage/capacity checks are recorded in the AI

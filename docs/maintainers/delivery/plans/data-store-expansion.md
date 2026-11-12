@@ -176,7 +176,7 @@ mapping and access exception replace that deployment. Opt-in configuration
 readiness is not deployed operational acceptance. See the
 [compatibility record](../../../../infrastructure/persistence/compatibility/neo4j-2026-10-17.md)
 and
-[operator workflow](../../../operators/data-stores.md#dedicated-neo4j-community-resources).
+operator workflow in pre-removal Git commit `632b921`.
 
 ## HugeGraph shared-service provisioning decision
 

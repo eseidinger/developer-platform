@@ -49,22 +49,14 @@ all:
         # group preserves its existing values. Explicit profiles: [] selects
         # PostgreSQL only.
         platform_stores:
-          # Select any of: [s3, qdrant, opensearch, neo4j, couchdb, hugegraph].
+          # New resources use PostgreSQL and, when selected, S3.
+          # Select from: [s3].
           profiles: []
           capacity_bytes:
             postgresql: 17179869184
             # Allocate every selected provider after reviewing host/disk
             # headroom:
             # s3: 8589934592
-            # qdrant: 4294967296
-            # opensearch: 4294967296
-            # neo4j: 4294967296
-            # couchdb: 4294967296
-            # hugegraph: 4294967296
-          neo4j:
-            max_instances: 4  # retained instances platform-wide; 1–64
-            # per instance; 1–16 GiB; independent of data capacity
-            memory_bytes: 1610612736
 
         # Choose networks before first installation. Existing network subnet
         # changes
@@ -78,20 +70,6 @@ all:
           # offsets:
           # addresses:
           #   store-access: 172.30.80.15
-          #   neo4j-controller: 172.30.80.31
-        platform_search_console_network:
-          subnet: 172.30.81.0/29
-          # addresses:
-          #   platform-api: 172.30.81.2
-          #   opensearch-dashboards: 172.30.81.3
-        platform_couchdb_network:
-          subnet: 172.30.82.0/29
-          # addresses:
-          #   couchdb: 172.30.82.2
-        platform_hugegraph_network:
-          subnet: 172.30.83.0/29
-          # addresses:
-          #   hugegraph: 172.30.83.2
 
         # The bastion installer is a separate opt-in playbook. Empty host
         # advertises

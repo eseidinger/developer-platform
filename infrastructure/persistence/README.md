@@ -1,17 +1,12 @@
 # Persistence services
 
 Run Compose from the repository root. `compose.yaml` owns the shared PostgreSQL
-server and pgAdmin console; `shared-stores.yaml` owns optional store services
-and the Neo4j controller.
+server and pgAdmin console; `shared-stores.yaml` owns optional RustFS object
+storage.
 
 - `Dockerfile` builds the reviewed AGE and pgvector extensions in a separate
   stage, then copies their installed files into the PostgreSQL runtime image.
 - `console/` owns pgAdmin authentication and session policy.
-- `opensearch-bootstrap.sh` initializes only a confirmed absent security
-  catalog. Existing broken catalogs require operator repair and are never
-  overwritten.
-- `opensearch-dashboards.yaml` configures the scoped search console.
-- `neo4j/` owns the Neo4j image and JVM exporter configuration.
 - `compatibility/` contains a disposable PostgreSQL coexistence/restore harness,
   its build image, and dated compatibility evidence. Preserve historical records
   when changing the harness; they describe the source tested on that date.
@@ -29,8 +24,7 @@ Run static checks from the repository root:
 
 ```bash
 hadolint infrastructure/persistence/Dockerfile \
-  infrastructure/persistence/compatibility/Dockerfile \
-  infrastructure/persistence/neo4j/Dockerfile
+  infrastructure/persistence/compatibility/Dockerfile
 yamllint infrastructure/persistence
 shellcheck infrastructure/persistence/*.sh \
   infrastructure/persistence/compatibility/*.sh

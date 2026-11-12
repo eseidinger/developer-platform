@@ -1,149 +1,65 @@
 import os
 from unittest import TestCase
 from unittest.mock import Mock, patch
-from uuid import uuid4
 
 from app.stores import providers
 
 
 class ProviderSelectionTests(TestCase):
-    def test_all_provider_quota_modes_are_available_to_resource_detail(self):
-        from app.stores.couchdb import CouchDB
-        from app.stores.hugegraph import HugeGraph
-        from app.stores.neo4j import Neo4j
-        from app.stores.opensearch import OpenSearch
-        from app.stores.postgres import Postgres
-        from app.stores.qdrant import Qdrant
-        from app.stores.s3 import S3
-
-        self.assertEqual(
-            [
-                kind.quota_enforcement
-                for kind in (
-                    Postgres,
-                    S3,
-                    OpenSearch,
-                    Qdrant,
-                    Neo4j,
-                    CouchDB,
-                    HugeGraph,
-                )
-            ],
-            [
-                "advisory: PostgreSQL has no hard per-database byte quota",
-                "hard",
-                "advisory",
-                "advisory",
-                "advisory",
-                "advisory",
-                "advisory",
-            ],
-        )
-
-    def test_default_has_only_postgresql_and_never_infers_other_services(self):
+    def test_default_advertises_only_postgresql_and_s3(self):
         with patch.dict(os.environ, {}, clear=True):
             self.assertEqual(
-                [p["id"] for p in providers.availability() if p["enabled"]],
-                ["postgresql"],
+                [(item["id"], item["enabled"]) for item in providers.availability()],
+                [("postgresql", True), ("s3", False)],
             )
-            for name in ("s3", "qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"):
-                with self.assertRaises(providers.ProviderUnavailable):
-                    providers.get(name)
+            with self.assertRaises(providers.ProviderUnavailable):
+                providers.get("s3")
 
-    def test_selection_requires_complete_operator_configuration_and_capacity(self):
+    def test_s3_requires_selection_credentials_and_capacity(self):
         env = {
             "STORE_ENABLED_PROVIDERS": "postgresql,s3",
             "RUSTFS_IP": "172.30.80.16",
-            "RUSTFS_ACCESS_KEY": "synthetic-access-key",
+            "RUSTFS_ACCESS_KEY": "k" * 20,
             "RUSTFS_SECRET_KEY": "s" * 32,
         }
-        with patch.dict(os.environ, env, clear=True), patch("app.stores.s3.S3"):
-            self.assertFalse(
-                next(p for p in providers.availability() if p["id"] == "s3")["enabled"]
-            )
-            os.environ["RUSTFS_ACCESS_KEY"] = "k" * 20
+        with patch.dict(os.environ, env, clear=True):
+            self.assertFalse(providers.availability()[1]["enabled"])
             os.environ["STORE_CAPACITY_BYTES"] = (
                 '{"postgresql":1073741824,"s3":1073741824}'
             )
-            self.assertTrue(
-                next(p for p in providers.availability() if p["id"] == "s3")["enabled"]
-            )
+            self.assertTrue(providers.availability()[1]["enabled"])
             del os.environ["RUSTFS_SECRET_KEY"]
             with self.assertRaises(providers.ProviderUnavailable):
                 providers.get("s3")
 
-    def test_unsupported_edition_and_missing_ca_cannot_be_enabled_by_a_flag(self):
-        env = {
-            "STORE_ENABLED_PROVIDERS": "neo4j,opensearch",
-            "OPENSEARCH_IP": "172.30.80.17",
-            "OPENSEARCH_ADMIN_PASSWORD": "p" * 32,
-        }
-        with patch.dict(os.environ, env, clear=True):
-            for name in ("neo4j", "opensearch"):
-                with self.assertRaises(providers.ProviderUnavailable):
-                    providers.get(name)
+    def test_legacy_selection_cannot_reopen_native_providers(self):
+        with patch.dict(
+            os.environ,
+            {"STORE_ENABLED_PROVIDERS": "postgresql,s3,qdrant,neo4j"},
+            clear=True,
+        ):
+            for name in ("opensearch", "qdrant", "neo4j", "couchdb", "hugegraph"):
+                with self.subTest(provider=name):
+                    with self.assertRaises(providers.ProviderUnavailable):
+                        providers.get(name)
+                    self.assertEqual(providers.quota_enforcement(name), "advisory")
 
-    def test_couchdb_requires_selection_admin_secret_and_capacity(self):
-        env = {
-            "STORE_ENABLED_PROVIDERS": "postgresql,couchdb",
-            "COUCHDB_IP": "172.30.82.2",
-            "COUCHDB_ADMIN_PASSWORD": "s" * 32,
-        }
-        with patch.dict(os.environ, env, clear=True):
-            couchdb = next(p for p in providers.availability() if p["id"] == "couchdb")
-            self.assertFalse(couchdb["enabled"])
-            os.environ["STORE_CAPACITY_BYTES"] = (
-                '{"postgresql":1073741824,"couchdb":1073741824}'
-            )
-            couchdb = next(p for p in providers.availability() if p["id"] == "couchdb")
-            self.assertTrue(couchdb["enabled"])
-            del os.environ["COUCHDB_ADMIN_PASSWORD"]
-            with self.assertRaises(providers.ProviderUnavailable):
-                providers.get("couchdb")
+    def test_historical_neo4j_capabilities_remain_readable(self):
+        capabilities = providers.capabilities("neo4j")
+        self.assertTrue(capabilities["dedicated_instance"])
+        self.assertEqual(capabilities["supported_modes"], ["read-write"])
 
-    def test_hugegraph_requires_selection_admin_secret_and_capacity(self):
-        env = {
-            "STORE_ENABLED_PROVIDERS": "postgresql,hugegraph",
-            "HUGEGRAPH_IP": "172.30.83.2",
-            "HUGEGRAPH_ADMIN_PASSWORD": "s" * 32,
-        }
-        with patch.dict(os.environ, env, clear=True):
-            selected = next(
-                p for p in providers.availability() if p["id"] == "hugegraph"
+    def test_s3_connection_uses_scoped_lease_relay(self):
+        backend = Mock()
+        backend.credentials.return_value = {"SCOPED_SECRET": "synthetic-secret"}
+        with (
+            patch.object(providers, "get", return_value=backend),
+            patch.dict(os.environ, {"STORE_RELAY_IP": "172.30.80.15"}),
+        ):
+            fields = providers.connection(
+                {"provider": "s3"}, {"relay_port": 20017}
             )
-            self.assertFalse(selected["enabled"])
-            os.environ["STORE_CAPACITY_BYTES"] = (
-                '{"postgresql":1073741824,"hugegraph":1073741824}'
-            )
-            selected = next(
-                p for p in providers.availability() if p["id"] == "hugegraph"
-            )
-            self.assertTrue(selected["enabled"])
-            del os.environ["HUGEGRAPH_ADMIN_PASSWORD"]
-            with self.assertRaises(providers.ProviderUnavailable):
-                providers.get("hugegraph")
-
-    def test_every_http_binding_points_to_its_lease_not_the_raw_service(self):
-        for name, variable in [
-            ("s3", "AWS_ENDPOINT_URL_S3"),
-            ("opensearch", "OPENSEARCH_URL"),
-            ("qdrant", "QDRANT_URL"),
-            ("couchdb", "COUCHDB_URL"),
-            ("hugegraph", "HUGEGRAPH_REST_URI"),
-        ]:
-            backend = Mock()
-            backend.credentials.return_value = {
-                variable: "http://172.30.80.18:6333",
-                "SCOPED_SECRET": "synthetic-secret",
-            }
-            with (
-                self.subTest(provider=name),
-                patch.object(providers, "get", return_value=backend),
-                patch.dict(os.environ, {"STORE_RELAY_IP": "172.30.80.15"}),
-            ):
-                values = providers.connection(
-                    {"provider": name, "resource_id": str(uuid4())},
-                    {"relay_port": 20017},
-                )
-                self.assertEqual(values[variable], "http://172.30.80.15:20017")
-                self.assertEqual(values["SCOPED_SECRET"], "synthetic-secret")
+        self.assertEqual(
+            fields["AWS_ENDPOINT_URL_S3"], "http://172.30.80.15:20017"
+        )
+        self.assertEqual(fields["SCOPED_SECRET"], "synthetic-secret")

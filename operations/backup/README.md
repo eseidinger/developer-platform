@@ -18,17 +18,14 @@ unverified acceptance criteria stay open.
 
 ## Current implementation and recovery limits
 
-Scheduled capture includes the full PostgreSQL catalog and Keycloak database,
-current application Secrets, generated store configuration, named native
-volumes, HugeGraph's image-declared anonymous `/hugegraph-server` volume,
-Neo4j instance/image inventory and verified purge intent. The HugeGraph parent
-archive contains initialized configuration, the startup marker and audit logs;
-the restore resolves its new anonymous volume from the created container before
-starting HugeGraph. Native-store
-bundles pause managed leases for at most 35 minutes and stop retained native
-instances for capture; applications must tolerate interruption and reconnect.
-Caddy and Grafana are also briefly stopped. See the
+Scheduled capture includes the PostgreSQL catalog and Keycloak database,
+current application Secrets, generated store configuration, the retained RustFS
+S3 volume, and verified purge intent. S3 volume capture pauses managed leases
+for at most 35 minutes; applications must reconnect after the scheduled
+interruption. Caddy and Grafana are also briefly stopped. See the
 [capture contract](../../docs/operators/data-stores.md#retention-and-capacity).
+Historical snapshots with live legacy-provider data require the pinned
+pre-removal Git commit `632b921` on an isolated recovery host.
 
 The automated playbook and `check`/`seed-marker` examples below preserve the
 legacy `project_<name>`/`database` Secret assumptions. For named PostgreSQL, the

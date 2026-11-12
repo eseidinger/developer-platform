@@ -5241,7 +5241,7 @@ October 18, 2026: disposable project `p7br-c9e97dd8` provisioned RustFS
 `40aed2f9-eb4b-4624-af60-19807714ea88`; two disposable interactive Keycloak
 humans received read-write/read-only grants, except Neo4j's second grant was
 full-access as required by Community Edition. The
-[browser helper](../../../platform/ui/scripts/verify-deployed-store-consoles.mjs)
+browser helper in the pinned pre-removal commit `632b921`
 used real portal OIDC, personal leases, HTTPS console assertions and official
 native UIs. | RustFS Browser listed its scoped bucket and uploaded/deleted an
 object; its reader's signed STS write returned 403. Qdrant's official console
@@ -5272,7 +5272,7 @@ Phase 9. |
   - **Check:** November 10, 2026, node-01: Ansible deployed checkout revision
     `66a056d90b5be038e21c86b5a00aac267c8689a7+dirty` with zero failed or
     unreachable tasks. The read-only
-    [Phase 8 host smoke](../../../scripts/tests/platform/check-phase8-store-health.py)
+    Phase 8 host smoke (retained in pre-removal Git commit `632b921`)
     checked API readiness, CouchDB and HugeGraph container health, CPU/memory
     limits, unpublished host ports, named persistent volumes and Prometheus
     native-up metrics. The three-node k3d cluster reported Ready. Local tests

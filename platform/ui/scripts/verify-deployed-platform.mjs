@@ -52,7 +52,7 @@ try {
     page.getByRole('heading', { name: `${config.project} data stores` }),
   ).toBeVisible()
   for (const provider of config.providers) {
-    assert.match(provider, /^(postgresql|s3|qdrant|opensearch|neo4j)$/)
+    assert.match(provider, /^(postgresql|s3)$/)
     await expect(
       page.getByRole('heading', {
         name: `functional-${provider} · ${provider}`,

@@ -235,15 +235,6 @@ function Workspace({
                   api.createResource(project!, {
                     name: text(d, 'name'),
                     provider: text(d, 'provider') as api.Provider,
-                    ...(text(d, 'provider') === 'qdrant'
-                      ? {
-                          configuration: {
-                            vector_size: Number(text(d, 'vectorSize')),
-                            distance: text(d, 'distance') as
-                              'Cosine' | 'Dot' | 'Euclid' | 'Manhattan',
-                          },
-                        }
-                      : {}),
                     quota_bytes: Number(text(d, 'quota')) * 1048576,
                     extensions:
                       text(d, 'provider') === 'postgresql'
@@ -270,12 +261,13 @@ function Workspace({
                 Provider
                 <select className={field} name="provider">
                   {context.data?.providers
-                    .filter((p) => p.enabled)
+                    .filter(
+                      (p) =>
+                        p.enabled && (p.id === 'postgresql' || p.id === 's3'),
+                    )
                     .map((p) => (
                       <option key={p.id} value={p.id}>
-                        {p.id === 'neo4j'
-                          ? 'Neo4j Community · dedicated instance, full access only'
-                          : p.id}
+                        {p.id}
                       </option>
                     ))}
                 </select>
@@ -296,25 +288,6 @@ function Workspace({
               </label>
               <label>
                 <input type="checkbox" name="age" /> AGE (PostgreSQL projection)
-              </label>
-              <label>
-                Qdrant vector dimensions
-                <input
-                  className={field}
-                  name="vectorSize"
-                  type="number"
-                  defaultValue={384}
-                  min={1}
-                  max={65536}
-                />
-              </label>
-              <label>
-                Qdrant distance
-                <select className={field} name="distance">
-                  {['Cosine', 'Dot', 'Euclid', 'Manhattan'].map((value) => (
-                    <option key={value}>{value}</option>
-                  ))}
-                </select>
               </label>
               <Button type="submit">Create resource</Button>
             </Form>
@@ -527,6 +500,14 @@ function Workspace({
                         {p.id}
                       </option>
                     ))}
+                  {knownBindingProvider &&
+                    !context.data?.providers.some(
+                      (p) => p.id === knownBindingProvider,
+                    ) && (
+                      <option value={knownBindingProvider}>
+                        {knownBindingProvider}
+                      </option>
+                    )}
                 </select>
               </label>
               <label>

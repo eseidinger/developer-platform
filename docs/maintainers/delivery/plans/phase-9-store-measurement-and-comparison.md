@@ -99,7 +99,7 @@ collector and real DuckDB profiling example provide workload histograms/numeric
 fields; external application instrumentation and deployed collection remain
 open. Private collector roles, missing/stale-data handling, alerts and real
 Prometheus query validation are implemented. See the
-[monitoring guide](../../../../infrastructure/monitoring/CAPACITY-AND-STORES.md#phase-7-store-performance).
+[monitoring guide](../../../../infrastructure/monitoring/CAPACITY-AND-STORES.md#named-store-performance).
 
 - **Dashboard / package:** **PostgreSQL performance — Phase 9 / PLAN-026**
   - **Required panels:** Transactions/sec and rollbacks; connection usage;

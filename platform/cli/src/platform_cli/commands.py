@@ -43,10 +43,6 @@ SENSITIVE_KEYS = {
     "authorization",
     "pgpassword",
     "aws_secret_access_key",
-    "opensearch_password",
-    "qdrant_api_key",
-    "neo4j_password",
-    "couchdb_password",
 }
 
 

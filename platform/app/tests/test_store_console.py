@@ -1,10 +1,8 @@
-import asyncio
 import os
 import tempfile
-import threading
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest import IsolatedAsyncioTestCase, TestCase
+from unittest import TestCase
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -12,7 +10,6 @@ import httpx2 as httpx
 from app.stores import console
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-from starlette.requests import Request
 from starlette.routing import Host
 
 
@@ -33,10 +30,9 @@ class ConsoleBoundaryTests(TestCase):
                 "APPS_DOMAIN": "apps.fixture.invalid",
                 "PLATFORM_DOMAIN": "platform.fixture.invalid",
                 "STORE_CONSOLE_HTTP_ENABLED": "true",
-                "STORE_ENABLED_PROVIDERS": "s3,qdrant",
+                "STORE_ENABLED_PROVIDERS": "s3",
                 "STORE_RELAY_IP": "127.0.0.1",
                 "RUSTFS_IP": "127.0.0.2",
-                "QDRANT_IP": "127.0.0.3",
             },
         )
         self.patch.start()
@@ -221,34 +217,6 @@ class ConsoleBoundaryTests(TestCase):
         self.assertIsNotNone(self.client.cookies.get(console.COOKIE))
         self.assertEqual(self.client.get("/", follow_redirects=False).status_code, 303)
 
-    def test_static_asset_routes_are_read_only_and_never_use_the_data_relay(self):
-        self.row["provider"] = "qdrant"
-        response = self.launch()
-        self.assertIn('content="0;url=/dashboard/"', response.text)
-        seen = []
-
-        async def handler(request):
-            seen.append(str(request.url))
-            return httpx.Response(200, stream=Bytes(b"asset"))
-
-        real_client = httpx.AsyncClient
-        with patch(
-            "app.stores.console.httpx.AsyncClient",
-            side_effect=lambda **kw: real_client(
-                transport=httpx.MockTransport(handler), **kw
-            ),
-        ):
-            self.assertEqual(
-                self.client.get("/dashboard/assets/index.js").status_code, 200
-            )
-        self.assertEqual(seen, ["http://127.0.0.3:6333/dashboard/assets/index.js"])
-        self.assertEqual(
-            self.client.put(
-                "/dashboard/assets/index.js", headers={"Origin": console.origin(20000)}
-            ).status_code,
-            405,
-        )
-
     def test_web_native_requests_and_assets_always_require_the_portal_cookie(self):
         from app.stores.http_relay import access_key
 
@@ -298,180 +266,3 @@ class ConsoleBoundaryTests(TestCase):
             self.assertEqual(
                 self.client.get("/rustfs/console/browser/").status_code, 401
             )
-
-    def test_dashboards_forwards_only_native_cookie_and_injects_authoritative_lease(
-        self,
-    ):
-        from app.stores import dashboards
-
-        self.row["provider"] = "opensearch"
-        seen = []
-
-        async def handler(request):
-            seen.append(dict(request.headers))
-            return httpx.Response(
-                200,
-                stream=Bytes(b"console"),
-                headers={
-                    "Set-Cookie": dashboards.COOKIE
-                    + "=Fe26.2*native; Path=/wrong; Domain=foreign.invalid",
-                    "Content-Security-Policy": "script-src 'self'",
-                },
-            )
-
-        real_client = httpx.AsyncClient
-        with (
-            patch.dict(os.environ, {"OPENSEARCH_DASHBOARDS_IP": "127.0.0.4"}),
-            patch(
-                "app.stores.console.httpx.AsyncClient",
-                side_effect=lambda **kw: real_client(
-                    transport=httpx.MockTransport(handler), **kw
-                ),
-            ),
-        ):
-            self.launch()
-            self.client.cookies.set("unrelated", "never-forward")
-            response = self.client.get(
-                "/",
-                headers={dashboards.HEADER: str(uuid4()), "securitytenant": "foreign"},
-            )
-            self.assertEqual(response.status_code, 200)
-            self.assertIn("Secure", response.headers["set-cookie"])
-            self.assertNotIn("Domain=", response.headers["set-cookie"])
-            self.assertIn("Path=/", response.headers["set-cookie"])
-            self.assertEqual(
-                response.headers.get_list("content-security-policy"),
-                [
-                    "script-src 'self'",
-                    "frame-ancestors 'none'; object-src 'none'; frame-src 'none'; base-uri 'self'",
-                ],
-            )
-            self.client.get("/")
-        self.assertNotIn("cookie", seen[0])
-        self.assertEqual(seen[0][dashboards.HEADER], self.row["credential_id"])
-        from app.stores.opensearch import tenant
-
-        self.assertEqual(seen[0]["securitytenant"], tenant(self.row))
-        self.assertEqual(seen[1]["cookie"], dashboards.COOKIE + "=Fe26.2*native")
-        self.assertNotIn(console.COOKIE, seen[1]["cookie"])
-
-
-class DashboardsStreamingTests(IsolatedAsyncioTestCase):
-    async def check_fence(self, expire, stall=False, asset=False):
-        finish = asyncio.Event()
-
-        class Held(httpx.AsyncByteStream):
-            async def __aiter__(self):
-                yield b"first"
-                await finish.wait()
-                if asset:
-                    yield b"second"
-
-        # Production rows carry a UUID object; the stream guard must accept it.
-        cid = uuid4()
-        row = {
-            "credential_id": cid,
-            "resource_id": str(uuid4()),
-            "relay_port": 20000,
-            "provider": "opensearch",
-            "issuer": "https://identity.fixture.invalid",
-            "subject": "human",
-            "expires_at": datetime.now(UTC) + timedelta(hours=24),
-        }
-        current = [dict(row)]
-        blocked, released = [False], threading.Event()
-
-        def load(cid):
-            if blocked[0]:
-                released.wait(2)
-            return current[0]
-
-        with patch.dict(
-            os.environ,
-            {
-                "DATABASE_KEY": "s" * 32,
-                "APPS_DOMAIN": "apps.fixture.invalid",
-                "OPENSEARCH_DASHBOARDS_IP": "127.0.0.4",
-            },
-        ):
-            app = console.create_gateway(load)
-            path = "9054/bundles/plugin/test/test.plugin.js" if asset else "held"
-            request = Request(
-                {
-                    "type": "http",
-                    "method": "GET",
-                    "scheme": "https",
-                    "path": "/" + path,
-                    "raw_path": ("/" + path).encode(),
-                    "query_string": b"",
-                    "path_params": {"port": 20000},
-                    "headers": [
-                        (b"host", b"console-20000.apps.fixture.invalid"),
-                        (
-                            b"cookie",
-                            (
-                                console.COOKIE
-                                + "="
-                                + console.assertion(row, "session", 86400)
-                            ).encode(),
-                        ),
-                    ],
-                    "client": ("127.0.0.1", 12345),
-                }
-            )
-
-            async def handler(request):
-                return httpx.Response(200, stream=Held())
-
-            real_client = httpx.AsyncClient
-            with patch(
-                "app.stores.console.httpx.AsyncClient",
-                side_effect=lambda **kw: real_client(
-                    transport=httpx.MockTransport(handler), **kw
-                ),
-            ):
-                endpoint = next(
-                    route.endpoint
-                    for route in app.routes
-                    if getattr(route, "path", None) == "/{path:path}"
-                    and getattr(route, "methods", None)
-                )
-                if stall:
-                    current[0]["expires_at"] = datetime.now(UTC) + timedelta(seconds=1)
-                response = await endpoint(request, path)
-                blocked[0] = stall
-                iterator = response.body_iterator
-                self.assertEqual(await asyncio.wait_for(anext(iterator), 1), b"first")
-                if stall:
-                    pass
-                elif expire:
-                    current[0]["expires_at"] = datetime.now(UTC) + timedelta(
-                        milliseconds=100
-                    )
-                else:
-                    current[0] = None
-                try:
-                    if asset:
-                        await asyncio.sleep(0.6)
-                        finish.set()
-                        self.assertEqual(
-                            await asyncio.wait_for(anext(iterator), 1), b"second"
-                        )
-                    with self.assertRaises(StopAsyncIteration):
-                        await asyncio.wait_for(anext(iterator), 1.5)
-                finally:
-                    released.set()
-
-    async def test_already_streaming_frontend_closes_on_revocation(self):
-        await self.check_fence(False)
-
-    async def test_already_streaming_frontend_closes_at_lease_deadline(self):
-        await self.check_fence(True)
-
-    async def test_catalog_stall_cannot_keep_a_frontend_stream_open_past_its_deadline(
-        self,
-    ):
-        await self.check_fence(False, stall=True)
-
-    async def test_authorized_frontend_asset_finishes_after_revocation(self):
-        await self.check_fence(False, asset=True)

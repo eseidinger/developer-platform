@@ -22,9 +22,6 @@ test -f .env || {
 # Validate shared settings and synchronize tracing before starting services.
 python3 scripts/setup/configure-platform.py --runtime
 
-# Prepare store keys and configuration, then check the trace storage mount.
-python3 scripts/setup/prepare-stores.py
-
 # Inspect the mount table: the private parent directory is intentionally root-only.
 if ! findmnt --mountpoint /var/lib/developer-platform/tempo --noheadings >/dev/null; then
   echo "Prepare the bounded trace filesystem: sudo bash scripts/setup/prepare-tempo-storage.sh" >&2
@@ -50,59 +47,10 @@ echo "Starting PostgreSQL and waiting for it to become healthy..."
 docker compose up -d --wait --wait-timeout 120 postgres
 python3 scripts/setup/setup-postgres-monitoring.py
 
-# Claim selected stores' fixed addresses before dynamically addressed services.
-# The initializer is a one-shot job; wait for persistent services separately.
-store_services=()
-IFS=',' read -ra store_profiles <<< "${COMPOSE_PROFILES:-}"
-for profile in "${store_profiles[@]}"; do
-  case "$profile" in
-    s3)
-      store_services+=(rustfs)
-      ;;
-    qdrant)
-      store_services+=(qdrant)
-      ;;
-    couchdb)
-      store_services+=(couchdb)
-      ;;
-    hugegraph)
-      store_services+=(hugegraph)
-      ;;
-    neo4j)
-      docker build -t developer-platform-neo4j:2026.09.0-community-jmx1.6.0 \
-        infrastructure/persistence/neo4j
-      store_services+=(neo4j-controller)
-      ;;
-    opensearch)
-      store_services+=(opensearch)
-      docker compose up -d opensearch-init
-      ;;
-  esac
-done
-
-if (( ${#store_services[@]} )); then
-  echo "Starting selected persistent data stores..."
-  docker compose up -d --wait --wait-timeout 240 "${store_services[@]}"
-fi
-
-# OpenSearch initialization must finish before its console is started.
-if [[ ",${COMPOSE_PROFILES:-}," == *,opensearch,* ]]; then
-  initializer=$(docker compose ps -aq opensearch-init)
-  for attempt in $(seq 1 60); do
-    state=$(docker inspect --format '{{.State.Status}} {{.State.ExitCode}}' "$initializer")
-    if [[ "$state" == 'exited 0' ]]; then
-      break
-    fi
-    if [[ "$state" == exited* || "$attempt" == 60 ]]; then
-      echo "OpenSearch initialization failed or timed out; inspect private initializer diagnostics." >&2
-      exit 1
-    fi
-    sleep 2
-  done
-
-  # Reserve the console's isolated address before any dynamically addressed peer.
-  # Its native backend becomes available when the API starts later in bootstrap.
-  docker compose up -d --no-deps opensearch-dashboards
+# RustFS is the only optional persistent store. PostgreSQL is already healthy.
+if [[ ",${COMPOSE_PROFILES:-}," == *,s3,* ]]; then
+  echo "Starting RustFS object storage..."
+  docker compose up -d --wait --wait-timeout 240 rustfs
 fi
 
 # --- Workload cluster and Kubernetes readiness ---

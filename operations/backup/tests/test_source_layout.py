@@ -4,7 +4,6 @@ import importlib.util
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
 
 SCRIPTS = Path(__file__).resolve().parents[1] / "scripts"
 
@@ -50,14 +49,3 @@ class ConfigurationLayoutTests(unittest.TestCase):
         (self.root / "infrastructure" / "identity").mkdir()
         with self.assertRaises(backup.BackupError):
             backup.configuration_sources(self.root)
-
-    def test_neo4j_restore_builds_from_the_recovered_bundle_layout(self):
-        for path in ("persistence/neo4j", "infrastructure/persistence/neo4j"):
-            with self.subTest(layout=path):
-                (self.root / path).mkdir(parents=True)
-                with (
-                    patch.object(restore, "ROOT", self.root),
-                    patch.object(restore, "run") as run,
-                ):
-                    restore.start_recovered_neo4j(["docker", "compose"], ["fixture"])
-                self.assertEqual(run.call_args_list[0].args[0][-1], path)

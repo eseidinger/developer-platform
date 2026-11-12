@@ -174,6 +174,9 @@ LEGACY_DASHBOARDS = (
     "application-spring-boot",
     "application-quarkus",
     "application-fastapi",
+    "neo4j-community",
+    "opensearch-performance",
+    "qdrant-performance",
 )
 
 
@@ -969,9 +972,6 @@ def store_dashboard():
             for uid, title in [
                 ("postgresql", "PostgreSQL"),
                 ("rustfs-s3", "RustFS S3"),
-                ("opensearch-performance", "OpenSearch"),
-                ("qdrant-performance", "Qdrant"),
-                ("neo4j-community", "Neo4j Community"),
                 ("age-performance", "Apache AGE"),
                 ("pgvector-performance", "pgvector"),
                 ("duckdb-parquet", "DuckDB / Parquet"),
@@ -995,19 +995,6 @@ def performance_dashboards():
     """Queries match reviewed native collectors or explicit application metrics."""
     definitions = [
         ("rustfs-s3", "RustFS S3 performance", "s3", None),
-        (
-            "opensearch-performance",
-            "OpenSearch performance",
-            "opensearch",
-            "opensearch",
-        ),
-        ("qdrant-performance", "Qdrant performance", "qdrant", "qdrant"),
-        (
-            "neo4j-community",
-            "Neo4j Community instance performance",
-            "neo4j",
-            "containers",
-        ),
         (
             "age-performance",
             "Apache AGE performance and projection health",
@@ -1052,42 +1039,9 @@ def performance_dashboards():
                     "s",
                     "Zero success timestamp means no successful sample. Old values are retained after failures.",
                 )
-            if uid not in {"age-performance", "pgvector-performance"}:
-                scope = "," + selected if provider == "neo4j" else ',scope="shared"'
-                base = 'provider="' + provider + '"' + scope
-                add(
-                    "Container CPU cores used",
-                    f"rate(platform_native_container_cpu_seconds_total{{{base}}}[5m])",
-                    "cores",
-                    "Docker counter; shared services are not attributed to the selected project.",
-                )
-                add(
-                    "Container memory / limit",
-                    f"platform_native_container_memory_bytes{{{base}}} / (platform_native_container_memory_limit_bytes{{{base}}} > 0)",
-                    "percentunit",
-                    "Docker memory excluding inactive file cache; instance/container scope.",
-                )
-                add(
-                    "Container restarts",
-                    f"platform_native_container_restarts{{{base}}}",
-                    description="Daemon restart count; replacement containers reset this gauge.",
-                )
-                add(
-                    "Container block I/O read",
-                    f"rate(platform_native_container_read_bytes_total{{{base}}}[5m])",
-                    "Bps",
-                    "Docker block I/O counters; page-cache hits are not physical reads.",
-                )
-                add(
-                    "Container block I/O write",
-                    f"rate(platform_native_container_write_bytes_total{{{base}}}[5m])",
-                    "Bps",
-                    "Docker block I/O counters; shared store activity is not per resource.",
-                )
         workload = {
             "age-performance": "age",
             "pgvector-performance": "pgvector",
-            "neo4j-community": "neo4j",
             "duckdb-parquet": "duckdb",
         }.get(uid)
         if workload:
@@ -1188,124 +1142,6 @@ def performance_dashboards():
                 'rustfs_heal_mrf_queue_depth{provider="s3"}',
                 description="Native healing work queue.",
             )
-        elif uid == "opensearch-performance":
-            prefix = "platform_native_opensearch_"
-            for name, expr, unit in [
-                (
-                    "Cluster health (0 green, 1 yellow, 2 red)",
-                    prefix + "health",
-                    "short",
-                ),
-                ("Unassigned shards", prefix + "unassigned_shards", "short"),
-                (
-                    "JVM heap utilization",
-                    prefix + "heap_used_bytes / (" + prefix + "heap_max_bytes > 0)",
-                    "percentunit",
-                ),
-                (
-                    "JVM GC time",
-                    "sum by(generation)(rate(" + prefix + "gc_seconds_total[5m]))",
-                    "s",
-                ),
-                ("Thread-pool queues", prefix + "thread_pool_queue", "short"),
-                (
-                    "Thread-pool rejections",
-                    "rate(" + prefix + "thread_pool_rejected_total[5m])",
-                    "ops",
-                ),
-                (
-                    "Circuit breaker trips",
-                    "rate(" + prefix + "breaker_tripped_total[5m])",
-                    "ops",
-                ),
-                ("Disk available", prefix + "disk_available_bytes", "bytes"),
-            ]:
-                add(
-                    name,
-                    expr,
-                    unit,
-                    "Native shared-node statistics. Interpret shard status against the configured single-node replica policy.",
-                )
-            for name, key, unit in [
-                ("Search throughput", "search_total", "ops"),
-                ("Index throughput", "index_total", "ops"),
-                ("Failed indexing", "index_failed_total", "ops"),
-            ]:
-                add(
-                    name,
-                    f"rate({prefix}{key}{{{selected}}}[5m])",
-                    unit,
-                    "Native primary-index counters scoped to the selected catalog resource.",
-                )
-            for operation in ("search", "index"):
-                add(
-                    operation.title() + " mean native time",
-                    f"rate({prefix}{operation}_seconds_total{{{selected}}}[5m]) / (rate({prefix}{operation}_total{{{selected}}}[5m]) > 0)",
-                    "s",
-                    "Native accumulated operation time/count; this is a mean, not a percentile or end-to-end request latency.",
-                )
-            add(
-                "Index size",
-                f"{prefix}index_bytes{{{selected}}}",
-                "bytes",
-                "Native primary-index store size; console metadata is included separately in logical resource usage.",
-            )
-            add(
-                "Active merges",
-                f"{prefix}merges_active{{{selected}}}",
-                description="Native primary-index segment maintenance.",
-            )
-            add(
-                "Cache hit rate",
-                f"rate({prefix}cache_hits_total{{{selected}}}[5m]) / ((rate({prefix}cache_hits_total{{{selected}}}[5m])+rate({prefix}cache_misses_total{{{selected}}}[5m])) > 0)",
-                "percentunit",
-                "Native query-cache observations for the selected resource.",
-            )
-        elif uid == "qdrant-performance":
-            prefix = "platform_native_qdrant_"
-            for name, key in [
-                ("Points", "collection_points"),
-                ("Vectors", "collection_vectors"),
-                ("Unindexed exclusions", "collection_indexed_only_excluded_points"),
-                ("Running optimizations", "collection_running_optimizations"),
-                ("Snapshots creating", "snapshot_creation_running"),
-                ("Snapshots recovering", "snapshot_recovery_running"),
-            ]:
-                add(
-                    name,
-                    f"{prefix}{key}{{{selected}}}",
-                    description="Native self-hosted collection metrics mapped to stable catalog resources; validation collections are excluded.",
-                )
-            add(
-                "REST throughput",
-                f"sum by(operation,status)(rate({prefix}rest_responses_total{{{selected}}}[5m]))",
-                "ops",
-                "Native per-collection API response counters; templates, never resolved query URLs.",
-            )
-            add(
-                "REST p95 latency",
-                f"histogram_quantile(0.95,sum by(le,operation)(rate({prefix}rest_responses_duration_seconds_bucket[5m])))",
-                "s",
-                "Native histogram; if the release omits collection dimensions this is explicitly shared service latency.",
-            )
-            add(
-                "Resident memory",
-                prefix + "memory_resident_bytes",
-                "bytes",
-                "Native process allocator metric; shared service.",
-            )
-            add(
-                "Major page faults",
-                "rate(" + prefix + "process_major_page_faults_total[5m])",
-                "ops",
-                "Native process I/O pressure; shared service.",
-            )
-            add(
-                "File descriptor utilization",
-                prefix + "process_open_fds / (" + prefix + "process_max_fds > 0)",
-                "percentunit",
-                "Native process descriptor usage; shared service.",
-            )
         elif uid in {"age-performance", "pgvector-performance"}:
             add(
                 "Resource native collection health",
@@ -1385,45 +1221,6 @@ def performance_dashboards():
                     unit,
                     "Selected numeric fields from the last profiled job; plans, paths, SQL and contents are excluded. These gauges are not cumulative counters.",
                 )
-        elif uid == "neo4j-community":
-            add(
-                "JVM heap utilization",
-                f"platform_native_neo4j_jvm_heap_used_bytes{{{selected}}} / (platform_native_neo4j_jvm_heap_max_bytes{{{selected}}} > 0)",
-                "percentunit",
-                "Standard JVM JMX agent in the pinned Community image; no Enterprise metrics plugin.",
-            )
-            add(
-                "JVM GC time",
-                f"rate(platform_native_neo4j_jvm_gc_seconds_total{{{selected}}}[5m])",
-                "s",
-                "Standard JVM collector time, aggregated across garbage collectors.",
-            )
-            add(
-                "JVM live threads",
-                f"platform_native_neo4j_jvm_threads{{{selected}}}",
-                description="Standard JVM thread count.",
-            )
-            add(
-                "JVM collection health",
-                'platform_native_collection_up{provider="neo4j"}',
-                description="Independent per-instance JVM collection; failures retain old values with their success timestamp.",
-            )
-            add(
-                "JVM collection age",
-                'time()-platform_native_last_success_timestamp_seconds{provider="neo4j"}',
-                "s",
-                "Original success time for the JVM batch; retained samples do not become fresh when Docker collection succeeds.",
-            )
-            add(
-                "Relayed Bolt connections",
-                'platform_store_relay_connections{provider="neo4j",resource_id=~"$resource"}',
-                description="Platform data-lease TCP connections; excludes operator-native maintenance connections.",
-            )
-            add(
-                "Dedicated instance running",
-                f'platform_native_container_running{{provider="neo4j",{selected}}}',
-                description="Retired instances can be intentionally stopped; check resource lifecycle and maintenance before alerting.",
-            )
         dashboard = {
             "uid": uid,
             "title": dashboard_title,

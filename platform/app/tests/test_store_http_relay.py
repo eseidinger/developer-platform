@@ -1,13 +1,10 @@
 import asyncio
-import base64
-import json
 import time
 from datetime import UTC, datetime, timedelta
 from unittest import IsolatedAsyncioTestCase
-from uuid import UUID, uuid4
+from uuid import uuid4
 
 import h11
-from app.stores import catalog
 from app.stores.http_relay import access_key, identity
 from app.stores.relay import Relay
 
@@ -17,7 +14,7 @@ class HTTPRelayTests(IsolatedAsyncioTestCase):
         self.lease = {
             "credential_id": str(uuid4()),
             "resource_id": str(uuid4()),
-            "provider": "opensearch",
+            "provider": "s3",
             "expires_at": datetime.now(UTC) + timedelta(seconds=10),
         }
         self.observed = []
@@ -41,11 +38,6 @@ class HTTPRelayTests(IsolatedAsyncioTestCase):
                 self.backend.sockets[0].getsockname()[1],
             )
         )
-        # Plain fixture backend: production OpenSearch uses a verified private CA.
-        self.patch = __import__("unittest.mock", fromlist=["patch"]).patch(
-            "app.stores.relay.http_tls", return_value=None
-        )
-        self.patch.start()
         self.relay.leases = {20000: self.lease}
         self.relay.last_success = time.monotonic()
         self.server = await asyncio.start_server(
@@ -55,19 +47,21 @@ class HTTPRelayTests(IsolatedAsyncioTestCase):
     async def asyncTearDown(self):
         self.relay.leases.clear()
         await asyncio.sleep(0.3)
-        self.patch.stop()
         for server in (self.server, self.backend):
             server.close()
             await server.wait_closed()
 
     def packet(self, credential=None):
-        login = catalog.login(credential or self.lease["credential_id"])
-        value = base64.b64encode((login + ":synthetic-password").encode())
-        return (
-            b"GET /resource/_search HTTP/1.1\r\nHost: fixture\r\nAuthorization: Basic "
-            + value
-            + b"\r\n\r\n"
+        key = access_key(credential or self.lease["credential_id"])
+        auth = (
+            f"AWS4-HMAC-SHA256 Credential={key}/20261017/us-east-1/s3/aws4_request, "
+            "SignedHeaders=host;x-amz-date, Signature=" + "a" * 64
         )
+        return (
+            "GET /bucket/key HTTP/1.1\r\nHost: fixture\r\nAuthorization: "
+            + auth
+            + "\r\n\r\n"
+        ).encode()
 
     async def client(self, packet):
         reader, writer = await asyncio.open_connection(
@@ -122,73 +116,14 @@ class HTTPRelayTests(IsolatedAsyncioTestCase):
         with self.assertRaises(ValueError):
             identity(presign, self.lease)
 
-    async def test_qdrant_requires_signed_payload_identity_before_forwarding(self):
-        self.lease["provider"] = "qdrant"
-        payload = (
-            base64.urlsafe_b64encode(
-                json.dumps({"jti": self.lease["credential_id"]}).encode()
-            )
-            .decode()
-            .rstrip("=")
-        )
-        # Signature verification belongs to Qdrant; the relay cannot mint a token.
-        request = h11.Request(
-            method="GET",
-            target="/collections",
-            headers=[
-                ("host", "fixture"),
-                ("api-key", "header." + payload + ".signature"),
-            ],
-        )
-        identity(request, self.lease)
-        self.lease["credential_id"] = UUID(self.lease["credential_id"])
-        identity(request, self.lease)
-        self.lease["credential_id"] = str(uuid4())
-        with self.assertRaises(ValueError):
-            identity(request, self.lease)
-
     async def test_http_upgrade_and_repeated_authorization_never_reach_backend(self):
         for packet in (
             self.packet().replace(b"\r\n\r\n", b"\r\nUpgrade: websocket\r\n\r\n"),
-            self.packet().replace(
-                b"\r\n\r\n", b"\r\nAuthorization: Basic duplicate\r\n\r\n"
-            ),
+            self.packet().replace(b"\r\n\r\n", b"\r\nAuthorization: duplicate\r\n\r\n"),
         ):
             reader, _ = await self.client(packet)
             self.assertEqual(await asyncio.wait_for(reader.read(), 1), b"")
         self.assertEqual(self.observed, [])
-
-    async def test_hugegraph_gateway_rejects_cross_graph_and_admin_paths(self):
-        import hashlib
-
-        self.lease["provider"] = "hugegraph"
-        self.lease["mode"] = "read-only"
-        self.lease["admission_sha256"] = hashlib.sha256(
-            b"synthetic-password"
-        ).hexdigest()
-        login = catalog.login(self.lease["credential_id"])
-        auth = base64.b64encode((login + ":synthetic-password").encode())
-        graph = catalog.identifier(self.lease["resource_id"])
-
-        def packet(target):
-            return (
-                b"GET "
-                + target.encode()
-                + b" HTTP/1.1\r\nHost: untrusted.example\r\nAuthorization: Basic "
-                + auth
-                + b"\r\n\r\n"
-            )
-
-        for target in ("/graphs", "/graphs/other/graph/vertices", "/auth/users"):
-            reader, _ = await self.client(packet(target))
-            self.assertEqual(await asyncio.wait_for(reader.read(), 1), b"")
-        self.assertEqual(self.observed, [])
-
-        reader, _ = await self.client(packet(f"/graphs/{graph}/graph/vertices"))
-        response_headers = await asyncio.wait_for(reader.readuntil(b"\r\n\r\n"), 1)
-        self.assertIn(b"HTTP/1.1 200", response_headers)
-        self.assertEqual(len(self.observed), 1)
-        self.assertNotIn(b"untrusted.example", self.observed[0])
 
     async def test_registered_child_session_revocation_closes_an_existing_stream_without_revoking_its_parent(
         self,

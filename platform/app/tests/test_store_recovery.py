@@ -57,3 +57,45 @@ class StoreRecoveryTests(TestCase):
                         "resources": resources,
                     }
                 )
+
+    def test_purged_legacy_history_reconciles_without_native_provider(self):
+        row = {
+            **self.record(),
+            "provider": "qdrant",
+            "state": "purged",
+            "configuration": {"vector_size": 4, "distance": "Dot"},
+        }
+        conn = Mock()
+
+        def execute(statement, *_args):
+            result = Mock()
+            if "SELECT row_to_json(r) FROM store_resources r" in statement:
+                result.fetchall.return_value = [(row,)]
+            elif "SELECT row_to_json(c),row_to_json(r)" in statement:
+                result.fetchall.return_value = [({"credential_id": str(uuid4())}, row)]
+            return result
+
+        conn.execute.side_effect = execute
+        manifest = {
+            "format": 1,
+            "captured_at": "2026-11-12T16:00:00Z",
+            "resources": [row],
+        }
+        with (
+            patch.object(recovery, "required", return_value=True),
+            patch("app.stores.providers.get") as provider,
+        ):
+            self.assertTrue(recovery.reconcile(conn, manifest, apply=True)["applied"])
+            provider.assert_not_called()
+
+        with (
+            patch.object(recovery, "required", return_value=True),
+            patch("app.stores.providers.get") as provider,
+            self.assertRaises(catalog.Conflict),
+        ):
+            recovery.reconcile(
+                conn,
+                {**manifest, "resources": [{**row, "state": "retired"}]},
+                apply=True,
+            )
+            provider.assert_not_called()

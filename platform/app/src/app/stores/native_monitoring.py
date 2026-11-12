@@ -1,4 +1,4 @@
-"""Private bounded native statistics, isolated from lifecycle reconciliation.
+"""Private bounded PostgreSQL statistics, isolated from lifecycle reconciliation.
 
 Only reviewed numeric fields and stable catalog identities leave this process.
 Failed samples retain last-good values with explicit health and freshness.
@@ -8,10 +8,8 @@ import json
 import logging
 import math
 import os
-import re
 import time
 from pathlib import Path
-from urllib.request import Request
 
 from . import catalog, providers
 
@@ -29,348 +27,6 @@ def line(name, value, labels):
         key + "=" + json.dumps(str(value)) for key, value in sorted(labels.items())
     )
     return name + "{" + encoded + "} " + str(value)
-
-
-def node_stats(value):
-    definitions = {
-        "jvm.mem.heap_used_in_bytes": ("heap_used_bytes", 1),
-        "jvm.mem.heap_max_in_bytes": ("heap_max_bytes", 1),
-        "jvm.uptime_in_millis": ("uptime_seconds", 0.001),
-        "process.cpu.percent": ("cpu_ratio", 0.01),
-        "process.open_file_descriptors": ("open_fds", 1),
-        "fs.total.available_in_bytes": ("disk_available_bytes", 1),
-        "fs.total.total_in_bytes": ("disk_total_bytes", 1),
-    }
-    for path, (name, scale) in definitions.items():
-        current = value
-        for part in path.split("."):
-            current = current[part]
-        yield name, current * scale, {}
-    for pool, stats in value.get("thread_pool", {}).items():
-        if pool not in {"search", "write", "refresh", "flush", "merge", "get"}:
-            continue
-        for field in ("active", "queue", "rejected", "completed"):
-            yield (
-                "thread_pool_"
-                + field
-                + ("_total" if field in {"rejected", "completed"} else ""),
-                stats[field],
-                {"pool": pool},
-            )
-    for collector in ("young", "old"):
-        stats = value["jvm"]["gc"]["collectors"][collector]
-        yield (
-            "gc_seconds_total",
-            stats["collection_time_in_millis"] / 1000,
-            {"generation": collector},
-        )
-        yield "gc_total", stats["collection_count"], {"generation": collector}
-    for name, stats in value.get("breakers", {}).items():
-        if name not in {
-            "parent",
-            "request",
-            "fielddata",
-            "in_flight_requests",
-            "accounting",
-        }:
-            continue
-        yield "breaker_tripped_total", stats["tripped"], {"breaker": name}
-
-
-def opensearch(provider, resources):
-    from .http_client import PrivateJSON
-    from .opensearch import authorization, index
-
-    root = PrivateJSON(
-        provider.endpoint,
-        {
-            "Authorization": authorization(
-                "platform_monitor", os.environ["STORE_MONITOR_PASSWORD"]
-            )
-        },
-        os.environ.get("OPENSEARCH_CA_FILE"),
-    )
-    nodes = root.request("GET", "/_nodes/stats/jvm,thread_pool,breaker,fs,process")[
-        "nodes"
-    ]
-    if len(nodes) != 1:
-        raise ValueError("Reviewed single-node topology required")
-    result = [
-        line(
-            "platform_native_opensearch_" + name,
-            number,
-            {"provider": "opensearch", "scope": "shared", **labels},
-        )
-        for name, number, labels in node_stats(next(iter(nodes.values())))
-    ]
-    health = root.request("GET", "/_cluster/health")
-    result.append(
-        line(
-            "platform_native_opensearch_health",
-            {"green": 0, "yellow": 1, "red": 2}[health["status"]],
-            {"provider": "opensearch", "scope": "shared"},
-        )
-    )
-    result.append(
-        line(
-            "platform_native_opensearch_unassigned_shards",
-            health["unassigned_shards"],
-            {"provider": "opensearch", "scope": "shared"},
-        )
-    )
-    # One bounded statistics call; ignore all indexes outside the current catalog.
-    indices = root.request(
-        "GET",
-        "/resource_*/_stats/docs,store,search,indexing,merge,query_cache,segments",
-    )["indices"]
-    for resource in resources:
-        if resource["state"] != "active":
-            continue
-        stats = indices[index(resource)]["primaries"]
-        labels = {
-            "provider": "opensearch",
-            "project": resource["owner_project"],
-            "resource_id": str(resource["resource_id"]),
-            "scope": "resource",
-        }
-        fields = {
-            "docs.count": ("documents", 1),
-            "store.size_in_bytes": ("index_bytes", 1),
-            "search.query_total": ("search_total", 1),
-            "search.query_time_in_millis": ("search_seconds_total", 0.001),
-            "search.query_current": ("search_active", 1),
-            "indexing.index_total": ("index_total", 1),
-            "indexing.index_time_in_millis": ("index_seconds_total", 0.001),
-            "indexing.index_failed": ("index_failed_total", 1),
-            "merges.total_time_in_millis": ("merge_seconds_total", 0.001),
-            "merges.current": ("merges_active", 1),
-            "query_cache.hit_count": ("cache_hits_total", 1),
-            "query_cache.miss_count": ("cache_misses_total", 1),
-            "segments.count": ("segments", 1),
-        }
-        for path, (name, scale) in fields.items():
-            first, second = path.split(".")
-            result.append(
-                line(
-                    "platform_native_opensearch_" + name,
-                    stats[first][second] * scale,
-                    labels,
-                )
-            )
-    return result
-
-
-QDRANT = {
-    "app_status_recovery_mode",
-    "collections_total",
-    "collection_points",
-    "collection_vectors",
-    "collections_vector_total",
-    "collection_indexed_only_excluded_points",
-    "collection_active_replicas_min",
-    "rest_responses_total",
-    "rest_responses_fail_total",
-    "rest_responses_duration_seconds_bucket",
-    "rest_responses_duration_seconds_sum",
-    "rest_responses_duration_seconds_count",
-    "grpc_responses_total",
-    "grpc_responses_fail_total",
-    "grpc_responses_duration_seconds_bucket",
-    "grpc_responses_duration_seconds_sum",
-    "grpc_responses_duration_seconds_count",
-    "memory_active_bytes",
-    "memory_allocated_bytes",
-    "memory_resident_bytes",
-    "process_threads",
-    "process_open_fds",
-    "process_max_fds",
-    "process_major_page_faults_total",
-    "process_minor_page_faults_total",
-    "collection_running_optimizations",
-    "snapshot_creation_running",
-    "snapshot_recovery_running",
-    "snapshot_created_total",
-}
-SAMPLE = re.compile(
-    r"([a-zA-Z_:][a-zA-Z0-9_:]*)(?:\{(.*)\})? ([+\-0-9.eE]+)(?: [0-9]+)?$"
-)
-LABEL = re.compile(r'([a-zA-Z_][a-zA-Z_0-9]*)="((?:[^"\\]|\\[\\"n])*)"(?:,|$)')
-
-
-def qdrant_samples(raw, resources):
-    if len(raw) > 2 * 1024 * 1024:
-        raise ValueError("Metrics response limit")
-    known = {catalog.identifier(r["resource_id"]): r for r in resources}
-    result = []
-    for item in raw.splitlines():
-        if not item or item.startswith("#"):
-            continue
-        candidate = re.split(r"[ {]", item, maxsplit=1)[0]
-        if candidate not in QDRANT:
-            continue
-        matched = SAMPLE.fullmatch(item)
-        if not matched:
-            raise ValueError("Unsupported metric format")
-        name, encoded, number = matched.groups()
-        if name not in QDRANT:
-            continue
-        labels = {}
-        position = 0
-        for pair in LABEL.finditer(encoded or ""):
-            if pair.start() != position or pair[1] in labels:
-                raise ValueError("Invalid labels")
-            labels[pair[1]] = json.loads('"' + pair[2] + '"')
-            position = pair.end()
-        if position != len(encoded or ""):
-            raise ValueError("Invalid labels")
-        if len(labels) > 10 or any(len(v) > 256 for v in labels.values()):
-            raise ValueError("Label limit")
-        if name.startswith("collection_") and "id" in labels:
-            labels["collection"] = labels.pop("id")
-        for vector_label in ("vector", "vector_name"):
-            if labels.get(vector_label) == "":
-                del labels[vector_label]
-        selected = {"provider": "qdrant", "scope": "shared"}
-        if "collection" in labels:
-            resource = known.get(labels["collection"])
-            if resource is None:
-                continue
-            selected.update(
-                project=resource["owner_project"],
-                resource_id=str(resource["resource_id"]),
-                scope="resource",
-            )
-        # Endpoint is a native reviewed template, never a resolved URL.
-        if "endpoint" in labels:
-            endpoint = labels["endpoint"]
-            if not re.fullmatch(
-                r"(?:/[a-z_/{}/]+|qdrant\.[A-Za-z]+/[A-Za-z]+)", endpoint
-            ):
-                continue
-            selected["operation"] = endpoint
-        for key in ("method", "status", "le"):
-            if key in labels:
-                if key == "method" and labels[key] not in {
-                    "GET",
-                    "POST",
-                    "PUT",
-                    "DELETE",
-                    "PATCH",
-                }:
-                    continue
-                if key == "status" and not re.fullmatch("[0-9]{1,3}", labels[key]):
-                    continue
-                selected[key] = labels[key]
-        # Different vector-name label sets must not collapse into duplicate series.
-        if set(labels) - {"collection", "endpoint", "method", "status", "le"}:
-            continue
-        result.append(line("platform_native_qdrant_" + name, float(number), selected))
-        if len(result) > 5000:
-            raise ValueError("Metric series limit")
-    if not result:
-        raise ValueError("No supported metrics")
-    return result
-
-
-def qdrant(provider, resources):
-    request = Request(
-        provider.endpoint + "/metrics?per_collection=true",
-        headers={"api-key": os.environ["STORE_MONITOR_PASSWORD"]},
-    )
-    with provider.root.opener.open(request, timeout=5) as response:
-        raw = response.read(2 * 1024 * 1024 + 1).decode("utf-8")
-    return qdrant_samples(raw, resources)
-
-
-def couchdb(provider, resources):
-    status = provider.root.request("GET", "/_up")
-    if status.get("status") != "ok":
-        raise ValueError("CouchDB is unavailable")
-    return [line("platform_native_couchdb_up", 1, {"provider": "couchdb"})]
-
-
-def hugegraph(provider, resources):
-    status = provider.root.request("GET", "/versions")
-    if status.get("versions", {}).get("core") != "1.7.0":
-        raise ValueError("HugeGraph release is unavailable or unexpected")
-    return [line("platform_native_hugegraph_up", 1, {"provider": "hugegraph"})]
-
-
-def containers(resources):
-    from .neo4j import Neo4j
-
-    root = Neo4j().call(
-        "containers", {"resource_id": "00000000-0000-0000-0000-000000000000"}
-    )
-    known = {str(r["resource_id"]): r for r in resources}
-    result = []
-    for item in root["containers"]:
-        provider = item["provider"]
-        if provider not in {
-            "postgresql",
-            "s3",
-            "qdrant",
-            "opensearch",
-            "neo4j",
-            "couchdb",
-            "hugegraph",
-        }:
-            raise ValueError()
-        labels = {"provider": provider, "scope": "shared"}
-        if item.get("resource_id"):
-            resource = known.get(item["resource_id"])
-            if resource is None:
-                continue
-            labels.update(
-                project=resource["owner_project"],
-                resource_id=str(resource["resource_id"]),
-                scope="resource",
-            )
-        for key in (
-            "running",
-            "restarts",
-            "cpu_seconds_total",
-            "memory_bytes",
-            "memory_limit_bytes",
-            "cpu_limit_cores",
-            "read_bytes_total",
-            "write_bytes_total",
-        ):
-            if key in item:
-                result.append(
-                    line("platform_native_container_" + key, item[key], labels)
-                )
-    return result
-
-
-def neo4j(provider, resources):
-    result = []
-    for resource in resources:
-        if resource["state"] != "active":
-            continue
-        labels = {
-            "provider": "neo4j",
-            "project": resource["owner_project"],
-            "resource_id": str(resource["resource_id"]),
-            "scope": "resource",
-        }
-        for name, value in provider.call("jvm", resource).items():
-            if name not in {
-                "platform_jvm_heap_used_bytes",
-                "platform_jvm_heap_max_bytes",
-                "platform_jvm_heap_committed_bytes",
-                "platform_jvm_gc_seconds_total",
-                "platform_jvm_threads",
-            }:
-                raise ValueError()
-            result.append(
-                line(
-                    name.replace("platform_jvm_", "platform_native_neo4j_jvm_"),
-                    value,
-                    labels,
-                )
-            )
-    return result
 
 
 PG_CACHE = {}
@@ -487,7 +143,7 @@ def postgres(provider, resources):
 def loop(stop, control):
     from ..monitoring import atomic_write
 
-    cache, prepared = {}, set()
+    cache = {}
     while not stop.is_set():
         try:
             with control.connect() as conn:
@@ -507,14 +163,7 @@ def loop(stop, control):
                         {"provider": native},
                     )
                 )
-            for name, collect in [
-                ("postgresql", postgres),
-                ("opensearch", opensearch),
-                ("qdrant", qdrant),
-                ("neo4j", neo4j),
-                ("couchdb", couchdb),
-                ("hugegraph", hugegraph),
-            ]:
+            for name, collect in [("postgresql", postgres)]:
                 enabled = name == "postgresql" or name in selected
                 lines.append(
                     line("platform_native_selected", int(enabled), {"provider": name})
@@ -525,10 +174,6 @@ def loop(stop, control):
                 up = 0
                 try:
                     provider = providers.get(name)
-                    if name == "opensearch" and name not in prepared:
-                        # Cluster monitoring must work before the first named resource.
-                        provider.ensure_monitoring()
-                        prepared.add(name)
                     readings = collect(
                         provider, [r for r in resources if r["provider"] == name]
                     )
@@ -548,28 +193,6 @@ def loop(stop, control):
                         {"provider": name},
                     )
                 )
-            try:
-                readings = containers(resources)
-                cache["containers"] = (time.time(), readings)
-                container_up = 1
-            except Exception:  # noqa: BLE001 - Docker diagnostics may contain private data.
-                container_up = 0
-            stamp, readings = cache.get("containers", (0, []))
-            lines.extend(readings)
-            lines.append(
-                line(
-                    "platform_native_collection_up",
-                    container_up,
-                    {"provider": "containers"},
-                )
-            )
-            lines.append(
-                line(
-                    "platform_native_last_success_timestamp_seconds",
-                    stamp,
-                    {"provider": "containers"},
-                )
-            )
             lines.append(
                 line("platform_native_collector_timestamp_seconds", time.time(), {})
             )

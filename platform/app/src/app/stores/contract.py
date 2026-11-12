@@ -10,6 +10,7 @@ Mode = Literal["read-only", "read-write"]
 Provider = Literal[
     "postgresql", "s3", "opensearch", "neo4j", "qdrant", "couchdb", "hugegraph"
 ]
+CreateProvider = Literal["postgresql", "s3"]
 
 
 class Strict(BaseModel):
@@ -22,13 +23,14 @@ class VectorConfiguration(Strict):
 
 
 class ResourceCreate(Strict):
+    """New resources are limited to the supported platform storage scope."""
+
     name: str = Field(pattern=NAME, max_length=32)
-    provider: Provider
+    provider: CreateProvider
     quota_bytes: int = Field(default=1_073_741_824, ge=1_048_576, le=1_099_511_627_776)
     extensions: list[Literal["vector", "age"]] = Field(
         default_factory=list, max_length=2
     )
-    configuration: VectorConfiguration | None = None
 
     @model_validator(mode="after")
     def extensions_only_on_postgres(self):
@@ -37,6 +39,17 @@ class ResourceCreate(Strict):
             or len(set(self.extensions)) != len(self.extensions)
         ):
             raise ValueError("unique extensions apply only to PostgreSQL resources")
+        return self
+
+
+class StoredResourceConfiguration(ResourceCreate):
+    """Validate retained records and recovery manifests from older releases."""
+
+    provider: Provider
+    configuration: VectorConfiguration | None = None
+
+    @model_validator(mode="after")
+    def vector_configuration_only_on_qdrant(self):
         if self.configuration is not None and self.provider != "qdrant":
             raise ValueError("Vector configuration applies only to Qdrant resources")
         if self.provider == "qdrant" and self.configuration is None:

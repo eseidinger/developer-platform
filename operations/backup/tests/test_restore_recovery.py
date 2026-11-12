@@ -15,162 +15,34 @@ spec.loader.exec_module(restore)
 
 
 class RestoreRecoveryTests(unittest.TestCase):
-    def test_anonymous_hugegraph_parent_restores_into_created_container_volume(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            volume = root / "volume"
-            volume.mkdir()
-            (volume / "image-default.txt").write_text("image copy")
-            archive = root / "hugegraph-hugegraph-server.tar.gz"
-            with tarfile.open(archive, "w:gz") as output:
-                payload = root / "init_complete"
-                payload.write_text("captured marker")
-                output.add(payload, arcname="docker/init_complete")
-            name = "a" * 64
-            inspect = json.dumps(
-                [
-                    {
-                        "State": {"Running": False},
-                        "Mounts": [
-                            {
-                                "Destination": "/hugegraph-server",
-                                "Type": "volume",
-                                "Name": name,
-                                "Source": str(volume),
-                            }
-                        ],
-                    }
-                ]
-            ).encode()
-            with patch.object(
-                restore,
-                "run",
-                side_effect=[b"container-id", inspect, str(volume).encode()],
-            ) as run:
-                restore.restore_hugegraph_parent_volume(["docker", "compose"], archive)
-            self.assertEqual(
-                run.call_args_list[0].args[0][-4:], ["ps", "-a", "-q", "hugegraph"]
-            )
-            self.assertFalse((volume / "image-default.txt").exists())
-            self.assertEqual(
-                (volume / "docker/init_complete").read_text(), "captured marker"
-            )
-            with (
-                patch.object(
-                    restore,
-                    "run",
-                    side_effect=[b"container-id", inspect, str(volume).encode()],
-                ),
-                self.assertRaisesRegex(RuntimeError, "already initialized"),
-            ):
-                restore.restore_hugegraph_parent_volume(["docker", "compose"], archive)
-
-    def test_retained_store_archives_are_required_before_creating_restore_services(
+    def test_retained_s3_archive_required_and_legacy_live_data_needs_pinned_release(
         self,
     ):
         with tempfile.TemporaryDirectory() as directory:
             bundle = Path(directory)
-            manifest = {
-                "resources": [
-                    {"provider": "s3", "state": "retired"},
-                    {"provider": "qdrant", "state": "active"},
-                    {"provider": "opensearch", "state": "purging"},
-                    {"provider": "couchdb", "state": "active"},
-                    {"provider": "hugegraph", "state": "active"},
-                    {"provider": "neo4j", "state": "purged"},
-                ]
-            }
-            (bundle / "store-recovery.json").write_text(json.dumps(manifest))
-            with self.assertRaisesRegex(RuntimeError, "volume is missing"):
-                restore.store_volume_restore_targets(bundle)
-            for filename in (
-                "couchdb-data.tar.gz",
-                "hugegraph-data.tar.gz",
-                "hugegraph-rocksdb-data.tar.gz",
-                "hugegraph-graphs.tar.gz",
-                "hugegraph-hugegraph-server.tar.gz",
-                "rustfs-data.tar.gz",
-                "qdrant-storage.tar.gz",
-                "opensearch-data.tar.gz",
-            ):
-                (bundle / filename).write_bytes(b"synthetic archive identity")
-            store_volumes = restore.store_volume_restore_targets(bundle)
-            self.assertEqual(
-                store_volumes,
-                [
-                    ("couchdb", "couchdb_data", "couchdb-data.tar.gz"),
-                    ("hugegraph", "hugegraph_data", "hugegraph-data.tar.gz"),
-                    ("hugegraph", "hugegraph_system", "hugegraph-rocksdb-data.tar.gz"),
-                    ("hugegraph", "hugegraph_config", "hugegraph-graphs.tar.gz"),
-                    ("opensearch", "opensearch_data", "opensearch-data.tar.gz"),
-                    ("qdrant", "qdrant_data", "qdrant-storage.tar.gz"),
-                    ("rustfs", "rustfs_data", "rustfs-data.tar.gz"),
-                ],
-            )
-            self.assertEqual(
-                restore.hugegraph_parent_archive(bundle, store_volumes),
-                bundle / "hugegraph-hugegraph-server.tar.gz",
-            )
-            (bundle / "hugegraph-hugegraph-server.tar.gz").unlink()
-            with self.assertRaisesRegex(RuntimeError, "anonymous parent volume"):
-                restore.hugegraph_parent_archive(bundle, store_volumes)
-            manifest["resources"].append({"provider": "unknown", "state": "active"})
-            (bundle / "store-recovery.json").write_text(json.dumps(manifest))
-            with self.assertRaisesRegex(RuntimeError, "No protected restore adapter"):
-                restore.store_volume_restore_targets(bundle)
-
-    def test_dedicated_archive_and_image_inventory_preflight_before_docker_mutation(
-        self,
-    ):
-        from uuid import uuid4
-
-        with tempfile.TemporaryDirectory() as directory:
-            bundle = Path(directory)
-            rid = str(uuid4())
-            (bundle / "store-recovery.json").write_text(
+            path = bundle / "store-recovery.json"
+            path.write_text(
                 json.dumps(
                     {
                         "resources": [
-                            {
-                                "provider": "neo4j",
-                                "state": "retired",
-                                "resource_id": rid,
-                            }
+                            {"provider": "s3", "state": "retired"},
+                            {"provider": "neo4j", "state": "purged"},
                         ]
                     }
                 )
             )
-            with (
-                patch.object(restore, "run") as run,
-                self.assertRaisesRegex(RuntimeError, "archive missing"),
-            ):
-                restore.restore_neo4j_volumes(bundle)
-            run.assert_not_called()
-            name = "platform-neo4j-" + rid.replace("-", "") + "-data"
-            (bundle / (name + ".tar.gz")).write_bytes(b"synthetic archive identity")
-            with self.assertRaisesRegex(RuntimeError, "inventory missing"):
-                restore.neo4j_restore_sources(bundle)
-            (bundle / "neo4j-instances.json").write_text(
-                json.dumps(
-                    [{"resource_id": rid, "configured_image": "enterprise-unreviewed"}]
-                )
-            )
-            with self.assertRaisesRegex(RuntimeError, "operator review"):
-                restore.neo4j_restore_sources(bundle)
-            (bundle / "neo4j-instances.json").write_text(
-                json.dumps(
-                    [
-                        {
-                            "resource_id": rid,
-                            "configured_image": "developer-platform-neo4j:2026.09.0-community-jmx1.6.0",
-                        }
-                    ]
-                )
-            )
+            with self.assertRaisesRegex(RuntimeError, "S3 volume is missing"):
+                restore.store_volume_restore_targets(bundle)
+            (bundle / "rustfs-data.tar.gz").write_bytes(b"synthetic archive identity")
             self.assertEqual(
-                restore.neo4j_restore_sources(bundle),
-                [(rid, name, bundle / (name + ".tar.gz"))],
+                restore.store_volume_restore_targets(bundle),
+                [("rustfs", "rustfs_data", "rustfs-data.tar.gz")],
             )
+            path.write_text(
+                json.dumps({"resources": [{"provider": "qdrant", "state": "active"}]})
+            )
+            with self.assertRaisesRegex(RuntimeError, "632b921"):
+                restore.store_volume_restore_targets(bundle)
 
     def test_restored_access_is_quarantined_before_services_start(self):
         with patch.object(restore, "run") as run:

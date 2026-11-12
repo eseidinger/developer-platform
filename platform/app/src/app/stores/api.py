@@ -74,11 +74,6 @@ def install(app, control):
             ),
         ),
     )
-    from . import dashboards
-
-    app.router.routes.insert(
-        0, Host(dashboards.HOST, app=dashboards.create_backend(console_lease))
-    )
 
     def human(conn, principal):
         # Known automation records are insufficient: an unregistered service
@@ -213,9 +208,7 @@ def install(app, control):
                 {
                     **row,
                     "capabilities": providers.capabilities(row["provider"]),
-                    "quota_enforcement": providers.get(
-                        row["provider"]
-                    ).quota_enforcement,
+                    "quota_enforcement": providers.quota_enforcement(row["provider"]),
                 }
             )
 

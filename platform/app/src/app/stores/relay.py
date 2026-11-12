@@ -21,36 +21,17 @@ from . import catalog, recovery
 
 log = logging.getLogger(__name__)
 MAX_CONNECTIONS = 128
-MAX_BOLT_CONNECTIONS = 16
 
 
 def backend_endpoint(lease):
-    if lease["provider"] == "neo4j":
-        import ipaddress
-
-        return str(ipaddress.IPv4Address(lease["native_host"])), 7687
     endpoints = {
         "postgresql": ("POSTGRES_IP", 5432),
         "s3": ("RUSTFS_IP", 9000),
-        "opensearch": ("OPENSEARCH_IP", 9200),
-        "qdrant": ("QDRANT_IP", 6333),
-        "couchdb": ("COUCHDB_IP", 5984),
-        "hugegraph": ("HUGEGRAPH_IP", 8080),
     }
     setting, port = endpoints[lease["provider"]]
     import ipaddress
 
     return str(ipaddress.ip_address(os.environ[setting])), port
-
-
-def http_tls(lease):
-    if lease["provider"] != "opensearch":
-        return (
-            None  # Private network/SSH boundary, matching the PostgreSQL lab profile.
-        )
-    import ssl
-
-    return ssl.create_default_context(cafile=os.environ["OPENSEARCH_CA_FILE"])
 
 
 def connect():
@@ -177,7 +158,6 @@ class Relay:
         self.leases = {}
         self.servers = {}
         self.connections = 0
-        self.bolt_connections = 0
         self.by_credential = {}
         self.last_success = 0.0
 
@@ -203,10 +183,8 @@ class Relay:
 
     async def handle(self, port, reader, writer):
         lease = self.leases.get(port)
-        is_bolt = lease is not None and lease["provider"] == "neo4j"
         if (
-            (is_bolt and self.bolt_connections >= MAX_BOLT_CONNECTIONS)
-            or lease is None
+            lease is None
             or self.connections >= MAX_CONNECTIONS
             or self.by_credential.get(lease["credential_id"], 0) >= 20
             or not self.allowed(port, lease)
@@ -214,40 +192,13 @@ class Relay:
             writer.close()
             return
         self.connections += 1
-        self.bolt_connections += int(is_bolt)
         self.by_credential[lease["credential_id"]] = (
             self.by_credential.get(lease["credential_id"], 0) + 1
         )
         backend_writer = None
         tasks = []
         try:
-            if lease["provider"] == "neo4j":
-                from .bolt_relay import exchange
-
-                async def guard_bolt():
-                    while self.allowed(port, lease):
-                        await asyncio.sleep(0.25)
-
-                tasks = [
-                    asyncio.create_task(
-                        exchange(
-                            reader,
-                            writer,
-                            lease,
-                            self.backend(lease),
-                            observe=self.observe,
-                        )
-                    ),
-                    asyncio.create_task(guard_bolt()),
-                ]
-                remaining = max(
-                    0, (lease["expires_at"] - datetime.now(UTC)).total_seconds()
-                )
-                await asyncio.wait_for(
-                    asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED), remaining
-                )
-                return
-            if lease["provider"] != "postgresql":
+            if lease["provider"] == "s3":
                 from .http_relay import exchange
 
                 session = [None]
@@ -265,7 +216,6 @@ class Relay:
                             writer,
                             lease,
                             self.backend(lease),
-                            tls=http_tls(lease),
                             authorized=lambda state: session.__setitem__(0, state),
                         )
                     ),
@@ -319,7 +269,6 @@ class Relay:
                     with contextlib.suppress(Exception):
                         await stream.wait_closed()
             self.connections -= 1
-            self.bolt_connections -= int(is_bolt)
             self.by_credential[lease["credential_id"]] -= 1
             if self.by_credential[lease["credential_id"]] == 0:
                 del self.by_credential[lease["credential_id"]]

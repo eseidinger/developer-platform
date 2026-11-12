@@ -111,9 +111,8 @@ def deploy(*, check=False, readiness_timeout=300):
         print("Deployment preflight passed; no services were stopped.")
         return
 
-    # Generate and verify selected-store configuration before the service outage.
+    # Validate shared settings before the service outage.
     command([sys.executable, "scripts/setup/configure-platform.py", "--runtime"])
-    command([sys.executable, "scripts/setup/prepare-stores.py"], private=True)
     print(
         "Stopping and recreating Compose containers; persistent data and k3d are retained.",
         flush=True,

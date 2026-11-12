@@ -50,10 +50,10 @@ def validate_manifest(value):
         resources: list[Resource] = Field(max_length=100000)
 
     result = Manifest.model_validate(value).model_dump(mode="json")
-    from .contract import ResourceCreate
+    from .contract import StoredResourceConfiguration
 
     for row in result["resources"]:
-        ResourceCreate(
+        StoredResourceConfiguration(
             name=row["name"],
             provider=row["provider"],
             extensions=row["extensions"],
@@ -119,6 +119,13 @@ def reconcile(conn, manifest, apply=False):
         "grant_policy": "revoke all recovered grants; require fresh explicit approval",
         "applied": False,
     }
+    if any(
+        row["provider"] not in {"postgresql", "s3"} and row["state"] != "purged"
+        for row in [*current.values(), *latest.values()]
+    ):
+        raise catalog.Conflict(
+            "Legacy store recovery requires the pinned pre-removal implementation"
+        )
     if not apply:
         return plan
     # Revoke even catalog tombstones: pg_dumpall does not snapshot role state and
@@ -126,7 +133,8 @@ def reconcile(conn, manifest, apply=False):
     credentials = conn.execute("""SELECT row_to_json(c),row_to_json(r) FROM store_credentials c
         JOIN store_grants g USING(grant_id) JOIN store_resources r USING(resource_id)""").fetchall()
     for credential, resource in credentials:
-        providers.get(resource["provider"]).revoke(resource, credential)
+        if resource["provider"] in {"postgresql", "s3"}:
+            providers.get(resource["provider"]).revoke(resource, credential)
     conn.execute("""UPDATE store_credentials SET state='revoked',observed_state='revoked',
         expires_at=LEAST(expires_at,now()),error_code=NULL""")
     conn.execute("""UPDATE store_grants SET state='revoked',observed_state='revoked',
@@ -136,23 +144,18 @@ def reconcile(conn, manifest, apply=False):
         "UPDATE store_resources SET name='recovery-'||replace(resource_id::text,'-','') WHERE state<>'purged'"
     )
     for identity, row in latest.items():
-        provider = providers.get(row["provider"])
-        if row["state"] in {"purging", "purged"}:
+        if row["provider"] not in {"postgresql", "s3"}:
+            # Historical tombstones remain readable without native access.
+            state = "purged"
+        elif row["state"] in {"purging", "purged"}:
+            provider = providers.get(row["provider"])
             provider.purge(row)
             state = "purged"
         else:
+            provider = providers.get(row["provider"])
             if row["provider"] == "postgresql" and "age" in row["extensions"]:
                 provider.rebuild_projections(row)
             provider.validate_recovery(row)
-            if row["provider"] == "neo4j":
-                instance = provider.provision(row)
-                conn.execute(
-                    """INSERT INTO store_instances(resource_id,host,port) VALUES(%s,%s,7687)
-                    ON CONFLICT(resource_id) DO UPDATE SET host=excluded.host,port=excluded.port""",
-                    (identity, instance["host"]),
-                )
-                if row["state"] == "retired":
-                    provider.retire(row)
             state = row["state"]
         if identity in current:
             conn.execute(

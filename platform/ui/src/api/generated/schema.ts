@@ -2368,9 +2368,11 @@ export interface components {
              */
             envPrefix: string;
         };
-        /** ResourceCreate */
+        /**
+         * ResourceCreate
+         * @description New resources are limited to the supported platform storage scope.
+         */
         ResourceCreate: {
-            configuration?: components["schemas"]["VectorConfiguration"] | null;
             /** Extensions */
             extensions?: ("vector" | "age")[];
             /** Name */
@@ -2379,7 +2381,7 @@ export interface components {
              * Provider
              * @enum {string}
              */
-            provider: "postgresql" | "s3" | "opensearch" | "neo4j" | "qdrant" | "couchdb" | "hugegraph";
+            provider: "postgresql" | "s3";
             /**
              * Quota Bytes
              * @default 1073741824
@@ -2605,20 +2607,6 @@ export interface components {
             msg: string;
             /** Error Type */
             type: string;
-        };
-        /** VectorConfiguration */
-        VectorConfiguration: {
-            /**
-             * Distance
-             * @default Cosine
-             * @enum {string}
-             */
-            distance: "Cosine" | "Dot" | "Euclid" | "Manhattan";
-            /**
-             * Vector Size
-             * @default 384
-             */
-            vector_size: number;
         };
         /** Version */
         Version: {

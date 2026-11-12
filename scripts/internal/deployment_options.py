@@ -18,9 +18,6 @@ ADDRESSES = {
     "alloy": ("ALLOY_IP", 14),
     "store-access": ("STORE_RELAY_IP", 15),
     "rustfs": ("RUSTFS_IP", 16),
-    "opensearch": ("OPENSEARCH_IP", 17),
-    "qdrant": ("QDRANT_IP", 18),
-    "opensearch-init": ("OPENSEARCH_INIT_IP", 19),
     "proxy": ("PROXY_IP", 20),
     "blackbox-exporter": ("BLACKBOX_EXPORTER_IP", 21),
     "prometheus": ("PROMETHEUS_IP", 22),
@@ -32,10 +29,9 @@ ADDRESSES = {
     "keycloak-db-init": ("KEYCLOAK_DB_INIT_IP", 28),
     "keycloak-realm-init": ("KEYCLOAK_REALM_INIT_IP", 29),
     "postgres-exporter": ("POSTGRES_EXPORTER_IP", 30),
-    "neo4j-controller": ("NEO4J_CONTROLLER_IP", 31),
     "local-application-edge": ("LOCAL_APPLICATION_EDGE_IP", 32),
 }
-PROFILES = {"s3", "qdrant", "opensearch", "neo4j", "couchdb", "hugegraph"}
+PROFILES = {"s3"}
 
 
 def fail(message):
@@ -108,9 +104,6 @@ def platform_inventory_settings(options):
         {
             "stores",
             "network",
-            "search_console_network",
-            "couchdb_network",
-            "hugegraph_network",
             "k3s_image",
             "bootstrap_subject",
             "store_ssh_host",
@@ -125,7 +118,7 @@ def platform_inventory_settings(options):
     result = {}
     stores = options.get("stores")
     if stores is not None:
-        mapping(stores, {"profiles", "capacity_bytes", "neo4j"}, "platform_stores")
+        mapping(stores, {"profiles", "capacity_bytes"}, "platform_stores")
         profiles = stores.get("profiles")
         if (
             not isinstance(profiles, list)
@@ -150,45 +143,9 @@ def platform_inventory_settings(options):
                 capacity, separators=(",", ":"), sort_keys=True
             ),
         )
-        neo4j = mapping(
-            stores.get("neo4j", {}),
-            {"max_instances", "memory_bytes"},
-            "platform_stores.neo4j",
-        )
-        for field, key, lower, upper in [
-            ("max_instances", "NEO4J_MAX_INSTANCES", 1, 64),
-            ("memory_bytes", "NEO4J_INSTANCE_MEMORY_BYTES", 2**30, 16 * 2**30),
-        ]:
-            if field in neo4j:
-                result[key] = str(
-                    integer(
-                        neo4j[field], lower, upper, "platform_stores.neo4j." + field
-                    )
-                )
     networks = []
     for field, prefix, key, specification in [
         ("network", 24, "PLATFORM_SUBNET", ADDRESSES),
-        (
-            "search_console_network",
-            29,
-            "STORE_SEARCH_CONSOLE_SUBNET",
-            {
-                "platform-api": ("STORE_SEARCH_API_IP", 2),
-                "opensearch-dashboards": ("OPENSEARCH_DASHBOARDS_IP", 3),
-            },
-        ),
-        (
-            "couchdb_network",
-            29,
-            "STORE_COUCHDB_SUBNET",
-            {"couchdb": ("COUCHDB_IP", 2)},
-        ),
-        (
-            "hugegraph_network",
-            29,
-            "STORE_HUGEGRAPH_SUBNET",
-            {"hugegraph": ("HUGEGRAPH_IP", 2)},
-        ),
     ]:
         config = options.get(field)
         if config is None:

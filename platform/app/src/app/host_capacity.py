@@ -15,7 +15,6 @@ log = logging.getLogger(__name__)
 
 SNAPSHOT = Path("/run/capacity/host.json")
 MAX_AGE_SECONDS = 60
-NATIVE_LABEL = "developer-platform.neo4j-resource"
 
 
 def positive(value):
@@ -34,11 +33,10 @@ def collect(engine):
         name = (summary.get("Names") or [""])[0].lstrip("/")
         node = re.fullmatch(r"k3d-workloads-(?:server|agent)-[0-9]+", name)
         managed = labels.get("com.docker.compose.project") == "developer-platform"
-        native = NATIVE_LABEL in labels
         running = summary.get("State") in {"running", "restarting", "paused"}
         if name == "k3d-workloads-serverlb":
             continue  # Included in the explicit host process allowance.
-        if not (node or managed or native or running):
+        if not (node or managed or running):
             continue
         container = engine("GET", "/containers/" + summary["Id"] + "/json")
         limits = container["HostConfig"]
@@ -46,7 +44,6 @@ def collect(engine):
         if managed and labels.get("com.docker.compose.service") in {
             "keycloak-db-init",
             "keycloak-realm-init",
-            "opensearch-init",
         }:
             continue
         memory_bytes = positive(limits["Memory"])

@@ -132,6 +132,30 @@ test('creating a resource does not implicitly bind an application', async () => 
   expect(api.requestBinding).not.toHaveBeenCalled()
   expect(api.createHuman).not.toHaveBeenCalled()
 })
+test('creation shows only PostgreSQL and S3 even with stale provider capabilities', async () => {
+  vi.mocked(api.getContext).mockResolvedValue({
+    manage: true,
+    platform_admin: false,
+    providers: [
+      { id: 'postgresql', enabled: true },
+      { id: 's3', enabled: true },
+      { id: 'qdrant', enabled: true },
+      { id: 'neo4j', enabled: true },
+    ],
+  })
+  setup()
+  const createForm = (
+    await screen.findByRole('button', { name: 'Create resource' })
+  ).closest('form')!
+  expect(
+    within(createForm)
+      .getAllByRole('option')
+      .map((option) => option.textContent),
+  ).toEqual(['postgresql', 's3'])
+  expect(
+    within(createForm).queryByLabelText('Qdrant vector dimensions'),
+  ).not.toBeInTheDocument()
+})
 test('credential issuance is explicit and pending provisioning never retries the POST', async () => {
   vi.mocked(api.getMine).mockResolvedValue([{ grant, resource }])
   vi.mocked(api.issue).mockResolvedValue(pending)
@@ -382,10 +406,7 @@ test('known Neo4j resources lock the binding mode to full access', async () => {
   vi.mocked(api.getContext).mockResolvedValue({
     manage: true,
     platform_admin: false,
-    providers: [
-      { id: 'postgresql', enabled: true },
-      { id: 'neo4j', enabled: true },
-    ],
+    providers: [{ id: 'postgresql', enabled: true }],
   })
   vi.mocked(api.getResources).mockResolvedValue([
     { ...resource, provider: 'neo4j' },
@@ -400,6 +421,9 @@ test('known Neo4j resources lock the binding mode to full access', async () => {
   )
   expect(within(form).getByLabelText('Resource provider')).toHaveValue('neo4j')
   expect(within(form).getByLabelText('Resource provider')).toBeDisabled()
+  expect(
+    within(form).getByRole('option', { name: 'neo4j' }),
+  ).toBeInTheDocument()
   expect(
     within(form).queryByRole('option', { name: 'Read-only' }),
   ).not.toBeInTheDocument()
