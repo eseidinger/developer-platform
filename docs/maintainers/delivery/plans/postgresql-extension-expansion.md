@@ -1,9 +1,12 @@
 # PostgreSQL Extension Expansion
 
-Status: local implementation and compatibility checks complete November 12,
-2026; the encrypted off-host backup was restored in separate disposable VMs
-with the prior and candidate PostgreSQL images, including historical SQL
-marker and quarantine checks. Deployed acceptance remains open. Evidence is
+Status: local, deployed, and external recovery acceptance passed on
+November 12, 2026. The new image and API are deployed on node-01; an opt-in
+six-extension resource and its data were restored into a separate VM, with a
+freshly approved read-only application binding and denied write. The 8 GiB host
+reserve held in deployed samples. Cleanup of the disposable source resource
+and a following purge-intent backup remain open because a fresh human admin
+authorization is required. Evidence is
 tracked in the
 [PLAN-040 validation record](../../../operators/validation/postgresql-extensions-2026-11-12.md).
 Task: **PLAN-040**. Implementation and deployment start after

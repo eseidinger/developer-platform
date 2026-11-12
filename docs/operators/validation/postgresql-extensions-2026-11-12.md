@@ -181,10 +181,88 @@ exact one-row source marker table was checked against its independent receipt
 and removed transactionally from the retired test database. The verified
 snapshot retains the marker for future replay.
 
-Before deployment, confirm
-the pinned image and extension files on a disposable restore server, then run
-the controlled upgrade and rollback rehearsal. Check existing AGE and pgvector resources,
-new time-series/spatial/queue/analytics resources, roles and credential
-revocation, monitored extension presence, host reserve, and application
-reconnection. Keep PLAN-040 open until the deployed checks and capacity budget
-are recorded.
+## Deployed image and remaining acceptance
+
+After marker cleanup, the normal encrypted backup completed with readback
+verification as snapshot
+`ee823420a226a3288ed6ffbae8f1f44662ec1924c4d87e3a2309674ce58e966c`.
+The production host had 22,635 MiB available RAM and 210 GiB free disk before
+deployment. Ansible then deployed clean source revision
+`f11bafccacb80519fc48c8683e79d1c849508e7f`; its installation record has
+that exact revision. The controlled Compose restart finished successfully.
+The running PostgreSQL image ID is
+`sha256:72e7c2712240a2d0d7458f8e43932b62262c4a7ae1b62abf25f2203ac4779b61`.
+It reports TimescaleDB 2.31.0, PostGIS 3.6.4, pgmq 1.13.0, and pg_duckdb
+1.2.0 available, with `timescaledb,age,pg_duckdb` preloaded. PostgreSQL,
+internal API, and public API readiness passed. Host available RAM after the
+restart was 23,552 MiB, above the 8 GiB reserve; PostgreSQL used 139.5 MiB in
+one idle sample under its unchanged 2 GiB limit. Disk free was 204 GiB.
+The server, AGE, pgvector, TimescaleDB, PostGIS, and pg_duckdb binary SHA-256
+digests all matched the locally validated candidate image despite the distinct
+Docker image IDs. A later sample with bound workloads running showed 23,624
+MiB host available RAM and PostgreSQL at 145.2 MiB within its 2 GiB limit.
+
+The existing retired AGE/pgvector resource still had `age` 1.8.0 and `vector`
+0.8.7 installed. An active plain resource and the platform database had only
+`plpgsql`; new extensions were not installed implicitly. Prometheus loaded the
+`PostgreSQLExtensionMissing` alert. The public OpenAPI schema advertised all
+six supported extension names for `ResourceCreate`. Scheduled ingestion jobs
+failed in both `odip` and `odip-test` at 21:58–22:00 UTC during maintenance;
+their jobs from 22:01 through 22:05 UTC succeeded after the API and database
+returned.
+
+The freshly installed backup runner then completed a normal encrypted backup
+with readback verification as snapshot
+`39e9b2c7e0fe7f39e77f315dbd995f87d3093ee4d47fcd3bf1f6a4a47bc8789c`.
+This validates capture with the deployed source and image configuration; it
+precedes creation of new extension data and therefore does not yet establish
+their restore behavior.
+
+A disposable resource `3b1f9806-b4a3-4121-8bc5-1c50c0a2d995` in the active
+`vareng-test` project selected all six extensions in reverse API order and
+reached `observed_state=active`. An unsupported extension request returned HTTP
+422 and left the resource catalog unchanged. The selected database installed
+AGE 1.8.0, pgvector 0.8.7, TimescaleDB 2.31.0, PostGIS 3.6.4, pgmq 1.13.0,
+and pg_duckdb 1.2.0. SQL readback found a hypertable value sum of 42, a
+PostGIS longitude of 13, one queued pgmq message, a DuckDB result of 42, and
+pgvector distance 1. PostGIS and pgvector live in the managed
+`platform_extensions` schema, so operator SQL explicitly included that schema
+in its search path. With this resource active, PostgreSQL used 243.1 MiB of
+2 GiB, with a 529 MiB container peak since restart; host available memory was
+23,396 MiB.
+
+An independent SQL marker was committed in that resource. Its source and
+controller receipt SHA-256 matched
+`624c5919dd57ccb818fd26b71a32ddfb4aa3d965f0c502067be1dcbcf62db162`.
+The normal encrypted backup then completed with readback verification as
+snapshot
+`28dfdde90e173e8082042bd71317e4767b6559230c66095c26b3082f5106989b`.
+A third fresh WSL VM completed the official one-shot restore with the reviewed
+image. Its private report in
+`.runtime/recovery-evidence/recovery_vm/20261112T222229/` passed historical
+marker and quarantine checks for the exact resource. Manual readback on the
+restored server found all six installed extension versions and the same
+hypertable sum 42, longitude 13, one queued message, DuckDB result 42, and
+vector distance 1. The official named-store report still says
+`application_reconnected: false`, because it checks only catalog and SQL. A
+supplemental VM-only project then requested and explicitly approved a fresh
+cross-project read-only binding. Its scheduled PostgreSQL application read the
+restored value and succeeded only after a write attempt was denied. The private
+`reconnect-app.json` report and completed job `reader-29908720` record this
+check. Since the fixture table was created by the operator `postgres` rather
+than the resource owner, the VM operator granted SELECT on that table to the
+resource reader role after restore; this supplemental check does not claim that
+default privileges for owner-created tables were exercised. The local fixture
+already covers those default privileges.
+
+The local bounded mixed workload and deployed samples with the all-extension
+resource showed no conflict with the unchanged 2 GiB PostgreSQL ceiling or the
+8 GiB host reserve. These samples do not measure long-running peak concurrency.
+The old and candidate image local rollback fixtures do not justify switching
+an already migrated database to the old image.
+
+The test resource remains active on the source until its exact API retirement
+and purge are completed, followed by a backup recording the latest purge
+intent. A second short-lived human admin device authorization was started for
+this cleanup but expired without approval. The remaining operation requires a
+fresh authorization; no production resource was deleted without it.
