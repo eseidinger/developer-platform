@@ -1,5 +1,15 @@
 # Data Store Expansion
 
+[ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+supersedes expansion beyond PostgreSQL with extensions and S3-compatible object
+storage. The selections and implementation notes below are retained as history;
+the [storage scope reduction plan](storage-scope-reduction.md) owns removal,
+migration, capacity verification, and the separate storage lab.
+After PLAN-039, the
+[PostgreSQL extension plan](postgresql-extension-expansion.md) adds TimescaleDB,
+PostGIS, pgmq, and pg_duckdb. The older TimescaleDB deferral and compatibility
+notes below remain historical evidence, not current extension acceptance.
+
 Status: design and delivery plan, originally recorded October 17, 2026. The
 earlier source assessment is historical: named PostgreSQL, RustFS, OpenSearch,
 Qdrant and dedicated Neo4j Community providers are now implemented. CouchDB

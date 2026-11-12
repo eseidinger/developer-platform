@@ -3,6 +3,13 @@
 Created: October 6, 2026. Status: **Accepted; application implementation is
 planned**.
 
+## Follow-on decision — November 12, 2026
+
+[ADR-023](ADR-023-mantine-portal-components.md) selects a Mantine component and
+styling migration after PLAN-040. This record still describes the current
+shadcn/Base UI and Tailwind implementation until that migration is accepted;
+its original decision and evidence below remain historical.
+
 ## Implementation status note — October 18, 2026
 
 The scaffold observations below describe the October 6 baseline. The selected

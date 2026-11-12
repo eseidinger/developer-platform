@@ -2,6 +2,11 @@
 
 Status: active implementation.
 
+[ADR-023](../architecture/decisions/ADR-023-mantine-portal-components.md)
+plans a Mantine component and styling migration after PLAN-040. The
+[migration plan](delivery/plans/mantine-ui-migration.md) owns the change; the
+guidance below applies to the currently deployed stack.
+
 The portal is a React/TypeScript/Vite application. It generates API types from
 the committed OpenAPI document and keeps FastAPI authoritative for validation,
 authorization, audit, lifecycle, and redaction.

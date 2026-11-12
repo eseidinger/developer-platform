@@ -1,6 +1,6 @@
 # Delivery status and plans
 
-Status: current delivery index as of October 18, 2026. Future phases are
+Status: current delivery index as of November 12, 2026. Future phases are
 proposals without confirmed dates.
 
 ## Architectural evolution
@@ -108,6 +108,19 @@ proposals without confirmed dates.
   - **Milestone:** Store measurement separated from provider acceptance
   - **Significance:** Phase 9 owns dashboards and comparisons; former Phase 9
     anytime leftovers become Phase 10, still last and lowest priority
+- **Date:** November 12, 2026
+  - **Milestone:** PostgreSQL and S3 project data-store scope selected
+  - **Significance:**
+    [ADR-022](../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+    supersedes non-retained store expansion; PLAN-039 owns migration, removal,
+    capacity verification, and the separate storage lab; PLAN-040 adds
+    TimescaleDB, PostGIS, pgmq, and pg_duckdb afterward
+- **Date:** November 12, 2026
+  - **Milestone:** Mantine portal migration planned after PostgreSQL extensions
+  - **Significance:**
+    [ADR-023](../../architecture/decisions/ADR-023-mantine-portal-components.md)
+    changes the future component and styling choice; PLAN-041 follows PLAN-040
+    while preserving the portal's API, auth, and feature behavior
 
 ## Implementation status
 
@@ -161,10 +174,9 @@ flowchart LR
     P3 --> P4["4 Tracing and Grafana Dashboards"]
     P4 --> P5["5 AI Operations / Development"]
     P5 -. "optional" .-> P6["6 Architecture Expansion"]
-    P5 --> P7["7 Planned Data Stores"]
-    P7 -. "owner-selected schedule" .-> P8["8 Deferred Data Stores"]
-    P7 -. "measure and compare" .-> P9["9 Store Measurement and Comparison"]
-    P8 -. "measure if activated" .-> P9
+    P2C --> Storage["PLAN-039 Storage Scope Reduction"]
+    Storage --> Extensions["PLAN-040 PostgreSQL Extensions"]
+    Extensions --> Mantine["PLAN-041 Mantine UI Migration"]
     P2C -. "anytime" .-> P10["10 Anytime Leftovers"]
     P1 --> Evidence["Measurements and Operational Evidence"]
     P2A --> Evidence
@@ -174,10 +186,10 @@ flowchart LR
     P4 --> Evidence
     P5 --> Evidence
     P6 --> Evidence
-    P9 --> Evidence
+    Storage --> Evidence
+    Extensions --> Evidence
+    Mantine --> Evidence
     P10 --> Evidence
-    P7 --> Evidence
-    P8 --> Evidence
 ```
 
 - **Phase:** [1](history/phase-1-foundation.md)
@@ -224,25 +236,36 @@ flowchart LR
   - **Outcome / dependency:** Optional Docker compute adapter and/or polyglot
     service extraction, each gated by parity, migration, rollback, and
     operational evidence
+- **Work package:** [PLAN-039](plans/storage-scope-reduction.md)
+  - **Entry condition:** ADR-022 accepted; inventory and owner assignment begin
+    before live changes
+  - **Outcome / dependency:** PostgreSQL and S3 retained, other providers
+    migrated and retired, measured CPU/RAM returned to workloads, separate
+    storage lab established
+- **Work package:** [PLAN-040](plans/postgresql-extension-expansion.md)
+  - **Entry condition:** PLAN-039 complete with measured post-reduction capacity
+  - **Outcome / dependency:** TimescaleDB, PostGIS, pgmq, and pg_duckdb added as
+    opt-in PostgreSQL extensions with isolation, capacity, and recovery evidence
+- **Work package:** [PLAN-041](plans/mantine-ui-migration.md)
+  - **Entry condition:** PLAN-040 implementation and acceptance complete
+  - **Outcome / dependency:** Portal components and styling migrated to Mantine;
+    existing user journeys and API/auth boundaries remain verified
 - **Phase:** [7 – Planned Data Stores](plans/phase-7-planned-data-stores.md)
-  - **Entry condition:** Existing PostgreSQL capabilities; package 7.1
-    integration acceptance before additional stores
-  - **Outcome / dependency:** PostgreSQL baseline, DuckDB/Parquet/S3 foundation
-    and targeted OpenSearch, AGE/Neo4j, pgvector/Qdrant functional provider
-    acceptance
+  - **Entry condition:** Historical plan; non-retained provider expansion
+    superseded by ADR-022
+  - **Outcome / dependency:** Existing PostgreSQL/extension and S3 evidence
+    retained; migration and removal owned by PLAN-039
 - **Phase:** [8 – Deferred Data Stores](plans/phase-8-deferred-data-stores.md)
-  - **Entry condition:** CouchDB and HugeGraph source and disposable fixtures
-    pass; full Phase 8 deployed acceptance remains open, while off-host backup
-    verification belongs to Phase 10.13
-  - **Outcome / dependency:** CouchDB and HugeGraph are selected providers;
-    TimescaleDB/ClickHouse and Valkey remain deferred; operational policies
-    still apply
+  - **Entry condition:** Historical plan; provider additions superseded by
+    ADR-022
+  - **Outcome / dependency:** Prior source evidence retained; no new provider
+    acceptance on this platform
 - **Phase:**
   [9 – Data Store Measurement and Comparison](plans/phase-9-store-measurement-and-comparison.md)
-  - **Entry condition:** Relevant provider or workload fixture available;
-    packages may run independently
-  - **Outcome / dependency:** Eight performance dashboards and reproducible
-    comparisons without adoption thresholds
+  - **Entry condition:** Historical plan; cross-store comparisons superseded by
+    ADR-022
+  - **Outcome / dependency:** Other-store comparisons move to the planned
+    separate storage lab
 - **Phase:** [10 – Anytime Leftovers](plans/phase-10-anytime-leftovers.md)
   - **Entry condition:** Phase 2C foundation; schedule independently when
     capacity allows
@@ -251,18 +274,17 @@ flowchart LR
     deferred PLAN-021–024 follow-ups (10.9) and second AI provider evaluation
     (10.10) without gating Phases 3–5 or optional 6
 
-The [data-store expansion plan](plans/data-store-expansion.md) groups source
-roadmap phases 0–4 into planned Phase 7 and source phases 5–7 into deferred
-Phase 8. Phase 9 owns quantitative measurements, dashboards and comparisons; it
-does not gate provider selection or Phase 7/8 exit. Phase 7 packages preserve
-the baseline → analytics/object storage → search → graph → vector sequence.
-Phase 8 packages activate independently at the owner's discretion. Provider
-lifecycle, backup integration and purge safeguards belong in Phases 7/8. Deployed
-backup verification for Phase 8 stores and deployed store restore, rebuild and
-reconnection acceptance belong in Phase 10 packages 10.11 and 10.13. Those
-Phase 10 checks do not gate Phase 7/8 exit.
-Reproducible domain benchmarks remain externally owned. Selected store services
-remain running together; check combined capacity before adding another service.
+The [data-store expansion plan](plans/data-store-expansion.md) and Phase 7–9
+plans preserve earlier decisions and evidence. The current
+[storage scope reduction plan](plans/storage-scope-reduction.md) controls new
+store work: retain PostgreSQL with extensions and S3, safely retire other
+providers, verify reclaimed CPU/RAM, and create a separate storage lab.
+Recovery checks for affected stores remain relevant while their data is retained;
+they do not justify new provider adoption. After PLAN-039,
+[PLAN-040](plans/postgresql-extension-expansion.md) expands PostgreSQL with
+TimescaleDB, PostGIS, pgmq, and pg_duckdb within the measured workload budget.
+After PLAN-040, [PLAN-041](plans/mantine-ui-migration.md) migrates the React
+portal's component and styling system to Mantine.
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and
 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their

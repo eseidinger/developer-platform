@@ -75,7 +75,8 @@ status individually.
     implementation proposed
 - **ADR:** [019](ADR-019-react-ui-technology-stack.md)
   - **Topic:** React UI technology stack
-  - **Status:** Accepted October 6, 2026; application implementation planned
+  - **Status:** Current implementation; future component/styling direction in
+    ADR-023
 - **ADR:** [020](ADR-020-generic-hosted-application-integration.md)
   - **Topic:** Generic hosted-application integration, group authorization,
     retention, and classification boundary
@@ -86,6 +87,14 @@ status individually.
     and scoped reads
   - **Status:** Accepted October 15, 2026; implementation and operational
     acceptance open
+- **ADR:** [022](ADR-022-postgresql-and-s3-storage-scope.md)
+  - **Topic:** Retain PostgreSQL with extensions and S3; move other storage
+    experiments to a separate lab; add four PostgreSQL extensions afterward
+  - **Status:** Accepted November 12, 2026; reduction, extension expansion, and
+    migration pending
+- **ADR:** [023](ADR-023-mantine-portal-components.md)
+  - **Topic:** Migrate portal components and styling to Mantine after PLAN-040
+  - **Status:** Accepted November 12, 2026; implementation pending
 
 ADRs 012–015 record choices observable in source as of September 27, 2026.
 **Implemented** describes what the code does; it does not imply owner approval

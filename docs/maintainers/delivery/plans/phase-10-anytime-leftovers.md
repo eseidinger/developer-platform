@@ -1,5 +1,12 @@
 # Phase 10 — Anytime Leftovers
 
+[ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+supersedes non-retained provider acceptance. Package 10.13 below remains
+historical scope; [PLAN-039](storage-scope-reduction.md) now controls migration,
+backup verification, and safe retirement of those providers. Its outstanding
+checks apply only while their data remains retained. PostgreSQL and S3 recovery
+checks remain in scope.
+
 Status: unscheduled, lowest-priority phase. It is listed last in the delivery
 plan and may be worked on whenever capacity allows; it does not gate Phases 3,
 4, 5, 7, 8, or optional 6. Internal dependencies still apply when a package is
@@ -336,6 +343,12 @@ and presentation records, or a new explicit owner-directed exception. Failure in
 a deterministic Phase 7 test remains Phase 7 work and is not moved here.
 
 ### 10.13 — Verify deployed data-store recovery (`PLAN-027`–`PLAN-033` follow-up)
+
+**Current disposition (November 12, 2026):** This package is superseded for a
+provider once PLAN-039 has verified its resource retirement and purge. Until
+then, keep the required backups and recovery path for retained data; do not
+delete a provider's service or volume because a future restore test was
+cancelled. The steps below preserve the earlier acceptance scope.
 
 **Owner deferral (October 18, 2026):** Restore, projection/index rebuild and
 application reconnection acceptance for stores introduced in Phases 7 and 8

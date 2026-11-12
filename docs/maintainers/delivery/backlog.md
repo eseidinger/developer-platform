@@ -317,18 +317,19 @@ and checkboxes below are authoritative.
     dashboards
 - **Gate:** Optional 6
   - **Tasks:** PLAN-004, PLAN-005
-- **Gate:** 7, planned
-  - **Tasks:** PLAN-026 (7.1 baseline/integration), PLAN-027 (7.2
-    analytics/object storage), PLAN-028 (7.3 search), PLAN-029 (7.4 graph),
-    PLAN-030 (7.5 vector), PLAN-036 (7.1 common private/console access, extended
-    by each provider package)
-- **Gate:** 8, CouchDB and HugeGraph source implemented; other providers deferred
-  - **Tasks:** PLAN-031 (8.1 time series/OLAP), PLAN-032 (8.2 caching), PLAN-033
-    (8.3 CouchDB), PLAN-038 (8.4 HugeGraph)
-- **Gate:** 9, measurement and comparison
-  - **Tasks:** PLAN-037: eight store performance dashboards and reproducible
-    comparisons across selected Phase 7/8 stores in the
-    [measurement plan](plans/phase-9-store-measurement-and-comparison.md)
+- **Gate:** Storage scope reduction
+  - **Tasks:** PLAN-039: inventory, creation freeze, migration, safe retirement,
+    source and service removal, capacity verification, and separate storage lab
+    in the [current plan](plans/storage-scope-reduction.md)
+- **Gate:** PostgreSQL extension expansion, after PLAN-039
+  - **Tasks:** PLAN-040: add TimescaleDB, PostGIS, pgmq, and pg_duckdb through
+    the [extension plan](plans/postgresql-extension-expansion.md)
+- **Gate:** Mantine UI migration, after PLAN-040
+  - **Tasks:** PLAN-041: replace the portal component and styling system under
+    the [migration plan](plans/mantine-ui-migration.md)
+- **Gate:** 7–9, historical store expansion and comparison scope
+  - **Tasks:** PLAN-026–033 and PLAN-036–038 retain their IDs and evidence;
+    non-retained provider additions and comparisons are superseded by ADR-022
 - **Gate:** 10, anytime
   - **Tasks:** PLAN-016, PLAN-009, PLAN-017, PLAN-018, PLAN-019, PLAN-006,
     PLAN-007, PLAN-008, the deferred deployed PLAN-020 portal journeys,
@@ -3590,7 +3591,65 @@ deployed restart, collector-outage/recovery, trace/metric readback,
 durable-total reconciliation and measured capacity/overhead evidence. See the
 [signal contract and verification](../../../infrastructure/monitoring/AI.md).
 
+## Storage scope reduction task
+
+**Owner decision (November 12, 2026):**
+[ADR-022](../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+limits project data stores to PostgreSQL with extensions and S3-compatible
+object storage. **PLAN-039** in the
+[storage scope reduction plan](plans/storage-scope-reduction.md) replaces new
+non-retained provider work on this platform. This entry records a plan, not a
+completed migration or capacity gain. Assign named platform, operator, and
+application owners before live work.
+
+- [ ] **PLAN-039 · Storage scope reduction** — Inventory every affected resource
+  and its data owner; reject new non-retained resources; migrate consumers or
+  document blockers; verify backups and authorized retirement/purge; remove
+  unused provider code, services, and volumes; keep PostgreSQL/extensions and S3
+  working; measure CPU/RAM before and after; create the separate storage lab.
+  Record source, local, and deployed evidence for each package. No stopped
+  service or missing lease is proof of data deletion.
+
+## PostgreSQL extension expansion task
+
+**Owner decision (November 12, 2026):** After PLAN-039 is complete, add
+TimescaleDB, PostGIS, pgmq, and pg_duckdb as opt-in extensions to the shared
+PostgreSQL service. PLAN-040 owns the
+[extension plan](plans/postgresql-extension-expansion.md). The current runtime
+image offers AGE and pgvector; the earlier TimescaleDB compatibility fixture is
+not deployed acceptance for this new scope.
+
+- [ ] **PLAN-040 · PostgreSQL extension expansion** — Pin compatible versions;
+  verify coexistence and capacity after PLAN-039; build and expose opt-in
+  extensions with project isolation; prove representative queries, backups,
+  restore, upgrade, and application reconnection. Record source, disposable
+  real-PostgreSQL, and deployed evidence. Implementation waits until PLAN-039
+  completes.
+
+## Mantine UI migration task
+
+**Owner direction (November 12, 2026):**
+[ADR-023](../../architecture/decisions/ADR-023-mantine-portal-components.md)
+selects Mantine for the portal after PLAN-040. **PLAN-041** in the
+[migration plan](plans/mantine-ui-migration.md) owns the component and styling
+change. The current shadcn/Base UI and Tailwind implementation remains active
+until the migration passes its checks.
+
+- [ ] **PLAN-041 · Mantine UI migration** — After PLAN-040, establish a Mantine
+  theme, migrate representative project and store flows, migrate remaining
+  features, remove unused shadcn/Base UI and Tailwind code and dependencies,
+  then verify existing portal journeys, authorization denials, keyboard/focus
+  behavior, responsive layout, API parity, and production build. Record
+  before/after bundle and stylesheet sizes and deployed browser evidence.
+
 ## Data-store expansion tasks
+
+**Superseded scope (November 12, 2026):** PLAN-026–033 and PLAN-036–038 below
+preserve earlier implementation decisions and evidence. ADR-022 supersedes
+non-PostgreSQL, non-S3 provider expansion and cross-store comparison gates.
+PLAN-039 owns migration and retirement. PostgreSQL and S3 safeguards remain
+applicable. The dated historical statements below do not authorize new store
+selection on this platform.
 
 Added October 17, 2026 from the
 [data store roadmap](../../product/data-store-roadmap.md). PLAN-026–030 and

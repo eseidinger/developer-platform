@@ -612,7 +612,9 @@ HTTP instead.
 The production PostgreSQL image builds pgvector 0.8.7 and AGE 1.8.0-rc0 from the
 reviewed commits on PostgreSQL 18.6. Only AGE is globally preloaded to support
 ordinary data identities; neither extension is installed in unselected
-databases. TimescaleDB remains deferred and is absent from this runtime image.
+databases. TimescaleDB, PostGIS, pgmq, and pg_duckdb are absent from this runtime
+image; they are planned after storage scope reduction in
+[PLAN-040](../maintainers/delivery/plans/postgresql-extension-expansion.md).
 pgvector objects are in the operator-owned `platform_extensions` schema. AGE
 uses its operator-owned `ag_catalog`; application graphs remain resource-scoped.
 

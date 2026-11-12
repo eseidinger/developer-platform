@@ -11,6 +11,20 @@ Adapted from the
 The repository status described there was not rechecked for this Markdown
 export.
 
+**Current scope decision (12 November 2026):**
+[ADR-022](../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+retains PostgreSQL with its extensions and S3-compatible object storage on the
+Developer Platform. Other project data-store providers are to be removed, and
+their experiments belong in a planned separate storage lab. The roadmap and
+provider selections below record earlier direction; they no longer authorize
+new provider work on this platform. Removal and migration have not yet been
+completed; see the
+[storage scope reduction plan](../maintainers/delivery/plans/storage-scope-reduction.md).
+After that plan completes, the
+[PostgreSQL extension plan](../maintainers/delivery/plans/postgresql-extension-expansion.md)
+adds TimescaleDB, PostGIS, pgmq, and pg_duckdb as opt-in extensions. The
+earlier TimescaleDB deferral below is historical.
+
 **Current platform policy amendment (17 October 2026):** The owner permits
 selection and permanent adoption of data stores at will. No benchmark success
 criteria, demonstrated-benefit threshold or workload/domain-need trigger is

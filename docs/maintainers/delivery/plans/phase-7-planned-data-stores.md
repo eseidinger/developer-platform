@@ -1,5 +1,11 @@
 # Phase 7 — Planned Data Stores
 
+[ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+narrows current platform scope to PostgreSQL with extensions and S3-compatible
+object storage. Other provider work below is superseded and retained as
+implementation history; [PLAN-039](storage-scope-reduction.md) owns migration
+and retirement.
+
 Status: implementation in progress as of October 18, 2026. The scoped 7.1
 PostgreSQL acceptance gate has local and deployed evidence, including active
 pgAdmin Query Tool session fencing and verified-backup-gated purge (EV-52–67).

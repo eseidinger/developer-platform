@@ -4,6 +4,13 @@ Status: selected single-host hybrid topology with one Python/FastAPI Platform
 API. Project workloads run in Kubernetes/k3d; no additional compute adapter or
 deployable platform-service split is in the current scope.
 
+[ADR-022](decisions/ADR-022-postgresql-and-s3-storage-scope.md) narrows the
+target project data-store set to PostgreSQL with extensions and S3-compatible
+object storage. The other implemented providers remain present until their
+migration and retirement are completed. The
+[follow-on plan](../maintainers/delivery/plans/postgresql-extension-expansion.md)
+adds TimescaleDB, PostGIS, pgmq, and pg_duckdb after that reduction.
+
 ## Implemented platform
 
 The [FastAPI service](../../platform/app/src/app/main.py) authenticates human

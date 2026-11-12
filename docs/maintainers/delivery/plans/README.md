@@ -7,6 +7,15 @@ Phase 4 plan is a completed record kept at its existing path for evidence links;
 current behavior belongs in the canonical guides. A plan's unchecked criteria
 must not be read as proof that the corresponding source capability is absent:
 
+[ADR-022](../../../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+supersedes non-PostgreSQL, non-S3 provider expansion and comparison work in the
+Phase 7–9 plans below. Those plans remain for implementation history and
+evidence. [PLAN-039](storage-scope-reduction.md) now owns retirement, migration,
+source cleanup, capacity verification, and the separate storage lab.
+[PLAN-040](postgresql-extension-expansion.md) follows it with four PostgreSQL
+extensions. [PLAN-041](mantine-ui-migration.md) follows PLAN-040 with the
+portal's Mantine migration.
+
 - [Deployed Platform API acceptance suite](deployed-api-acceptance.md) —
   proposed first installed-platform test stage
 - [Energy-system use-case enablement priority](energy-system-integration.md)
@@ -18,18 +27,23 @@ must not be read as proof that the corresponding source capability is absent:
   package 5.6 owner-accepted
 - [CLI implementation and complete project administration](cli.md)
 - [UI implementation](ui.md)
+- [Mantine UI migration](mantine-ui-migration.md) — PLAN-041; follows PLAN-040
+  while preserving portal behavior and API boundaries
+- [Storage scope reduction](storage-scope-reduction.md) — PLAN-039; retain
+  PostgreSQL and S3, retire other providers, verify workload capacity, and
+  establish the separate storage lab
+- [PostgreSQL extension expansion](postgresql-extension-expansion.md) — PLAN-040;
+  after PLAN-039, add TimescaleDB, PostGIS, pgmq, and pg_duckdb
 - [Phase 7 planned data stores](phase-7-planned-data-stores.md) —
-  baseline/integration, analytics/object storage, search, graphs and vectors
+  historical baseline/integration and provider expansion scope
 - [Phase 8 deferred data stores](phase-8-deferred-data-stores.md) —
-  CouchDB and HugeGraph selected; time series/OLAP and caching remain deferred
+  historical deferred provider scope
 - [CouchDB provider](couchdb-provider.md) — source, disposable fixture and
-  bounded deployed access checks pass; Phase 8 acceptance remains open and
-  off-host backup verification belongs to Phase 10.13
+  bounded deployed access checks recorded under superseded Phase 8 scope
 - [HugeGraph provider](hugegraph-provider.md) — source and disposable fixture
-  pass; Phase 8 deployed acceptance remains open and off-host backup
-  verification belongs to Phase 10.13
+  results recorded under superseded Phase 8 scope
 - [Phase 9 data store measurement and comparison](phase-9-store-measurement-and-comparison.md)
-  — performance dashboards and reproducible comparisons
+  — historical performance dashboard and comparison scope
 - [Phase 10 anytime leftovers and store recovery — lowest priority](phase-10-anytime-leftovers.md)
 
 **PLAN-020**

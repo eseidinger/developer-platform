@@ -1,8 +1,20 @@
 # Product Roadmap
 
-Status: current/next/later roadmap updated November 2, 2026. No calendar
+Status: current/next/later roadmap updated November 12, 2026. No calendar
 deadlines or effort commitments have been confirmed. The sequence follows
 dependencies and verifiable outcomes.
+
+**Storage scope update (November 12, 2026):**
+[ADR-022](../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+retains PostgreSQL with extensions and S3-compatible object storage. Other
+project data-store providers are to be removed to simplify the platform and
+free CPU and RAM for workloads. A separate storage lab is planned for other
+options. The linked Phase 7–9 plans record earlier delivery scope;
+non-retained provider expansion and comparisons are superseded. Removal and
+migration are tracked in
+[PLAN-039](../maintainers/delivery/plans/storage-scope-reduction.md). After it
+finishes, [PLAN-040](../maintainers/delivery/plans/postgresql-extension-expansion.md)
+adds TimescaleDB, PostGIS, pgmq, and pg_duckdb to PostgreSQL.
 
 - **Phase:**
   [1 – Foundation](../maintainers/delivery/history/phase-1-foundation.md)
@@ -54,34 +66,48 @@ dependencies and verifiable outcomes.
     services only for a recorded need
   - **Acceptance gate:** Provider parity and/or migration, behavior parity,
     rollback, and operational evidence for the activated package
+- **Work package:**
+  [Storage Scope Reduction](../maintainers/delivery/plans/storage-scope-reduction.md)
+  - **State:** Planned under ADR-022; implementation and migration pending
+  - **User outcome:** Keep PostgreSQL and S3, free CPU and RAM for workloads,
+    and establish a separate storage lab
+  - **Acceptance gate:** Safe migration and retirement, retained-store parity,
+    removed-provider denial, and measured capacity gain
+- **Work package:**
+  [PostgreSQL Extension Expansion](../maintainers/delivery/plans/postgresql-extension-expansion.md)
+  - **State:** Planned after storage scope reduction
+  - **User outcome:** Use TimescaleDB, PostGIS, pgmq, and pg_duckdb as opt-in
+    PostgreSQL extensions
+  - **Acceptance gate:** Compatible pinned builds, isolation, bounded capacity,
+    backup/restore, upgrade, and application readback
+- **Work package:**
+  [Mantine UI Migration](../maintainers/delivery/plans/mantine-ui-migration.md)
+  - **State:** Planned after PostgreSQL extension expansion
+  - **User outcome:** Develop and maintain the portal with one Mantine component
+    and styling system
+  - **Acceptance gate:** Existing portal journeys, accessibility, responsive
+    behavior, API boundaries, and production build pass after migration
 - **Phase:**
   [7 – Planned Data Stores](../maintainers/delivery/plans/phase-7-planned-data-stores.md)
-  - **State:** Implementation in progress
-  - **User outcome:** Extend the PostgreSQL baseline with DuckDB/Parquet/RustFS
-    S3 and targeted OpenSearch, AGE/Neo4j and pgvector/Qdrant providers
-  - **Acceptance gate:** Independent resource lifecycle, explicit bindings,
-    scoped private/browser access, functional integration, backup capture and
-    safe purge
+  - **State:** Scope narrowed by ADR-022; retirement and migration pending
+  - **User outcome:** Retain PostgreSQL, its extensions, and S3-compatible object
+    storage for workloads
+  - **Acceptance gate:** Retained stores keep their lifecycle, access, backup,
+    recovery and safe purge safeguards
 - **Phase:**
   [8 – Deferred Data Stores](../maintainers/delivery/plans/phase-8-deferred-data-stores.md)
-  - **State:** CouchDB and HugeGraph implemented in source with disposable
-    fixtures; full deployed acceptance remains open
-  - **User outcome:** Add CouchDB and HugeGraph; TimescaleDB, ClickHouse and
-    Valkey remain owner-scheduled
-  - **Acceptance gate:** CouchDB and HugeGraph operational acceptance, including
-    backup integration and purge safeguards; owner selection and acceptance for
-    other activated providers. Off-host backup verification is Phase 10 work
+  - **State:** Superseded by ADR-022; prior implementation evidence retained
+  - **User outcome:** Move non-retained storage experiments to a separate lab
+  - **Acceptance gate:** No new non-retained provider acceptance on this platform
 - **Phase:**
   [9 – Data Store Measurement and Comparison](../maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md)
-  - **State:** Planned, unscheduled
-  - **User outcome:** Measure selected stores and compare them on versioned
-    workloads
-  - **Acceptance gate:** Eight performance dashboards and reproducible
-    quantitative/domain comparisons; no adoption threshold
+  - **State:** Cross-store comparison scope superseded by ADR-022
+  - **User outcome:** Compare other storage options in the planned storage lab
+  - **Acceptance gate:** No cross-store comparison gate on this platform
 - **Phase:**
   [10 – Anytime Leftovers](../maintainers/delivery/plans/phase-10-anytime-leftovers.md)
   - **State:** Open, unscheduled, lowest priority
-  - **User outcome:** Complete remaining generic acceptance and deployed store
+  - **User outcome:** Complete remaining generic acceptance and retained-store
     recovery when capacity allows
   - **Acceptance gate:** Outstanding task criteria remain open; store recovery
     does not gate Phases 7–8
@@ -110,15 +136,15 @@ expiry/revocation evidence; Neo4j Browser/private Bolt has local full-access,
 independent credential-fencing and cold-recovery evidence. All eight store
 performance dashboards and native metrics pipelines are implemented in source;
 workload instrumentation examples and version-pinned Parquet/DuckDB comparisons
-pass locally. Their remaining deployed measurement and domain comparison
-acceptance is Phase 9 work. October 18 evidence adds PostgreSQL's scoped
+pass locally. The former Phase 9 measurement and domain comparison scope is
+superseded by ADR-022. October 18 evidence adds PostgreSQL's scoped
 deterministic exit (EV-67), native provider/extension checks (EV-68/69),
 synthetic artifact/outbox/search integration (EV-71), and deployed human
 console/session checks (EV-72). Seven EV-71/72 resource purges remain awaiting
 verified scheduled backup; zero active leases is not evidence of completed
 deletion. Deployed restore/rebuild and natural expiry/operator reviews remain
 Phase 10 work. CouchDB and HugeGraph have Phase 8 source implementations;
-their remaining acceptance is tracked separately. These statuses reflect
+their earlier acceptance plans are superseded. These statuses reflect
 inspected source and the recorded
 [backlog evidence](../maintainers/delivery/backlog.md).
 
@@ -140,18 +166,13 @@ The sequence follows the selected hybrid topology. A direct Docker workload
 adapter remains an optional Phase 6 expansion in
 [ADR-002](../architecture/decisions/ADR-002-docker-vs-kubernetes.md).
 
-The [data store roadmap](data-store-roadmap.md) is incorporated into Phase 7 for
-planned stores, Phase 8 for deferred stores, Phase 9 for measurement and
-comparison, and Phase 10 for deployed restore, rebuild and application
-reconnection acceptance. PostgreSQL remains the reference. DuckDB is an
-application analytical engine; the
+The [data store roadmap](data-store-roadmap.md) records the earlier Phase 7–9
+provider and comparison scope. Under ADR-022, the platform keeps PostgreSQL
+with extensions and S3-compatible storage; other storage experiments move to a
+planned separate lab. The
 [Parquet artifact example](../../examples/analytics-artifacts/README.md)
-supplies exact-version S3 manifests, verified local reads and synthetic SQL
-comparison/recovery fixtures. The platform supplies generic provider lifecycle
-and backup safeguards while ODIP, VEF, Energy and Bot Social own domain
-experiments. Phase 10 recovery checks do not gate Phase 7/8 provider acceptance.
-Phase 10 remains last, anytime and lowest priority; optional Phase 6 is
-independent.
+remains source evidence for S3 manifests and synthetic comparisons. Recovery
+work for retained stores remains in Phase 10. Optional Phase 6 is independent.
 
 Phase 5 implements content-free OpenLIT instrumentation and operator Grafana
 dashboards for AI operations, token usage/estimated cost and telemetry health.
@@ -162,11 +183,7 @@ collector-failure/recovery, elapsed retention and sustained-capacity checks
 remain open; see the
 [deployed evidence](../../infrastructure/monitoring/AI.md#deployed-smoke-check-october-17-2026).
 
-Data stores may be selected at will. Benchmark success criteria, demonstrated
-benefit and workload/domain triggers do not gate selection or permanent
-adoption; the agreed provisioning, isolation, recovery and capacity policies
-still apply.
-
-Selected data-store services remain running together. Capacity planning covers
-their combined workload; adding another store must not automatically stop
-existing services. Review a concrete capacity increase when needed.
+Under ADR-022, the platform retains PostgreSQL with extensions and
+S3-compatible object storage. Earlier open-ended store selection and combined
+service capacity policies are superseded. Measure reclaimed CPU and RAM as
+other providers are retired, and preserve capacity for workloads.

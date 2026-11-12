@@ -1,6 +1,6 @@
 # Product overview and vision
 
-Status: current product overview and target vision. Last reviewed November 10,
+Status: current product overview and target vision. Last reviewed November 12,
 2026\.
 
 The Developer Platform allows developers to describe an application and its
@@ -35,6 +35,13 @@ can execute a rollback. The API and CLI provide automation. Source
 implementation and local tests do not establish every deployed acceptance
 criterion; see the [roadmap](roadmap.md).
 
+[ADR-022](../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+narrows the target store set to PostgreSQL with its extensions and S3-compatible
+object storage. Other implemented providers are pending removal, with storage
+experiments moving to a planned separate lab. After that reduction,
+[PLAN-040](../maintainers/delivery/plans/postgresql-extension-expansion.md)
+adds TimescaleDB, PostGIS, pgmq, and pg_duckdb to PostgreSQL.
+
 ## Users and value
 
 - **User:** Developer
@@ -64,9 +71,9 @@ project creates an ownership scope on that foundation. Stores are created
 independently and bound to consuming components; an empty project or unbound
 application creates no database.
 
-Labs comparing JSONB with the selected CouchDB provider, relational with graph
-persistence, or pgvector with specialized vector stores remain extensions. They
-provide decision evidence but are not required MVP services.
+Comparisons with other storage options belong in the planned separate storage
+lab. PostgreSQL extension experiments may remain here within the retained
+service's capacity and operational safeguards.
 
 AI supports development, delivery, and operations. Its initial value is
 explaining applications and incidents using platform context. A general-purpose
