@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError } from '@/api/errors'
 import { useAuth } from '@/auth/auth-context'
-import { Button } from '@mantine/core'
+import { Badge, Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -128,11 +128,14 @@ function PlatformAdministrationPage() {
                     </p>
                   </div>
                   {isSelf ? (
-                    <span className={styles.mutedTiny}>Your access</span>
+                    <Badge variant="light" color="indigo">
+                      Your access
+                    </Badge>
                   ) : (
                     <Button
                       size="sm"
                       color="red"
+                      variant="outline"
                       onClick={() => setRevoking(grant)}
                     >
                       Revoke

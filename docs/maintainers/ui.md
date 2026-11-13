@@ -8,8 +8,27 @@ selects Mantine components and a shared theme with focused CSS modules. The
 its acceptance evidence. Keep the theme and component styles in
 `platform/ui/src/app/theme.tsx` and feature-local CSS modules. Import only the
 Mantine styles used by production components through `src/index.css`.
-The [design refresh plan](delivery/plans/mantine-design-refresh.md) describes
-the intended visual hierarchy after PLAN-041; it is not current UI behavior.
+The [design refresh plan](delivery/plans/mantine-design-refresh.md) records
+PLAN-042's visual hierarchy and acceptance evidence.
+
+## Visual conventions
+
+The shared light theme uses Geist Variable, Mantine indigo 7 for primary
+actions and focus, gray 0 for the page canvas, white content surfaces, and
+Mantine's `md`/`lg` radii. Semantic state uses labeled badges or alerts: teal
+for successful observed states, orange for pending or uncertain states, and red
+for failures and destructive actions. Keep these tokens in
+`platform/ui/src/app/theme.tsx` and focused feature CSS modules. The global
+`AppShell` has a fixed desktop sidebar and a mobile drawer. Project pages use
+the local Overview, Application access, Data stores, and AI assistance
+navigation near the title.
+
+Make one action visually primary for each workflow. Keep retire, purge, revoke,
+and rollback confirmations explicit. Loading, denied, empty, and unavailable
+states must stay distinct. Use the native data-store creation disclosure for a
+compact resource list; new providers or extension options must retain labels
+and accessible controls when the disclosure opens. Import a Mantine component's
+layer stylesheet in `platform/ui/src/index.css` when introducing it.
 
 The portal is a React/TypeScript/Vite application. It generates API types from
 the committed OpenAPI document and keeps FastAPI authoritative for validation,

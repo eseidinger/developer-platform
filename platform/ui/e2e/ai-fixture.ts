@@ -112,6 +112,9 @@ export async function aiFixture(
     const request = route.request()
     const url = new URL(request.url())
     const path = url.pathname
+    // The source tree also contains /features/projects/ modules. Only portal
+    // navigation and API requests belong to this fixture.
+    if (path.startsWith('/src/')) return route.continue()
     if (request.isNavigationRequest() && /^\/projects\/[^/]+\/ai$/.test(path))
       return route.fulfill({
         response: await route.fetch({

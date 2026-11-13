@@ -1,5 +1,5 @@
 .workspace {
-  max-width: 56rem;
+  max-width: 76rem;
   overflow-wrap: break-word;
 }
 
@@ -10,8 +10,8 @@
 .panel {
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-lg);
-  background: var(--mantine-color-body);
-  padding: 1.25rem;
+  background: var(--mantine-color-white);
+  padding: clamp(1.25rem, 2vw, 2rem);
 }
 
 .panel > * + * {
@@ -19,13 +19,14 @@
 }
 
 .pageTitle {
-  font-size: 1.875rem;
-  font-weight: 600;
+  font-size: clamp(1.875rem, 3vw, 2.5rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 .sectionTitle {
-  font-size: var(--mantine-font-size-lg);
-  font-weight: 500;
+  font-size: 1.25rem;
+  font-weight: 650;
 }
 
 .strong,
@@ -65,8 +66,7 @@
 .tiny,
 .tinyBreakable,
 .mutedTiny,
-.mutedTinyBreakable,
-.stateBadge {
+.mutedTinyBreakable {
   font-size: var(--mantine-font-size-xs);
 }
 
@@ -148,13 +148,6 @@
   margin-top: 0.5rem;
 }
 
-.stateBadge {
-  border-radius: 999px;
-  background: var(--mantine-color-gray-1);
-  padding: 0.25rem 0.5rem;
-  font-weight: 500;
-}
-
 .notice,
 .noticeStack {
   border-radius: var(--mantine-radius-md);
@@ -188,17 +181,20 @@
 .viewTab {
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-white);
   padding: 0.5rem 0.75rem;
   font-size: var(--mantine-font-size-sm);
 }
 
 .viewTab:hover,
 .viewTabActive {
-  background: var(--mantine-color-gray-1);
+  border-color: var(--mantine-color-indigo-3);
+  background: var(--mantine-color-indigo-0);
 }
 
 .viewTabActive {
-  font-weight: 500;
+  color: var(--mantine-color-indigo-8);
+  font-weight: 650;
 }
 
 @media (min-width: 40em) {

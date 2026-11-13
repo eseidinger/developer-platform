@@ -1,14 +1,7 @@
-import { Badge } from '@mantine/core'
-import { Button } from '@mantine/core'
+import { Alert, Badge, Button, Paper } from '@mantine/core'
 import { useAuth } from '@/auth/auth-context'
 import { ProjectList } from '@/features/projects/project-list'
 import styles from './home-page.module.css'
-
-const foundationItems = [
-  'Typed Platform API client generated from OpenAPI',
-  'Route and query-provider application shell',
-  'Component and browser-test foundations',
-] as const
 
 function HomePage() {
   const { error, signIn, status, user } = useAuth()
@@ -19,16 +12,19 @@ function HomePage() {
 
   return (
     <section aria-labelledby="page-title" className={styles.page}>
-      <div className={styles.intro}>
-        <Badge variant="light" color="gray">
-          UI foundation
+      <Paper component="header" withBorder radius="lg" className={styles.hero}>
+        <Badge variant="light" color="indigo">
+          Platform workspace
         </Badge>
         <h1 id="page-title" className={styles.heading}>
-          Developer Platform portal
+          {status === 'authenticated'
+            ? 'Your platform workspace'
+            : 'Developer Platform portal'}
         </h1>
         <p className={styles.lead}>
-          The portal foundation is ready for authenticated project discovery,
-          deployment, and diagnostics work.
+          {status === 'authenticated'
+            ? 'Choose a project to manage deployments, data stores, and application access.'
+            : 'Sign in to find your projects and manage their applications, data, and access in one place.'}
         </p>
         {status === 'loading' && (
           <p role="status" className={styles.mutedSmall}>
@@ -47,21 +43,11 @@ function HomePage() {
           </div>
         )}
         {error && (
-          <p role="alert" className={styles.error}>
+          <Alert color="red" title="Sign-in unavailable" role="alert">
             {error}
-          </p>
+          </Alert>
         )}
-      </div>
-      <section aria-labelledby="foundation-title" className={styles.panel}>
-        <h2 id="foundation-title" className={styles.sectionHeading}>
-          Current foundation
-        </h2>
-        <ul className={styles.foundationList}>
-          {foundationItems.map((item) => (
-            <li key={item}>{item}</li>
-          ))}
-        </ul>
-      </section>
+      </Paper>
       <ProjectList />
     </section>
   )

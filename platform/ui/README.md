@@ -42,6 +42,12 @@ Keycloak/lifecycle journey.
 - Type-aware ESLint, JSX accessibility checks, and strict TypeScript
 - Prettier and npm with the committed lockfile
 
+The portal uses a Mantine `AppShell`: a persistent desktop sidebar, mobile
+drawer, and project-local section navigation. The shared light theme defines
+Geist and indigo primary actions; feature CSS modules handle operational data
+and responsive rows. Add the component's layer stylesheet to `src/index.css`
+when using another Mantine component.
+
 Authentication uses the installed `oidc-client-ts` client. Portal tokens stay in
 memory; protocol transaction state uses session storage across the redirect. The
 client renews tokens automatically while the identity-provider session remains

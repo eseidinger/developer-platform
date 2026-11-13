@@ -7,11 +7,21 @@ import {
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Button, Group, Modal, Stack, Text, TextInput } from '@mantine/core'
+import {
+  Alert,
+  Badge,
+  Button,
+  Group,
+  Modal,
+  Stack,
+  Text,
+  TextInput,
+} from '@mantine/core'
 import { useAuth } from '@/auth/auth-context'
 import { ApiError } from '@/api/errors'
 import * as api from './stores-api'
 import { submitConsoleLaunch } from './console-launch'
+import { ProjectNavigation } from '@/features/projects/project-navigation'
 import styles from './stores-page.module.css'
 
 type Action = (work: () => Promise<unknown>) => Promise<void>
@@ -202,124 +212,147 @@ function Workspace({
           Refresh stores
         </Button>
       </div>
+      {project && <ProjectNavigation name={project} />}
       <p>
         Resources have an independent lifecycle. Removing an application retains
         its data. Each component needs an approved binding.
       </p>
       {message && <p role="status">{message}</p>}
       {uncertain && (
-        <p role="alert">
+        <Alert color="orange" title="Outcome unknown" role="alert">
           Writes are paused until a successful refresh. Creation requests are
           never automatically retried.
-        </p>
+        </Alert>
       )}
       {project && context.isError && (
         <p role="alert">{context.error.message}</p>
       )}
       {manage && (
         <>
-          <section className={styles.panel}>
-            <h2 className={styles.sectionTitle}>Create resource</h2>
-            <Form
-              disabled={disabled}
-              submit={(d) =>
-                action(() =>
-                  api.createResource(project!, {
-                    name: text(d, 'name'),
-                    provider: text(d, 'provider') as api.Provider,
-                    quota_bytes: Number(text(d, 'quota')) * 1048576,
-                    extensions:
-                      text(d, 'provider') === 'postgresql'
-                        ? [
-                            ...(d.has('vector') ? ['vector' as const] : []),
-                            ...(d.has('age') ? ['age' as const] : []),
-                            ...(d.has('timescaledb')
-                              ? ['timescaledb' as const]
-                              : []),
-                            ...(d.has('postgis') ? ['postgis' as const] : []),
-                            ...(d.has('pgmq') ? ['pgmq' as const] : []),
-                            ...(d.has('pg_duckdb')
-                              ? ['pg_duckdb' as const]
-                              : []),
-                          ]
-                        : [],
-                  }),
-                )
-              }
-            >
-              <label>
-                Resource name
-                <input
-                  className={styles.field}
-                  name="name"
-                  required
-                  pattern="[a-z][a-z0-9-]*"
-                  maxLength={32}
-                />
-              </label>
-              <label>
-                Provider
-                <select className={styles.field} name="provider">
-                  {context.data?.providers
-                    .filter(
-                      (p) =>
-                        p.enabled && (p.id === 'postgresql' || p.id === 's3'),
-                    )
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.id}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label>
-                Storage allocation (MiB)
-                <input
-                  className={styles.field}
-                  name="quota"
-                  type="number"
-                  defaultValue={1024}
-                  min={1}
-                  required
-                />
-              </label>
-              <label>
-                <input type="checkbox" name="vector" /> pgvector (vector search)
-              </label>
-              <label>
-                <input type="checkbox" name="age" /> AGE (graph projections)
-              </label>
-              <label>
-                <input type="checkbox" name="timescaledb" /> TimescaleDB (time
-                series)
-              </label>
-              <label>
-                <input type="checkbox" name="postgis" /> PostGIS (spatial)
-              </label>
-              <label>
-                <input type="checkbox" name="pgmq" /> pgmq (queues)
-              </label>
-              <label>
-                <input type="checkbox" name="pg_duckdb" /> pg_duckdb (analytics)
-              </label>
-              <Button type="submit">Create resource</Button>
-            </Form>
-            <p>
-              AGE graphs must be rebuildable from protected sources and loaders.
-              AGE-only changes may be lost during recovery.
-            </p>
-          </section>
+          <details className={styles.panel}>
+            <summary className={styles.createSummary}>
+              Create resource
+              <span>PostgreSQL or S3</span>
+            </summary>
+            <div className={styles.createBody}>
+              <Form
+                disabled={disabled}
+                submit={(d) =>
+                  action(() =>
+                    api.createResource(project!, {
+                      name: text(d, 'name'),
+                      provider: text(d, 'provider') as api.Provider,
+                      quota_bytes: Number(text(d, 'quota')) * 1048576,
+                      extensions:
+                        text(d, 'provider') === 'postgresql'
+                          ? [
+                              ...(d.has('vector') ? ['vector' as const] : []),
+                              ...(d.has('age') ? ['age' as const] : []),
+                              ...(d.has('timescaledb')
+                                ? ['timescaledb' as const]
+                                : []),
+                              ...(d.has('postgis') ? ['postgis' as const] : []),
+                              ...(d.has('pgmq') ? ['pgmq' as const] : []),
+                              ...(d.has('pg_duckdb')
+                                ? ['pg_duckdb' as const]
+                                : []),
+                            ]
+                          : [],
+                    }),
+                  )
+                }
+              >
+                <label>
+                  Resource name
+                  <input
+                    className={styles.field}
+                    name="name"
+                    required
+                    pattern="[a-z][a-z0-9-]*"
+                    maxLength={32}
+                  />
+                </label>
+                <label>
+                  Provider
+                  <select className={styles.field} name="provider">
+                    {context.data?.providers
+                      .filter(
+                        (p) =>
+                          p.enabled && (p.id === 'postgresql' || p.id === 's3'),
+                      )
+                      .map((p) => (
+                        <option key={p.id} value={p.id}>
+                          {p.id}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <label>
+                  Storage allocation (MiB)
+                  <input
+                    className={styles.field}
+                    name="quota"
+                    type="number"
+                    defaultValue={1024}
+                    min={1}
+                    required
+                  />
+                </label>
+                <label>
+                  <input type="checkbox" name="vector" /> pgvector (vector
+                  search)
+                </label>
+                <label>
+                  <input type="checkbox" name="age" /> AGE (graph projections)
+                </label>
+                <label>
+                  <input type="checkbox" name="timescaledb" /> TimescaleDB (time
+                  series)
+                </label>
+                <label>
+                  <input type="checkbox" name="postgis" /> PostGIS (spatial)
+                </label>
+                <label>
+                  <input type="checkbox" name="pgmq" /> pgmq (queues)
+                </label>
+                <label>
+                  <input type="checkbox" name="pg_duckdb" /> pg_duckdb
+                  (analytics)
+                </label>
+                <Button type="submit">Create resource</Button>
+              </Form>
+              <p>
+                AGE graphs must be rebuildable from protected sources and
+                loaders. AGE-only changes may be lost during recovery.
+              </p>
+            </div>
+          </details>
           {resources.isError && <p role="alert">{resources.error.message}</p>}
           {resources.isPending && <p role="status">Loading resources…</p>}
           {resources.data?.map((resource) => (
             <section className={styles.panel} key={resource.resource_id}>
-              <h2 className={styles.sectionTitle}>
-                {resource.name} · {resource.provider}
-              </h2>
-              <p>{resource.resource_id}</p>
+              <div className={styles.resourceHeading}>
+                <div>
+                  <h2 className={styles.sectionTitle}>{resource.name}</h2>
+                  <p className={styles.resourceId}>{resource.resource_id}</p>
+                </div>
+                <div className={styles.resourceBadges}>
+                  <Badge variant="light" color="indigo">
+                    {resource.provider}
+                  </Badge>
+                  <Badge
+                    variant="light"
+                    color={
+                      resource.observed_state === 'active' ? 'teal' : 'orange'
+                    }
+                  >
+                    {resource.observed_state}
+                  </Badge>
+                </div>
+              </div>
               <p>
-                Desired: {resource.state} · observed: {resource.observed_state}{' '}
-                · allocation: {resource.quota_bytes / 1048576} MiB
+                Desired: {resource.state} · allocation:{' '}
+                {resource.quota_bytes / 1048576} MiB
                 {resource.error_code ? ` · ${resource.error_code}` : ''}
               </p>
               <p>

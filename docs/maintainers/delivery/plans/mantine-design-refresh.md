@@ -1,6 +1,7 @@
 # Mantine Portal Design Refresh
 
-Status: planned November 13, 2026. Task: **PLAN-042**. Follows the completed
+Status: implemented in source November 13, 2026; deployed acceptance pending.
+Task: **PLAN-042**. Follows the completed
 [PLAN-041 Mantine migration](mantine-ui-migration.md).
 
 ## Outcome and scope
@@ -149,3 +150,30 @@ increments. Preserve the current build for rollback until the deployed portal
 passes the same journeys. The plan is complete when the old layout-specific
 styling has been cleaned up and the new composition is accepted across all
 portal features.
+
+## Implementation reference and local evidence
+
+The light design uses Geist Variable, Mantine indigo 7 for primary actions,
+indigo 8 for links, gray 0 for the canvas, white content surfaces, `md`/`lg`
+radii, and Mantine spacing tokens. The desktop `AppShell` has a 248 px sidebar
+and 72 px header. At the 768 px breakpoint, navigation moves to a drawer with
+Escape and focus return. Project-local navigation sits directly below the
+title. Labeled badges distinguish active, pending, retired, and failed states;
+alerts distinguish unavailable or uncertain operations from empty lists.
+
+The old PLAN-041 source and its synthetic screenshots in
+`.runtime/plan041/screenshots/` are the comparison baseline. New synthetic
+screenshots in `.runtime/plan042/screenshots/` cover anonymous home at 390,
+768, and 1440 px, the project list/workspace, the data-store entry and
+retirement states, and the retirement dialog. These local artifacts contain no
+credentials or one-time secrets. The browser suite checks the mobile drawer,
+focus return, reduced motion, and horizontal overflow at 390, 768, and 1440 px.
+
+After `npm ci`, `npm run check` passed with 69 unit tests and a production
+build; all 33 Playwright scenarios passed. The PLAN-041 baseline transferred
+893,533 B JavaScript (261.21 KB gzip) and 84,587 B CSS (13.74 KB gzip). The
+PLAN-042 build transfers 936,420 B JavaScript (272.30 KB gzip) and 105,560 B
+CSS (17.35 KB gzip). The added 14.70 KB gzip comes from the AppShell, drawer,
+status, and loading components and their selective Mantine styles. No new
+runtime dependency or API request was added. Deployed OIDC and navigation
+acceptance remains the release gate.

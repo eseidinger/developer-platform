@@ -112,6 +112,9 @@ test('creating a resource does not implicitly bind an application', async () => 
   })
   vi.mocked(api.createResource).mockResolvedValue(resource)
   const { user } = setup()
+  await user.click(
+    await screen.findByText(/^Create resource/, { selector: 'summary' }),
+  )
   await user.type(await screen.findByLabelText('Resource name'), 'primary')
   expect(api.createResource).not.toHaveBeenCalled()
   await user.click(screen.getByRole('button', { name: 'Create resource' }))
@@ -134,6 +137,9 @@ test('creation sends the selected PostgreSQL extension set', async () => {
   })
   vi.mocked(api.createResource).mockResolvedValue(resource)
   const { user } = setup()
+  await user.click(
+    await screen.findByText(/^Create resource/, { selector: 'summary' }),
+  )
   await user.type(await screen.findByLabelText('Resource name'), 'analytics')
   for (const label of [
     'pgvector (vector search)',

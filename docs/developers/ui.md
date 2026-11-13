@@ -12,6 +12,13 @@ credentials, with separate pages for **Application access**, **Data stores** and
 store grants and leases across projects. Implementation and acceptance evidence
 are tracked in the [delivery backlog](../maintainers/delivery/backlog.md).
 
+The desktop portal has a persistent sidebar for **Projects**, **My store
+access**, and **Platform admin**. On narrow screens, open the menu in the
+header. Within a project, use the section navigation under its title for
+**Overview**, **Application access**, **Data stores**, and **AI assistance**.
+The project list shows lifecycle state beside each project; select **Show
+retired projects** to include retired entries.
+
 The UI may explain or hide actions based on the current role, but the Platform
 API is authoritative for authorization, validation, audit, and redaction. Access
 tokens and one-time secrets must not enter URLs, logs, screenshots, or
@@ -28,7 +35,9 @@ resources, request component bindings, review incoming requests, and manage
 explicit human grants. The server supplies enabled providers and management
 permissions. Resource and grant changes use their current versions. Retirement
 revokes access and retains data; purge is a separate UUID-confirmed action that
-waits for verified off-host backup intent.
+waits for verified off-host backup intent. Use **Create resource** to expand
+the creation form. Resource cards show provider, observed state, desired state,
+allocation, and last measured usage before their grant and binding controls.
 
 Open **My store access** at `/store-access` to issue a 24-hour credential for
 your own grant, inspect lease history, reveal connection values, or open an

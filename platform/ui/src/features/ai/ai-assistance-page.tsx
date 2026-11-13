@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { useAuth } from '@/auth/auth-context'
 import { ApiError } from '@/api/errors'
-import { Button } from '@mantine/core'
+import { Badge, Button } from '@mantine/core'
 import { Input } from '@mantine/core'
 import {
   Dialog,
@@ -30,6 +30,7 @@ import {
   type Run,
 } from './ai-api'
 import styles from './ai-assistance-page.module.css'
+import { ProjectNavigation } from '@/features/projects/project-navigation'
 
 const uuid = (value: string | null) =>
   z.uuid().safeParse(value).success ? value! : undefined
@@ -271,6 +272,7 @@ function AiWorkspace({ project }: { project: string }) {
           {project}: bounded assistance using authorized project evidence.
           Results can be incomplete; review their sources.
         </p>
+        <ProjectNavigation name={project} />
       </header>
       <QueryMessage query={context} label="AI context" />
       {notice && (
@@ -383,16 +385,24 @@ function AiWorkspace({ project }: { project: string }) {
             <QueryMessage query={runs} label="Run history" />
             {runs.isSuccess && (
               <>
-                <ul className={styles.stackSmall}>
+                <ul className={styles.historyList}>
                   {runs.data.items.map((r) => (
-                    <li key={r.run_id}>
+                    <li key={r.run_id} className={styles.historyRow}>
                       <Link
-                        className={styles.link}
+                        className={styles.historyLink}
                         to={`?${new URLSearchParams({ run: r.run_id, ...(runsBefore ? { runs_before: runsBefore } : {}) })}`}
                       >
-                        {kinds[r.kind]} · {r.state} · {r.created_at} ·{' '}
-                        {r.run_id}
+                        <span className={styles.strong}>{kinds[r.kind]}</span>
+                        <span className={styles.historyMetadata}>
+                          {r.created_at} · {r.run_id}
+                        </span>
                       </Link>
+                      <Badge
+                        variant="light"
+                        color={r.state === 'completed' ? 'teal' : 'orange'}
+                      >
+                        {r.state}
+                      </Badge>
                     </li>
                   ))}
                 </ul>
@@ -459,16 +469,26 @@ function AiWorkspace({ project }: { project: string }) {
             <QueryMessage query={proposals} label="Proposal history" />
             {proposals.isSuccess && (
               <>
-                <ul className={styles.stackSmall}>
+                <ul className={styles.historyList}>
                   {proposals.data.items.map((p) => (
-                    <li key={p.proposal_id}>
+                    <li key={p.proposal_id} className={styles.historyRow}>
                       <Link
-                        className={styles.link}
+                        className={styles.historyLink}
                         to={`?${new URLSearchParams({ proposal: p.proposal_id, ...(proposalsBefore ? { proposals_before: proposalsBefore } : {}) })}`}
                       >
-                        Rollback {p.base_revision} → {p.target_revision} ·{' '}
-                        {p.state} · {p.proposal_id}
+                        <span className={styles.strong}>
+                          Rollback {p.base_revision} → {p.target_revision}
+                        </span>
+                        <span className={styles.historyMetadata}>
+                          {p.proposal_id}
+                        </span>
                       </Link>
+                      <Badge
+                        variant="light"
+                        color={p.state === 'executed' ? 'teal' : 'indigo'}
+                      >
+                        {p.state}
+                      </Badge>
                     </li>
                   ))}
                 </ul>

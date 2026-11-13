@@ -1,27 +1,33 @@
 .panel {
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-lg);
-  background: var(--mantine-color-body);
-  padding: 1.5rem;
-  box-shadow: var(--mantine-shadow-xs);
+  padding-top: 0.5rem;
 }
 
-.header {
+.header,
+.actions,
+.listItem {
   display: flex;
-  flex-wrap: wrap;
   align-items: center;
+  gap: var(--mantine-spacing-md);
+}
+
+.header,
+.listItem {
   justify-content: space-between;
-  gap: var(--mantine-spacing-sm);
+}
+
+.header,
+.actions {
+  flex-wrap: wrap;
 }
 
 .heading {
-  font-size: var(--mantine-font-size-lg);
-  font-weight: 500;
+  font-size: clamp(1.4rem, 2vw, 1.75rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 .intro,
-.message,
-.status {
+.message {
   color: var(--mantine-color-dimmed);
   font-size: var(--mantine-font-size-sm);
 }
@@ -30,53 +36,57 @@
   margin-top: 0.25rem;
 }
 
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--mantine-spacing-xs);
-}
-
 .filter {
-  display: flex;
-  align-items: center;
-  gap: var(--mantine-spacing-xs);
-  margin-top: 1rem;
-  font-size: var(--mantine-font-size-sm);
+  margin-block: 1.25rem;
 }
 
-.message,
-.error,
+.loading,
 .list {
-  margin-top: 1rem;
-}
-
-.error {
-  color: var(--mantine-color-red-7);
-  font-size: var(--mantine-font-size-sm);
-}
-
-.list {
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-md);
+  display: grid;
+  gap: var(--mantine-spacing-sm);
 }
 
 .listItem {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 0.75rem 1rem;
-}
-
-.listItem + .listItem {
-  border-top: 1px solid var(--mantine-color-default-border);
+  min-width: 0;
+  padding: 1rem 1.25rem;
+  background: var(--mantine-color-white);
 }
 
 .projectLink {
-  font-weight: 500;
-  text-underline-offset: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--mantine-color-indigo-8);
+  font-weight: 650;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 0.25rem;
 }
 
 .projectLink:hover {
-  text-decoration: underline;
+  text-decoration-color: currentColor;
+}
+
+.projectLink:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 4px;
+}
+
+.empty {
+  border: 1px dashed var(--mantine-color-gray-4);
+  border-radius: var(--mantine-radius-lg);
+  padding: 2rem;
+  color: var(--mantine-color-dimmed);
+  text-align: center;
+}
+
+@media (max-width: 40em) {
+  .actions,
+  .actions > * {
+    width: 100%;
+  }
+
+  .listItem {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }

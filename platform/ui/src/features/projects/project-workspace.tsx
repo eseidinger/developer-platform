@@ -31,6 +31,7 @@ import { CreateDeploymentCredentialDialog } from '@/features/projects/create-dep
 import { RevokeDeploymentCredentialDialog } from '@/features/projects/revoke-deployment-credential-dialog'
 import { RotateDeploymentCredentialDialog } from '@/features/projects/rotate-deployment-credential-dialog'
 import { ProjectGrants } from '@/features/projects/project-grants'
+import { ProjectNavigation } from '@/features/projects/project-navigation'
 
 function memoryMebibytes(bytes: number) {
   return `${(bytes / 1024 / 1024).toFixed(1)} MiB`
@@ -69,6 +70,14 @@ function ProjectWorkspace() {
   const projectStatus = projectsQuery.data?.find(
     (project) => project.name === name,
   )?.status
+  const statusColor =
+    projectStatus === 'retired'
+      ? 'gray'
+      : projectStatus === 'failed'
+        ? 'red'
+        : projectStatus === 'active' || projectStatus === 'applied'
+          ? 'teal'
+          : 'indigo'
   const revisionsQuery = useQuery({
     queryKey: ['projects', name, 'revisions'],
     queryFn: () => getProjectRevisions(name ?? ''),
@@ -181,16 +190,31 @@ function ProjectWorkspace() {
         </Link>
         <div className={styles.headerRow}>
           <div>
-            <h1 id="project-title" className={styles.pageTitle}>
-              {name}
-            </h1>
+            <div className={styles.titleLine}>
+              <h1 id="project-title" className={styles.pageTitle}>
+                {name}
+              </h1>
+              {projectStatus && (
+                <Badge color={statusColor} variant="light" size="lg">
+                  {projectStatus}
+                </Badge>
+              )}
+            </div>
             <p className={styles.mutedBelow}>
               Desired revision history and deployment context.
             </p>
           </div>
           <div className={styles.actions}>
+            {revisionsQuery.data && (
+              <DeployProjectDialog
+                name={name}
+                onAccepted={(operation) =>
+                  setOperationId(operation.operationId)
+                }
+              />
+            )}
             <Button
-              variant="outline"
+              variant="subtle"
               onClick={() => void refreshProject()}
               disabled={isRefreshing}
             >
@@ -203,18 +227,7 @@ function ProjectWorkspace() {
             )}
           </div>
         </div>
-        <Link
-          className={styles.outlineLink}
-          to={`/projects/${name}/application-access`}
-        >
-          Application access
-        </Link>
-        <Link className={styles.outlineLink} to={`/projects/${name}/ai`}>
-          AI assistance
-        </Link>
-        <Link className={styles.outlineLink} to={`/projects/${name}/stores`}>
-          Data stores
-        </Link>
+        <ProjectNavigation name={name} />
       </div>
 
       {status !== 'authenticated' && (
@@ -686,12 +699,6 @@ function ProjectWorkspace() {
                   }
                 />
               )}
-              <DeployProjectDialog
-                name={name}
-                onAccepted={(operation) =>
-                  setOperationId(operation.operationId)
-                }
-              />
             </div>
           </div>
           {revisionsQuery.data.revisions.length > 0 && (

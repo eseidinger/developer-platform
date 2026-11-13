@@ -1,5 +1,5 @@
 .workspace {
-  max-width: 64rem;
+  max-width: 76rem;
   overflow-wrap: break-word;
 }
 
@@ -10,8 +10,8 @@
 .panel {
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-lg);
-  background: var(--mantine-color-body);
-  padding: 1.25rem;
+  background: var(--mantine-color-white);
+  padding: clamp(1.25rem, 2vw, 2rem);
 }
 
 .panel > * + *,
@@ -39,13 +39,14 @@
 }
 
 .pageTitle {
-  font-size: 1.875rem;
-  font-weight: 600;
+  font-size: clamp(1.875rem, 3vw, 2.5rem);
+  font-weight: 650;
+  letter-spacing: -0.025em;
 }
 
 .sectionTitle {
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 650;
 }
 
 .strong,
@@ -116,7 +117,6 @@
 
 .detailGrid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.5rem;
 }
 
@@ -124,7 +124,52 @@
   overflow-wrap: anywhere;
 }
 
+.historyList {
+  overflow: hidden;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.historyRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0.85rem 1rem;
+}
+
+.historyRow + .historyRow {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.historyLink {
+  display: grid;
+  min-width: 0;
+  gap: 0.15rem;
+  color: var(--mantine-color-indigo-8);
+}
+
+.historyLink:hover {
+  text-decoration: underline;
+}
+
+.historyLink:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 3px;
+}
+
+.historyMetadata {
+  overflow-wrap: anywhere;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}
+
 @media (min-width: 40em) {
+  .detailGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .modalContent {
     max-width: 42rem;
   }

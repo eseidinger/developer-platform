@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Button } from '@mantine/core'
+import { Alert, Badge, Button, Checkbox, Paper, Skeleton } from '@mantine/core'
 import { useAuth } from '@/auth/auth-context'
 import { CreateProjectDialog } from '@/features/projects/create-project-dialog'
 import { listProjects } from '@/features/projects/projects-api'
@@ -20,6 +20,13 @@ function ProjectList() {
     (project) => showRetired || project.status !== 'retired',
   )
 
+  function statusColor(projectStatus: string) {
+    if (projectStatus === 'retired') return 'gray'
+    if (projectStatus === 'failed') return 'red'
+    if (projectStatus === 'active' || projectStatus === 'applied') return 'teal'
+    return 'indigo'
+  }
+
   if (status !== 'authenticated') {
     return null
   }
@@ -32,13 +39,13 @@ function ProjectList() {
             Projects
           </h2>
           <p className={styles.intro}>
-            Projects returned by your current platform grants.
+            Projects available through your current platform grants.
           </p>
         </div>
         <div className={styles.actions}>
           <CreateProjectDialog />
           <Button
-            variant="outline"
+            variant="subtle"
             onClick={() => void projectsQuery.refetch()}
             disabled={projectsQuery.isFetching}
           >
@@ -47,29 +54,29 @@ function ProjectList() {
         </div>
       </div>
 
-      <label className={styles.filter}>
-        <input
-          type="checkbox"
-          checked={showRetired}
-          onChange={(event) => setShowRetired(event.target.checked)}
-        />
-        Show retired projects
-      </label>
+      <Checkbox
+        className={styles.filter}
+        checked={showRetired}
+        onChange={(event) => setShowRetired(event.target.checked)}
+        label="Show retired projects"
+      />
 
       {projectsQuery.isLoading && (
-        <p role="status" className={styles.message}>
-          Loading projects…
-        </p>
+        <div role="status" className={styles.loading}>
+          <p className={styles.message}>Loading projects…</p>
+          <Skeleton height={76} radius="md" />
+          <Skeleton height={76} radius="md" />
+        </div>
       )}
 
       {projectsQuery.isError && (
-        <p role="alert" className={styles.error}>
+        <Alert color="red" title="Projects unavailable" role="alert">
           {projectsQuery.error.message}
-        </p>
+        </Alert>
       )}
 
       {projectsQuery.data?.length === 0 && (
-        <p className={styles.message}>
+        <p className={styles.empty}>
           You do not currently have access to any projects.
         </p>
       )}
@@ -77,7 +84,7 @@ function ProjectList() {
       {projectsQuery.data &&
         projectsQuery.data.length > 0 &&
         visibleProjects?.length === 0 && (
-          <p className={styles.message}>
+          <p className={styles.empty}>
             All your projects are retired. Select “Show retired projects” to
             view them.
           </p>
@@ -86,15 +93,23 @@ function ProjectList() {
       {visibleProjects && visibleProjects.length > 0 && (
         <ul className={styles.list}>
           {visibleProjects.map((project) => (
-            <li key={project.name} className={styles.listItem}>
+            <Paper
+              component="li"
+              withBorder
+              radius="lg"
+              key={project.name}
+              className={styles.listItem}
+            >
               <Link
                 className={styles.projectLink}
                 to={`/projects/${project.name}`}
               >
                 {project.name}
               </Link>
-              <span className={styles.status}>{project.status}</span>
-            </li>
+              <Badge color={statusColor(project.status)} variant="light">
+                {project.status}
+              </Badge>
+            </Paper>
           ))}
         </ul>
       )}

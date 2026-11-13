@@ -26,6 +26,7 @@ test('creates, deploys, rolls back, and retires a project through the portal', a
   page,
 }) => {
   const fixture = await projectFixture(page)
+  await page.setViewportSize({ width: 1440, height: 900 })
   await page.goto('/e2e/project-harness.html')
   await page.getByRole('button', { name: 'New project' }).click()
   await page.getByLabel('Project name').fill('demo')
@@ -33,12 +34,31 @@ test('creates, deploys, rolls back, and retires a project through the portal', a
     .getByRole('dialog')
     .getByRole('button', { name: 'Create project' })
     .click()
+  await expect(page.getByRole('link', { name: 'demo' })).toBeVisible()
+  if (process.env.PLAN042_SCREENSHOT_DIR) {
+    await page.screenshot({
+      path: `${process.env.PLAN042_SCREENSHOT_DIR}/projects-1440.png`,
+      fullPage: true,
+    })
+  }
   await page.getByRole('link', { name: 'demo' }).click()
   await expect(
     page.getByText(
       'This project is empty. Deploy an application to create its first revision.',
     ),
   ).toBeVisible()
+  if (process.env.PLAN042_SCREENSHOT_DIR) {
+    await page.screenshot({
+      path: `${process.env.PLAN042_SCREENSHOT_DIR}/workspace-1440.png`,
+      fullPage: true,
+    })
+    await page.setViewportSize({ width: 390, height: 844 })
+    await page.screenshot({
+      path: `${process.env.PLAN042_SCREENSHOT_DIR}/workspace-390.png`,
+      fullPage: true,
+    })
+    await page.setViewportSize({ width: 1440, height: 900 })
+  }
 
   for (const revision of [1, 2]) {
     await page.getByRole('button', { name: 'Deploy application' }).click()

@@ -93,6 +93,13 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
   })
 
   await page.goto('/e2e/store-harness.html')
+  if (process.env.PLAN041_SCREENSHOT_DIR) {
+    await page.screenshot({
+      path: `${process.env.PLAN041_SCREENSHOT_DIR}/store-entry-desktop.png`,
+      fullPage: true,
+    })
+  }
+  await page.locator('summary').click()
   await page.getByLabel('Resource name').fill('measurements')
   for (const name of [
     'pgvector (vector search)',
@@ -106,11 +113,10 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
   }
   await page.getByRole('button', { name: 'Create resource' }).click()
   await expect(
-    page.getByRole('heading', { name: 'measurements · postgresql' }),
+    page.getByRole('heading', { name: 'measurements' }),
   ).toBeVisible()
-  await expect(
-    page.getByText(/Desired: active · observed: active/),
-  ).toBeVisible()
+  await expect(page.getByText(/Desired: active · allocation:/)).toBeVisible()
+  await expect(page.getByText('active', { exact: true })).toBeVisible()
   if (process.env.PLAN041_SCREENSHOT_DIR) {
     await page.screenshot({
       path: `${process.env.PLAN041_SCREENSHOT_DIR}/store-desktop.png`,
@@ -131,9 +137,8 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
   }
   expect(mutations).toEqual(['POST /v1/projects/alpha/resources'])
   await dialog.getByRole('button', { name: 'Confirm' }).click()
-  await expect(
-    page.getByText(/Desired: retired · observed: retired/),
-  ).toBeVisible()
+  await expect(page.getByText(/Desired: retired · allocation:/)).toBeVisible()
+  await expect(page.getByText('retired', { exact: true })).toBeVisible()
   await expect(dialog).toBeHidden()
   await expect(page.locator('.mantine-Modal-overlay')).toBeHidden()
   expect(mutations).toEqual([
@@ -142,6 +147,7 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
   ])
 
   await page.setViewportSize({ width: 390, height: 844 })
+  await page.locator('summary').click()
   await expect(
     page.getByRole('heading', { name: 'alpha data stores' }),
   ).toBeVisible()

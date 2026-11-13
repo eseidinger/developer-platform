@@ -4,11 +4,12 @@ import {
   type MantineProviderProps,
 } from '@mantine/core'
 
-// Keep the portal's light, neutral appearance while components migrate.
+// Shared light-mode design tokens for the operational portal.
 const portalTheme = createTheme({
   fontFamily: 'Geist Variable, sans-serif',
-  primaryColor: 'gray',
-  primaryShade: 9,
+  headings: { fontFamily: 'Geist Variable, sans-serif' },
+  primaryColor: 'indigo',
+  primaryShade: 7,
   defaultRadius: 'md',
 })
 

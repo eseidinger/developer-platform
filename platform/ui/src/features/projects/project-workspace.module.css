@@ -1,5 +1,5 @@
 .workspace {
-  max-width: 48rem;
+  max-width: 76rem;
 }
 
 .workspace > * + * {
@@ -16,9 +16,8 @@
 
 .panel {
   border-radius: var(--mantine-radius-lg);
-  background: var(--mantine-color-body);
-  padding: 1.5rem;
-  box-shadow: var(--mantine-shadow-xs);
+  background: var(--mantine-color-white);
+  padding: clamp(1.25rem, 2vw, 2rem);
 }
 
 .detailPanel {
@@ -44,7 +43,6 @@
 .mutedSmallBelowLarge,
 .mutedGroup,
 .mutedLink,
-.outlineLink,
 .compactField,
 .field {
   font-size: var(--mantine-font-size-sm);
@@ -78,14 +76,22 @@
 }
 
 .pageTitle {
-  font-size: 1.875rem;
-  font-weight: 600;
+  overflow-wrap: anywhere;
+  font-size: clamp(1.875rem, 3vw, 2.5rem);
+  font-weight: 650;
   letter-spacing: -0.025em;
 }
 
 .sectionTitle {
-  font-size: var(--mantine-font-size-lg);
-  font-weight: 500;
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.titleLine {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
 }
 
 .strong,
@@ -130,16 +136,11 @@
 }
 
 .compactField,
-.field,
-.outlineLink {
+.field {
   height: 2rem;
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-md);
-  background: transparent;
-}
-
-.compactField,
-.field {
+  background: var(--mantine-color-white);
   padding-inline: 0.5rem;
 }
 
@@ -148,20 +149,9 @@
 }
 
 .compactField:focus-visible,
-.field:focus-visible,
-.outlineLink:focus-visible {
+.field:focus-visible {
   outline: 2px solid var(--mantine-primary-color-filled);
   outline-offset: 2px;
-}
-
-.outlineLink {
-  display: inline-block;
-  height: auto;
-  padding: 0.5rem 0.75rem;
-}
-
-.outlineLink:hover {
-  background: var(--mantine-color-gray-1);
 }
 
 .itemTitle,

@@ -1,28 +1,63 @@
 .page {
-  max-width: 48rem;
+  max-width: 82rem;
 }
 
 .page > * + * {
-  margin-top: 2rem;
+  margin-top: clamp(1.5rem, 3vw, 2.25rem);
 }
 
-.intro > * + * {
-  margin-top: 0.75rem;
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-color: var(--mantine-color-indigo-1);
+  background: linear-gradient(
+    120deg,
+    var(--mantine-color-indigo-0),
+    var(--mantine-color-white) 72%
+  );
+  padding: clamp(1.5rem, 4vw, 3rem);
+}
+
+.hero::after {
+  position: absolute;
+  top: -5rem;
+  right: -4rem;
+  width: 16rem;
+  height: 16rem;
+  border: 2.5rem solid var(--mantine-color-indigo-1);
+  border-radius: 50%;
+  content: '';
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.hero > * {
+  position: relative;
+  z-index: 1;
+}
+
+.hero > * + * {
+  margin-top: var(--mantine-spacing-md);
 }
 
 .heading {
-  font-size: 1.875rem;
-  font-weight: 600;
-  letter-spacing: -0.025em;
+  max-width: 44rem;
+  color: var(--mantine-color-dark-8);
+  font-size: clamp(2rem, 4vw, 3rem);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  line-height: 1.12;
 }
 
 .lead {
   max-width: 42rem;
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-gray-7);
+  font-size: clamp(1rem, 1.4vw, 1.125rem);
+  line-height: 1.65;
 }
 
 .mutedSmall {
-  color: var(--mantine-color-dimmed);
+  color: var(--mantine-color-gray-6);
   font-size: var(--mantine-font-size-sm);
 }
 
@@ -33,32 +68,8 @@
   gap: var(--mantine-spacing-sm);
 }
 
-.error {
-  color: var(--mantine-color-red-7);
-  font-size: var(--mantine-font-size-sm);
-}
-
-.panel {
-  border: 1px solid var(--mantine-color-default-border);
-  border-radius: var(--mantine-radius-lg);
-  background: var(--mantine-color-body);
-  padding: 1.5rem;
-  box-shadow: var(--mantine-shadow-xs);
-}
-
-.sectionHeading {
-  font-size: var(--mantine-font-size-lg);
-  font-weight: 500;
-}
-
-.foundationList {
-  margin-top: 1rem;
-  padding-left: 1.25rem;
-  color: var(--mantine-color-dimmed);
-  font-size: var(--mantine-font-size-sm);
-  list-style: disc;
-}
-
-.foundationList > * + * {
-  margin-top: 0.5rem;
+@media (max-width: 39.99em) {
+  .hero::after {
+    right: -9rem;
+  }
 }

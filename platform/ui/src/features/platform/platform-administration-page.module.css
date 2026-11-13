@@ -1,5 +1,5 @@
 .page {
-  max-width: 48rem;
+  max-width: 76rem;
 }
 
 .page > * + * {
@@ -7,17 +7,16 @@
 }
 
 .pageTitle {
-  font-size: 1.875rem;
-  font-weight: 600;
+  font-size: clamp(1.875rem, 3vw, 2.5rem);
+  font-weight: 650;
   letter-spacing: -0.025em;
 }
 
 .panel {
   border: 1px solid var(--mantine-color-default-border);
   border-radius: var(--mantine-radius-lg);
-  background: var(--mantine-color-body);
-  padding: 1.5rem;
-  box-shadow: var(--mantine-shadow-xs);
+  background: var(--mantine-color-white);
+  padding: clamp(1.25rem, 2vw, 2rem);
 }
 
 .header,
@@ -34,8 +33,8 @@
 }
 
 .sectionTitle {
-  font-size: var(--mantine-font-size-lg);
-  font-weight: 500;
+  font-size: 1.25rem;
+  font-weight: 650;
 }
 
 .strong {

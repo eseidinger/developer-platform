@@ -51,7 +51,7 @@ function PurgeProjectDialog({ name }: { name: string }) {
 
   return (
     <>
-      <Button color="red" onClick={() => setOpen(true)}>
+      <Button color="red" variant="outline" onClick={() => setOpen(true)}>
         Permanently purge
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>

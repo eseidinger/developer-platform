@@ -16,7 +16,7 @@ const anonymousAuth: AuthContextValue = {
 }
 
 describe('HomePage', () => {
-  it('describes the portal foundation', () => {
+  it('orients anonymous users toward sign-in', () => {
     const queryClient = new QueryClient()
 
     render(
@@ -33,7 +33,7 @@ describe('HomePage', () => {
       screen.getByRole('heading', { name: 'Developer Platform portal' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('Typed Platform API client generated from OpenAPI'),
+      screen.getByRole('button', { name: 'Sign in with OIDC' }),
     ).toBeInTheDocument()
   })
 })

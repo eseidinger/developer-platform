@@ -4,7 +4,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/auth/auth-context'
 import { isTransientApiError } from '@/api/errors'
-import { Button } from '@mantine/core'
+import { Alert, Badge, Button } from '@mantine/core'
+import { ProjectNavigation } from '@/features/projects/project-navigation'
 import { AccessDialog, RouteSummary } from './access-controls'
 import { AccessEvents } from './access-events'
 import {
@@ -92,9 +93,9 @@ function QueryMessage({
 }) {
   if (query.isError)
     return (
-      <p role="alert" className={styles.error}>
-        {label}: {query.error?.message} Use Refresh to try again.
-      </p>
+      <Alert color="red" title={`${label} unavailable`} role="alert">
+        {query.error?.message} Use Refresh to try again.
+      </Alert>
     )
   if (query.isPending)
     return (
@@ -105,7 +106,18 @@ function QueryMessage({
   return null
 }
 function State({ state }: { state: string }) {
-  return <span className={styles.stateBadge}>{state}</span>
+  const color = ['active', 'approved', 'ready', 'completed'].includes(state)
+    ? 'teal'
+    : ['denied', 'failed', 'revoked'].includes(state)
+      ? 'red'
+      : ['queued', 'running', 'provisioning', 'activating'].includes(state)
+        ? 'orange'
+        : 'gray'
+  return (
+    <Badge component="span" color={color} variant="light">
+      {state}
+    </Badge>
+  )
 }
 
 export function ApplicationAccessPage() {
@@ -370,6 +382,7 @@ function AccessWorkspace({ project }: { project: string }) {
             {project}: configure who can use the hosted application. Project
             roles and CI deployment credentials grant no application membership.
           </p>
+          <ProjectNavigation name={project} />
         </div>
         <QueryMessage query={context} label="Access context" />
         {context.data && !context.isError && (
