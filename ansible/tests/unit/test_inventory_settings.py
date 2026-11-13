@@ -259,9 +259,8 @@ class InventorySettingsTests(unittest.TestCase):
                 configured = copy.deepcopy(variables)
                 expected = copy.deepcopy(assertions)
                 if mode == "invalid":
-                    configured["platform_stores"]["profiles"] = [
-                        "neo4j"
-                    ]  # missing capacity
+                    # Retired providers are rejected before capacity validation.
+                    configured["platform_stores"]["profiles"] = ["neo4j"]
                 elif mode == "all":
                     configured["platform_stores"] = self.stores()
                     expected["ansible.builtin.assert"]["that"][0] = (
@@ -323,7 +322,10 @@ class InventorySettingsTests(unittest.TestCase):
                 )
                 if mode == "invalid":
                     self.assertNotEqual(result.returncode, 0)
-                    self.assertIn("Allocate capacity", result.stdout + result.stderr)
+                    self.assertIn(
+                        "platform_stores.profiles must be a list of distinct supported providers",
+                        result.stdout + result.stderr,
+                    )
                 else:
                     self.assertEqual(
                         result.returncode, 0, result.stdout + result.stderr

@@ -11,6 +11,7 @@ import json
 import os
 import secrets
 import subprocess
+import sys
 import tempfile
 import time
 from pathlib import Path
@@ -132,7 +133,10 @@ def verify(binary, snapshot, source_image, alpha, beta, purging, old_credential)
                 "store_fixture_restore", location
             )
             restore = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(restore)
+            # The operational script imports a sibling module when invoked by
+            # Ansible. Match that import path without changing later tests.
+            with patch.object(sys, "path", [str(location.parent), *sys.path]):
+                spec.loader.exec_module(restore)
             restore.check_import_errors(loaded.stderr.decode())
             # Rotate only this disposable root identity after import. This keeps
             # the fixture connection separate from the source server's root key.
