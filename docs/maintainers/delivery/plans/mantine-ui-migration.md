@@ -1,7 +1,7 @@
 # Mantine UI Migration
 
-Status: implementation and local acceptance November 13, 2026; deployed
-acceptance pending. Task: **PLAN-041**. Implementation began after
+Status: source implemented and deployed November 13, 2026; authenticated
+browser acceptance pending. Task: **PLAN-041**. Implementation began after
 [PLAN-040](postgresql-extension-expansion.md) completed. Decision:
 [ADR-023](../../../architecture/decisions/ADR-023-mantine-portal-components.md).
 
@@ -133,3 +133,13 @@ contract.
   checks cover project lifecycle, denied creation, access governance, store
   consoles, and AI assistance. All 32 Playwright tests and `npm run check`
   passed after a clean `npm ci` installation.
+- Deployed revision `a2eebafda111c05595d31e04cac94f7c0cf0b813` passed the
+  Ansible rollout. The first rollout failed because the source overlay left
+  deleted shadcn files on the host. The deploy source-transfer now removes
+  those retired files before building; the corrected run passed. The public
+  portal and `/readyz` returned HTTP 200, the served JS/CSS asset names matched
+  the local build, `/projects` denied an unauthenticated call with HTTP 401,
+  and the public portal fit at 390 px without horizontal overflow. Browser
+  navigation reached the OIDC login page. The local initial-admin credential
+  did not complete sign-in, so authenticated portal journeys and sign-out still
+  need a valid disposable identity for deployed acceptance.
