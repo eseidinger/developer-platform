@@ -31,7 +31,7 @@ refresh on that Mantine foundation.
 - [Mantine UI migration](mantine-ui-migration.md) — PLAN-041; after PLAN-040
   while preserving portal behavior and API boundaries
 - [Mantine portal design refresh](mantine-design-refresh.md) — PLAN-042;
-  visual hierarchy and responsive layout after PLAN-041
+  deployed visual hierarchy with limited-role browser acceptance pending
 - [Storage scope reduction](storage-scope-reduction.md) — PLAN-039; retain
   PostgreSQL and S3, retire other providers, and verify workload capacity
 - [PostgreSQL extension expansion](postgresql-extension-expansion.md) — PLAN-040;

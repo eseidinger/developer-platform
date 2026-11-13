@@ -1,6 +1,6 @@
 # UI maintenance
 
-Status: active implementation.
+Status: active source and deployed portal.
 
 [ADR-023](../architecture/decisions/ADR-023-mantine-portal-components.md)
 selects Mantine components and a shared theme with focused CSS modules. The

@@ -3651,12 +3651,16 @@ change. The migration passed its source and deployed browser checks on November
 **Owner direction (November 13, 2026):** After PLAN-041, give the portal a
 distinct Mantine-based visual design. [PLAN-042](plans/mantine-design-refresh.md)
 sets the page hierarchy, component choices, rollout order, and acceptance
-criteria. PLAN-041 remains the operational baseline until this design ships.
+criteria. Revision `a6a7da0` shipped the design on November 13, 2026; the
+limited-role live browser check remains open.
 
 - [ ] **PLAN-042 · Mantine portal design refresh** — Establish a reviewable
   desktop/mobile design reference, introduce the AppShell and theme tokens,
   refresh project and operational pages, then validate accessibility,
   responsive behavior, existing workflows, deployed auth, and bundle impact.
+  Source checks, 33 browser scenarios, deployed OIDC/navigation, and asset
+  comparison passed. A second disposable identity is needed to verify a denied
+  platform-administration role in the installed browser.
 
 ## Data-store expansion tasks
 

@@ -1,6 +1,6 @@
 # Mantine Portal Design Refresh
 
-Status: implemented in source November 13, 2026; deployed acceptance pending.
+Status: deployed November 13, 2026; limited-role browser acceptance pending.
 Task: **PLAN-042**. Follows the completed
 [PLAN-041 Mantine migration](mantine-ui-migration.md).
 
@@ -162,7 +162,9 @@ title. Labeled badges distinguish active, pending, retired, and failed states;
 alerts distinguish unavailable or uncertain operations from empty lists.
 
 The old PLAN-041 source and its synthetic screenshots in
-`.runtime/plan041/screenshots/` are the comparison baseline. New synthetic
+`.runtime/plan041/screenshots/` are the comparison baseline. Anonymous
+before/after installation screenshots are in `.runtime/plan042/screenshots/`
+as `baseline-home-*` and `shipped-home-*`. New synthetic
 screenshots in `.runtime/plan042/screenshots/` cover anonymous home at 390,
 768, and 1440 px, the project list/workspace, the data-store entry and
 retirement states, and the retirement dialog. These local artifacts contain no
@@ -175,5 +177,15 @@ build; all 33 Playwright scenarios passed. The PLAN-041 baseline transferred
 PLAN-042 build transfers 936,420 B JavaScript (272.30 KB gzip) and 105,560 B
 CSS (17.35 KB gzip). The added 14.70 KB gzip comes from the AppShell, drawer,
 status, and loading components and their selective Mantine styles. No new
-runtime dependency or API request was added. Deployed OIDC and navigation
-acceptance remains the release gate.
+runtime dependency or API request was added.
+
+The deployed revision `a6a7da0` passed the Ansible rollout. The public portal
+and `/readyz` returned HTTP 200, its JavaScript and CSS asset names matched the
+local build, and an unauthenticated `/projects` request returned HTTP 401. The
+existing disposable human identity completed OIDC sign-in and sign-out,
+project and data-store navigation, AI assistance, application access, and
+authorized platform administration. The mobile drawer opened, closed with
+Escape, returned focus to its trigger, and had no horizontal overflow at 390
+px. A second disposable identity with a denied administration role was not
+available for a live browser check; the local fixture suite covers viewer and
+denial behavior. That live role check remains the last acceptance item.
