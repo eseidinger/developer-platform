@@ -292,10 +292,10 @@ function Workspace({
                 />
               </label>
               <label>
-                <input type="checkbox" name="vector" /> pgvector (PostgreSQL)
+                <input type="checkbox" name="vector" /> pgvector (vector search)
               </label>
               <label>
-                <input type="checkbox" name="age" /> AGE (PostgreSQL projection)
+                <input type="checkbox" name="age" /> AGE (graph projections)
               </label>
               <label>
                 <input type="checkbox" name="timescaledb" /> TimescaleDB (time

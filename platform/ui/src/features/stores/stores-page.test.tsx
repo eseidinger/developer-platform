@@ -142,6 +142,8 @@ test('creation sends the selected PostgreSQL extension set', async () => {
   const { user } = setup()
   await user.type(await screen.findByLabelText('Resource name'), 'analytics')
   for (const label of [
+    'pgvector (vector search)',
+    'AGE (graph projections)',
     'TimescaleDB (time series)',
     'PostGIS (spatial)',
     'pgmq (queues)',
@@ -155,7 +157,14 @@ test('creation sends the selected PostgreSQL extension set', async () => {
       name: 'analytics',
       provider: 'postgresql',
       quota_bytes: 1073741824,
-      extensions: ['timescaledb', 'postgis', 'pgmq', 'pg_duckdb'],
+      extensions: [
+        'vector',
+        'age',
+        'timescaledb',
+        'postgis',
+        'pgmq',
+        'pg_duckdb',
+      ],
     }),
   )
 })
