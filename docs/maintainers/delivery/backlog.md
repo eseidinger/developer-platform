@@ -327,6 +327,10 @@ and checkboxes below are authoritative.
 - **Gate:** Mantine UI migration, after PLAN-040
   - **Tasks:** PLAN-041: replace the portal component and styling system under
     the [migration plan](plans/mantine-ui-migration.md)
+- **Gate:** Mantine portal design refresh, after PLAN-041
+  - **Tasks:** PLAN-042: establish the visual system and refresh shell, projects,
+    stores, access, AI, and administration under the
+    [design plan](plans/mantine-design-refresh.md)
 - **Gate:** 7–9, historical store expansion and comparison scope
   - **Tasks:** PLAN-026–033 and PLAN-036–038 retain their IDs and evidence;
     non-retained provider additions and comparisons are superseded by ADR-022
@@ -3641,6 +3645,18 @@ change. The migration passed its source and deployed browser checks on November
   then verify existing portal journeys, authorization denials, keyboard/focus
   behavior, responsive layout, API parity, and production build. Record
   before/after bundle and stylesheet sizes and deployed browser evidence.
+
+## Mantine portal design refresh task
+
+**Owner direction (November 13, 2026):** After PLAN-041, give the portal a
+distinct Mantine-based visual design. [PLAN-042](plans/mantine-design-refresh.md)
+sets the page hierarchy, component choices, rollout order, and acceptance
+criteria. PLAN-041 remains the operational baseline until this design ships.
+
+- [ ] **PLAN-042 · Mantine portal design refresh** — Establish a reviewable
+  desktop/mobile design reference, introduce the AppShell and theme tokens,
+  refresh project and operational pages, then validate accessibility,
+  responsive behavior, existing workflows, deployed auth, and bundle impact.
 
 ## Data-store expansion tasks
 

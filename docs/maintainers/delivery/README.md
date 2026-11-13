@@ -121,6 +121,11 @@ proposals without confirmed dates.
     [ADR-023](../../architecture/decisions/ADR-023-mantine-portal-components.md)
     changes the future component and styling choice; PLAN-041 follows PLAN-040
     while preserving the portal's API, auth, and feature behavior
+- **Date:** November 13, 2026
+  - **Milestone:** Mantine migration accepted; portal design refresh planned
+  - **Significance:** PLAN-041 established the component foundation and
+    [PLAN-042](plans/mantine-design-refresh.md) owns the visual hierarchy and
+    responsive redesign
 
 ## Implementation status
 
@@ -177,6 +182,7 @@ flowchart LR
     P2C --> Storage["PLAN-039 Storage Scope Reduction"]
     Storage --> Extensions["PLAN-040 PostgreSQL Extensions"]
     Extensions --> Mantine["PLAN-041 Mantine UI Migration"]
+    Mantine --> Design["PLAN-042 Mantine Design Refresh"]
     P2C -. "anytime" .-> P10["10 Anytime Leftovers"]
     P1 --> Evidence["Measurements and Operational Evidence"]
     P2A --> Evidence
@@ -189,6 +195,7 @@ flowchart LR
     Storage --> Evidence
     Extensions --> Evidence
     Mantine --> Evidence
+    Design --> Evidence
     P10 --> Evidence
 ```
 
@@ -249,6 +256,10 @@ flowchart LR
   - **Entry condition:** PLAN-040 implementation and acceptance complete
   - **Outcome / dependency:** Portal components and styling migrated to Mantine;
     existing user journeys and API/auth boundaries remain verified
+- **Work package:** [PLAN-042](plans/mantine-design-refresh.md)
+  - **Entry condition:** PLAN-041 migration and deployed acceptance complete
+  - **Outcome / dependency:** Mantine-based shell and visual hierarchy across
+    portal features, with current workflows and API/auth boundaries preserved
 - **Phase:** [7 – Planned Data Stores](plans/phase-7-planned-data-stores.md)
   - **Entry condition:** Historical plan; non-retained provider expansion
     superseded by ADR-022
@@ -284,6 +295,7 @@ they do not justify new provider adoption. After PLAN-039,
 TimescaleDB, PostGIS, pgmq, and pg_duckdb within the measured workload budget.
 After PLAN-040, [PLAN-041](plans/mantine-ui-migration.md) migrated the React
 portal's component and styling system to Mantine.
+[PLAN-042](plans/mantine-design-refresh.md) plans the subsequent visual refresh.
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and
 1C. Requirement delivery phases labeled “Phase 1 (MVP)” must meet their

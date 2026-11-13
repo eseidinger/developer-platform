@@ -8,6 +8,8 @@ selects Mantine components and a shared theme with focused CSS modules. The
 its acceptance evidence. Keep the theme and component styles in
 `platform/ui/src/app/theme.tsx` and feature-local CSS modules. Import only the
 Mantine styles used by production components through `src/index.css`.
+The [design refresh plan](delivery/plans/mantine-design-refresh.md) describes
+the intended visual hierarchy after PLAN-041; it is not current UI behavior.
 
 The portal is a React/TypeScript/Vite application. It generates API types from
 the committed OpenAPI document and keeps FastAPI authoritative for validation,
