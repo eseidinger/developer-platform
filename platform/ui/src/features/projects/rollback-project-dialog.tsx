@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -60,7 +61,7 @@ function RollbackProjectDialog({
             </DialogDescription>
           </DialogHeader>
           {rollback.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {rollback.error.message}
             </p>
           )}

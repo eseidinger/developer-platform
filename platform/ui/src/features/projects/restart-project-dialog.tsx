@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useMutation } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -52,7 +53,7 @@ function RestartProjectDialog({
             </DialogDescription>
           </DialogHeader>
           {restart.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {restart.error.message}
             </p>
           )}

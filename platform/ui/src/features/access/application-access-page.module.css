@@ -1,0 +1,208 @@
+.workspace {
+  max-width: 56rem;
+  overflow-wrap: break-word;
+}
+
+.workspace > * + * {
+  margin-top: 1.5rem;
+}
+
+.panel {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-body);
+  padding: 1.25rem;
+}
+
+.panel > * + * {
+  margin-top: 1rem;
+}
+
+.pageTitle {
+  font-size: 1.875rem;
+  font-weight: 600;
+}
+
+.sectionTitle {
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 500;
+}
+
+.strong,
+.strongBreakable {
+  font-weight: 500;
+}
+
+.strongBreakable,
+.smallBreakable,
+.tinyBreakable,
+.mutedTinyBreakable,
+.breakable {
+  overflow-wrap: anywhere;
+}
+
+.wrappable,
+.notice {
+  overflow-wrap: break-word;
+}
+
+.small,
+.smallBreakable,
+.error,
+.mutedSmall,
+.smallLink,
+.blockSmall,
+.notice,
+.noticeStack,
+.outlinedSmallStack,
+.smallStack,
+.filter,
+.inlineSelect,
+.detailGrid {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.tiny,
+.tinyBreakable,
+.mutedTiny,
+.mutedTinyBreakable,
+.stateBadge {
+  font-size: var(--mantine-font-size-xs);
+}
+
+.muted,
+.mutedSmall,
+.mutedTiny,
+.mutedTinyBreakable {
+  color: var(--mantine-color-dimmed);
+}
+
+.error {
+  color: var(--mantine-color-red-7);
+}
+
+.blockSmall {
+  display: block;
+}
+
+.link,
+.smallLink {
+  text-decoration: underline;
+}
+
+.headerRow,
+.row,
+.compactRow,
+.actions,
+.filter {
+  display: flex;
+  gap: var(--mantine-spacing-xs);
+}
+
+.headerRow,
+.row,
+.compactRow,
+.actions {
+  flex-wrap: wrap;
+}
+
+.headerRow {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+}
+
+.row,
+.compactRow {
+  justify-content: space-between;
+}
+
+.row {
+  gap: var(--mantine-spacing-sm);
+}
+
+.filter {
+  align-items: center;
+}
+
+.detailGrid {
+  display: grid;
+  gap: var(--mantine-spacing-sm);
+}
+
+.inlineSelect {
+  min-height: 2.25rem;
+  margin-left: 0.5rem;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-body);
+  padding-inline: 0.5rem;
+}
+
+.inlineSelect:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.marginMedium {
+  margin-top: 0.5rem;
+}
+
+.stateBadge {
+  border-radius: 999px;
+  background: var(--mantine-color-gray-1);
+  padding: 0.25rem 0.5rem;
+  font-weight: 500;
+}
+
+.notice,
+.noticeStack {
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-gray-1);
+  padding: 0.75rem;
+}
+
+.noticeStack > * + * {
+  margin-top: 0.25rem;
+}
+
+.outlinedStack,
+.outlinedSmallStack,
+.outlinedMediumStack {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  padding: 0.75rem;
+}
+
+.outlinedStack > * + *,
+.outlinedSmallStack > * + *,
+.smallStack > * + * {
+  margin-top: 0.5rem;
+}
+
+.outlinedMediumStack > * + *,
+.stack > * + * {
+  margin-top: 0.75rem;
+}
+
+.viewTab {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  padding: 0.5rem 0.75rem;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.viewTab:hover,
+.viewTabActive {
+  background: var(--mantine-color-gray-1);
+}
+
+.viewTabActive {
+  font-weight: 500;
+}
+
+@media (min-width: 40em) {
+  .detailGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

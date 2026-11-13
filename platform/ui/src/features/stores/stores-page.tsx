@@ -7,21 +7,13 @@ import {
 } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { Button, Group, Modal, Stack, Text, TextInput } from '@mantine/core'
 import { useAuth } from '@/auth/auth-context'
 import { ApiError } from '@/api/errors'
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import * as api from './stores-api'
 import { submitConsoleLaunch } from './console-launch'
+import styles from './stores-page.module.css'
 
-const box = 'space-y-4 rounded-xl border border-border bg-card p-5'
-const field =
-  'block rounded-md border border-input bg-background px-3 py-2 text-sm'
 type Action = (work: () => Promise<unknown>) => Promise<void>
 function Form({
   children,
@@ -38,7 +30,7 @@ function Form({
   }
   return (
     <form onSubmit={send}>
-      <fieldset disabled={disabled} className="flex flex-wrap items-end gap-3">
+      <fieldset disabled={disabled} className={styles.formFields}>
         {children}
       </fieldset>
     </form>
@@ -58,7 +50,7 @@ function Mode({
   return (
     <label>
       {label}
-      <select className={field} name="mode">
+      <select className={styles.field} name="mode">
         {!fullAccess && <option value="read-only">Read-only</option>}
         <option value="read-write">
           {fullAccess
@@ -75,7 +67,7 @@ export function StoresPage() {
   if (status !== 'authenticated')
     return (
       <section>
-        <h1 className="text-3xl font-semibold">Data stores</h1>
+        <h1 className={styles.pageTitle}>Data stores</h1>
         <p>Sign in to manage resources or use your human grants.</p>
       </section>
     )
@@ -194,12 +186,12 @@ function Workspace({
   )?.provider
   const selectedBindingProvider = knownBindingProvider ?? bindingProvider
   return (
-    <section className="max-w-5xl space-y-6">
-      <Link to={project ? `/projects/${project}` : '/'} className="underline">
+    <section className={styles.workspace}>
+      <Link to={project ? `/projects/${project}` : '/'} className={styles.link}>
         {project ?? 'Projects'}
       </Link>
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-semibold">
+      <div className={styles.headingRow}>
+        <h1 className={styles.pageTitle}>
           {project ? `${project} data stores` : 'My store access'}
         </h1>
         <Button
@@ -226,8 +218,8 @@ function Workspace({
       )}
       {manage && (
         <>
-          <section className={box}>
-            <h2 className="text-xl font-semibold">Create resource</h2>
+          <section className={styles.panel}>
+            <h2 className={styles.sectionTitle}>Create resource</h2>
             <Form
               disabled={disabled}
               submit={(d) =>
@@ -258,7 +250,7 @@ function Workspace({
               <label>
                 Resource name
                 <input
-                  className={field}
+                  className={styles.field}
                   name="name"
                   required
                   pattern="[a-z][a-z0-9-]*"
@@ -267,7 +259,7 @@ function Workspace({
               </label>
               <label>
                 Provider
-                <select className={field} name="provider">
+                <select className={styles.field} name="provider">
                   {context.data?.providers
                     .filter(
                       (p) =>
@@ -283,7 +275,7 @@ function Workspace({
               <label>
                 Storage allocation (MiB)
                 <input
-                  className={field}
+                  className={styles.field}
                   name="quota"
                   type="number"
                   defaultValue={1024}
@@ -320,8 +312,8 @@ function Workspace({
           {resources.isError && <p role="alert">{resources.error.message}</p>}
           {resources.isPending && <p role="status">Loading resources…</p>}
           {resources.data?.map((resource) => (
-            <section className={box} key={resource.resource_id}>
-              <h2 className="text-xl font-semibold">
+            <section className={styles.panel} key={resource.resource_id}>
+              <h2 className={styles.sectionTitle}>
                 {resource.name} · {resource.provider}
               </h2>
               <p>{resource.resource_id}</p>
@@ -380,7 +372,7 @@ function Workspace({
                 </p>
               )}
               {resource.state === 'active' && (
-                <div className="space-y-3">
+                <div className={styles.stack}>
                   <Form
                     disabled={disabled}
                     submit={(d) =>
@@ -395,7 +387,7 @@ function Workspace({
                     <label>
                       New name
                       <input
-                        className={field}
+                        className={styles.field}
                         name="name"
                         defaultValue={resource.name}
                         required
@@ -421,7 +413,7 @@ function Workspace({
                       <label>
                         Approved allocation (MiB)
                         <input
-                          className={field}
+                          className={styles.field}
                           name="quota"
                           type="number"
                           min={1}
@@ -457,7 +449,7 @@ function Workspace({
                 resource.observed_state === 'retired' && (
                   <Button
                     disabled={disabled}
-                    variant="destructive"
+                    color="red"
                     onClick={() =>
                       void action(async () => {
                         setPurge(await api.getPreview(resource.resource_id))
@@ -477,8 +469,8 @@ function Workspace({
               />
             </section>
           ))}
-          <section className={box}>
-            <h2 className="text-xl font-semibold">Component bindings</h2>
+          <section className={styles.panel}>
+            <h2 className={styles.sectionTitle}>Component bindings</h2>
             <p>
               Cross-project requests require the resource owner's approval. Copy
               an approved binding ID into that component's declaration.
@@ -498,7 +490,7 @@ function Workspace({
               <label>
                 Resource UUID
                 <input
-                  className={field}
+                  className={styles.field}
                   name="resource"
                   required
                   onChange={(e) => setBindingResource(e.target.value)}
@@ -507,7 +499,7 @@ function Workspace({
               <label>
                 Resource provider
                 <select
-                  className={field}
+                  className={styles.field}
                   value={selectedBindingProvider}
                   onChange={(e) => setBindingProvider(e.target.value)}
                   disabled={Boolean(knownBindingProvider)}
@@ -533,14 +525,14 @@ function Workspace({
               </label>
               <label>
                 Component
-                <input className={field} name="component" required />
+                <input className={styles.field} name="component" required />
               </label>
               <Mode fullAccess={selectedBindingProvider === 'neo4j'} />
               <Button type="submit">Request binding</Button>
             </Form>
             {bindings.isError && <p role="alert">{bindings.error.message}</p>}
             {bindings.data?.map((g) => (
-              <div key={g.grant_id} className="space-y-2 border-t pt-3">
+              <div key={g.grant_id} className={styles.bindingRow}>
                 <p>
                   {g.component} → {g.resource_id} · {g.mode} · {g.state} /{' '}
                   {g.observed_state}
@@ -570,8 +562,8 @@ function Workspace({
           </section>
         </>
       )}
-      <section className={box}>
-        <h2 className="text-xl font-semibold">My private and console access</h2>
+      <section className={styles.panel}>
+        <h2 className={styles.sectionTitle}>My private and console access</h2>
         <p>
           Human credentials last 24 hours. Active connections close at expiry.
           Renew early and reconnect; your old lease keeps its original deadline.
@@ -592,7 +584,7 @@ function Workspace({
           <label>
             Ed25519 public key
             <textarea
-              className={field}
+              className={styles.field}
               name="key"
               required
               autoComplete="off"
@@ -628,27 +620,32 @@ function Workspace({
           ) : (
             <p>
               No named-resource human grants for this project.{' '}
-              <Link className="underline" to="/store-access">
+              <Link className={styles.link} to="/store-access">
                 View all your store access
               </Link>
               .
             </p>
           ))}
       </section>
-      <Dialog
-        open={Boolean(confirm)}
-        onOpenChange={(open) => {
-          if (!open && !busy) {
-            setConfirm(null)
-            setKeyText('')
-          }
+      <Modal
+        opened={Boolean(confirm)}
+        onClose={() => {
+          if (busy) return
+          setConfirm(null)
+          setKeyText('')
         }}
+        title={confirm?.title}
+        centered
+        closeOnEscape={!busy}
+        closeOnClickOutside={!busy}
+        withCloseButton={!busy}
       >
-        <DialogContent>
-          <DialogTitle>{confirm?.title}</DialogTitle>
-          <DialogDescription>{confirm?.detail}</DialogDescription>
-          {keyText && <p>New public key will replace the previous key.</p>}
-          <div className="flex gap-2">
+        <Stack gap="md">
+          <Text size="sm">{confirm?.detail}</Text>
+          {keyText && (
+            <Text size="sm">New public key will replace the previous key.</Text>
+          )}
+          <Group justify="flex-end">
             <Button
               variant="outline"
               disabled={busy}
@@ -670,36 +667,36 @@ function Workspace({
             >
               Confirm
             </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-      <Dialog
-        open={Boolean(purge)}
-        onOpenChange={(open) => {
-          if (!open && !busy) {
-            setPurge(null)
-            setConfirmation('')
-          }
+          </Group>
+        </Stack>
+      </Modal>
+      <Modal
+        opened={Boolean(purge)}
+        onClose={() => {
+          if (busy) return
+          setPurge(null)
+          setConfirmation('')
         }}
+        title="Permanently purge resource"
+        centered
+        closeOnEscape={!busy}
+        closeOnClickOutside={!busy}
+        withCloseButton={!busy}
       >
-        <DialogContent>
-          <DialogTitle>Permanently purge resource</DialogTitle>
-          <DialogDescription>
+        <Stack gap="md">
+          <Text size="sm">
             {purge?.name} · {purge?.owner_project} · {purge?.effect}
-          </DialogDescription>
-          <label>
-            Type resource UUID to confirm
-            <input
-              className={field}
-              value={confirmation}
-              onChange={(e) => setConfirmation(e.target.value)}
-              autoComplete="off"
-            />
-          </label>
-          <p>{purge?.resource_id}</p>
+          </Text>
+          <TextInput
+            label="Type resource UUID to confirm"
+            value={confirmation}
+            onChange={(e) => setConfirmation(e.target.value)}
+            autoComplete="off"
+          />
+          <Text size="sm">{purge?.resource_id}</Text>
           <Button
             disabled={disabled || confirmation !== purge?.resource_id}
-            variant="destructive"
+            color="red"
             onClick={() => {
               const pending = purge
               setPurge(null)
@@ -709,8 +706,8 @@ function Workspace({
           >
             Permanently purge
           </Button>
-        </DialogContent>
-      </Dialog>
+        </Stack>
+      </Modal>
     </section>
   )
 }
@@ -736,8 +733,8 @@ function Grants({
     queryFn: () => api.getGrants(resource.resource_id),
   })
   return (
-    <div className="space-y-3">
-      <h3 className="font-semibold">Human grants and incoming bindings</h3>
+    <div className={styles.stack}>
+      <h3 className={styles.strong}>Human grants and incoming bindings</h3>
       {resource.state === 'active' && (
         <Form
           disabled={disabled}
@@ -753,11 +750,11 @@ function Grants({
         >
           <label>
             Issuer
-            <input className={field} name="issuer" type="url" required />
+            <input className={styles.field} name="issuer" type="url" required />
           </label>
           <label>
             Subject ID
-            <input className={field} name="subject" required />
+            <input className={styles.field} name="subject" required />
           </label>
           <Mode fullAccess={resource.provider === 'neo4j'} />
           <Button type="submit">Grant human access</Button>
@@ -765,7 +762,7 @@ function Grants({
       )}
       {query.isError && <p role="alert">{query.error.message}</p>}
       {query.data?.map((g) => (
-        <div key={g.grant_id} className="space-y-2 border-t pt-3">
+        <div key={g.grant_id} className={styles.bindingRow}>
           <p>
             {g.kind === 'human'
               ? `${g.issuer} / ${g.subject}`
@@ -889,8 +886,8 @@ function HumanAccess({
     }
   }
   return (
-    <div className="space-y-3 border-t pt-3">
-      <h3 className="font-semibold">
+    <div className={styles.grantSection}>
+      <h3 className={styles.strong}>
         {resource.owner_project} / {resource.name} · {grant.mode}
       </h3>
       <p>
@@ -928,7 +925,7 @@ function HumanAccess({
           </div>
         ))}
       {credential && (
-        <div className="space-y-3 rounded border p-3">
+        <div className={styles.outlinedGroup}>
           <p>
             Lease {credential.credential_id} · {credential.state} · expires{' '}
             {credential.expires_at}
@@ -951,22 +948,26 @@ function HumanAccess({
           ) : (
             <>
               {resource.provider === 'postgresql' && resource.console_url && (
-                <div className="space-y-3 rounded-md border border-border p-3">
-                  <h4 className="font-semibold">pgAdmin connection</h4>
+                <div className={styles.connectionPanel}>
+                  <h4 className={styles.strong}>pgAdmin connection</h4>
                   <p>
                     Use these values when registering a server in pgAdmin. The
                     private PGHOST address below is for native clients and is
                     unreachable from pgAdmin.
                   </p>
-                  <div className="grid gap-3 sm:grid-cols-2">
+                  <div className={styles.connectionGrid}>
                     <label>
                       Host name/address (pgAdmin)
-                      <input className={field} readOnly value="store-access" />
+                      <input
+                        className={styles.field}
+                        readOnly
+                        value="store-access"
+                      />
                     </label>
                     <label>
                       Port (pgAdmin)
                       <input
-                        className={field}
+                        className={styles.field}
                         readOnly
                         value={credential.connection.PGPORT ?? ''}
                       />
@@ -974,7 +975,7 @@ function HumanAccess({
                     <label>
                       Maintenance database (pgAdmin)
                       <input
-                        className={field}
+                        className={styles.field}
                         readOnly
                         value={credential.connection.PGDATABASE ?? ''}
                       />
@@ -982,14 +983,18 @@ function HumanAccess({
                     <label>
                       Username (pgAdmin)
                       <input
-                        className={field}
+                        className={styles.field}
                         readOnly
                         value={credential.connection.PGUSER ?? ''}
                       />
                     </label>
                     <label>
                       SSL mode (pgAdmin)
-                      <input className={field} readOnly value="Disable" />
+                      <input
+                        className={styles.field}
+                        readOnly
+                        value="Disable"
+                      />
                     </label>
                   </div>
                   <p>
@@ -997,7 +1002,7 @@ function HumanAccess({
                     disabled.
                   </p>
                   <a
-                    className="underline"
+                    className={styles.link}
                     href={resource.console_url}
                     target="_blank"
                     rel="noopener noreferrer"
@@ -1022,7 +1027,7 @@ function HumanAccess({
                     and port with http://127.0.0.1:15432; retain the scoped
                     credential and resource identifier.
                   </p>
-                  <code className="block break-all">
+                  <code className={styles.code}>
                     ssh -N -p {credential.ssh.port} -L 15432:
                     {credential.ssh.destination}:
                     {credential.ssh.destination_port} {credential.ssh.user}@
@@ -1031,19 +1036,19 @@ function HumanAccess({
                 </>
               )}
               {resource.provider === 'postgresql' && resource.console_url && (
-                <h4 className="font-semibold">
+                <h4 className={styles.strong}>
                   Private native-client connection
                 </h4>
               )}
               {Object.entries(credential.connection).map(([key, value]) => (
-                <label className="block" key={key}>
+                <label className={styles.block} key={key}>
                   {key === 'PGHOST' &&
                   resource.provider === 'postgresql' &&
                   resource.console_url
                     ? 'PGHOST (private client only)'
                     : key}
                   <input
-                    className={field}
+                    className={styles.field}
                     readOnly
                     type={
                       !shown && /PASS|SECRET|TOKEN|KEY/.test(key)

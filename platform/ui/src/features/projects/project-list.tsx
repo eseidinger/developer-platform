@@ -2,10 +2,11 @@ import { useQuery } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import { useAuth } from '@/auth/auth-context'
 import { CreateProjectDialog } from '@/features/projects/create-project-dialog'
 import { listProjects } from '@/features/projects/projects-api'
+import styles from './project-list.module.css'
 
 function ProjectList() {
   const { status } = useAuth()
@@ -24,20 +25,17 @@ function ProjectList() {
   }
 
   return (
-    <section
-      aria-labelledby="projects-title"
-      className="rounded-xl border border-border bg-card p-6 shadow-sm"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section aria-labelledby="projects-title" className={styles.panel}>
+      <div className={styles.header}>
         <div>
-          <h2 id="projects-title" className="text-lg font-medium">
+          <h2 id="projects-title" className={styles.heading}>
             Projects
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className={styles.intro}>
             Projects returned by your current platform grants.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className={styles.actions}>
           <CreateProjectDialog />
           <Button
             variant="outline"
@@ -49,7 +47,7 @@ function ProjectList() {
         </div>
       </div>
 
-      <label className="mt-4 flex items-center gap-2 text-sm">
+      <label className={styles.filter}>
         <input
           type="checkbox"
           checked={showRetired}
@@ -59,19 +57,19 @@ function ProjectList() {
       </label>
 
       {projectsQuery.isLoading && (
-        <p role="status" className="mt-4 text-sm text-muted-foreground">
+        <p role="status" className={styles.message}>
           Loading projects…
         </p>
       )}
 
       {projectsQuery.isError && (
-        <p role="alert" className="mt-4 text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {projectsQuery.error.message}
         </p>
       )}
 
       {projectsQuery.data?.length === 0 && (
-        <p className="mt-4 text-sm text-muted-foreground">
+        <p className={styles.message}>
           You do not currently have access to any projects.
         </p>
       )}
@@ -79,28 +77,23 @@ function ProjectList() {
       {projectsQuery.data &&
         projectsQuery.data.length > 0 &&
         visibleProjects?.length === 0 && (
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className={styles.message}>
             All your projects are retired. Select “Show retired projects” to
             view them.
           </p>
         )}
 
       {visibleProjects && visibleProjects.length > 0 && (
-        <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+        <ul className={styles.list}>
           {visibleProjects.map((project) => (
-            <li
-              key={project.name}
-              className="flex items-center justify-between gap-4 px-4 py-3"
-            >
+            <li key={project.name} className={styles.listItem}>
               <Link
-                className="font-medium underline-offset-4 hover:underline"
+                className={styles.projectLink}
                 to={`/projects/${project.name}`}
               >
                 {project.name}
               </Link>
-              <span className="text-sm text-muted-foreground">
-                {project.status}
-              </span>
+              <span className={styles.status}>{project.status}</span>
             </li>
           ))}
         </ul>

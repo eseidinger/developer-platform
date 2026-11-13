@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Label } from '@/components/ui/label'
+import { InputLabel as Label } from '@mantine/core'
 import { requestDataServiceRecovery } from '@/features/projects/projects-api'
 
 type Reason = 'unavailable' | 'access' | 'data_integrity' | 'other'
@@ -49,11 +50,11 @@ function RequestRecoveryDialog({ name }: { name: string }) {
               credentials or incident details.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="recovery-reason">Reason category</Label>
             <select
               id="recovery-reason"
-              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={styles.field}
               value={reason}
               onChange={(event) => setReason(event.target.value as Reason)}
               disabled={request.isPending}
@@ -65,7 +66,7 @@ function RequestRecoveryDialog({ name }: { name: string }) {
             </select>
           </div>
           {request.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {request.error.message}
             </p>
           )}

@@ -4,7 +4,7 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '@/auth/auth-context'
 import { isTransientApiError } from '@/api/errors'
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import { AccessDialog, RouteSummary } from './access-controls'
 import { AccessEvents } from './access-events'
 import {
@@ -41,6 +41,7 @@ import {
   RequestServiceDialog,
   ServiceActionDialog,
 } from './request-dialogs'
+import styles from './application-access-page.module.css'
 
 const views = {
   overview: 'Overview',
@@ -91,26 +92,21 @@ function QueryMessage({
 }) {
   if (query.isError)
     return (
-      <p role="alert" className="text-sm text-destructive">
+      <p role="alert" className={styles.error}>
         {label}: {query.error?.message} Use Refresh to try again.
       </p>
     )
   if (query.isPending)
     return (
-      <p role="status" className="text-sm text-muted-foreground">
+      <p role="status" className={styles.mutedSmall}>
         Loading {label.toLowerCase()}…
       </p>
     )
   return null
 }
 function State({ state }: { state: string }) {
-  return (
-    <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
-      {state}
-    </span>
-  )
+  return <span className={styles.stateBadge}>{state}</span>
 }
-const sectionClass = 'space-y-4 rounded-xl border border-border bg-card p-5'
 
 export function ApplicationAccessPage() {
   const { name } = useParams()
@@ -119,8 +115,8 @@ export function ApplicationAccessPage() {
   if (status !== 'authenticated')
     return (
       <section>
-        <h1 className="text-3xl font-semibold">Application access</h1>
-        <p className="mt-2">
+        <h1 className={styles.pageTitle}>Application access</h1>
+        <p className={styles.marginMedium}>
           Sign in to view this project's application access.
         </p>
       </section>
@@ -347,18 +343,18 @@ function AccessWorkspace({ project }: { project: string }) {
   return (
     <AccessEvents.Provider value={{ onDenied }}>
       <section
-        className="max-w-4xl space-y-6 break-words"
+        className={styles.workspace}
         aria-labelledby="application-access-title"
       >
-        <div className="space-y-3">
-          <Link className="text-sm underline" to={`/projects/${project}`}>
+        <div className={styles.stack}>
+          <Link className={styles.smallLink} to={`/projects/${project}`}>
             Back to {project}
           </Link>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className={styles.headerRow}>
             <h1
               tabIndex={-1}
               id="application-access-title"
-              className="text-3xl font-semibold"
+              className={styles.pageTitle}
             >
               Application access
             </h1>
@@ -370,7 +366,7 @@ function AccessWorkspace({ project }: { project: string }) {
               Refresh access
             </Button>
           </div>
-          <p className="text-muted-foreground">
+          <p className={styles.muted}>
             {project}: configure who can use the hosted application. Project
             roles and CI deployment credentials grant no application membership.
           </p>
@@ -380,24 +376,21 @@ function AccessWorkspace({ project }: { project: string }) {
           <>
             <nav
               aria-label="Application access sections"
-              className="flex flex-wrap gap-2"
+              className={styles.actions}
             >
               {Object.entries(views).map(([key, label]) => (
                 <Link
                   key={key}
                   to={`?view=${key}`}
                   aria-current={view === key ? 'page' : undefined}
-                  className={`rounded-lg border px-3 py-2 text-sm ${view === key ? 'bg-muted font-medium' : 'hover:bg-muted'}`}
+                  className={`${styles.viewTab} ${view === key ? styles.viewTabActive : ''}`}
                 >
                   {label}
                 </Link>
               ))}
             </nav>
             {notice && (
-              <p
-                role="status"
-                className="rounded-lg bg-muted p-3 text-sm break-words"
-              >
+              <p role="status" className={styles.notice}>
                 {notice}
               </p>
             )}
@@ -412,21 +405,19 @@ function AccessWorkspace({ project }: { project: string }) {
                 </p>
               )}
             {view === 'overview' && (
-              <section className={sectionClass} aria-label="Access overview">
-                <h2 className="text-lg font-medium">Access overview</h2>
-                <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              <section className={styles.panel} aria-label="Access overview">
+                <h2 className={styles.sectionTitle}>Access overview</h2>
+                <dl className={styles.detailGrid}>
                   <div>
-                    <dt className="text-muted-foreground">Application</dt>
+                    <dt className={styles.muted}>Application</dt>
                     <dd>{context.data.application}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Public component</dt>
+                    <dt className={styles.muted}>Public component</dt>
                     <dd>{context.data.component ?? 'None'}</dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">
-                      Workload readiness
-                    </dt>
+                    <dt className={styles.muted}>Workload readiness</dt>
                     <dd>
                       {readiness.isError
                         ? 'Unavailable'
@@ -436,7 +427,7 @@ function AccessWorkspace({ project }: { project: string }) {
                     </dd>
                   </div>
                   <div>
-                    <dt className="text-muted-foreground">Access policy</dt>
+                    <dt className={styles.muted}>Access policy</dt>
                     <dd>
                       {!context.data.eligible ? (
                         'Not available'
@@ -453,9 +444,9 @@ function AccessWorkspace({ project }: { project: string }) {
                   </div>
                 </dl>
                 {context.data.url && (
-                  <p className="text-sm break-all">
+                  <p className={styles.smallBreakable}>
                     Public URL:{' '}
-                    <a className="underline" href={context.data.url}>
+                    <a className={styles.link} href={context.data.url}>
                       {context.data.url}
                     </a>
                   </p>
@@ -475,7 +466,7 @@ function AccessWorkspace({ project }: { project: string }) {
                   label="Hosted-access capabilities"
                 />
                 {capabilities.data && (
-                  <p className="text-sm">
+                  <p className={styles.small}>
                     Supported authentication:{' '}
                     {capabilities.data.modes.join(', ')}. Maximum authorization
                     staleness:{' '}
@@ -489,16 +480,16 @@ function AccessWorkspace({ project }: { project: string }) {
                     This API does not advertise hosted-application access.
                   </p>
                 )}
-                <p className="text-sm">
+                <p className={styles.small}>
                   Application-administrator groups protect application routes.
                   They confer no portal administration authority.
                 </p>
               </section>
             )}
             {view === 'governance' && (
-              <section className={sectionClass}>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <h2 className="text-lg font-medium">Governance</h2>
+              <section className={styles.panel}>
+                <div className={styles.row}>
+                  <h2 className={styles.sectionTitle}>Governance</h2>
                   {manage && !governance.isPending && !governance.isError && (
                     <Button onClick={() => setEditor('governance')}>
                       Edit governance
@@ -508,11 +499,11 @@ function AccessWorkspace({ project }: { project: string }) {
                 <QueryMessage query={governance} label="Governance" />
                 {governance.isSuccess &&
                   (ownGovernance ? (
-                    <dl className="space-y-2 text-sm">
+                    <dl className={styles.smallStack}>
                       {Object.entries(ownGovernance.spec).map(
                         ([key, value]) => (
-                          <div key={key} className="break-words">
-                            <dt className="font-medium">
+                          <div key={key} className={styles.wrappable}>
+                            <dt className={styles.strong}>
                               {governanceLabels[key] ?? key}
                             </dt>
                             <dd>{String(value)}</dd>
@@ -526,40 +517,37 @@ function AccessWorkspace({ project }: { project: string }) {
               </section>
             )}
             {view === 'groups' && (
-              <section className={sectionClass}>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <h2 className="text-lg font-medium">Groups</h2>
+              <section className={styles.panel}>
+                <div className={styles.row}>
+                  <h2 className={styles.sectionTitle}>Groups</h2>
                   {manage && (
                     <Button onClick={() => setEditor('group')}>
                       Create application group
                     </Button>
                   )}
                 </div>
-                <p className="text-sm text-muted-foreground">
+                <p className={styles.mutedSmall}>
                   Group creation assigns no members. Names are labels; policy
                   references use stable IDs.
                 </p>
                 <QueryMessage query={groups} label="Groups" />
                 {groups.isSuccess &&
                   (ownGroups.length ? (
-                    <ul className="space-y-3">
+                    <ul className={styles.stack}>
                       {ownGroups.map((group) => (
-                        <li
-                          key={group.id}
-                          className="space-y-2 rounded-lg border p-3"
-                        >
-                          <div className="flex flex-wrap justify-between gap-2">
+                        <li key={group.id} className={styles.outlinedStack}>
+                          <div className={styles.compactRow}>
                             <p>
                               {group.spec.displayName} ({group.name})
                             </p>
                             <State state={group.state} />
                           </div>
-                          <p className="text-xs break-all text-muted-foreground">
+                          <p className={styles.mutedTinyBreakable}>
                             {group.id}
                           </p>
                           {manage && group.state === 'active' && (
                             <Button
-                              variant="destructive"
+                              color="red"
                               size="sm"
                               onClick={() =>
                                 setEditor({
@@ -594,9 +582,9 @@ function AccessWorkspace({ project }: { project: string }) {
               </section>
             )}
             {view === 'policy' && (
-              <section className={sectionClass}>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <h2 className="text-lg font-medium">Policy</h2>
+              <section className={styles.panel}>
+                <div className={styles.row}>
+                  <h2 className={styles.sectionTitle}>Policy</h2>
                   {policyEditable && (
                     <Button onClick={() => setEditor('policy')}>
                       {ownPolicy
@@ -623,7 +611,7 @@ function AccessWorkspace({ project }: { project: string }) {
                             policy={ownPolicy.spec}
                             groups={ownGroups}
                           />
-                          <p className="text-sm">
+                          <p className={styles.small}>
                             Identity attributes: display name{' '}
                             {ownPolicy.spec.identityAttributes.displayName
                               ? 'released'
@@ -640,9 +628,9 @@ function AccessWorkspace({ project }: { project: string }) {
                       ))}
                     <QueryMessage query={revisions} label="Policy revisions" />
                     {revisions.isSuccess && (
-                      <ul className="space-y-2 text-sm">
+                      <ul className={styles.smallStack}>
                         {revisions.data.map((r) => (
-                          <li key={r.id} className="break-all">
+                          <li key={r.id} className={styles.breakable}>
                             Revision {r.id}; {r.created_at}
                             {r.id === ownPolicy?.spec.revisionId
                               ? ' (current desired)'
@@ -681,8 +669,8 @@ function AccessWorkspace({ project }: { project: string }) {
               </section>
             )}
             {view === 'humans' && (
-              <section className={sectionClass}>
-                <h2 className="text-lg font-medium">Human requests</h2>
+              <section className={styles.panel}>
+                <h2 className={styles.sectionTitle}>Human requests</h2>
                 {!adminReads ? (
                   <p>
                     Your platform permissions do not allow human request
@@ -690,15 +678,15 @@ function AccessWorkspace({ project }: { project: string }) {
                   </p>
                 ) : (
                   <>
-                    <p className="text-sm">
+                    <p className={styles.small}>
                       First login creates a request without membership. Accounts
                       and password recovery are managed by the identity
                       administrator.
                     </p>
-                    <label className="block text-sm">
+                    <label className={styles.blockSmall}>
                       Request state{' '}
                       <select
-                        className="ml-2 min-h-9 rounded-lg border bg-background px-2"
+                        className={styles.inlineSelect}
                         value={filter}
                         onChange={(e) =>
                           setParams({ view: 'humans', state: e.target.value })
@@ -720,30 +708,30 @@ function AccessWorkspace({ project }: { project: string }) {
                           .map((request) => (
                             <li
                               key={request.id}
-                              className="space-y-3 rounded-lg border p-3"
+                              className={styles.outlinedMediumStack}
                             >
-                              <div className="flex flex-wrap justify-between gap-2">
-                                <span className="font-medium break-all">
+                              <div className={styles.compactRow}>
+                                <span className={styles.strongBreakable}>
                                   {request.spec.displayName ??
                                     request.spec.principalId}
                                 </span>
                                 <State state={request.state} />
                               </div>
-                              <p className="text-xs break-all">
+                              <p className={styles.tinyBreakable}>
                                 {request.id} · created {request.created_at} ·
                                 expires {request.spec.expiresAt}
                               </p>
-                              <p className="text-xs break-all text-muted-foreground">
+                              <p className={styles.mutedTinyBreakable}>
                                 {request.spec.principalId} ·{' '}
                                 {request.spec.issuer} / {request.spec.subject}
                               </p>
                               {request.state === 'approved' && (
-                                <p className="text-sm">
+                                <p className={styles.small}>
                                   Request approved; membership states determine
                                   effective access.
                                 </p>
                               )}
-                              <div className="flex flex-wrap gap-2">
+                              <div className={styles.actions}>
                                 {manage &&
                                   humanActions(request).map((action) => (
                                     <Button
@@ -784,8 +772,8 @@ function AccessWorkspace({ project }: { project: string }) {
               </section>
             )}
             {view === 'memberships' && (
-              <section className={sectionClass}>
-                <h2 className="text-lg font-medium">Memberships</h2>
+              <section className={styles.panel}>
+                <h2 className={styles.sectionTitle}>Memberships</h2>
                 {!adminReads ? (
                   <p>
                     Your platform permissions do not allow membership
@@ -793,13 +781,13 @@ function AccessWorkspace({ project }: { project: string }) {
                   </p>
                 ) : (
                   <>
-                    <p className="text-sm">
+                    <p className={styles.small}>
                       Only active memberships authorize requests. Revocation
                       takes effect within five minutes; provider cleanup may
                       remain pending.
                     </p>
                     <QueryMessage query={memberships} label="Memberships" />
-                    <label className="flex items-center gap-2 text-sm">
+                    <label className={styles.filter}>
                       <input
                         type="checkbox"
                         checked={showRevokedMemberships}
@@ -824,11 +812,11 @@ function AccessWorkspace({ project }: { project: string }) {
                           )
                           .map((membership) => (
                             <li
-                              className="space-y-2 rounded-lg border p-3"
+                              className={styles.outlinedStack}
                               key={membership.id}
                             >
-                              <div className="flex flex-wrap justify-between gap-2">
-                                <span className="break-all">
+                              <div className={styles.compactRow}>
+                                <span className={styles.breakable}>
                                   {membership.spec.displayName ??
                                     membership.spec.principalId}{' '}
                                   →{' '}
@@ -838,7 +826,7 @@ function AccessWorkspace({ project }: { project: string }) {
                                 </span>
                                 <State state={membership.state} />
                               </div>
-                              <p className="text-xs break-all text-muted-foreground">
+                              <p className={styles.mutedTinyBreakable}>
                                 {membership.id} · {membership.spec.principalId}
                               </p>
                               {manage &&
@@ -847,7 +835,7 @@ function AccessWorkspace({ project }: { project: string }) {
                                 ) && (
                                   <Button
                                     size="sm"
-                                    variant="destructive"
+                                    color="red"
                                     onClick={() =>
                                       setEditor({
                                         kind: 'confirmation',
@@ -882,9 +870,9 @@ function AccessWorkspace({ project }: { project: string }) {
               </section>
             )}
             {view === 'services' && (
-              <section className={sectionClass}>
-                <div className="flex flex-wrap justify-between gap-3">
-                  <h2 className="text-lg font-medium">Service access</h2>
+              <section className={styles.panel}>
+                <div className={styles.row}>
+                  <h2 className={styles.sectionTitle}>Service access</h2>
                   {consume && (
                     <Button onClick={() => setEditor('service-request')}>
                       Request service access
@@ -894,7 +882,7 @@ function AccessWorkspace({ project }: { project: string }) {
                 <QueryMessage query={services} label="Service access" />
                 {services.isSuccess && (
                   <>
-                    <h3 className="font-medium">Incoming service requests</h3>
+                    <h3 className={styles.strong}>Incoming service requests</h3>
                     <ServiceRows
                       rows={services.data.filter(
                         (s) => s.spec.providerProject === project,
@@ -911,7 +899,7 @@ function AccessWorkspace({ project }: { project: string }) {
                         !groups.isPending
                       }
                     />
-                    <h3 className="font-medium">Outgoing service requests</h3>
+                    <h3 className={styles.strong}>Outgoing service requests</h3>
                     <ServiceRows
                       rows={services.data.filter((s) => s.project === project)}
                       project={project}
@@ -926,9 +914,9 @@ function AccessWorkspace({ project }: { project: string }) {
                 )}
               </section>
             )}
-            <section className={sectionClass} aria-label="Access operations">
-              <h2 className="text-lg font-medium">Access operations</h2>
-              <p className="text-xs text-muted-foreground">
+            <section className={styles.panel} aria-label="Access operations">
+              <h2 className={styles.sectionTitle}>Access operations</h2>
+              <p className={styles.mutedTiny}>
                 Latest 100 visible operations. Server work continues if polling
                 stops.
               </p>
@@ -937,15 +925,12 @@ function AccessWorkspace({ project }: { project: string }) {
                 <RequestRows
                   empty="No access operations."
                   rows={operations.data.map((op) => (
-                    <li
-                      key={op.id}
-                      className="space-y-2 rounded-lg border p-3 text-sm"
-                    >
-                      <div className="flex flex-wrap justify-between gap-2">
+                    <li key={op.id} className={styles.outlinedSmallStack}>
+                      <div className={styles.compactRow}>
                         <span>{op.action}</span>
                         <State state={op.state} />
                       </div>
-                      <p className="text-xs break-all">
+                      <p className={styles.tinyBreakable}>
                         Operation {op.id}; resource {op.resourceId}; attempts{' '}
                         {op.attempts}.
                       </p>
@@ -1083,9 +1068,9 @@ function RequestRows({
   empty: string
 }) {
   return rows.length ? (
-    <ul className="space-y-3">{rows}</ul>
+    <ul className={styles.stack}>{rows}</ul>
   ) : (
-    <p className="text-sm text-muted-foreground">{empty}</p>
+    <p className={styles.mutedSmall}>{empty}</p>
   )
 }
 function humanActions(request: HumanRequest): HumanAction[] {
@@ -1158,40 +1143,42 @@ function ServiceRows({
         )
           actions.push('revoke')
         return (
-          <li key={service.id} className="space-y-3 rounded-lg border p-3">
-            <div className="flex flex-wrap justify-between gap-2">
-              <span className="font-medium">{service.name}</span>
+          <li key={service.id} className={styles.outlinedMediumStack}>
+            <div className={styles.compactRow}>
+              <span className={styles.strong}>{service.name}</span>
               <State state={service.state} />
             </div>
-            <p className="text-sm">
+            <p className={styles.small}>
               {service.project} → {service.spec.providerProject}/
               {service.spec.application}
             </p>
-            <p className="text-xs break-all text-muted-foreground">
+            <p className={styles.mutedTinyBreakable}>
               {service.id}; principal {service.spec.principalId}.
             </p>
-            <p className="text-xs">
+            <p className={styles.tiny}>
               Every consumer project component can use this credential.
             </p>
             {service.spec.credentials.map((c) => (
-              <p className="text-xs break-all" key={c.id}>
+              <p className={styles.tinyBreakable} key={c.id}>
                 Credential {c.id}: {c.state}
                 {c.expiresAt ? `; overlap ends ${c.expiresAt}` : ''}.
               </p>
             ))}
             {service.spec.adoption && (
-              <p className="text-sm">Adoption: {service.spec.adoption}</p>
+              <p className={styles.small}>Adoption: {service.spec.adoption}</p>
             )}
             {consume &&
               service.state === 'active' &&
               service.spec.secretPrefix && (
-                <div className="space-y-1 rounded-lg bg-muted p-3 text-sm">
-                  <p className="break-all">
+                <div className={styles.noticeStack}>
+                  <p className={styles.breakable}>
                     Provider URL: {service.spec.providerUrl}
                   </p>
-                  <p className="break-all">Audience: {service.spec.audience}</p>
+                  <p className={styles.breakable}>
+                    Audience: {service.spec.audience}
+                  </p>
                   <p>Managed secret variables:</p>
-                  <ul className="break-all">
+                  <ul className={styles.breakable}>
                     {['CLIENT_ID', 'CLIENT_SECRET', 'TOKEN_URL'].map(
                       (suffix) => (
                         <li key={suffix}>
@@ -1207,7 +1194,7 @@ function ServiceRows({
                   </p>
                 </div>
               )}
-            <div className="flex flex-wrap gap-2">
+            <div className={styles.actions}>
               {actions.map((action) => (
                 <Button
                   size="sm"

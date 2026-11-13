@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -71,7 +72,7 @@ function SecretActions({
 
   return (
     <>
-      <div className="flex flex-wrap gap-2">
+      <div className={styles.actionWrap}>
         {state === 'rotating' && (
           <Button
             size="sm"
@@ -91,16 +92,12 @@ function SecretActions({
             Confirm rotation
           </Button>
         )}
-        <Button
-          size="sm"
-          variant="destructive"
-          onClick={() => setAction('delete')}
-        >
+        <Button size="sm" color="red" onClick={() => setAction('delete')}>
           Delete
         </Button>
       </div>
       {state === 'rotating' && !canConfirm && (
-        <p className="text-xs text-muted-foreground">
+        <p className={styles.mutedTiny}>
           Confirmation is available after activation is active.
         </p>
       )}
@@ -128,7 +125,7 @@ function SecretActions({
             </DialogDescription>
           </DialogHeader>
           {error && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {error}
             </p>
           )}

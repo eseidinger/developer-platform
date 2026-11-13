@@ -1,0 +1,166 @@
+.panel,
+.detailPanel,
+.list {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.panel {
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-body);
+  padding: 1.5rem;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.detailPanel {
+  padding: 1rem;
+}
+
+.list > * + * {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.header,
+.listRow,
+.actions,
+.actionsBelow {
+  display: flex;
+  gap: var(--mantine-spacing-xs);
+}
+
+.header,
+.listRow,
+.actionsBelow {
+  flex-wrap: wrap;
+}
+
+.header,
+.listRow {
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+}
+
+.listRow {
+  padding: 0.75rem 1rem;
+}
+
+.strong,
+.strongBreakable {
+  font-weight: 500;
+}
+
+.strongBreakable,
+.monoBreakable,
+.mutedTinyBreakable,
+.mutedTinyBreakableBelow {
+  overflow-wrap: anywhere;
+}
+
+.mono,
+.monoBreakable,
+.keyInput {
+  font-family: var(--mantine-font-family-monospace);
+}
+
+.sectionTitle {
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 500;
+}
+
+.detailGrid,
+.twoColumnGrid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.detailGrid,
+.list,
+.detailPanel,
+.mutedSmallBelow,
+.mutedSmallBelowMedium,
+.mutedBelow,
+.error,
+.errorBelow {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.keyInput {
+  min-height: 5rem;
+  width: 100%;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: transparent;
+  padding: 0.5rem 0.75rem;
+  font-size: var(--mantine-font-size-xs);
+}
+
+.keyInput:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.muted,
+.mutedSmallBelow,
+.mutedSmallBelowMedium,
+.mutedTinyBelow,
+.mutedTinyBreakable,
+.mutedTinyBreakableBelow,
+.mutedBelow {
+  color: var(--mantine-color-dimmed);
+}
+
+.mutedTinyBelow,
+.mutedTinyBreakable,
+.mutedTinyBreakableBelow {
+  font-size: var(--mantine-font-size-xs);
+}
+
+.error,
+.errorBelow {
+  color: var(--mantine-color-red-7);
+}
+
+.mutedSmallBelow,
+.mutedTinyBreakableBelow {
+  margin-top: 0.25rem;
+}
+
+.mutedSmallBelowMedium,
+.twoColumnGrid {
+  margin-top: 0.5rem;
+}
+
+.list,
+.actionsBelow,
+.mutedTinyBelow {
+  margin-top: 0.75rem;
+}
+
+.detailPanel,
+.errorBelow,
+.mutedBelow {
+  margin-top: 1rem;
+}
+
+.sectionGap {
+  margin-top: 1.25rem;
+}
+
+.stackSmall > * + * {
+  margin-top: 0.5rem;
+}
+
+.stackLarge > * + * {
+  margin-top: 1rem;
+}
+
+@media (min-width: 40em) {
+  .twoColumnGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .wideModal {
+    max-width: 36rem;
+  }
+}

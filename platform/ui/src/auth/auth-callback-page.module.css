@@ -1,0 +1,17 @@
+.panel {
+  max-width: 36rem;
+}
+
+.panel > * + * {
+  margin-top: 0.75rem;
+}
+
+.heading {
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.message {
+  color: var(--mantine-color-dimmed);
+}

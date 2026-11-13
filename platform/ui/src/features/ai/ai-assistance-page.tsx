@@ -4,8 +4,8 @@ import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
 import { useAuth } from '@/auth/auth-context'
 import { ApiError } from '@/api/errors'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { Button } from '@mantine/core'
+import { Input } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -29,8 +29,8 @@ import {
   type Proposal,
   type Run,
 } from './ai-api'
+import styles from './ai-assistance-page.module.css'
 
-const sectionClass = 'space-y-4 rounded-xl border border-border bg-card p-5'
 const uuid = (value: string | null) =>
   z.uuid().safeParse(value).success ? value! : undefined
 function QueryMessage({
@@ -57,7 +57,7 @@ export function AiAssistancePage() {
   if (status !== 'authenticated')
     return (
       <section>
-        <h1 className="text-3xl font-semibold">AI assistance</h1>
+        <h1 className={styles.pageTitle}>AI assistance</h1>
         <p>Sign in to view this project's AI assistance.</p>
       </section>
     )
@@ -247,19 +247,16 @@ function AiWorkspace({ project }: { project: string }) {
           : selectedProposal.state === 'approved' && unexpired)
 
   return (
-    <section
-      className="max-w-5xl space-y-6 break-words"
-      aria-labelledby="ai-title"
-    >
-      <header className="space-y-3">
+    <section className={styles.workspace} aria-labelledby="ai-title">
+      <header className={styles.stackMedium}>
         <Link
-          className="underline"
+          className={styles.link}
           to={`/projects/${encodeURIComponent(project)}`}
         >
           Back to {project}
         </Link>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 id="ai-title" tabIndex={-1} className="text-3xl font-semibold">
+        <div className={styles.headingRow}>
+          <h1 id="ai-title" tabIndex={-1} className={styles.pageTitle}>
             AI assistance
           </h1>
           <Button
@@ -277,7 +274,7 @@ function AiWorkspace({ project }: { project: string }) {
       </header>
       <QueryMessage query={context} label="AI context" />
       {notice && (
-        <p role="alert" className="rounded-lg bg-muted p-3">
+        <p role="alert" className={styles.notice}>
           {notice}
         </p>
       )}
@@ -296,8 +293,8 @@ function AiWorkspace({ project }: { project: string }) {
       )}
       {enabled && (
         <>
-          <section className={sectionClass} aria-labelledby="ai-policy-title">
-            <h2 id="ai-policy-title" className="text-xl font-semibold">
+          <section className={styles.panel} aria-labelledby="ai-policy-title">
+            <h2 id="ai-policy-title" className={styles.sectionTitle}>
               Data policy
             </h2>
             <p>
@@ -327,16 +324,16 @@ function AiWorkspace({ project }: { project: string }) {
                 Change classification
               </Button>
             ) : (
-              <p className="text-sm text-muted-foreground">
+              <p className={styles.mutedSmall}>
                 A human platform administrator can change classification.
               </p>
             )}
           </section>
-          <section className={sectionClass} aria-labelledby="ai-actions-title">
-            <h2 id="ai-actions-title" className="text-xl font-semibold">
+          <section className={styles.panel} aria-labelledby="ai-actions-title">
+            <h2 id="ai-actions-title" className={styles.sectionTitle}>
               Start assistance
             </h2>
-            <div className="flex flex-wrap gap-2">
+            <div className={styles.actions}>
               {Object.entries(kinds).map(([kind, label]) => (
                 <Button
                   key={kind}
@@ -379,18 +376,18 @@ function AiWorkspace({ project }: { project: string }) {
               </p>
             )}
           </section>
-          <section className={sectionClass} aria-labelledby="ai-runs-title">
-            <h2 id="ai-runs-title" className="text-xl font-semibold">
+          <section className={styles.panel} aria-labelledby="ai-runs-title">
+            <h2 id="ai-runs-title" className={styles.sectionTitle}>
               Run history
             </h2>
             <QueryMessage query={runs} label="Run history" />
             {runs.isSuccess && (
               <>
-                <ul className="space-y-2">
+                <ul className={styles.stackSmall}>
                   {runs.data.items.map((r) => (
                     <li key={r.run_id}>
                       <Link
-                        className="underline"
+                        className={styles.link}
                         to={`?${new URLSearchParams({ run: r.run_id, ...(runsBefore ? { runs_before: runsBefore } : {}) })}`}
                       >
                         {kinds[r.kind]} · {r.state} · {r.created_at} ·{' '}
@@ -410,7 +407,7 @@ function AiWorkspace({ project }: { project: string }) {
             )}
           </section>
           {runId && (
-            <section className={sectionClass} aria-label="Selected run">
+            <section className={styles.panel} aria-label="Selected run">
               <QueryMessage query={run} label="Run" />
               {selectedRun && (
                 <>
@@ -453,20 +450,20 @@ function AiWorkspace({ project }: { project: string }) {
             </section>
           )}
           <section
-            className={sectionClass}
+            className={styles.panel}
             aria-labelledby="ai-proposals-title"
           >
-            <h2 id="ai-proposals-title" className="text-xl font-semibold">
+            <h2 id="ai-proposals-title" className={styles.sectionTitle}>
               Proposal history
             </h2>
             <QueryMessage query={proposals} label="Proposal history" />
             {proposals.isSuccess && (
               <>
-                <ul className="space-y-2">
+                <ul className={styles.stackSmall}>
                   {proposals.data.items.map((p) => (
                     <li key={p.proposal_id}>
                       <Link
-                        className="underline"
+                        className={styles.link}
                         to={`?${new URLSearchParams({ proposal: p.proposal_id, ...(proposalsBefore ? { proposals_before: proposalsBefore } : {}) })}`}
                       >
                         Rollback {p.base_revision} → {p.target_revision} ·{' '}
@@ -488,11 +485,11 @@ function AiWorkspace({ project }: { project: string }) {
             )}
           </section>
           {proposalId && (
-            <section className={sectionClass} aria-label="Selected proposal">
+            <section className={styles.panel} aria-label="Selected proposal">
               <QueryMessage query={proposal} label="Proposal" />
               {selectedProposal && (
                 <>
-                  <h2 className="text-xl font-semibold">Review rollback</h2>
+                  <h2 className={styles.sectionTitle}>Review rollback</h2>
                   <ProposalReview proposal={selectedProposal} />
                   {!freshProposal && selectedProposal.state !== 'executed' && (
                     <p role="alert">
@@ -505,7 +502,7 @@ function AiWorkspace({ project }: { project: string }) {
                       Approval has expired. Execution is disabled.
                     </p>
                   )}
-                  <div className="flex flex-wrap gap-2">
+                  <div className={styles.actions}>
                     <Button
                       disabled={
                         !manage ||
@@ -539,8 +536,8 @@ function AiWorkspace({ project }: { project: string }) {
                     </Button>
                   </div>
                   {selectedProposal.operation_id && (
-                    <div className="space-y-2">
-                      <h3 className="font-semibold">Recovery observation</h3>
+                    <div className={styles.stackSmall}>
+                      <h3 className={styles.strong}>Recovery observation</h3>
                       <p>
                         Operation: {selectedProposal.operation_id} · resulting
                         revision: {selectedProposal.resulting_revision}
@@ -569,7 +566,7 @@ function AiWorkspace({ project }: { project: string }) {
                           ?.desired_replicas ?? 'unknown'}
                         .
                       </p>
-                      <h4 className="font-semibold">Application metrics</h4>
+                      <h4 className={styles.strong}>Application metrics</h4>
                       {selectedProposal.observation?.metrics ? (
                         <MetricObservation
                           metrics={selectedProposal.observation.metrics}
@@ -595,7 +592,7 @@ function AiWorkspace({ project }: { project: string }) {
         }}
       >
         <DialogContent
-          className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
+          className={styles.modalContent}
           showCloseButton={!busy}
           finalFocus={() =>
             returnFocus.current?.isConnected &&
@@ -617,10 +614,10 @@ function AiWorkspace({ project }: { project: string }) {
               : 'Approval and execution are separate human actions. Execution queues a deployment and consumes the approval once.'}
           </DialogDescription>
           {confirmation?.action === 'policy' ? (
-            <label className="space-y-2">
+            <label className={styles.stackSmall}>
               Classification
               <select
-                className="block w-full rounded border p-2"
+                className={styles.select}
                 value={classification}
                 onChange={(e) =>
                   setClassification(e.target.value as typeof classification)
@@ -634,7 +631,7 @@ function AiWorkspace({ project }: { project: string }) {
           ) : (
             confirmation && <ProposalReview proposal={confirmation.proposal} />
           )}
-          <label className="space-y-2">
+          <label className={styles.stackSmall}>
             Type {project} to confirm
             <Input
               autoComplete="off"
@@ -642,7 +639,7 @@ function AiWorkspace({ project }: { project: string }) {
               onChange={(e) => setProjectConfirmation(e.target.value)}
             />
           </label>
-          <div className="flex gap-2">
+          <div className={styles.buttonRow}>
             <Button
               variant="outline"
               disabled={busy}
@@ -696,7 +693,7 @@ function Pagination({
   label: string
 }) {
   return (
-    <nav className="flex gap-2" aria-label={`${label} pagination`}>
+    <nav className={styles.buttonRow} aria-label={`${label} pagination`}>
       <Button
         variant="outline"
         disabled={!before}
@@ -716,8 +713,8 @@ function Pagination({
 }
 function RunResult({ run }: { run: Run }) {
   return (
-    <div className="space-y-4">
-      <h2 className="text-xl font-semibold">
+    <div className={styles.stackLarge}>
+      <h2 className={styles.sectionTitle}>
         {kinds[run.kind]} · {run.state}
       </h2>
       <p>
@@ -751,10 +748,10 @@ function RunResult({ run }: { run: Run }) {
           )}
           {(['observations', 'hypotheses'] as const).map((kind) => (
             <div key={kind}>
-              <h3 className="font-semibold capitalize">
+              <h3 className={styles.capitalizedHeading}>
                 {kind === 'hypotheses' ? 'Tentative hypotheses' : kind}
               </h3>
-              <ul className="list-disc space-y-2 pl-5">
+              <ul className={styles.spacedBulletList}>
                 {run.result?.[kind]?.map((item, i) => (
                   <li key={i}>
                     {item.statement}{' '}
@@ -762,7 +759,7 @@ function RunResult({ run }: { run: Run }) {
                       {item.source_ids.map((id) => (
                         <a
                           key={id}
-                          className="mr-2 underline"
+                          className={styles.inlineLink}
                           href={`#evidence-${run.run_id}-${id}`}
                         >
                           {id}
@@ -775,8 +772,8 @@ function RunResult({ run }: { run: Run }) {
             </div>
           ))}
           <div>
-            <h3 className="font-semibold">Evidence gaps</h3>
-            <ul className="list-disc pl-5">
+            <h3 className={styles.strong}>Evidence gaps</h3>
+            <ul className={styles.bulletList}>
               {run.result.gaps.map((gap, i) => (
                 <li key={i}>{gap}</li>
               ))}
@@ -785,8 +782,8 @@ function RunResult({ run }: { run: Run }) {
         </>
       )}
       <div>
-        <h3 className="font-semibold">Evidence sources</h3>
-        <ul className="space-y-2">
+        <h3 className={styles.strong}>Evidence sources</h3>
+        <ul className={styles.stackSmall}>
           {run.evidence.map((e) => (
             <li key={e.id} id={`evidence-${run.run_id}-${e.id}`} tabIndex={-1}>
               {e.id}: {e.tool} · {e.source} · {e.state} · {e.at}
@@ -799,7 +796,7 @@ function RunResult({ run }: { run: Run }) {
 }
 function ProposalReview({ proposal: p }: { proposal: Proposal }) {
   return (
-    <div className="space-y-2 text-sm">
+    <div className={styles.detailStack}>
       <p>
         Project: {p.project} · action: {p.diff.action} · state: {p.state}
       </p>
@@ -807,7 +804,7 @@ function ProposalReview({ proposal: p }: { proposal: Proposal }) {
         Revision {p.base_revision} → retained revision {p.target_revision}
       </p>
       <p>Changed paths: {p.diff.changed_paths.join(', ') || 'none'}</p>
-      <p className="break-all">Diff SHA-256: {p.diff_sha256}</p>
+      <p className={styles.breakable}>Diff SHA-256: {p.diff_sha256}</p>
       <p>Approval expires: {p.expires_at ?? 'not approved'}</p>
       <p>Rollback plan: {p.rollback_plan}</p>
     </div>
@@ -822,7 +819,7 @@ function MetricObservation({
   const value = (n: number | null | undefined, unit: string) =>
     n == null ? 'unavailable' : `${n.toFixed(4)} ${unit}`
   return (
-    <div className="space-y-2">
+    <div className={styles.stackSmall}>
       <p>
         Collection: {m.state}
         {m.reason ? ` (${m.reason})` : ''} · component:{' '}
@@ -832,7 +829,7 @@ function MetricObservation({
         Observed: {m.observed_at ?? 'unavailable'} · window:{' '}
         {m.window_seconds ?? 'unknown'} seconds
       </p>
-      <dl className="grid grid-cols-2 gap-2">
+      <dl className={styles.detailGrid}>
         <dt>Request rate</dt>
         <dd>{value(m.request_rate_per_second, 'requests/s')}</dd>
         <dt>Server error rate</dt>

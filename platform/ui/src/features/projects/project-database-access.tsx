@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError } from '@/api/errors'
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -11,8 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Input } from '@mantine/core'
+import { InputLabel as Label } from '@mantine/core'
+import styles from './project-database-access.module.css'
 import {
   createHumanDatabaseGrant,
   getMyDatabaseAccess,
@@ -58,16 +59,13 @@ function ProjectDatabaseAccess({
   if (!enabled) return null
 
   return (
-    <section
-      aria-labelledby="database-access-title"
-      className="rounded-xl border border-border bg-card p-6 shadow-sm"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section aria-labelledby="database-access-title" className={styles.panel}>
+      <div className={styles.header}>
         <div>
-          <h2 id="database-access-title" className="text-lg font-medium">
+          <h2 id="database-access-title" className={styles.sectionTitle}>
             Human database access
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className={styles.mutedSmallBelow}>
             Read-only PostgreSQL identities are separate from application
             credentials. The API enforces every grant and revocation.
           </p>
@@ -80,45 +78,45 @@ function ProjectDatabaseAccess({
       </div>
 
       {mine.isLoading && (
-        <p role="status" className="mt-4 text-sm text-muted-foreground">
+        <p role="status" className={styles.mutedBelow}>
           Loading your database access…
         </p>
       )}
       {mine.isError &&
         !expectedAbsence(mine.error, 404) &&
         !expectedAbsence(mine.error, 403) && (
-          <p role="alert" className="mt-4 text-sm text-destructive">
+          <p role="alert" className={styles.errorBelow}>
             {mine.error.message}
           </p>
         )}
       {mine.isSuccess && mine.data ? (
-        <div className="mt-4 rounded-lg border border-border p-4 text-sm">
-          <h3 className="font-medium">Your database identity</h3>
-          <dl className="mt-2 grid gap-2 sm:grid-cols-2">
+        <div className={styles.detailPanel}>
+          <h3 className={styles.strong}>Your database identity</h3>
+          <dl className={styles.twoColumnGrid}>
             <div>
-              <dt className="text-muted-foreground">Database</dt>
-              <dd className="font-mono break-all">{mine.data.database}</dd>
+              <dt className={styles.muted}>Database</dt>
+              <dd className={styles.monoBreakable}>{mine.data.database}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">SQL username</dt>
-              <dd className="font-mono break-all">{mine.data.username}</dd>
+              <dt className={styles.muted}>SQL username</dt>
+              <dd className={styles.monoBreakable}>{mine.data.username}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">SSH account</dt>
-              <dd className="font-mono">{mine.data.sshUser}</dd>
+              <dt className={styles.muted}>SSH account</dt>
+              <dd className={styles.mono}>{mine.data.sshUser}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Key fingerprint</dt>
-              <dd className="font-mono break-all">
+              <dt className={styles.muted}>Key fingerprint</dt>
+              <dd className={styles.monoBreakable}>
                 {mine.data.keyFingerprint}
               </dd>
             </div>
           </dl>
-          <p className="mt-3 text-xs text-muted-foreground">
+          <p className={styles.mutedTinyBelow}>
             Use the operator-provided bastion host, port, and verified host key.
             The tunnel is configured outside this portal.
           </p>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className={styles.actionsBelow}>
             <Button
               size="sm"
               variant="outline"
@@ -138,50 +136,48 @@ function ProjectDatabaseAccess({
       ) : (
         !mine.isLoading &&
         (expectedAbsence(mine.error, 404) || mine.isSuccess) && (
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className={styles.mutedBelow}>
             You do not have a personal database grant for this project.
           </p>
         )
       )}
 
       {grants.isLoading && (
-        <p role="status" className="mt-4 text-sm text-muted-foreground">
+        <p role="status" className={styles.mutedBelow}>
           Loading database grants…
         </p>
       )}
       {grants.isError && !expectedAbsence(grants.error, 403) && (
-        <p role="alert" className="mt-4 text-sm text-destructive">
+        <p role="alert" className={styles.errorBelow}>
           {grants.error.message}
         </p>
       )}
       {grants.data && (
-        <div className="mt-5">
-          <h3 className="font-medium">Project database grants</h3>
+        <div className={styles.sectionGap}>
+          <h3 className={styles.strong}>Project database grants</h3>
           {grants.data.length ? (
-            <ul className="mt-3 divide-y divide-border rounded-lg border border-border text-sm">
+            <ul className={styles.list}>
               {grants.data.map((grant) => (
                 <li
                   key={`${grant.issuer}|${grant.subject}`}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+                  className={styles.listRow}
                 >
                   <div>
-                    <p className="font-medium break-all">
+                    <p className={styles.strongBreakable}>
                       {grant.subject}{' '}
-                      <span className="text-muted-foreground">
+                      <span className={styles.muted}>
                         · {grant.active ? 'active' : 'revoked'}
                       </span>
                     </p>
-                    <p className="text-xs break-all text-muted-foreground">
-                      {grant.issuer}
-                    </p>
-                    <p className="mt-1 text-xs break-all text-muted-foreground">
+                    <p className={styles.mutedTinyBreakable}>{grant.issuer}</p>
+                    <p className={styles.mutedTinyBreakableBelow}>
                       {grant.username} · {grant.keyFingerprint}
                     </p>
                   </div>
                   {grant.active && (
                     <Button
                       size="sm"
-                      variant="destructive"
+                      color="red"
                       onClick={() => setRevoking(grant)}
                     >
                       Revoke
@@ -191,7 +187,7 @@ function ProjectDatabaseAccess({
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-sm text-muted-foreground">
+            <p className={styles.mutedSmallBelowMedium}>
               No human database grants are recorded.
             </p>
           )}
@@ -260,7 +256,7 @@ function CreateDatabaseGrantDialog({
       }}
     >
       <DialogContent
-        className="sm:max-w-xl"
+        className={styles.wideModal}
         showCloseButton={!create.isPending}
       >
         <DialogHeader>
@@ -272,13 +268,13 @@ function CreateDatabaseGrantDialog({
           </DialogDescription>
         </DialogHeader>
         <form
-          className="space-y-4"
+          className={styles.stackLarge}
           onSubmit={(event) => {
             event.preventDefault()
             if (valid) create.mutate()
           }}
         >
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="database-grant-issuer">Issuer</Label>
             <Input
               id="database-grant-issuer"
@@ -291,7 +287,7 @@ function CreateDatabaseGrantDialog({
               }
             />
           </div>
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="database-grant-subject">Subject ID</Label>
             <Input
               id="database-grant-subject"
@@ -304,11 +300,11 @@ function CreateDatabaseGrantDialog({
               }
             />
           </div>
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="database-grant-key">SSH public key</Label>
             <textarea
               id="database-grant-key"
-              className="min-h-20 w-full rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-xs"
+              className={styles.keyInput}
               autoComplete="off"
               spellCheck={false}
               maxLength={256}
@@ -320,7 +316,7 @@ function CreateDatabaseGrantDialog({
             />
           </div>
           {create.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {create.error.message}
             </p>
           )}
@@ -379,7 +375,7 @@ function RevokeDatabaseGrantDialog({
           </DialogDescription>
         </DialogHeader>
         {revoke.isError && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className={styles.error}>
             {revoke.error.message}
           </p>
         )}
@@ -394,7 +390,7 @@ function RevokeDatabaseGrantDialog({
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            color="red"
             disabled={revoke.isPending}
             onClick={() => revoke.mutate()}
           >
@@ -432,7 +428,7 @@ function ReplaceDatabaseKeyDialog({
       }}
     >
       <DialogContent
-        className="sm:max-w-xl"
+        className={styles.wideModal}
         showCloseButton={!replace.isPending}
       >
         <DialogHeader>
@@ -444,17 +440,17 @@ function ReplaceDatabaseKeyDialog({
           </DialogDescription>
         </DialogHeader>
         <form
-          className="space-y-4"
+          className={styles.stackLarge}
           onSubmit={(event) => {
             event.preventDefault()
             if (publicKey.trim()) replace.mutate()
           }}
         >
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="database-replacement-key">New SSH public key</Label>
             <textarea
               id="database-replacement-key"
-              className="min-h-20 w-full rounded-lg border border-input bg-transparent px-3 py-2 font-mono text-xs"
+              className={styles.keyInput}
               autoComplete="off"
               spellCheck={false}
               maxLength={256}
@@ -464,7 +460,7 @@ function ReplaceDatabaseKeyDialog({
             />
           </div>
           {replace.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {replace.error.message}
             </p>
           )}
@@ -545,7 +541,7 @@ function IssueDatabaseCredentialDialog({
         if (!open) close()
       }}
     >
-      <DialogContent className="sm:max-w-xl" showCloseButton={!isIssuing}>
+      <DialogContent className={styles.wideModal} showCloseButton={!isIssuing}>
         <DialogHeader>
           <DialogTitle>
             {result
@@ -559,22 +555,22 @@ function IssueDatabaseCredentialDialog({
           </DialogDescription>
         </DialogHeader>
         {result ? (
-          <div className="space-y-4">
-            <dl className="grid gap-2 text-sm">
+          <div className={styles.stackLarge}>
+            <dl className={styles.detailGrid}>
               <div>
-                <dt className="text-muted-foreground">Database</dt>
-                <dd className="font-mono break-all">{result.database}</dd>
+                <dt className={styles.muted}>Database</dt>
+                <dd className={styles.monoBreakable}>{result.database}</dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Username</dt>
-                <dd className="font-mono break-all">{result.username}</dd>
+                <dt className={styles.muted}>Username</dt>
+                <dd className={styles.monoBreakable}>{result.username}</dd>
               </div>
             </dl>
-            <div className="space-y-2">
+            <div className={styles.stackSmall}>
               <Label htmlFor="database-onetime-password">
                 One-time password
               </Label>
-              <div className="flex gap-2">
+              <div className={styles.actions}>
                 <Input
                   id="database-onetime-password"
                   readOnly
@@ -599,7 +595,7 @@ function IssueDatabaseCredentialDialog({
               </div>
             </div>
             {error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={styles.error}>
                 {error}
               </p>
             )}
@@ -610,9 +606,9 @@ function IssueDatabaseCredentialDialog({
             </DialogFooter>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className={styles.stackLarge}>
             {error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={styles.error}>
                 {error}
               </p>
             )}

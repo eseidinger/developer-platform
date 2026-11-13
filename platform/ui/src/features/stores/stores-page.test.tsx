@@ -1,10 +1,4 @@
-import {
-  cleanup,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react'
+import { cleanup, render, screen, waitFor, within } from '@/test/render'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
@@ -166,6 +160,33 @@ test('creation sends the selected PostgreSQL extension set', async () => {
         'pg_duckdb',
       ],
     }),
+  )
+})
+test('retirement shows the resource scope and requires an explicit confirmation', async () => {
+  vi.mocked(api.getContext).mockResolvedValue({
+    manage: true,
+    platform_admin: false,
+    providers: [{ id: 'postgresql', enabled: true }],
+  })
+  vi.mocked(api.getResources).mockResolvedValue([resource])
+  vi.mocked(api.retireResource).mockResolvedValue({
+    ...resource,
+    state: 'retired',
+  })
+  const { user } = setup()
+
+  await user.click(
+    await screen.findByRole('button', { name: 'Retire resource' }),
+  )
+  const dialog = screen.getByRole('dialog', { name: 'Retire resource' })
+  expect(dialog).toHaveTextContent(
+    'primary: revoke every human and application grant',
+  )
+  expect(api.retireResource).not.toHaveBeenCalled()
+
+  await user.click(within(dialog).getByRole('button', { name: 'Confirm' }))
+  await waitFor(() =>
+    expect(api.retireResource).toHaveBeenCalledWith(resource.resource_id, 1),
   )
 })
 test('creation shows only PostgreSQL and S3 even with stale provider capabilities', async () => {

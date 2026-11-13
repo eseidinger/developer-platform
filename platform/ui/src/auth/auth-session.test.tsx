@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, render, screen, waitFor } from '@/test/render'
 import userEvent from '@testing-library/user-event'
 import { User } from 'oidc-client-ts'
 import { MemoryRouter } from 'react-router-dom'

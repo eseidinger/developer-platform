@@ -1,9 +1,9 @@
 # Platform UI implementation plan
 
 [ADR-023](../../../architecture/decisions/ADR-023-mantine-portal-components.md)
-selects a future Mantine component and styling migration after PLAN-040.
-[PLAN-041](mantine-ui-migration.md) owns that work; the existing stack and
-implementation evidence below describe the current portal.
+selects Mantine components and styling after PLAN-040.
+[PLAN-041](mantine-ui-migration.md) records that migration; the original stack
+and implementation evidence below remain historical.
 
 Status: in progress as of October 14, 2026. Foundation, the authentication
 boundary, the project workspace, and the core developer lifecycle are

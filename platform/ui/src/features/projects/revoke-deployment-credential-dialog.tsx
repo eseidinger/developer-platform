@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -41,7 +42,7 @@ function RevokeDeploymentCredentialDialog({
 
   return (
     <>
-      <Button size="sm" variant="destructive" onClick={() => setOpen(true)}>
+      <Button size="sm" color="red" onClick={() => setOpen(true)}>
         Revoke
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -54,7 +55,7 @@ function RevokeDeploymentCredentialDialog({
             </DialogDescription>
           </DialogHeader>
           {revoke.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {revoke.error.message}
             </p>
           )}
@@ -69,7 +70,7 @@ function RevokeDeploymentCredentialDialog({
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              color="red"
               onClick={() => revoke.mutate()}
               disabled={revoke.isPending}
             >

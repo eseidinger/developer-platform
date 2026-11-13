@@ -1,0 +1,91 @@
+.field > * + * {
+  margin-top: 0.25rem;
+}
+
+.select {
+  min-height: 2.25rem;
+  width: 100%;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-body);
+  padding-inline: 0.5rem;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.select:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.check {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--mantine-spacing-xs);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.checkbox {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.25rem;
+}
+
+.legend {
+  padding-inline: 0.25rem;
+  font-weight: 500;
+}
+
+.strong {
+  font-weight: 500;
+}
+
+.stackSmall > * + *,
+.notice > * + *,
+.outlinedStack > * + * {
+  margin-top: 0.5rem;
+}
+
+.stackLarge > * + * {
+  margin-top: 1rem;
+}
+
+.notice,
+.outlinedStack {
+  border-radius: var(--mantine-radius-md);
+  padding: 0.75rem;
+}
+
+.notice {
+  background: var(--mantine-color-gray-1);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.outlinedStack {
+  border: 1px solid var(--mantine-color-default-border);
+}
+
+.error {
+  color: var(--mantine-color-red-7);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.hint {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}
+
+.wrappable {
+  overflow-wrap: break-word;
+}
+
+.dialogContent {
+  max-height: 90dvh;
+  overflow-y: auto;
+}
+
+@media (min-width: 40em) {
+  .dialogContent {
+    max-width: 42rem;
+  }
+}

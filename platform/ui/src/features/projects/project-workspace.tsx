@@ -2,8 +2,9 @@ import * as React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams, useSearchParams } from 'react-router-dom'
 
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@mantine/core'
+import { Button } from '@mantine/core'
+import styles from './project-workspace.module.css'
 import { useAuth } from '@/auth/auth-context'
 import { DeployProjectDialog } from '@/features/projects/deploy-project-dialog'
 import {
@@ -173,27 +174,21 @@ function ProjectWorkspace() {
   }
 
   return (
-    <section aria-labelledby="project-title" className="max-w-3xl space-y-6">
-      <div className="space-y-3">
-        <Link
-          className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-          to="/"
-        >
+    <section aria-labelledby="project-title" className={styles.workspace}>
+      <div className={styles.stack}>
+        <Link className={styles.mutedLink} to="/">
           Projects
         </Link>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className={styles.headerRow}>
           <div>
-            <h1
-              id="project-title"
-              className="text-3xl font-semibold tracking-tight"
-            >
+            <h1 id="project-title" className={styles.pageTitle}>
               {name}
             </h1>
-            <p className="mt-1 text-muted-foreground">
+            <p className={styles.mutedBelow}>
               Desired revision history and deployment context.
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className={styles.actions}>
             <Button
               variant="outline"
               onClick={() => void refreshProject()}
@@ -209,49 +204,38 @@ function ProjectWorkspace() {
           </div>
         </div>
         <Link
-          className="inline-block rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
+          className={styles.outlineLink}
           to={`/projects/${name}/application-access`}
         >
           Application access
         </Link>
-        <Link
-          className="inline-block rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
-          to={`/projects/${name}/ai`}
-        >
+        <Link className={styles.outlineLink} to={`/projects/${name}/ai`}>
           AI assistance
         </Link>
-        <Link
-          className="inline-block rounded-lg border border-border px-3 py-2 text-sm hover:bg-muted"
-          to={`/projects/${name}/stores`}
-        >
+        <Link className={styles.outlineLink} to={`/projects/${name}/stores`}>
           Data stores
         </Link>
       </div>
 
       {status !== 'authenticated' && (
-        <p className="text-sm text-muted-foreground">
-          Sign in to view this project.
-        </p>
+        <p className={styles.mutedSmall}>Sign in to view this project.</p>
       )}
       {revisionsQuery.isLoading && (
-        <p role="status" className="text-sm text-muted-foreground">
+        <p role="status" className={styles.mutedSmall}>
           Loading project revisions…
         </p>
       )}
       {revisionsQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {revisionsQuery.error.message}
         </p>
       )}
       {operationQuery.data && (
-        <section
-          aria-labelledby="operation-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <h2 id="operation-title" className="text-lg font-medium">
+        <section aria-labelledby="operation-title" className={styles.panel}>
+          <h2 id="operation-title" className={styles.sectionTitle}>
             Deployment operation
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className={styles.mutedSmallBelowMedium}>
             Revision {operationQuery.data.revision}: {operationQuery.data.state}
             ; readiness {operationQuery.data.readinessState}
             {operationQuery.data.readinessReason
@@ -260,49 +244,43 @@ function ProjectWorkspace() {
             .
           </p>
           {operationQuery.data.errorCode && (
-            <p role="alert" className="mt-2 text-sm text-destructive">
+            <p role="alert" className={styles.errorBelow}>
               {operationQuery.data.errorCode}
             </p>
           )}
         </section>
       )}
       {usageQuery.data && (
-        <section
-          aria-labelledby="usage-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <h2 id="usage-title" className="text-lg font-medium">
+        <section aria-labelledby="usage-title" className={styles.panel}>
+          <h2 id="usage-title" className={styles.sectionTitle}>
             Resource usage
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className={styles.mutedSmallBelowMedium}>
             Metrics state: {usageQuery.data.state}
             {usageQuery.data.reason ? ` (${usageQuery.data.reason})` : ''}.
           </p>
           {usageQuery.data.totals && (
-            <dl className="mt-4 grid grid-cols-2 gap-4 rounded-lg border border-border p-4 text-sm">
+            <dl className={styles.detailPanel}>
               <div>
-                <dt className="text-muted-foreground">Total CPU</dt>
-                <dd className="mt-1 font-medium">
+                <dt className={styles.muted}>Total CPU</dt>
+                <dd className={styles.itemTitle}>
                   {usageQuery.data.totals.cpuMillicores} mCPU
                 </dd>
               </div>
               <div>
-                <dt className="text-muted-foreground">Total memory</dt>
-                <dd className="mt-1 font-medium">
+                <dt className={styles.muted}>Total memory</dt>
+                <dd className={styles.itemTitle}>
                   {memoryMebibytes(usageQuery.data.totals.memoryBytes)}
                 </dd>
               </div>
             </dl>
           )}
           {usageQuery.data.pods.length > 0 && (
-            <ul className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">
+            <ul className={styles.smallList}>
               {usageQuery.data.pods.map((pod) => (
-                <li
-                  key={pod.name}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
-                  <span className="font-medium">{pod.name}</span>
-                  <span className="text-muted-foreground">
+                <li key={pod.name} className={styles.listRow}>
+                  <span className={styles.strong}>{pod.name}</span>
+                  <span className={styles.muted}>
                     {pod.cpuMillicores} mCPU ·{' '}
                     {memoryMebibytes(pod.memoryBytes)}
                   </span>
@@ -310,25 +288,22 @@ function ProjectWorkspace() {
               ))}
             </ul>
           )}
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className={styles.mutedTinyBelow}>
             Observed {new Date(usageQuery.data.observedAt).toLocaleString()}.
           </p>
         </section>
       )}
       {usageQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {usageQuery.error.message}
         </p>
       )}
       {inventoryQuery.data && (
-        <section
-          aria-labelledby="inventory-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <h2 id="inventory-title" className="text-lg font-medium">
+        <section aria-labelledby="inventory-title" className={styles.panel}>
+          <h2 id="inventory-title" className={styles.sectionTitle}>
             Deployment inventory
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className={styles.mutedSmallBelowMedium}>
             Inventory state: {inventoryQuery.data.state}
             {inventoryQuery.data.reason
               ? ` (${inventoryQuery.data.reason})`
@@ -336,8 +311,8 @@ function ProjectWorkspace() {
             .
           </p>
           {inventoryQuery.data.deployments.map((deployment) => (
-            <p key={deployment.name} className="mt-2 text-sm">
-              <span className="font-medium">{deployment.name}</span>:{' '}
+            <p key={deployment.name} className={styles.smallBelow}>
+              <span className={styles.strong}>{deployment.name}</span>:{' '}
               {deployment.readyReplicas ?? 'unknown'}/
               {deployment.replicas ?? 'unknown'} ready replicas
             </p>
@@ -345,21 +320,18 @@ function ProjectWorkspace() {
         </section>
       )}
       {inventoryQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {inventoryQuery.error.message}
         </p>
       )}
       {logsQuery.data && (
-        <section
-          aria-labelledby="logs-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <div className="flex items-center justify-between gap-3">
+        <section aria-labelledby="logs-title" className={styles.panel}>
+          <div className={styles.compactHeader}>
             <div>
-              <h2 id="logs-title" className="text-lg font-medium">
+              <h2 id="logs-title" className={styles.sectionTitle}>
                 Recent logs
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className={styles.mutedSmallBelow}>
                 State: {logsQuery.data.state}
                 {logsQuery.data.reason ? ` (${logsQuery.data.reason})` : ''}.
                 {logsQuery.data.truncated ? ' Output is truncated.' : ''}
@@ -374,7 +346,7 @@ function ProjectWorkspace() {
             </Button>
           </div>
           <form
-            className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-3"
+            className={styles.summaryGrid}
             onSubmit={(event) => {
               event.preventDefault()
               setLogFilters({ 'log-search': logSearch, 'log-after': undefined })
@@ -382,7 +354,7 @@ function ProjectWorkspace() {
           >
             <input
               aria-label="Search logs"
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={styles.field}
               value={logSearch}
               maxLength={256}
               onChange={(event) => setLogSearch(event.target.value)}
@@ -390,7 +362,7 @@ function ProjectWorkspace() {
             />
             <input
               aria-label="Log component"
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={styles.field}
               value={logComponent}
               maxLength={32}
               onChange={(event) =>
@@ -403,7 +375,7 @@ function ProjectWorkspace() {
             />
             <input
               aria-label="Log instance"
-              className="h-8 rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={styles.field}
               value={logInstance}
               maxLength={253}
               onChange={(event) =>
@@ -416,7 +388,7 @@ function ProjectWorkspace() {
             />
             <select
               aria-label="Log time range"
-              className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+              className={styles.compactField}
               value={logSinceSeconds}
               onChange={(event) =>
                 setLogFilters({
@@ -433,7 +405,7 @@ function ProjectWorkspace() {
             </select>
             <select
               aria-label="Log line limit"
-              className="h-8 rounded-lg border border-input bg-transparent px-2 text-sm"
+              className={styles.compactField}
               value={logTail}
               onChange={(event) =>
                 setLogFilters({
@@ -451,10 +423,10 @@ function ProjectWorkspace() {
             </Button>
           </form>
           {logsQuery.data.lines.length > 0 && (
-            <ol className="mt-4 max-h-80 space-y-2 overflow-auto rounded-lg bg-muted p-4 text-xs leading-5">
+            <ol className={styles.logPanel}>
               {logsQuery.data.lines.map((line, index) => (
                 <li key={`${line.timestamp}-${line.pod}-${index}`}>
-                  <span className="text-muted-foreground">
+                  <span className={styles.muted}>
                     {line.timestamp} {line.pod}
                   </span>
                   <br />
@@ -465,7 +437,7 @@ function ProjectWorkspace() {
           )}
           {logsQuery.data.nextCursor && (
             <Button
-              className="mt-4"
+              className={styles.marginLarge}
               variant="outline"
               onClick={() =>
                 setLogFilters({
@@ -479,21 +451,18 @@ function ProjectWorkspace() {
         </section>
       )}
       {logsQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {logsQuery.error.message}
         </p>
       )}
       {configurationQuery.data && (
-        <section
-          aria-labelledby="configuration-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <section aria-labelledby="configuration-title" className={styles.panel}>
+          <div className={styles.headerRow}>
             <div>
-              <h2 id="configuration-title" className="text-lg font-medium">
+              <h2 id="configuration-title" className={styles.sectionTitle}>
                 Configuration
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className={styles.mutedSmallBelow}>
                 Revision {configurationQuery.data.revision}; activation{' '}
                 {configurationQuery.data.activationState}
                 {configurationQuery.data.activationReason
@@ -510,48 +479,40 @@ function ProjectWorkspace() {
             />
           </div>
           {Object.keys(configurationQuery.data.values).length ? (
-            <dl className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">
+            <dl className={styles.smallList}>
               {Object.entries(configurationQuery.data.values).map(
                 ([key, value]) => (
-                  <div
-                    key={key}
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-3 px-4 py-3"
-                  >
-                    <dt className="font-medium">{key}</dt>
-                    <dd className="break-words text-muted-foreground">
-                      {value}
-                    </dd>
+                  <div key={key} className={styles.keyValueRow}>
+                    <dt className={styles.strong}>{key}</dt>
+                    <dd className={styles.mutedWrap}>{value}</dd>
                   </div>
                 ),
               )}
             </dl>
           ) : (
-            <p className="mt-2 text-sm">No configuration values.</p>
+            <p className={styles.smallBelow}>No configuration values.</p>
           )}
         </section>
       )}
       {configurationQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {configurationQuery.error.message}
         </p>
       )}
       {dataServicesQuery.data && (
-        <section
-          aria-labelledby="data-services-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <h2 id="data-services-title" className="text-lg font-medium">
+        <section aria-labelledby="data-services-title" className={styles.panel}>
+          <div className={styles.headerRow}>
+            <h2 id="data-services-title" className={styles.sectionTitle}>
               Data services
             </h2>
             <RequestRecoveryDialog name={name} />
           </div>
           {dataServicesQuery.data.services.length === 0 && (
-            <p className="mt-2 text-sm">No named data resources.</p>
+            <p className={styles.smallBelow}>No named data resources.</p>
           )}
           {dataServicesQuery.data.services.map((service) => (
-            <p key={service.resourceId} className="mt-2 text-sm">
-              <span className="font-medium">
+            <p key={service.resourceId} className={styles.smallBelow}>
+              <span className={styles.strong}>
                 {service.type} ({service.name})
               </span>
               : {service.state}
@@ -562,7 +523,7 @@ function ProjectWorkspace() {
             </p>
           ))}
           {dataServicesQuery.data.bindings.map((binding) => (
-            <p key={binding.bindingId} className="mt-2 text-sm">
+            <p key={binding.bindingId} className={styles.smallBelow}>
               {binding.component} binding: {binding.state} /{' '}
               {binding.observedState} · credential{' '}
               {binding.credentialActive ? 'active' : 'not active'}
@@ -570,7 +531,7 @@ function ProjectWorkspace() {
             </p>
           ))}
           {dataServicesQuery.data.latestRecoveryRequest && (
-            <p className="mt-3 text-sm text-muted-foreground">
+            <p className={styles.mutedSmallBelowLarge}>
               Latest recovery request:{' '}
               {dataServicesQuery.data.latestRecoveryRequest.status} (
               {dataServicesQuery.data.latestRecoveryRequest.reason}), requested{' '}
@@ -583,37 +544,32 @@ function ProjectWorkspace() {
         </section>
       )}
       {dataServicesQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {dataServicesQuery.error.message}
         </p>
       )}
 
       {credentialsQuery.data && (
-        <section
-          aria-labelledby="credentials-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <section aria-labelledby="credentials-title" className={styles.panel}>
+          <div className={styles.headerRow}>
             <div>
-              <h2 id="credentials-title" className="text-lg font-medium">
+              <h2 id="credentials-title" className={styles.sectionTitle}>
                 Deployment credentials
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className={styles.mutedSmallBelow}>
                 Credential metadata only. Secret material is never shown here.
               </p>
             </div>
             <CreateDeploymentCredentialDialog name={name} />
           </div>
           {credentialsQuery.data.credentials.length > 0 ? (
-            <ul className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">
+            <ul className={styles.smallList}>
               {credentialsQuery.data.credentials.map((credential) => (
-                <li key={credential.id} className="px-4 py-3">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <span className="font-medium">{credential.name}</span>
-                    <div className="flex items-center gap-2">
-                      <span className="text-muted-foreground">
-                        {credential.status}
-                      </span>
+                <li key={credential.id} className={styles.listCell}>
+                  <div className={styles.headerRow}>
+                    <span className={styles.strong}>{credential.name}</span>
+                    <div className={styles.inlineGroup}>
+                      <span className={styles.muted}>{credential.status}</span>
                       {credential.status === 'active' && (
                         <RotateDeploymentCredentialDialog
                           name={name}
@@ -630,7 +586,7 @@ function ProjectWorkspace() {
                       )}
                     </div>
                   </div>
-                  <p className="mt-1 text-xs text-muted-foreground">
+                  <p className={styles.mutedTinyBelow}>
                     Expires {new Date(credential.expiresAt).toLocaleString()}
                     {credential.lastUsedAt
                       ? ` · last used ${new Date(credential.lastUsedAt).toLocaleString()}`
@@ -641,27 +597,24 @@ function ProjectWorkspace() {
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-sm">No deployment credentials.</p>
+            <p className={styles.smallBelow}>No deployment credentials.</p>
           )}
         </section>
       )}
       {credentialsQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {credentialsQuery.error.message}
         </p>
       )}
       <ProjectGrants name={name} enabled={status === 'authenticated'} />
       {secretsQuery.data && (
-        <section
-          aria-labelledby="secrets-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <section aria-labelledby="secrets-title" className={styles.panel}>
+          <div className={styles.headerRow}>
             <div>
-              <h2 id="secrets-title" className="text-lg font-medium">
+              <h2 id="secrets-title" className={styles.sectionTitle}>
                 Secrets
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className={styles.mutedSmallBelow}>
                 Activation {secretsQuery.data.activationState}
                 {secretsQuery.data.activationReason
                   ? ` (${secretsQuery.data.activationReason})`
@@ -672,18 +625,15 @@ function ProjectWorkspace() {
             <SetSecretDialog name={name} />
           </div>
           {secretsQuery.data.secrets.length > 0 ? (
-            <ul className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">
+            <ul className={styles.smallList}>
               {secretsQuery.data.secrets.map((secret) => (
-                <li
-                  key={secret.name}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
+                <li key={secret.name} className={styles.listRow}>
                   <div>
-                    <p className="font-medium">{secret.name}</p>
-                    <p className="text-muted-foreground">
+                    <p className={styles.strong}>{secret.name}</p>
+                    <p className={styles.muted}>
                       Version {secret.version} · {secret.state}
                     </p>
-                    <div className="mt-2">
+                    <div className={styles.marginSmall}>
                       <SecretActions
                         name={name}
                         secret={secret.name}
@@ -693,7 +643,7 @@ function ProjectWorkspace() {
                     </div>
                   </div>
                   <time
-                    className="text-muted-foreground"
+                    className={styles.muted}
                     dateTime={secret.changedAt ?? undefined}
                   >
                     {secret.changedAt
@@ -704,33 +654,30 @@ function ProjectWorkspace() {
               ))}
             </ul>
           ) : (
-            <p className="mt-2 text-sm">No secret names configured.</p>
+            <p className={styles.smallBelow}>No secret names configured.</p>
           )}
         </section>
       )}
       {secretsQuery.isError && (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={styles.error}>
           {secretsQuery.error.message}
         </p>
       )}
 
       {revisionsQuery.data && (
-        <section
-          aria-labelledby="revisions-title"
-          className="rounded-xl border border-border bg-card p-6 shadow-sm"
-        >
-          <div className="flex flex-wrap items-center justify-between gap-3">
+        <section aria-labelledby="revisions-title" className={styles.panel}>
+          <div className={styles.headerRow}>
             <div>
-              <h2 id="revisions-title" className="text-lg font-medium">
+              <h2 id="revisions-title" className={styles.sectionTitle}>
                 Revisions
               </h2>
-              <p className="mt-1 text-sm text-muted-foreground">
+              <p className={styles.mutedSmallBelow}>
                 {revisionsQuery.data.currentRevision === null
                   ? 'This project is empty. Deploy an application to create its first revision.'
                   : `Current desired revision: ${revisionsQuery.data.currentRevision}.`}
               </p>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className={styles.actions}>
               {revisionsQuery.data.currentRevision !== null && (
                 <RestartProjectDialog
                   name={name}
@@ -748,21 +695,22 @@ function ProjectWorkspace() {
             </div>
           </div>
           {revisionsQuery.data.revisions.length > 0 && (
-            <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+            <ul className={styles.list}>
               {revisionsQuery.data.revisions.map((revision) => (
-                <li
-                  key={revision.revision}
-                  className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
-                >
+                <li key={revision.revision} className={styles.listRow}>
                   <div>
-                    <p className="font-medium">Revision {revision.revision}</p>
-                    <p className="text-sm text-muted-foreground">
+                    <p className={styles.strong}>
+                      Revision {revision.revision}
+                    </p>
+                    <p className={styles.mutedSmall}>
                       {revision.image ?? 'Image unavailable'}
                     </p>
                   </div>
-                  <div className="flex items-center gap-3 text-sm text-muted-foreground">
+                  <div className={styles.mutedGroup}>
                     {revision.current && (
-                      <Badge variant="secondary">Current</Badge>
+                      <Badge variant="light" color="gray">
+                        Current
+                      </Badge>
                     )}
                     {!revision.current &&
                       revisionsQuery.data.currentRevision !== null && (

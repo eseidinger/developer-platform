@@ -1,11 +1,11 @@
 # ADR-023 – Mantine Components for the Portal
 
-Created and accepted: November 12, 2026. Status: **Accepted future direction;
-implementation after PLAN-040**.
+Created and accepted: November 12, 2026. Status: **Implemented November 13,
+2026 under PLAN-041**.
 
 ## Context
 
-The React portal currently uses repository-owned shadcn/Base UI components,
+The React portal originally used repository-owned shadcn/Base UI components,
 Tailwind CSS, and CSS variables under the stack selected in
 [ADR-019](ADR-019-react-ui-technology-stack.md). Its feature screens mostly use
 Button, Dialog, Input, Label, and Badge, but styling and interaction patterns
@@ -29,8 +29,8 @@ operation state, and redaction boundaries. Mantine changes presentation and
 interaction components, not the platform contract.
 
 This decision supersedes ADR-019's shadcn/Base UI and Tailwind component and
-styling selections **for the target portal after migration**. ADR-019 remains
-the record of the current implementation until the migration is complete.
+styling selections. ADR-019 remains the historical record of the original
+implementation.
 
 ## Alternatives and consequences
 

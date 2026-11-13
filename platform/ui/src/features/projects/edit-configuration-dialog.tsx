@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -10,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { Input } from '@mantine/core'
 import {
   updateProjectConfiguration,
   type OperationAccepted,
@@ -101,7 +102,7 @@ function EditConfigurationDialog({
         }}
       >
         <DialogContent
-          className="sm:max-w-xl"
+          className={styles.wideModal}
           showCloseButton={!update.isPending}
         >
           <DialogHeader>
@@ -111,9 +112,9 @@ function EditConfigurationDialog({
               workload. Use Secrets for sensitive values.
             </DialogDescription>
           </DialogHeader>
-          <form className="space-y-3" onSubmit={submit}>
+          <form className={styles.stackMedium} onSubmit={submit}>
             {entries.map((entry, index) => (
-              <div key={index} className="flex gap-2">
+              <div key={index} className={styles.actions}>
                 <Input
                   aria-label={`Configuration name ${index + 1}`}
                   value={entry.name}
@@ -159,12 +160,12 @@ function EditConfigurationDialog({
               Add value
             </Button>
             {formError && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={styles.error}>
                 {formError}
               </p>
             )}
             {update.isError && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={styles.error}>
                 {update.error.message}
               </p>
             )}

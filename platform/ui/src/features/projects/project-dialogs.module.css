@@ -1,0 +1,93 @@
+.actions,
+.actionWrap {
+  display: flex;
+  gap: var(--mantine-spacing-xs);
+}
+
+.actionWrap {
+  flex-wrap: wrap;
+}
+
+.strong,
+.smallStrong {
+  font-weight: 500;
+}
+
+.small,
+.smallStrong,
+.smallStack,
+.smallMediumStack,
+.error,
+.mutedSmall,
+.field {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.mutedTiny {
+  font-size: var(--mantine-font-size-xs);
+}
+
+.muted,
+.mutedSmall,
+.mutedTiny,
+.mutedBulletList,
+.boundedList,
+.indentedList {
+  color: var(--mantine-color-dimmed);
+}
+
+.danger,
+.error {
+  color: var(--mantine-color-red-7);
+}
+
+.field {
+  height: 2rem;
+  width: 100%;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: transparent;
+  padding-inline: 0.625rem;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.bulletList,
+.mutedBulletList,
+.boundedList,
+.indentedList {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+
+.boundedList {
+  max-height: 8rem;
+  overflow: auto;
+}
+
+.indentedList {
+  margin-top: 0.25rem;
+}
+
+.stackSmall > * + *,
+.smallStack > * + * {
+  margin-top: 0.5rem;
+}
+
+.stackMedium > * + *,
+.smallMediumStack > * + * {
+  margin-top: 0.75rem;
+}
+
+.stackLarge > * + * {
+  margin-top: 1rem;
+}
+
+@media (min-width: 40em) {
+  .wideModal {
+    max-width: 36rem;
+  }
+}

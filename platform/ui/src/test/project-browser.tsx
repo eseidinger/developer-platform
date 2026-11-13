@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { createQueryClient } from '@/api/query-client'
+import { PortalThemeProvider } from '@/app/theme'
 import { AuthContext, type AuthContextValue } from '@/auth/auth-context'
 import { HomePage } from '@/features/home/home-page'
 import { ProjectWorkspace } from '@/features/projects/project-workspace'
@@ -19,14 +20,16 @@ const auth: AuthContextValue = {
 const target = document.getElementById('root')
 if (!target) throw new Error('Missing browser fixture root')
 createRoot(target).render(
-  <QueryClientProvider client={createQueryClient()}>
-    <AuthContext.Provider value={auth}>
-      <MemoryRouter>
-        <Routes>
-          <Route path="/" element={<HomePage />} />
-          <Route path="/projects/:name" element={<ProjectWorkspace />} />
-        </Routes>
-      </MemoryRouter>
-    </AuthContext.Provider>
-  </QueryClientProvider>,
+  <PortalThemeProvider>
+    <QueryClientProvider client={createQueryClient()}>
+      <AuthContext.Provider value={auth}>
+        <MemoryRouter>
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/projects/:name" element={<ProjectWorkspace />} />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  </PortalThemeProvider>,
 )

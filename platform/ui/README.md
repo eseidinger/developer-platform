@@ -6,8 +6,9 @@ maintenance guidance belongs in the
 [UI maintainer guide](../../docs/maintainers/ui.md).
 
 This directory contains the React and TypeScript workspace for the Platform
-Control Plane portal. The technology selection is recorded in
-[ADR-019](../../docs/architecture/decisions/ADR-019-react-ui-technology-stack.md).
+Control Plane portal. The component and styling selection is recorded in
+[ADR-023](../../docs/architecture/decisions/ADR-023-mantine-portal-components.md),
+which updates the original [stack decision](../../docs/architecture/decisions/ADR-019-react-ui-technology-stack.md).
 Delivery is sequenced in the
 [UI implementation plan](../../docs/maintainers/delivery/plans/ui.md).
 
@@ -35,12 +36,11 @@ Keycloak/lifecycle journey.
 - React Router 7 and TanStack Query 5
 - OpenAPI TypeScript and `openapi-fetch`
 - React Hook Form, Zod, and Hook Form resolvers
-- shadcn Base Nova components using Base UI primitives
-- Tailwind CSS 4, Class Variance Authority, `cn`, and `tw-animate-css`
-- Lucide icons and the locally bundled Geist Variable font
+- Mantine components and theme with focused CSS modules
+- Locally bundled Geist Variable font
 - Vitest, jsdom, Testing Library, and Playwright
 - Type-aware ESLint, JSX accessibility checks, and strict TypeScript
-- Prettier with Tailwind class sorting, and npm with the committed lockfile
+- Prettier and npm with the committed lockfile
 
 Authentication uses the installed `oidc-client-ts` client. Portal tokens stay in
 memory; protocol transaction state uses session storage across the redirect. The
@@ -81,7 +81,7 @@ runs this same command. Accessibility lint uses `eslint-plugin-jsx-a11y-x`,
 whose declared peer range supports the project's ESLint 10; the original plugin
 currently supports up to ESLint 9.
 
-`format` applies Prettier formatting and Tailwind class ordering; `format:check`
+`format` applies Prettier formatting; `format:check`
 checks without writing. Generated API types, build output, and browser-test
 artifacts are excluded. Markdown uses the repository's Markdown tools.
 

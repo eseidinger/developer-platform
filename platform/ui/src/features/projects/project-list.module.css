@@ -1,0 +1,82 @@
+.panel {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-body);
+  padding: 1.5rem;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+}
+
+.heading {
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 500;
+}
+
+.intro,
+.message,
+.status {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.intro {
+  margin-top: 0.25rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--mantine-spacing-xs);
+}
+
+.filter {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+  margin-top: 1rem;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.message,
+.error,
+.list {
+  margin-top: 1rem;
+}
+
+.error {
+  color: var(--mantine-color-red-7);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.list {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.listItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.listItem + .listItem {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.projectLink {
+  font-weight: 500;
+  text-underline-offset: 4px;
+}
+
+.projectLink:hover {
+  text-decoration: underline;
+}

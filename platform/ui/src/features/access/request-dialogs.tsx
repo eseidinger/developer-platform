@@ -23,6 +23,7 @@ import {
   type ServiceAccess,
   type ServiceAction,
 } from './access-api'
+import styles from './request-dialogs.module.css'
 
 const humanLabels: Record<HumanAction, string> = {
   approve: 'Approve human request',
@@ -79,7 +80,7 @@ export function HumanActionDialog({
         )
       }
     >
-      <dl className="space-y-1 text-sm break-all">
+      <dl className={styles.detailList}>
         <dt>Request</dt>
         <dd>{resource.id}</dd>
         <dt>Identity issuer / subject</dt>
@@ -257,7 +258,7 @@ export function ServiceActionDialog({
         )
       }
     >
-      <p className="text-sm break-all">
+      <p className={styles.detail}>
         Request {resource.id}; state {resource.state}.
       </p>
       {action === 'approve' && (

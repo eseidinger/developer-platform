@@ -40,10 +40,9 @@ issuing an SSH lease; replacing your key ends existing leases. Console-only
 access needs no key.
 
 PostgreSQL uses pgAdmin SSO and the host `store-access` inside that console. The
-separately labelled `PGHOST` is for private native clients. RustFS, Qdrant,
-OpenSearch Dashboards and Neo4j Browser use lease-scoped launch sessions plus
-native credentials. Neo4j Community grants full instance access and has no
-read-only mode. Expiry, revocation and permission changes fence connections.
+separately labelled `PGHOST` is for private native clients. S3 uses a
+lease-scoped launch session and native credentials. Expiry, revocation and
+permission changes fence connections.
 Credential values remain in dialog memory and are discarded on close or expiry.
 See [human store access](database-access.md) and the
 [operator store guide](../operators/data-stores.md) for provider-specific steps

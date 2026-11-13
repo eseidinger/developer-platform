@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -10,8 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Input } from '@mantine/core'
+import { InputLabel as Label } from '@mantine/core'
 import {
   rotateDeploymentCredential,
   type OneTimeDeploymentCredential,
@@ -81,7 +82,10 @@ function RotateDeploymentCredentialDialog({
         Rotate
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent className="sm:max-w-xl" showCloseButton={!isSubmitting}>
+        <DialogContent
+          className={styles.wideModal}
+          showCloseButton={!isSubmitting}
+        >
           <DialogHeader>
             <DialogTitle>
               {result
@@ -95,7 +99,7 @@ function RotateDeploymentCredentialDialog({
             </DialogDescription>
           </DialogHeader>
           {result ? (
-            <div className="space-y-3">
+            <div className={styles.stackMedium}>
               <CredentialField
                 label="Token endpoint"
                 value={result.tokenEndpoint}
@@ -113,7 +117,7 @@ function RotateDeploymentCredentialDialog({
                 secret
               />
               {error && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={styles.error}>
                   {error}
                 </p>
               )}
@@ -125,10 +129,10 @@ function RotateDeploymentCredentialDialog({
             </div>
           ) : (
             <form
-              className="space-y-4"
+              className={styles.stackLarge}
               onSubmit={(event) => void submit(event)}
             >
-              <div className="space-y-2">
+              <div className={styles.stackSmall}>
                 <Label htmlFor={`rotation-expiry-${credentialId}`}>
                   Replacement lifetime in days
                 </Label>
@@ -144,7 +148,7 @@ function RotateDeploymentCredentialDialog({
                   disabled={isSubmitting}
                 />
               </div>
-              <div className="space-y-2">
+              <div className={styles.stackSmall}>
                 <Label htmlFor={`rotation-overlap-${credentialId}`}>
                   Predecessor overlap in hours
                 </Label>
@@ -161,7 +165,7 @@ function RotateDeploymentCredentialDialog({
                 />
               </div>
               {error && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={styles.error}>
                   {error}
                 </p>
               )}
@@ -198,9 +202,9 @@ function CredentialField({
   secret?: boolean
 }) {
   return (
-    <div className="space-y-2">
+    <div className={styles.stackSmall}>
       <Label>{label}</Label>
-      <div className="flex gap-2">
+      <div className={styles.actions}>
         <Input readOnly type={secret ? 'password' : 'text'} value={value} />
         <Button type="button" variant="outline" onClick={onCopy}>
           Copy

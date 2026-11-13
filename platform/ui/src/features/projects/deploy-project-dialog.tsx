@@ -1,10 +1,11 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -13,8 +14,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Input } from '@mantine/core'
+import { InputLabel as Label } from '@mantine/core'
 import {
   deployProject,
   type OperationAccepted,
@@ -80,14 +81,14 @@ function DeployProjectDialog({
             </DialogDescription>
           </DialogHeader>
           <form
-            className="space-y-4"
+            className={styles.stackLarge}
             onSubmit={(event) =>
               void form.handleSubmit((values) => deployment.mutate(values))(
                 event,
               )
             }
           >
-            <div className="space-y-2">
+            <div className={styles.stackSmall}>
               <Label htmlFor="deployment-image">Container image</Label>
               <Input
                 id="deployment-image"
@@ -96,12 +97,12 @@ function DeployProjectDialog({
                 {...form.register('image')}
               />
               {form.formState.errors.image && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={styles.error}>
                   {form.formState.errors.image.message}
                 </p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className={styles.stackSmall}>
               <Label htmlFor="deployment-port">Port</Label>
               <Input
                 id="deployment-port"
@@ -112,16 +113,16 @@ function DeployProjectDialog({
                 {...form.register('port', { valueAsNumber: true })}
               />
               {form.formState.errors.port && (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={styles.error}>
                   {form.formState.errors.port.message}
                 </p>
               )}
             </div>
-            <div className="space-y-2">
+            <div className={styles.stackSmall}>
               <Label htmlFor="deployment-probe">Probe profile</Label>
               <select
                 id="deployment-probe"
-                className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+                className={styles.field}
                 {...form.register('probe_profile')}
               >
                 <option value="status">HTTP 200 status</option>
@@ -129,7 +130,7 @@ function DeployProjectDialog({
               </select>
             </div>
             {deployment.isError && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={styles.error}>
                 {deployment.error.message}
               </p>
             )}

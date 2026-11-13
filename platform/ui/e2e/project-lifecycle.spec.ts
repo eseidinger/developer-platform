@@ -1,6 +1,27 @@
 import { expect, test } from '@playwright/test'
 import { projectFixture } from './project-fixture.ts'
 
+test('project creation returns keyboard focus to its trigger at a narrow width', async ({
+  page,
+}) => {
+  await projectFixture(page)
+  await page.setViewportSize({ width: 390, height: 844 })
+  await page.goto('/e2e/project-harness.html')
+
+  const trigger = page.getByRole('button', { name: 'New project' })
+  await trigger.focus()
+  await page.keyboard.press('Enter')
+  await expect(page.getByLabel('Project name')).toBeFocused()
+  await page.keyboard.press('Escape')
+  await expect(page.getByRole('dialog')).toBeHidden()
+  await expect(trigger).toBeFocused()
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth > window.innerWidth,
+    ),
+  ).toBe(false)
+})
+
 test('creates, deploys, rolls back, and retires a project through the portal', async ({
   page,
 }) => {

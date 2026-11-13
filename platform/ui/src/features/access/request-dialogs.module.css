@@ -1,0 +1,9 @@
+.detailList,
+.detail {
+  overflow-wrap: anywhere;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.detailList > * + * {
+  margin-top: 0.25rem;
+}

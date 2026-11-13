@@ -1,35 +1,28 @@
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '@/auth/auth-context'
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
+import styles from './layout.module.css'
 
 function AppLayout() {
   const { status, signOut } = useAuth()
   return (
-    <div className="min-h-svh bg-background text-foreground">
-      <a
-        className="sr-only fixed top-4 left-4 z-50 rounded-md bg-primary px-3 py-2 text-primary-foreground focus:not-sr-only"
-        href="#main-content"
-      >
+    <div className={styles.shell}>
+      <a className={styles.skipLink} href="#main-content">
         Skip to content
       </a>
-      <header className="border-b border-border bg-background">
-        <div className="mx-auto flex min-h-16 max-w-7xl items-center px-4 sm:px-6 lg:px-8">
-          <NavLink className="font-semibold tracking-tight" to="/">
+      <header className={styles.header}>
+        <div className={styles.headerInner}>
+          <NavLink className={styles.brand} to="/">
             Developer Platform
           </NavLink>
-          <span className="ml-3 text-sm text-muted-foreground">
-            Control Plane
-          </span>
-          <nav className="ml-auto" aria-label="Primary navigation">
-            <NavLink
-              className="rounded-md px-3 py-2 text-sm"
-              to="/store-access"
-            >
+          <span className={styles.subtitle}>Control Plane</span>
+          <nav className={styles.navigation} aria-label="Primary navigation">
+            <NavLink className={styles.navLink} to="/store-access">
               My store access
             </NavLink>
             <NavLink
               className={({ isActive }) =>
-                `rounded-md px-3 py-2 text-sm font-medium ${isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`
+                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
               }
               to="/"
               end
@@ -38,7 +31,7 @@ function AppLayout() {
             </NavLink>
             <NavLink
               className={({ isActive }) =>
-                `rounded-md px-3 py-2 text-sm font-medium ${isActive ? 'bg-muted text-foreground' : 'text-muted-foreground hover:text-foreground'}`
+                `${styles.navLink} ${isActive ? styles.navLinkActive : ''}`
               }
               to="/platform/administration"
             >
@@ -48,7 +41,7 @@ function AppLayout() {
           {status === 'authenticated' && (
             <Button
               variant="outline"
-              className="ml-3"
+              className={styles.logout}
               onClick={() => void signOut()}
             >
               Log out
@@ -56,10 +49,7 @@ function AppLayout() {
           )}
         </div>
       </header>
-      <main
-        id="main-content"
-        className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8"
-      >
+      <main id="main-content" className={styles.main}>
         <Outlet />
       </main>
     </div>

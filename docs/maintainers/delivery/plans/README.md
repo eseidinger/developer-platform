@@ -13,8 +13,8 @@ Phase 7–9 plans below. Those plans remain for implementation history and
 evidence. [PLAN-039](storage-scope-reduction.md) now owns retirement, migration,
 source cleanup, and capacity verification.
 [PLAN-040](postgresql-extension-expansion.md) follows it with four PostgreSQL
-extensions. [PLAN-041](mantine-ui-migration.md) follows PLAN-040 with the
-portal's Mantine migration.
+extensions. [PLAN-041](mantine-ui-migration.md) records the portal's Mantine
+migration after PLAN-040.
 
 - [Deployed Platform API acceptance suite](deployed-api-acceptance.md) —
   proposed first installed-platform test stage
@@ -27,7 +27,7 @@ portal's Mantine migration.
   package 5.6 owner-accepted
 - [CLI implementation and complete project administration](cli.md)
 - [UI implementation](ui.md)
-- [Mantine UI migration](mantine-ui-migration.md) — PLAN-041; follows PLAN-040
+- [Mantine UI migration](mantine-ui-migration.md) — PLAN-041; after PLAN-040
   while preserving portal behavior and API boundaries
 - [Storage scope reduction](storage-scope-reduction.md) — PLAN-039; retain
   PostgreSQL and S3, retire other providers, and verify workload capacity

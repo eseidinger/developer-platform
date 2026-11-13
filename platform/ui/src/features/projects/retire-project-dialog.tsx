@@ -1,8 +1,9 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { Input } from '@mantine/core'
 import {
   getRetirementPreview,
   retireProject,
@@ -62,12 +63,12 @@ function RetireProjectDialog({ name }: { name: string }) {
   )
   return (
     <>
-      <Button variant="destructive" onClick={() => setOpen(true)}>
+      <Button color="red" onClick={() => setOpen(true)}>
         Retire project
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
-          className="sm:max-w-xl"
+          className={styles.wideModal}
           showCloseButton={!retire.isPending}
         >
           <DialogHeader>
@@ -80,28 +81,28 @@ function RetireProjectDialog({ name }: { name: string }) {
             </DialogDescription>
           </DialogHeader>
           {preview.isLoading && (
-            <p role="status" className="text-sm text-muted-foreground">
+            <p role="status" className={styles.mutedSmall}>
               Loading retirement scope…
             </p>
           )}
           {preview.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {preview.error.message}
             </p>
           )}
           {preview.data && (
             <>
-              <div className="space-y-2 text-sm">
-                <p className="font-medium">Will remove</p>
-                <ul className="max-h-32 list-disc overflow-auto pl-5 text-muted-foreground">
+              <div className={styles.smallStack}>
+                <p className={styles.strong}>Will remove</p>
+                <ul className={styles.boundedList}>
                   {preview.data.removes.map((resource) => (
                     <li key={`${resource.kind}-${resource.name}`}>
                       {resource.kind} {resource.name}
                     </li>
                   ))}
                 </ul>
-                <p className="font-medium">Will retain</p>
-                <ul className="list-disc pl-5 text-muted-foreground">
+                <p className={styles.strong}>Will retain</p>
+                <ul className={styles.mutedBulletList}>
                   {Object.entries(preview.data.retains).map(([key, value]) => (
                     <li key={key}>
                       {key}: {String(value)}
@@ -110,11 +111,11 @@ function RetireProjectDialog({ name }: { name: string }) {
                 </ul>
               </div>
               {preview.data.stores.length > 0 && (
-                <div className="text-sm">
-                  <p className="font-medium">
+                <div className={styles.small}>
+                  <p className={styles.strong}>
                     Stores to retire (data retained)
                   </p>
-                  <ul className="list-disc pl-5">
+                  <ul className={styles.bulletList}>
                     {preview.data.stores.map((store) => (
                       <li key={store.id}>
                         {store.name} ({store.id})
@@ -123,18 +124,18 @@ function RetireProjectDialog({ name }: { name: string }) {
                   </ul>
                 </div>
               )}
-              <p className="text-sm">
+              <p className={styles.small}>
                 Named store grants to revoke: {preview.data.storeGrantCount}
               </p>
               {preview.data.blockers.length > 0 ? (
-                <p role="alert" className="text-sm text-destructive">
+                <p role="alert" className={styles.error}>
                   Retirement is blocked: {preview.data.blockers.join(', ')}.
                 </p>
               ) : (
-                <div className="space-y-2">
+                <div className={styles.stackSmall}>
                   <label
                     htmlFor="retirement-confirmation"
-                    className="text-sm font-medium"
+                    className={styles.smallStrong}
                   >
                     Type {name} to confirm
                   </label>
@@ -150,13 +151,13 @@ function RetireProjectDialog({ name }: { name: string }) {
             </>
           )}
           {retirementStatus === 'retiring' && (
-            <p role="status" className="text-sm text-muted-foreground">
+            <p role="status" className={styles.mutedSmall}>
               Namespace deletion is still in progress. Repeat the confirmed
               request to complete retirement.
             </p>
           )}
           {retire.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {retire.error.message}
             </p>
           )}
@@ -171,7 +172,7 @@ function RetireProjectDialog({ name }: { name: string }) {
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              color="red"
               onClick={() => retire.mutate()}
               disabled={!canRetire || retire.isPending}
             >

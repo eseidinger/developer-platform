@@ -1,0 +1,125 @@
+.shell {
+  min-height: 100svh;
+  background: var(--mantine-color-body);
+  color: var(--mantine-color-text);
+}
+
+.skipLink {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.skipLink:focus {
+  position: fixed;
+  z-index: 50;
+  top: 1rem;
+  left: 1rem;
+  width: auto;
+  height: auto;
+  clip: auto;
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-dark-9);
+  color: white;
+  padding: 0.5rem 0.75rem;
+}
+
+.header {
+  border-bottom: 1px solid var(--mantine-color-default-border);
+  background: var(--mantine-color-body);
+}
+
+.headerInner,
+.main {
+  max-width: 80rem;
+  margin-inline: auto;
+  padding-inline: 1rem;
+}
+
+.headerInner {
+  display: flex;
+  min-height: 4rem;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-block: 0.75rem;
+}
+
+.brand {
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.subtitle {
+  margin-left: 0.75rem;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-sm);
+}
+
+.navigation {
+  display: flex;
+  flex-wrap: wrap;
+  order: 3;
+  width: 100%;
+}
+
+.navLink {
+  border-radius: var(--mantine-radius-md);
+  padding: 0.5rem 0.75rem;
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-sm);
+  font-weight: 500;
+}
+
+.navLink:hover,
+.navLink:focus-visible {
+  color: var(--mantine-color-text);
+}
+
+.navLinkActive {
+  background: var(--mantine-color-gray-1);
+  color: var(--mantine-color-text);
+}
+
+.logout {
+  margin-left: auto;
+}
+
+.main {
+  padding-block: 2rem;
+}
+
+@media (min-width: 40em) {
+  .headerInner,
+  .main {
+    padding-inline: 1.5rem;
+  }
+}
+
+@media (min-width: 64em) {
+  .headerInner,
+  .main {
+    padding-inline: 2rem;
+  }
+}
+
+@media (min-width: 48em) {
+  .headerInner {
+    flex-wrap: nowrap;
+    gap: 0;
+    padding-block: 0;
+  }
+
+  .navigation {
+    order: 0;
+    width: auto;
+    margin-left: auto;
+  }
+
+  .logout {
+    margin-left: 0.75rem;
+  }
+}

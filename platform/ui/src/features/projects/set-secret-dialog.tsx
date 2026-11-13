@@ -1,7 +1,8 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useQueryClient } from '@tanstack/react-query'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -10,8 +11,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Input } from '@mantine/core'
+import { InputLabel as Label } from '@mantine/core'
 import { setProjectSecret } from '@/features/projects/projects-api'
 
 function SetSecretDialog({ name }: { name: string }) {
@@ -78,8 +79,11 @@ function SetSecretDialog({ name }: { name: string }) {
               rotates its value and restarts the workload.
             </DialogDescription>
           </DialogHeader>
-          <form className="space-y-4" onSubmit={(event) => void submit(event)}>
-            <div className="space-y-2">
+          <form
+            className={styles.stackLarge}
+            onSubmit={(event) => void submit(event)}
+          >
+            <div className={styles.stackSmall}>
               <Label htmlFor="secret-name">Name</Label>
               <Input
                 id="secret-name"
@@ -89,7 +93,7 @@ function SetSecretDialog({ name }: { name: string }) {
                 disabled={isSubmitting}
               />
             </div>
-            <div className="space-y-2">
+            <div className={styles.stackSmall}>
               <Label htmlFor="secret-value">Value</Label>
               <Input
                 id="secret-value"
@@ -101,7 +105,7 @@ function SetSecretDialog({ name }: { name: string }) {
               />
             </div>
             {error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" className={styles.error}>
                 {error}
               </p>
             )}

@@ -2,6 +2,7 @@ import * as React from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useAuth } from '@/auth/auth-context'
+import styles from './auth-callback-page.module.css'
 
 function AuthCallbackPage() {
   const { completeSignIn, error, status } = useAuth()
@@ -42,24 +43,21 @@ function AuthCallbackPage() {
 
   if (error) {
     return (
-      <section aria-labelledby="callback-title" className="max-w-xl space-y-3">
-        <h1
-          id="callback-title"
-          className="text-2xl font-semibold tracking-tight"
-        >
+      <section aria-labelledby="callback-title" className={styles.panel}>
+        <h1 id="callback-title" className={styles.heading}>
           Sign-in could not be completed
         </h1>
-        <p className="text-muted-foreground">{error}</p>
+        <p className={styles.message}>{error}</p>
       </section>
     )
   }
 
   return (
-    <section aria-labelledby="callback-title" className="max-w-xl space-y-3">
-      <h1 id="callback-title" className="text-2xl font-semibold tracking-tight">
+    <section aria-labelledby="callback-title" className={styles.panel}>
+      <h1 id="callback-title" className={styles.heading}>
         Completing sign-in
       </h1>
-      <p className="text-muted-foreground">
+      <p className={styles.message}>
         Verifying the identity-provider response.
       </p>
     </section>

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { createQueryClient } from '@/api/query-client'
+import { PortalThemeProvider } from '@/app/theme'
 import { AuthContext, type AuthContextValue } from '@/auth/auth-context'
 import { ApplicationAccessPage } from '@/features/access/application-access-page'
 import '../index.css'
@@ -21,20 +22,22 @@ const view = params.get('view') ?? 'overview'
 const target = document.getElementById('root')
 if (!target) throw new Error('Missing browser fixture root')
 createRoot(target).render(
-  <QueryClientProvider client={createQueryClient()}>
-    <AuthContext.Provider value={auth}>
-      <MemoryRouter
-        initialEntries={[
-          `/projects/${project}/application-access?view=${view}`,
-        ]}
-      >
-        <Routes>
-          <Route
-            path="/projects/:name/application-access"
-            element={<ApplicationAccessPage />}
-          />
-        </Routes>
-      </MemoryRouter>
-    </AuthContext.Provider>
-  </QueryClientProvider>,
+  <PortalThemeProvider>
+    <QueryClientProvider client={createQueryClient()}>
+      <AuthContext.Provider value={auth}>
+        <MemoryRouter
+          initialEntries={[
+            `/projects/${project}/application-access?view=${view}`,
+          ]}
+        >
+          <Routes>
+            <Route
+              path="/projects/:name/application-access"
+              element={<ApplicationAccessPage />}
+            />
+          </Routes>
+        </MemoryRouter>
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  </PortalThemeProvider>,
 )

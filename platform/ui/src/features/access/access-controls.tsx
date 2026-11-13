@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useMutation } from '@tanstack/react-query'
 
 import { ApiError } from '@/api/errors'
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -11,22 +11,21 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Input } from '@mantine/core'
+import { InputLabel as Label } from '@mantine/core'
 import type { Group, Policy, Resource } from './access-api'
 import { AccessEvents } from './access-events'
+import styles from './access-controls.module.css'
 
-export const selectClass =
-  'min-h-9 w-full rounded-lg border border-input bg-background px-2 text-sm'
 export function Field({
   label,
   ...props
-}: React.ComponentProps<typeof Input> & { label: string }) {
+}: Omit<React.ComponentProps<'input'>, 'size'> & { label: string }) {
   const id = React.useId()
   return (
-    <div className="space-y-1">
+    <div className={styles.field}>
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} {...props} />
+      <Input id={id} data-autofocus {...props} />
     </div>
   )
 }
@@ -37,9 +36,9 @@ export function Choice({
 }: React.ComponentProps<'select'> & { label: string }) {
   const id = React.useId()
   return (
-    <div className="space-y-1">
+    <div className={styles.field}>
       <Label htmlFor={id}>{label}</Label>
-      <select id={id} className={selectClass} {...props}>
+      <select id={id} className={styles.select} {...props}>
         {children}
       </select>
     </div>
@@ -50,8 +49,8 @@ export function Check({
   ...props
 }: React.ComponentProps<'input'> & { label: string }) {
   return (
-    <label className="flex items-start gap-2 text-sm">
-      <input className="mt-1 size-4 shrink-0" type="checkbox" {...props} />
+    <label className={styles.check}>
+      <input className={styles.checkbox} type="checkbox" {...props} />
       <span>{label}</span>
     </label>
   )
@@ -68,8 +67,8 @@ export function GroupPicker({
   label?: string
 }) {
   return (
-    <fieldset className="space-y-2 rounded-lg border border-border p-3">
-      <legend className="px-1 font-medium">{label}</legend>
+    <fieldset className={styles.outlinedStack}>
+      <legend className={styles.legend}>{label}</legend>
       {groups.length ? (
         groups.map((group) => (
           <Check
@@ -91,7 +90,7 @@ export function GroupPicker({
           first.
         </p>
       )}
-      <p className="text-xs text-muted-foreground">
+      <p className={styles.hint}>
         Membership in any selected group permits the matching routes.
       </p>
     </fieldset>
@@ -112,13 +111,13 @@ export function RouteSummary({
       )
     : policy.routes
   return (
-    <div className="space-y-2 rounded-lg bg-muted p-3 text-sm">
-      <p className="font-medium">Permitted routes</p>
+    <div className={styles.notice}>
+      <p className={styles.strong}>Permitted routes</p>
       {routes.length ? (
-        <ul className="space-y-2">
+        <ul className={styles.stackSmall}>
           {routes.map((route) => (
-            <li key={route.name} className="break-words">
-              <span className="font-medium">{route.name}</span>:{' '}
+            <li key={route.name} className={styles.wrappable}>
+              <span className={styles.strong}>{route.name}</span>:{' '}
               {route.match.methods.join(', ')}{' '}
               {route.match.path ?? route.match.pathPrefix} (
               {route.match.path ? 'exact' : 'segment prefix'}),{' '}
@@ -227,7 +226,7 @@ export function AccessDialog({
       }}
     >
       <DialogContent
-        className="max-h-[90dvh] overflow-y-auto sm:max-w-2xl"
+        className={styles.dialogContent}
         showCloseButton={!mutation.isPending && !reloading}
         finalFocus={() =>
           returnFocus.current?.isConnected
@@ -240,7 +239,7 @@ export function AccessDialog({
           <DialogDescription>{description}</DialogDescription>
         </DialogHeader>
         <form
-          className="space-y-4"
+          className={styles.stackLarge}
           onSubmit={(event) => {
             event.preventDefault()
             if (
@@ -256,7 +255,7 @@ export function AccessDialog({
         >
           <fieldset
             disabled={mutation.isPending || reloading}
-            className="space-y-4"
+            className={styles.stackLarge}
           >
             {children}
           </fieldset>
@@ -267,12 +266,12 @@ export function AccessDialog({
             </p>
           )}
           {mutation.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {mutation.error.message}
             </p>
           )}
           {reloadRequired && (
-            <div className="space-y-2">
+            <div className={styles.stackSmall}>
               <p>
                 The resource changed or the action conflicts with its state.
                 Reload and review before submitting again.
@@ -288,7 +287,7 @@ export function AccessDialog({
             </div>
           )}
           {reloadError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {reloadError}
             </p>
           )}

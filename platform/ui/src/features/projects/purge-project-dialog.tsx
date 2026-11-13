@@ -1,8 +1,9 @@
+import styles from './project-dialogs.module.css'
 import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -11,7 +12,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
+import { Input } from '@mantine/core'
 import { getPurgePreview, purgeProject } from '@/features/projects/projects-api'
 
 function PurgeProjectDialog({ name }: { name: string }) {
@@ -50,12 +51,12 @@ function PurgeProjectDialog({ name }: { name: string }) {
 
   return (
     <>
-      <Button variant="destructive" onClick={() => setOpen(true)}>
+      <Button color="red" onClick={() => setOpen(true)}>
         Permanently purge
       </Button>
       <Dialog open={open} onOpenChange={handleOpenChange}>
         <DialogContent
-          className="sm:max-w-xl"
+          className={styles.wideModal}
           showCloseButton={!purge.isPending}
         >
           <DialogHeader>
@@ -68,20 +69,20 @@ function PurgeProjectDialog({ name }: { name: string }) {
             </DialogDescription>
           </DialogHeader>
           {preview.isLoading && (
-            <p role="status" className="text-sm text-muted-foreground">
+            <p role="status" className={styles.mutedSmall}>
               Loading permanent-deletion scope…
             </p>
           )}
           {preview.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {preview.error.message}
             </p>
           )}
           {preview.data && (
-            <div className="space-y-3 text-sm">
+            <div className={styles.smallMediumStack}>
               <div>
-                <p className="font-medium">Will permanently remove</p>
-                <ul className="mt-1 list-disc pl-5 text-muted-foreground">
+                <p className={styles.strong}>Will permanently remove</p>
+                <ul className={styles.indentedList}>
                   <li>Database: {preview.data.database}</li>
                   <li>Database role: {preview.data.role}</li>
                   {preview.data.catalog.map((item) => (
@@ -89,12 +90,12 @@ function PurgeProjectDialog({ name }: { name: string }) {
                   ))}
                 </ul>
               </div>
-              <p className="text-muted-foreground">
+              <p className={styles.muted}>
                 Audit records retained:{' '}
                 {preview.data.auditRecordsRetained ? 'yes' : 'no'}.
               </p>
               {pendingCredentials.length > 0 ? (
-                <p role="alert" className="text-destructive">
+                <p role="alert" className={styles.danger}>
                   Purge is blocked until credential cleanup completes:{' '}
                   {pendingCredentials
                     .map(([status, count]) => `${count} ${status}`)
@@ -102,8 +103,8 @@ function PurgeProjectDialog({ name }: { name: string }) {
                   .
                 </p>
               ) : (
-                <div className="space-y-2">
-                  <label htmlFor="purge-confirmation" className="font-medium">
+                <div className={styles.stackSmall}>
+                  <label htmlFor="purge-confirmation" className={styles.strong}>
                     Type {name} to permanently purge it
                   </label>
                   <Input
@@ -118,7 +119,7 @@ function PurgeProjectDialog({ name }: { name: string }) {
             </div>
           )}
           {purge.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {purge.error.message}
             </p>
           )}
@@ -133,7 +134,7 @@ function PurgeProjectDialog({ name }: { name: string }) {
             </Button>
             <Button
               type="button"
-              variant="destructive"
+              color="red"
               onClick={() => purge.mutate()}
               disabled={!canPurge || purge.isPending}
             >

@@ -2,7 +2,7 @@ import * as React from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { ApiError } from '@/api/errors'
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   Dialog,
   DialogContent,
@@ -11,8 +11,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Input } from '@mantine/core'
+import { InputLabel as Label } from '@mantine/core'
+import styles from './project-grants.module.css'
 import {
   deleteProjectGrant,
   getProjectGrants,
@@ -41,21 +42,15 @@ function ProjectGrants({ name, enabled }: { name: string; enabled: boolean }) {
     return null
   if (grants.isLoading)
     return (
-      <section
-        aria-label="Project access"
-        className="rounded-xl border border-border bg-card p-6 text-sm text-muted-foreground"
-      >
+      <section aria-label="Project access" className={styles.emptyPanel}>
         Loading project access…
       </section>
     )
   if (grants.isError)
     return (
-      <section
-        aria-label="Project access"
-        className="rounded-xl border border-border bg-card p-6"
-      >
-        <h2 className="text-lg font-medium">Project access</h2>
-        <p role="alert" className="mt-2 text-sm text-destructive">
+      <section aria-label="Project access" className={styles.panel}>
+        <h2 className={styles.sectionTitle}>Project access</h2>
+        <p role="alert" className={styles.errorBelow}>
           {grants.error.message}
         </p>
       </section>
@@ -63,16 +58,13 @@ function ProjectGrants({ name, enabled }: { name: string; enabled: boolean }) {
   if (!grants.data) return null
 
   return (
-    <section
-      aria-labelledby="access-title"
-      className="rounded-xl border border-border bg-card p-6"
-    >
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <section aria-labelledby="access-title" className={styles.panel}>
+      <div className={styles.header}>
         <div>
-          <h2 id="access-title" className="text-lg font-medium">
+          <h2 id="access-title" className={styles.sectionTitle}>
             Project access
           </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <p className={styles.mutedSmallBelow}>
             Roles are enforced by the API on every request. Revoking access
             takes effect on the recipient’s next request.
           </p>
@@ -92,27 +84,25 @@ function ProjectGrants({ name, enabled }: { name: string; enabled: boolean }) {
         </Button>
       </div>
       {grants.data.grants.length ? (
-        <ul className="mt-4 divide-y divide-border rounded-lg border border-border text-sm">
+        <ul className={styles.grantList}>
           {grants.data.grants.map((grant) => (
             <li
               key={`${grant.issuer}|${grant.subject}`}
-              className="flex flex-wrap items-center justify-between gap-3 px-4 py-3"
+              className={styles.grantRow}
             >
               <div>
-                <p className="font-medium">
+                <p className={styles.strong}>
                   {grant.displayName ?? grant.subject}
                 </p>
-                <p className="text-xs break-all text-muted-foreground">
+                <p className={styles.identifier}>
                   {grant.issuer} · {grant.subject}
                 </p>
-                <p className="mt-1 text-xs text-muted-foreground">
+                <p className={styles.mutedTinyBelow}>
                   Granted {new Date(grant.grantedAt).toLocaleString()}
                 </p>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium">
-                  {grant.role}
-                </span>
+              <div className={styles.inlineGroup}>
+                <span className={styles.roleBadge}>{grant.role}</span>
                 <Button
                   size="sm"
                   variant="outline"
@@ -129,7 +119,7 @@ function ProjectGrants({ name, enabled }: { name: string; enabled: boolean }) {
                 </Button>
                 <Button
                   size="sm"
-                  variant="destructive"
+                  color="red"
                   onClick={() => setRevoking(grant)}
                 >
                   Revoke
@@ -139,9 +129,7 @@ function ProjectGrants({ name, enabled }: { name: string; enabled: boolean }) {
           ))}
         </ul>
       ) : (
-        <p className="mt-3 text-sm text-muted-foreground">
-          No project grants are recorded.
-        </p>
+        <p className={styles.empty}>No project grants are recorded.</p>
       )}
       {editing && (
         <GrantDialog
@@ -202,13 +190,13 @@ function GrantDialog({
           </DialogDescription>
         </DialogHeader>
         <form
-          className="space-y-4"
+          className={styles.stackLarge}
           onSubmit={(event) => {
             event.preventDefault()
             if (valid) save.mutate()
           }}
         >
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="grant-issuer">Issuer</Label>
             <Input
               id="grant-issuer"
@@ -220,7 +208,7 @@ function GrantDialog({
               }
             />
           </div>
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="grant-subject">Subject ID</Label>
             <Input
               id="grant-subject"
@@ -232,7 +220,7 @@ function GrantDialog({
               }
             />
           </div>
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="grant-display-name">Display name (optional)</Label>
             <Input
               id="grant-display-name"
@@ -244,11 +232,11 @@ function GrantDialog({
               }
             />
           </div>
-          <div className="space-y-2">
+          <div className={styles.stackSmall}>
             <Label htmlFor="grant-role">Role</Label>
             <select
               id="grant-role"
-              className="h-8 w-full rounded-lg border border-input bg-transparent px-2.5 text-sm"
+              className={styles.field}
               value={draft.role}
               disabled={save.isPending}
               onChange={(event) =>
@@ -266,7 +254,7 @@ function GrantDialog({
             </select>
           </div>
           {save.isError && (
-            <p role="alert" className="text-sm text-destructive">
+            <p role="alert" className={styles.error}>
               {save.error.message}
             </p>
           )}
@@ -328,7 +316,7 @@ function RevokeGrantDialog({
           </DialogDescription>
         </DialogHeader>
         {revoke.isError && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className={styles.error}>
             {revoke.error.message}
           </p>
         )}
@@ -343,7 +331,7 @@ function RevokeGrantDialog({
           </Button>
           <Button
             type="button"
-            variant="destructive"
+            color="red"
             disabled={revoke.isPending}
             onClick={() => revoke.mutate()}
           >

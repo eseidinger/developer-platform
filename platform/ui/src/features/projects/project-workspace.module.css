@@ -1,0 +1,235 @@
+.workspace {
+  max-width: 48rem;
+}
+
+.workspace > * + * {
+  margin-top: 1.5rem;
+}
+
+.panel,
+.detailPanel,
+.list,
+.smallList {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.panel {
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-body);
+  padding: 1.5rem;
+  box-shadow: var(--mantine-shadow-xs);
+}
+
+.detailPanel {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  padding: 1rem;
+  font-size: var(--mantine-font-size-sm);
+}
+
+.list > * + *,
+.smallList > * + * {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.smallList,
+.smallBelow,
+.error,
+.errorBelow,
+.mutedSmall,
+.mutedSmallBelow,
+.mutedSmallBelowMedium,
+.mutedSmallBelowLarge,
+.mutedGroup,
+.mutedLink,
+.outlineLink,
+.compactField,
+.field {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.logPanel,
+.mutedTinyBelow {
+  font-size: var(--mantine-font-size-xs);
+}
+
+.muted,
+.mutedWrap,
+.mutedBelow,
+.mutedSmall,
+.mutedSmallBelow,
+.mutedSmallBelowMedium,
+.mutedSmallBelowLarge,
+.mutedTinyBelow,
+.mutedGroup,
+.mutedLink {
+  color: var(--mantine-color-dimmed);
+}
+
+.mutedWrap {
+  overflow-wrap: break-word;
+}
+
+.error,
+.errorBelow {
+  color: var(--mantine-color-red-7);
+}
+
+.pageTitle {
+  font-size: 1.875rem;
+  font-weight: 600;
+  letter-spacing: -0.025em;
+}
+
+.sectionTitle {
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 500;
+}
+
+.strong,
+.itemTitle {
+  font-weight: 500;
+}
+
+.headerRow,
+.listRow,
+.compactHeader,
+.actions,
+.inlineGroup,
+.mutedGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+}
+
+.headerRow,
+.listRow,
+.actions {
+  flex-wrap: wrap;
+}
+
+.headerRow,
+.listRow,
+.compactHeader {
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+}
+
+.listRow,
+.listCell,
+.keyValueRow {
+  padding: 0.75rem 1rem;
+}
+
+.keyValueRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: var(--mantine-spacing-sm);
+}
+
+.compactField,
+.field,
+.outlineLink {
+  height: 2rem;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: transparent;
+}
+
+.compactField,
+.field {
+  padding-inline: 0.5rem;
+}
+
+.field {
+  padding-inline: 0.625rem;
+}
+
+.compactField:focus-visible,
+.field:focus-visible,
+.outlineLink:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.outlineLink {
+  display: inline-block;
+  height: auto;
+  padding: 0.5rem 0.75rem;
+}
+
+.outlineLink:hover {
+  background: var(--mantine-color-gray-1);
+}
+
+.itemTitle,
+.mutedBelow,
+.mutedSmallBelow,
+.mutedTinyBelow {
+  margin-top: 0.25rem;
+}
+
+.marginSmall,
+.smallBelow,
+.errorBelow,
+.mutedSmallBelowMedium {
+  margin-top: 0.5rem;
+}
+
+.mutedSmallBelowLarge {
+  margin-top: 0.75rem;
+}
+
+.marginLarge,
+.list,
+.smallList,
+.summaryGrid,
+.detailPanel,
+.logPanel {
+  margin-top: 1rem;
+}
+
+.stack > * + * {
+  margin-top: 0.75rem;
+}
+
+.summaryGrid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.logPanel {
+  max-height: 20rem;
+  overflow: auto;
+  border-radius: var(--mantine-radius-md);
+  background: var(--mantine-color-gray-1);
+  padding: 1rem;
+  line-height: 1.25rem;
+}
+
+.logPanel > * + * {
+  margin-top: 0.5rem;
+}
+
+.mutedLink {
+  text-underline-offset: 4px;
+}
+
+.mutedLink:hover {
+  color: var(--mantine-color-text);
+  text-decoration: underline;
+}
+
+@media (min-width: 40em) {
+  .summaryGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64em) {
+  .summaryGrid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}

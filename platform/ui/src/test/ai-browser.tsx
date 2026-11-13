@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { QueryClientProvider } from '@tanstack/react-query'
 import { BrowserRouter, Link, Route, Routes } from 'react-router-dom'
 import { createQueryClient } from '@/api/query-client'
+import { PortalThemeProvider } from '@/app/theme'
 import { AuthContext, type AuthContextValue } from '@/auth/auth-context'
 import { AiAssistancePage } from '@/features/ai/ai-assistance-page'
 import '../index.css'
@@ -17,16 +18,18 @@ const auth: AuthContextValue = {
 const target = document.getElementById('root')
 if (!target) throw new Error('Missing browser fixture root')
 createRoot(target).render(
-  <QueryClientProvider client={createQueryClient()}>
-    <AuthContext.Provider value={auth}>
-      <BrowserRouter>
-        <nav>
-          <Link to="/projects/other/ai">Switch project</Link>
-        </nav>
-        <Routes>
-          <Route path="/projects/:name/ai" element={<AiAssistancePage />} />
-        </Routes>
-      </BrowserRouter>
-    </AuthContext.Provider>
-  </QueryClientProvider>,
+  <PortalThemeProvider>
+    <QueryClientProvider client={createQueryClient()}>
+      <AuthContext.Provider value={auth}>
+        <BrowserRouter>
+          <nav>
+            <Link to="/projects/other/ai">Switch project</Link>
+          </nav>
+          <Routes>
+            <Route path="/projects/:name/ai" element={<AiAssistancePage />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthContext.Provider>
+    </QueryClientProvider>
+  </PortalThemeProvider>,
 )

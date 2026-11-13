@@ -1,0 +1,46 @@
+.actions,
+.wideActions {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.actions {
+  gap: 0.5rem;
+}
+
+.wideActions {
+  gap: 0.75rem;
+}
+
+.errorList {
+  color: var(--mantine-color-red-7);
+  list-style: disc inside;
+}
+
+.legend {
+  margin-bottom: 0.25rem;
+}
+
+.strongLegend {
+  padding-inline: 0.25rem;
+  font-weight: 500;
+}
+
+.outlinedGroup {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  padding: 1rem;
+}
+
+.outlinedGroup > * + * {
+  margin-top: 0.75rem;
+}
+
+.small {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.hint {
+  color: var(--mantine-color-dimmed);
+  font-size: var(--mantine-font-size-xs);
+}

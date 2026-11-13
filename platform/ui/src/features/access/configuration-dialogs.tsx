@@ -1,6 +1,6 @@
 import * as React from 'react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@mantine/core'
 import {
   AccessDialog,
   Check,
@@ -26,6 +26,7 @@ import {
   type RouteInput,
 } from './access-api'
 import { httpMethods, validatePolicy } from './policy-validation'
+import styles from './configuration-dialogs.module.css'
 
 export function CreateGroupDialog({
   project,
@@ -63,7 +64,7 @@ export function CreateGroupDialog({
         value={name}
         onChange={(e) => setName(e.target.value)}
       />
-      <p className="text-xs text-muted-foreground">
+      <p className={styles.hint}>
         Use lowercase letters, digits and hyphens. Start with a letter and end
         with a letter or digit.
       </p>
@@ -252,7 +253,7 @@ export function PolicyDialog({
       onClose={onClose}
       submit={(version) => savePolicy(project, draft, version)}
     >
-      <p className="text-sm">
+      <p className={styles.small}>
         Public component: <strong>{component}</strong>. All unmatched requests
         are denied. Include entry pages, assets and browser API calls. HEAD
         follows GET; OPTIONS must be selected explicitly.
@@ -285,16 +286,13 @@ export function PolicyDialog({
         }
       />
       {!personalData && (
-        <p className="text-xs text-muted-foreground">
+        <p className={styles.hint}>
           Email release requires saved governance covering personal data.
         </p>
       )}
       {draft.routes.map((route, index) => (
-        <fieldset
-          key={index}
-          className="space-y-3 rounded-lg border border-border p-4"
-        >
-          <legend className="px-1 font-medium">Rule {index + 1}</legend>
+        <fieldset key={index} className={styles.outlinedGroup}>
+          <legend className={styles.strongLegend}>Rule {index + 1}</legend>
           <Field
             label={`Rule ${index + 1} name`}
             required
@@ -339,8 +337,8 @@ export function PolicyDialog({
               })
             }
           />
-          <fieldset className="flex flex-wrap gap-3">
-            <legend className="mb-1">HTTP methods</legend>
+          <fieldset className={styles.wideActions}>
+            <legend className={styles.legend}>HTTP methods</legend>
             {httpMethods.map((method) => (
               <Check
                 key={method}
@@ -405,7 +403,7 @@ export function PolicyDialog({
           </Button>
         </fieldset>
       ))}
-      <div className="flex flex-wrap gap-2">
+      <div className={styles.actions}>
         <Button
           type="button"
           variant="outline"
@@ -432,7 +430,7 @@ export function PolicyDialog({
         </Button>
       </div>
       {errors.length > 0 && (
-        <ul role="alert" className="list-inside list-disc text-destructive">
+        <ul role="alert" className={styles.errorList}>
           {errors.map((error, i) => (
             <li key={i}>{error}</li>
           ))}

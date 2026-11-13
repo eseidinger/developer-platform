@@ -1,14 +1,14 @@
 # ADR-019 – React UI Technology Stack
 
-Created: October 6, 2026. Status: **Accepted; application implementation is
-planned**.
+Created: October 6, 2026. Status: **Accepted historical decision; component and
+styling choices superseded by ADR-023**.
 
-## Follow-on decision — November 12, 2026
+## Follow-on implementation — November 13, 2026
 
-[ADR-023](ADR-023-mantine-portal-components.md) selects a Mantine component and
-styling migration after PLAN-040. This record still describes the current
-shadcn/Base UI and Tailwind implementation until that migration is accepted;
-its original decision and evidence below remain historical.
+[ADR-023](ADR-023-mantine-portal-components.md) selects Mantine components and
+styling after PLAN-040. PLAN-041 replaces the original shadcn/Base UI and
+Tailwind implementation with Mantine and CSS modules. The original decision and
+evidence below remain historical.
 
 ## Implementation status note — October 18, 2026
 

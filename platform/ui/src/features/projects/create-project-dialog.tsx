@@ -3,18 +3,8 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { Button, Group, Modal, Stack, Text, TextInput } from '@mantine/core'
 
-import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { createEmptyProject } from '@/features/projects/projects-api'
 
 const projectSchema = z.object({
@@ -60,65 +50,63 @@ function CreateProjectDialog() {
   return (
     <>
       <Button onClick={() => setOpen(true)}>New project</Button>
-      <Dialog open={open} onOpenChange={handleOpenChange}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create project</DialogTitle>
-            <DialogDescription>
-              Creates an empty project and its authorization scope. You can
-              deploy an application in the next step.
-            </DialogDescription>
-          </DialogHeader>
+      <Modal
+        opened={open}
+        onClose={() => handleOpenChange(false)}
+        title="Create project"
+        centered
+        closeOnEscape={!createProject.isPending}
+        closeOnClickOutside={!createProject.isPending}
+        withCloseButton={!createProject.isPending}
+      >
+        <Stack gap="md">
+          <Text size="sm">
+            Creates an empty project and its authorization scope. You can deploy
+            an application in the next step.
+          </Text>
           <form
-            className="space-y-4"
             onSubmit={(event) =>
               void form.handleSubmit((values) => createProject.mutate(values))(
                 event,
               )
             }
           >
-            <div className="space-y-2">
-              <Label htmlFor="project-name">Project name</Label>
-              <Input
+            <Stack gap="md">
+              <TextInput
                 id="project-name"
+                data-autofocus
+                label="Project name"
+                description="1–32 lowercase letters, digits, or hyphens. Names start with a letter."
                 autoComplete="off"
-                aria-describedby="project-name-help"
                 aria-invalid={Boolean(form.formState.errors.name)}
                 {...form.register('name')}
               />
-              <p
-                id="project-name-help"
-                className="text-xs text-muted-foreground"
-              >
-                1–32 lowercase letters, digits, or hyphens. Names start with a
-                letter.
-              </p>
               {form.formState.errors.name && (
-                <p role="alert" className="text-sm text-destructive">
+                <Text role="alert" size="sm" c="red">
                   {form.formState.errors.name.message}
-                </p>
+                </Text>
               )}
-            </div>
-            {createProject.isError && (
-              <p role="alert" className="text-sm text-destructive">
-                {createProject.error.message}
-              </p>
-            )}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => handleOpenChange(false)}
-              >
-                Cancel
-              </Button>
-              <Button type="submit" disabled={createProject.isPending}>
-                {createProject.isPending ? 'Creating…' : 'Create project'}
-              </Button>
-            </DialogFooter>
+              {createProject.isError && (
+                <Text role="alert" size="sm" c="red">
+                  {createProject.error.message}
+                </Text>
+              )}
+              <Group justify="flex-end">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => handleOpenChange(false)}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" disabled={createProject.isPending}>
+                  {createProject.isPending ? 'Creating…' : 'Create project'}
+                </Button>
+              </Group>
+            </Stack>
           </form>
-        </DialogContent>
-      </Dialog>
+        </Stack>
+      </Modal>
     </>
   )
 }

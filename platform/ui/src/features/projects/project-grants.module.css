@@ -1,0 +1,120 @@
+.panel,
+.emptyPanel {
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-lg);
+  background: var(--mantine-color-body);
+  padding: 1.5rem;
+}
+
+.emptyPanel,
+.mutedSmallBelow,
+.mutedTinyBelow,
+.empty,
+.identifier {
+  color: var(--mantine-color-dimmed);
+}
+
+.emptyPanel,
+.mutedSmallBelow,
+.empty,
+.error,
+.errorBelow,
+.grantList,
+.field {
+  font-size: var(--mantine-font-size-sm);
+}
+
+.mutedTinyBelow,
+.identifier,
+.roleBadge {
+  font-size: var(--mantine-font-size-xs);
+}
+
+.identifier {
+  overflow-wrap: anywhere;
+}
+
+.mutedSmallBelow,
+.mutedTinyBelow {
+  margin-top: 0.25rem;
+}
+
+.errorBelow {
+  margin-top: 0.5rem;
+}
+
+.empty {
+  margin-top: 0.75rem;
+}
+
+.error,
+.errorBelow {
+  color: var(--mantine-color-red-7);
+}
+
+.header,
+.grantRow,
+.inlineGroup {
+  display: flex;
+  align-items: center;
+  gap: var(--mantine-spacing-xs);
+}
+
+.header,
+.grantRow {
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--mantine-spacing-sm);
+}
+
+.grantRow {
+  padding: 0.75rem 1rem;
+}
+
+.sectionTitle {
+  font-size: var(--mantine-font-size-lg);
+  font-weight: 500;
+}
+
+.strong {
+  font-weight: 500;
+}
+
+.field {
+  height: 2rem;
+  width: 100%;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+  background: transparent;
+  padding-inline: 0.625rem;
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--mantine-primary-color-filled);
+  outline-offset: 2px;
+}
+
+.grantList {
+  margin-top: 1rem;
+  border: 1px solid var(--mantine-color-default-border);
+  border-radius: var(--mantine-radius-md);
+}
+
+.grantList > * + * {
+  border-top: 1px solid var(--mantine-color-default-border);
+}
+
+.roleBadge {
+  border-radius: 999px;
+  background: var(--mantine-color-gray-1);
+  padding: 0.25rem 0.5rem;
+  font-weight: 500;
+}
+
+.stackSmall > * + * {
+  margin-top: 0.5rem;
+}
+
+.stackLarge > * + * {
+  margin-top: 1rem;
+}

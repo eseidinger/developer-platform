@@ -1,7 +1,8 @@
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Badge } from '@mantine/core'
+import { Button } from '@mantine/core'
 import { useAuth } from '@/auth/auth-context'
 import { ProjectList } from '@/features/projects/project-list'
+import styles from './home-page.module.css'
 
 const foundationItems = [
   'Typed Platform API client generated from OpenAPI',
@@ -17,18 +18,20 @@ function HomePage() {
     user?.profile.preferred_username ?? user?.profile.name ?? subject
 
   return (
-    <section aria-labelledby="page-title" className="max-w-3xl space-y-8">
-      <div className="space-y-3">
-        <Badge variant="secondary">UI foundation</Badge>
-        <h1 id="page-title" className="text-3xl font-semibold tracking-tight">
+    <section aria-labelledby="page-title" className={styles.page}>
+      <div className={styles.intro}>
+        <Badge variant="light" color="gray">
+          UI foundation
+        </Badge>
+        <h1 id="page-title" className={styles.heading}>
           Developer Platform portal
         </h1>
-        <p className="max-w-2xl text-muted-foreground">
+        <p className={styles.lead}>
           The portal foundation is ready for authenticated project discovery,
           deployment, and diagnostics work.
         </p>
         {status === 'loading' && (
-          <p role="status" className="text-sm text-muted-foreground">
+          <p role="status" className={styles.mutedSmall}>
             Preparing secure sign-in…
           </p>
         )}
@@ -36,27 +39,24 @@ function HomePage() {
           <Button onClick={() => void signIn()}>Sign in with OIDC</Button>
         )}
         {status === 'authenticated' && (
-          <div className="flex flex-wrap items-center gap-3">
-            <p className="text-sm text-muted-foreground">
+          <div className={styles.signedIn}>
+            <p className={styles.mutedSmall}>
               Signed in{displayName ? ` as ${displayName}` : ''}. Access is
               determined by platform-owned grants.
             </p>
           </div>
         )}
         {error && (
-          <p role="alert" className="text-sm text-destructive">
+          <p role="alert" className={styles.error}>
             {error}
           </p>
         )}
       </div>
-      <section
-        aria-labelledby="foundation-title"
-        className="rounded-xl border border-border bg-card p-6 shadow-sm"
-      >
-        <h2 id="foundation-title" className="text-lg font-medium">
+      <section aria-labelledby="foundation-title" className={styles.panel}>
+        <h2 id="foundation-title" className={styles.sectionHeading}>
           Current foundation
         </h2>
-        <ul className="mt-4 list-disc space-y-2 pl-5 text-sm text-muted-foreground">
+        <ul className={styles.foundationList}>
           {foundationItems.map((item) => (
             <li key={item}>{item}</li>
           ))}

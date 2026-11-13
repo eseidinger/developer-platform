@@ -1,7 +1,8 @@
 # Mantine UI Migration
 
-Status: planned November 12, 2026. Task: **PLAN-041**. Implementation begins
-after [PLAN-040](postgresql-extension-expansion.md) is complete. Decision:
+Status: implementation and local acceptance November 13, 2026; deployed
+acceptance pending. Task: **PLAN-041**. Implementation began after
+[PLAN-040](postgresql-extension-expansion.md) completed. Decision:
 [ADR-023](../../../architecture/decisions/ADR-023-mantine-portal-components.md).
 
 ## Outcome and scope
@@ -102,10 +103,33 @@ remaining production dependency on shadcn/Base UI or Tailwind.
 
 ## Sequencing and release rules
 
-This document records the plan now. Dependency installation, the pilot, source
-changes, and deployment begin only after PLAN-040's accepted completion.
-Deliver feature increments that can be reviewed and rolled back independently;
-keep the current UI build available until the Mantine build passes the same
+The source migration follows PLAN-040's accepted completion. Keep the prior UI
+revision available for rollback until the Mantine build passes the deployed
 functional and access-control journeys. PLAN-041 is complete only when the old
 styling system has been removed and the portal meets its existing acceptance
 contract.
+
+## Implementation evidence — November 13, 2026
+
+- Baseline revision: `5ae2ea185401a43ccfcc78e54d5e205fe36ff4e2`.
+  Mantine `@mantine/core` and `@mantine/hooks` are pinned to `9.8.0` in the npm
+  lockfile. Browser fixture target: Chromium at 1280 px and 390 px widths.
+- Theme mapping: Geist Variable remains the font, light mode stays fixed,
+  neutral gray is the primary color, and Mantine's `md` radius and default
+  spacing and focus tokens replace the shared Tailwind tokens. Feature-local
+  CSS modules retain product-specific layout and status presentation.
+- Project creation and store retirement use Mantine dialogs; all portal
+  features use Mantine controls and CSS modules. React Hook Form/Zod, router,
+  query cache, OIDC state handling, and the generated API client remain in
+  place. No production shadcn/Base UI, Tailwind, `cn`, or CVA imports remain.
+- Baseline build: JavaScript 874,777 B (gzip 259.19 KB), CSS 74,960 B
+  (gzip 12.66 KB). Mantine build: JavaScript 893,533 B (gzip 261.21 KB),
+  CSS 84,587 B (gzip 13.74 KB). The added transfer size is about 3.1 KB gzip.
+- Baseline project-creation screenshots and Mantine project-creation and store
+  workflow screenshots are in local `.runtime/plan041/screenshots/`; they use
+  synthetic API fixtures and contain no credentials. At 390 px, the project
+  dialog and store form fit without horizontal overflow. Keyboard tests verify
+  initial focus, Escape, focus return, and dialog tab order. Fixture browser
+  checks cover project lifecycle, denied creation, access governance, store
+  consoles, and AI assistance. All 32 Playwright tests and `npm run check`
+  passed after a clean `npm ci` installation.

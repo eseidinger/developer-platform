@@ -3,9 +3,11 @@
 Status: active implementation.
 
 [ADR-023](../architecture/decisions/ADR-023-mantine-portal-components.md)
-plans a Mantine component and styling migration after PLAN-040. The
-[migration plan](delivery/plans/mantine-ui-migration.md) owns the change; the
-guidance below applies to the currently deployed stack.
+selects Mantine components and a shared theme with focused CSS modules. The
+[migration plan](delivery/plans/mantine-ui-migration.md) records the change and
+its acceptance evidence. Keep the theme and component styles in
+`platform/ui/src/app/theme.tsx` and feature-local CSS modules. Import only the
+Mantine styles used by production components through `src/index.css`.
 
 The portal is a React/TypeScript/Vite application. It generates API types from
 the committed OpenAPI document and keeps FastAPI authoritative for validation,
@@ -15,11 +17,7 @@ Run from `platform/ui`:
 
 ```bash
 npm ci
-npm run lint
-npm run typecheck
-npm test
-npm run api:check
-npm run build
+npm run check
 ```
 
 `npm run test:e2e` additionally requires Playwright browser binaries. See the

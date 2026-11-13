@@ -92,8 +92,9 @@ These guidelines apply throughout the repository.
 - Use Prettier for UI source and configuration formatting, with the committed
   settings. Run `npm run format` to apply formatting. Keep formatting rules out
   of ESLint; apply `eslint-config-prettier` after the other ESLint presets.
-- Use the Tailwind Prettier plugin with `src/index.css` as the stylesheet entry
-  point. Sort classes in JSX and in `cn()` and `cva()` calls automatically.
+- Use the Mantine theme for shared tokens and focused CSS modules for
+  product-specific styling. Keep the light appearance until a design change is
+  reviewed.
 - Exclude generated API types and build/test output from lint and formatting;
   regenerate API types with `npm run api:generate` and verify with
   `npm run api:check`. Markdown continues to use the repository's Markdown
