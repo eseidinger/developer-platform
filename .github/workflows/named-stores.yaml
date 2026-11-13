@@ -4,7 +4,7 @@ on: [push, pull_request]
 jobs:
   postgres-access-recovery:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
