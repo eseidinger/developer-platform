@@ -261,8 +261,15 @@ resource showed no conflict with the unchanged 2 GiB PostgreSQL ceiling or the
 The old and candidate image local rollback fixtures do not justify switching
 an already migrated database to the old image.
 
-The test resource remains active on the source until its exact API retirement
-and purge are completed, followed by a backup recording the latest purge
-intent. A second short-lived human admin device authorization was started for
-this cleanup but expired without approval. The remaining operation requires a
-fresh authorization; no production resource was deleted without it.
+On November 13, the disposable source resource
+`3b1f9806-b4a3-4121-8bc5-1c50c0a2d995` was retired and its purge requested
+through the API with a fresh human admin authorization. The controller waited
+for the required verified backup of the purge intent, snapshot
+`6fd0d552a98058a5b0b25bb2ea8610c8f998973c2f0f841e2230cfabacd4d518`.
+It then marked the exact resource `purged` with observed state `purged`; its
+PostgreSQL database was absent. A second normal encrypted backup completed with
+readback verification after the purge as snapshot
+`a8e69241ab416841763153c076e18de6d34726a019cf04739daf827f86bf5af4`.
+The backup service was inactive afterward, and the one-time local admin token
+file was removed. Host available memory was 23,414 MiB, above the 8 GiB
+reserve; disk free was 204 GiB. PLAN-040 acceptance and cleanup are complete.
