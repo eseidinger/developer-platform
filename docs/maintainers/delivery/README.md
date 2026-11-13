@@ -282,7 +282,7 @@ Recovery checks for affected stores remain relevant while their data is retained
 they do not justify new provider adoption. After PLAN-039,
 [PLAN-040](plans/postgresql-extension-expansion.md) expands PostgreSQL with
 TimescaleDB, PostGIS, pgmq, and pg_duckdb within the measured workload budget.
-After PLAN-040, [PLAN-041](plans/mantine-ui-migration.md) migrates the React
+After PLAN-040, [PLAN-041](plans/mantine-ui-migration.md) migrated the React
 portal's component and styling system to Mantine.
 
 **Phase 1 is the MVP (minimum viable product)** and includes gates 1A, 1B and

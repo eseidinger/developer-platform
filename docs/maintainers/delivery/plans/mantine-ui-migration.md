@@ -1,7 +1,7 @@
 # Mantine UI Migration
 
-Status: source implemented and deployed November 13, 2026; authenticated
-browser acceptance pending. Task: **PLAN-041**. Implementation began after
+Status: completed and deployed November 13, 2026. Task: **PLAN-041**.
+Implementation began after
 [PLAN-040](postgresql-extension-expansion.md) completed. Decision:
 [ADR-023](../../../architecture/decisions/ADR-023-mantine-portal-components.md).
 
@@ -139,7 +139,11 @@ contract.
   those retired files before building; the corrected run passed. The public
   portal and `/readyz` returned HTTP 200, the served JS/CSS asset names matched
   the local build, `/projects` denied an unauthenticated call with HTTP 401,
-  and the public portal fit at 390 px without horizontal overflow. Browser
-  navigation reached the OIDC login page. The local initial-admin credential
-  did not complete sign-in, so authenticated portal journeys and sign-out still
-  need a valid disposable identity for deployed acceptance.
+  and the public portal fit at 390 px without horizontal overflow. A disposable
+  human test identity completed OIDC sign-in and sign-out. The deployed browser
+  reached the project workspace, named stores, AI assistance, application
+  access, and platform administration, and its authenticated mobile layout had
+  no horizontal overflow. The identity had platform-administrator rights;
+  denied-role behavior was covered by fixture browser tests and the live
+  unauthenticated API request. No live project or store mutation was needed for
+  this UI release; those workflows passed the synthetic browser suite.

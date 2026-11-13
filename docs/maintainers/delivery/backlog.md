@@ -3632,10 +3632,10 @@ not deployed acceptance for this new scope.
 [ADR-023](../../architecture/decisions/ADR-023-mantine-portal-components.md)
 selects Mantine for the portal after PLAN-040. **PLAN-041** in the
 [migration plan](plans/mantine-ui-migration.md) owns the component and styling
-change. The current shadcn/Base UI and Tailwind implementation remains active
-until the migration passes its checks.
+change. The migration passed its source and deployed browser checks on November
+13, 2026; the previous shadcn/Base UI and Tailwind implementation is retired.
 
-- [ ] **PLAN-041 · Mantine UI migration** — After PLAN-040, establish a Mantine
+- [x] **PLAN-041 · Mantine UI migration** — After PLAN-040, establish a Mantine
   theme, migrate representative project and store flows, migrate remaining
   features, remove unused shadcn/Base UI and Tailwind code and dependencies,
   then verify existing portal journeys, authorization denials, keyboard/focus
