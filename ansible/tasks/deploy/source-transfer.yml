@@ -41,7 +41,9 @@
         owner: root
         group: root
 
-    - name: Remove source files retired with PLAN-039
+    # Unarchive overlays files but does not remove paths deleted from Git.
+    # Clear retired source before building the new image on this host.
+    - name: Remove source files retired with PLAN-039 and PLAN-041
       ansible.builtin.file:
         path: "{{ platform_install_dir }}/{{ item }}"
         state: absent
@@ -70,6 +72,23 @@
         - infrastructure/persistence/opensearch-bootstrap.sh
         - infrastructure/persistence/opensearch-dashboards.yaml
         - infrastructure/persistence/neo4j
+        - platform/ui/components.json
+        - platform/ui/src/components/ui/badge.tsx
+        - platform/ui/src/components/ui/button.tsx
+        - platform/ui/src/components/ui/card.tsx
+        - platform/ui/src/components/ui/dropdown-menu.tsx
+        - platform/ui/src/components/ui/input.tsx
+        - platform/ui/src/components/ui/label.tsx
+        - platform/ui/src/components/ui/separator.tsx
+        - platform/ui/src/components/ui/sheet.tsx
+        - platform/ui/src/components/ui/sidebar-context.ts
+        - platform/ui/src/components/ui/sidebar.tsx
+        - platform/ui/src/components/ui/skeleton.tsx
+        - platform/ui/src/components/ui/table.tsx
+        - platform/ui/src/components/ui/tabs.tsx
+        - platform/ui/src/components/ui/tooltip.tsx
+        - platform/ui/src/hooks/use-mobile.ts
+        - platform/ui/src/lib/utils.ts
   always:
 
     - name: Remove local source archive
