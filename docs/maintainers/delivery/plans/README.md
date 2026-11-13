@@ -14,8 +14,8 @@ evidence. [PLAN-039](storage-scope-reduction.md) now owns retirement, migration,
 source cleanup, and capacity verification.
 [PLAN-040](postgresql-extension-expansion.md) follows it with four PostgreSQL
 extensions. [PLAN-041](mantine-ui-migration.md) records the portal's Mantine
-migration after PLAN-040. [PLAN-042](mantine-design-refresh.md) plans the visual
-refresh on that Mantine foundation.
+migration after PLAN-040. [PLAN-042](mantine-design-refresh.md) records the
+completed visual refresh on that Mantine foundation.
 
 - [Deployed Platform API acceptance suite](deployed-api-acceptance.md) —
   proposed first installed-platform test stage
@@ -31,7 +31,7 @@ refresh on that Mantine foundation.
 - [Mantine UI migration](mantine-ui-migration.md) — PLAN-041; after PLAN-040
   while preserving portal behavior and API boundaries
 - [Mantine portal design refresh](mantine-design-refresh.md) — PLAN-042;
-  deployed visual hierarchy with limited-role browser acceptance pending
+  completed and deployed visual hierarchy with browser acceptance
 - [Storage scope reduction](storage-scope-reduction.md) — PLAN-039; retain
   PostgreSQL and S3, retire other providers, and verify workload capacity
 - [PostgreSQL extension expansion](postgresql-extension-expansion.md) — PLAN-040;

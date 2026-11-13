@@ -1,6 +1,6 @@
 # Mantine Portal Design Refresh
 
-Status: deployed November 13, 2026; limited-role browser acceptance pending.
+Status: completed and deployed November 13, 2026.
 Task: **PLAN-042**. Follows the completed
 [PLAN-041 Mantine migration](mantine-ui-migration.md).
 
@@ -186,6 +186,7 @@ existing disposable human identity completed OIDC sign-in and sign-out,
 project and data-store navigation, AI assistance, application access, and
 authorized platform administration. The mobile drawer opened, closed with
 Escape, returned focus to its trigger, and had no horizontal overflow at 390
-px. A second disposable identity with a denied administration role was not
-available for a live browser check; the local fixture suite covers viewer and
-denial behavior. That live role check remains the last acceptance item.
+px. A separate disposable viewer identity then completed OIDC sign-in and
+sign-out. Its Platform administration page showed the explicit access-denied
+message and no grant action. No production resource was changed for this
+role check. All PLAN-042 release gates are satisfied.
