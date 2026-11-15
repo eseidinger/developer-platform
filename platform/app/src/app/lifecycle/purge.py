@@ -171,9 +171,16 @@ def purge(conn, control, operation):
             conn.execute("SELECT pg_advisory_unlock(731904)")
         if not complete:
             return False
+        resource_ids = [
+            row[0]
+            for row in conn.execute(
+                "SELECT resource_id::text FROM store_resources WHERE owner_project=%s",
+                (operation["project"],),
+            ).fetchall()
+        ]
         conn.execute(
-            "UPDATE project_lifecycle_operations SET step='external_erasure',updated_at=now() WHERE operation_id=%s",
-            (operation["operation_id"],),
+            "UPDATE project_lifecycle_operations SET step='external_erasure',result=result || %s,updated_at=now() WHERE operation_id=%s",
+            (Jsonb({"store_resource_ids": resource_ids}), operation["operation_id"]),
         )
         return False
     if step == "external_erasure":
@@ -196,6 +203,7 @@ def purge(conn, control, operation):
                 (
                     Jsonb(
                         {
+                            **operation["result"],
                             "live_resources_removed": True,
                             "operational_data_removed": True,
                             "backups_removed": False,

@@ -474,9 +474,27 @@ def current_principal(
         )
         raise HTTPException(401, "Invalid OIDC access token")
     with connect() as conn:
-        upsert_principal(conn, principal)
         machine = access_scope(conn, principal)
-        if machine is not None and not machine.active:
+        if machine is None and (principal.authorized_party or "").startswith(
+            "platform-ci-"
+        ):
+            raise HTTPException(403, "Automation credential no longer exists")
+        upsert_principal(conn, principal)
+        own_retirement_status = False
+        if (
+            machine is not None
+            and not machine.active
+            and request.method == "GET"
+            and request.url.path.startswith("/v1/operations/")
+        ):
+            from .lifecycle.catalog import retirement_actor
+
+            try:
+                identity = UUID(request.url.path.removeprefix("/v1/operations/"))
+                own_retirement_status = retirement_actor(conn, identity, principal)
+            except ValueError:
+                pass
+        if machine is not None and not machine.active and not own_retirement_status:
             best_effort_audit(
                 actor_for(principal),
                 "authentication",
@@ -2489,7 +2507,7 @@ def component_status(
     name: Annotated[str, Path(alias="project")],
     principal: Principal = Depends(current_principal),
 ):
-    """Live, per-component status for a v1alpha2 application revision."""
+    """Live, per-component status for a v1 application revision."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
     current = current_spec(name)
@@ -2509,7 +2527,7 @@ def component_status(
     components = current[1].get("components")
     if components is None:
         raise HTTPException(
-            409, "Component status requires a v1alpha2 application revision"
+            409, "Component status requires a v1 application revision"
         )
     result = observe_components(runtime, name, components, log)
     required_audit(
@@ -4006,7 +4024,10 @@ def operation_status(
         lifecycle = read_lifecycle(conn, str(operation_id))
         if lifecycle:
             if lifecycle["kind"] == "retire":
-                require_permission(principal, "view", lifecycle["project"])
+                from .lifecycle.catalog import retirement_actor
+
+                if not retirement_actor(conn, str(operation_id), principal):
+                    require_permission(principal, "view", lifecycle["project"])
             else:
                 require_platform_admin(principal)
             return lifecycle

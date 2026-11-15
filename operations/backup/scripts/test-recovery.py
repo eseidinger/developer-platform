@@ -476,7 +476,7 @@ def main():
         retry(ready)
         projects = json.loads(
             request(
-                "http://127.0.0.1:8000/projects",
+                "http://127.0.0.1:8000/v1/projects",
                 {"Authorization": "Bearer " + access_token},
             )
         )

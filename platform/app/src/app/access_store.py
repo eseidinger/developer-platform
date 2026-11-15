@@ -261,7 +261,7 @@ def application(conn, project, name, component=None):
     components = spec.get("components")
     if components is None:
         raise HTTPException(
-            409, "Hosted access requires a v1alpha2 application with a public component"
+            409, "Hosted access requires a v1 application with a public component"
         )
     public = [
         c

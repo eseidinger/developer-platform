@@ -34,6 +34,8 @@ def configuration_sources(root):
         "scripts",
         "platform",
         "infrastructure",
+        "operations/maintenance",
+        "operations/backup/scripts",
     ]
     for component in ("identity", "persistence"):
         # infrastructure/ already captures these services in current checkouts.

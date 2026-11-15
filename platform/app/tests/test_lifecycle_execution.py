@@ -266,3 +266,128 @@ class LifecycleExecutionTests(unittest.TestCase):
         result = self.operation(identity)["result"]
         self.assertTrue(result["prepared"])
         self.assertNotEqual(result["deployment_operation_id"], previous)
+
+    def test_purge_erases_owned_stores_and_consumed_grants_but_preserves_foreign_data(
+        self,
+    ):
+        own, foreign, binding = uuid4(), uuid4(), uuid4()
+        with self.connect() as conn:
+            conn.execute("INSERT INTO projects(name,status) VALUES('other','empty')")
+            for identity, owner in ((own, "demo"), (foreign, "other")):
+                conn.execute(
+                    "INSERT INTO store_resources(resource_id,owner_project,name,provider,quota_bytes,state,observed_state) VALUES(%s,%s,'primary','postgresql',1024,'active','active')",
+                    (identity, owner),
+                )
+            conn.execute(
+                "INSERT INTO store_grants(grant_id,resource_id,kind,consumer_project,component,mode,state,requested_by) VALUES(%s,%s,'binding','demo','web','read-write','active','test')",
+                (binding, foreign),
+            )
+            conn.execute(
+                "INSERT INTO platform_audit.events(scope,target_kind,target_id,detail) VALUES(%s,'store-grant',%s,'{}'),(%s,'store',%s,'{}')",
+                (
+                    Jsonb({"project": "other"}),
+                    str(binding),
+                    Jsonb({"project": "other"}),
+                    str(foreign),
+                ),
+            )
+        identity = self.start("purge")
+        provider = Mock()
+        with patch("app.lifecycle.purge.providers.get", return_value=provider):
+            worker.process_one(main)
+            worker.process_one(main)
+            worker.process_one(main)
+        provider.purge.assert_called_once()
+        operation = self.operation(identity)
+        self.assertEqual(operation["result"]["store_resource_ids"], [str(own)])
+        receipt = {
+            key: operation[key] for key in ("operation_id", "project_id", "project")
+        }
+        receipt["verified"] = True
+        erasure.atomic(erasure.directory() / (identity + ".receipt.json"), receipt)
+        worker.process_one(main)
+        with self.connect() as conn:
+            self.assertEqual(
+                conn.execute(
+                    "SELECT resource_id::text FROM store_resources"
+                ).fetchall(),
+                [(str(foreign),)],
+            )
+            self.assertEqual(
+                conn.execute(
+                    "SELECT count(*) FROM store_grants WHERE consumer_project='demo'"
+                ).fetchone()[0],
+                0,
+            )
+            self.assertEqual(
+                conn.execute(
+                    "SELECT count(*) FROM platform_audit.events WHERE target_id=%s",
+                    (str(binding),),
+                ).fetchone()[0],
+                0,
+            )
+            self.assertEqual(
+                conn.execute(
+                    "SELECT count(*) FROM platform_audit.events WHERE target_id=%s",
+                    (str(foreign),),
+                ).fetchone()[0],
+                1,
+            )
+        erasure.atomic(erasure.directory() / (identity + ".final.json"), receipt)
+        worker.process_one(main)
+        with self.connect() as conn:
+            self.assertEqual(
+                conn.execute(
+                    "SELECT actor,intent FROM project_lifecycle_operations WHERE operation_id=%s",
+                    (identity,),
+                ).fetchone(),
+                ({}, {}),
+            )
+
+    def test_lifecycle_acceptance_drains_admitted_requests_before_secret_capture(self):
+        import time
+        from concurrent.futures import ThreadPoolExecutor
+
+        from app.api_routes import LIFECYCLE_HTTP_LOCK
+
+        with self.connect() as gate, ThreadPoolExecutor(max_workers=1) as executor:
+            gate.execute("SELECT pg_advisory_lock_shared(%s)", (LIFECYCLE_HTTP_LOCK,))
+            future = executor.submit(self.start, "purge")
+            try:
+                for _ in range(100):
+                    waiting = gate.execute(
+                        "SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=0 AND objid=%s AND NOT granted",
+                        (LIFECYCLE_HTTP_LOCK,),
+                    ).fetchone()
+                    if waiting:
+                        break
+                    time.sleep(0.01)
+                self.assertIsNotNone(waiting)
+                self.assertFalse(future.done())
+                # This write belongs to an already admitted request. Acceptance
+                # must wait and include its completed secret in the recovery point.
+                self.runtime.objects[("Secret", "app-secrets", "project-demo")]["data"][
+                    "PASSWORD"
+                ] = "bmV3"
+            finally:
+                gate.execute(
+                    "SELECT pg_advisory_unlock_shared(%s)", (LIFECYCLE_HTTP_LOCK,)
+                )
+            future.result(timeout=10)
+        from app.lifecycle import snapshot
+
+        with self.connect() as conn:
+            saved = snapshot.load(conn, self.identity)
+            self.assertEqual(saved["secrets"][0]["data"]["PASSWORD"], "bmV3")
+
+    def test_retiring_actor_can_read_its_receipt_after_project_roles_are_revoked(self):
+        from fastapi import HTTPException
+
+        identity = self.start("retire")
+        worker.process_one(main)
+        with patch.object(
+            main, "require_permission", side_effect=HTTPException(403, "Retired roles")
+        ):
+            response = self.client.get("/v1/operations/" + identity)
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["state"], "succeeded")

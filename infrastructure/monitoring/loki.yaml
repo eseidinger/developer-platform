@@ -28,6 +28,8 @@ compactor:
   delete_request_cancel_period: 1m
   retention_delete_delay: 1m
 limits_config:
+  # Private maintenance replays verified retained streams with original times.
+  reject_old_samples: false
   retention_period: 168h
   deletion_mode: filter-and-delete
   ingestion_rate_mb: 4

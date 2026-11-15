@@ -9,7 +9,7 @@ from uuid import UUID
 import httpx2 as httpx
 
 from .. import main
-from . import catalog, erasure
+from . import catalog, erasure, log_rebuild
 
 
 def inspect(identity):
@@ -38,6 +38,8 @@ def operational_storage(operation):
         "{namespace=" + json.dumps("project-" + project) + "}",
         "{platform_project_id=" + json.dumps(operation["project_id"]) + "}",
     ]
+    for resource_id in operation["result"].get("store_resource_ids", []):
+        selectors.append("{resource_id=" + json.dumps(str(UUID(resource_id))) + "}")
     with httpx.Client(timeout=10, trust_env=False, follow_redirects=False) as client:
         for match in selectors:
             response = client.post(
@@ -49,7 +51,13 @@ def operational_storage(operation):
             "http://prometheus:9090/api/v1/admin/tsdb/clean_tombstones"
         )
         response.raise_for_status()
-    return True
+        response = client.post(
+            "http://prometheus:9090/api/v1/admin/tsdb/snapshot",
+            params={"skip_head": "false"},
+        )
+        response.raise_for_status()
+        snapshot = response.json()["data"]["name"]
+    return {"snapshot": snapshot}
 
 
 def verify_loki(operation):
@@ -86,6 +94,8 @@ def main_cli():
         choices=[
             "inspect",
             "operational",
+            "export-logs",
+            "restore-logs",
             "verify-traces",
             "verify-logs",
             "receipt",
@@ -99,8 +109,13 @@ def main_cli():
     if args.action == "inspect":
         print(json.dumps(operation, default=str))
     elif args.action == "operational":
-        if not operational_storage(operation):
-            raise SystemExit(3)
+        print(json.dumps(operational_storage(operation)))
+    elif args.action == "export-logs":
+        with main.connect() as conn, log_rebuild.client() as client:
+            log_rebuild.export(conn, operation, client)
+    elif args.action == "restore-logs":
+        with log_rebuild.client() as client:
+            log_rebuild.restore(operation, client)
     elif args.action == "verify-logs":
         if not verify_loki(operation):
             raise SystemExit(3)

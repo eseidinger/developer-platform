@@ -28,8 +28,14 @@ class ConfigurationLayoutTests(unittest.TestCase):
         self.root = Path(temporary.name)
         for name in ("compose.yaml", ".env", ".env.example"):
             (self.root / name).touch()
-        for name in ("scripts", "platform", "infrastructure"):
-            (self.root / name).mkdir()
+        for name in (
+            "scripts",
+            "platform",
+            "infrastructure",
+            "operations/maintenance",
+            "operations/backup/scripts",
+        ):
+            (self.root / name).mkdir(parents=True, exist_ok=True)
 
     def test_current_layout_is_captured_once_through_infrastructure(self):
         for component in ("identity", "persistence"):
@@ -43,6 +49,8 @@ class ConfigurationLayoutTests(unittest.TestCase):
                 "scripts",
                 "platform",
                 "infrastructure",
+                "operations/maintenance",
+                "operations/backup/scripts",
             ],
         )
 

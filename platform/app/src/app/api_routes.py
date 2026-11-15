@@ -1,5 +1,7 @@
 """Register response models and errors together with each public API route."""
 
+from functools import wraps
+
 from fastapi.datastructures import DefaultPlaceholder
 from fastapi.routing import APIRoute
 
@@ -22,6 +24,32 @@ ACCEPTED = {
     "rollback",
     "restart",
 }
+
+
+# Ordinary API calls share this lock. Lifecycle acceptance and worker steps take
+# it exclusively so no admitted request can recreate records after their sweep.
+LIFECYCLE_HTTP_LOCK = 731926
+
+
+def lifecycle_fenced(endpoint, exclusive=False):
+    @wraps(endpoint)
+    def guarded(*args, **kwargs):
+        from . import main
+
+        suffix = "" if exclusive else "_shared"
+        with main.connect() as conn:
+            conn.execute(
+                "SELECT pg_advisory_lock" + suffix + "(%s)", (LIFECYCLE_HTTP_LOCK,)
+            )
+            try:
+                return endpoint(*args, **kwargs)
+            finally:
+                conn.execute(
+                    "SELECT pg_advisory_unlock" + suffix + "(%s)",
+                    (LIFECYCLE_HTTP_LOCK,),
+                )
+
+    return guarded
 
 
 class ContractRoute(APIRoute):
@@ -78,4 +106,9 @@ class ContractRoute(APIRoute):
                     "content": {"text/csv": {"schema": {"type": "string"}}},
                 }
             kwargs["responses"] = responses
+        if path.startswith("/v1/") and path != "/v1/capabilities":
+            exclusive = endpoint.__module__.endswith(
+                ".lifecycle.api"
+            ) and endpoint.__name__ in {"retire", "restore", "purge"}
+            endpoint = lifecycle_fenced(endpoint, exclusive)
         super().__init__(path, endpoint, **kwargs)

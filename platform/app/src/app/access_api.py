@@ -79,7 +79,7 @@ def install(app, control):
             reason = (
                 "Project is retired"
                 if status == "retired"
-                else "Deploy a v1alpha2 application before configuring access"
+                else "Deploy a v1 application before configuring access"
                 if components is None
                 else "Application access requires one public service"
                 if len(public) != 1

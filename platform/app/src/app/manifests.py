@@ -306,7 +306,7 @@ def resources(
 def component_resources(
     name, components, database_ip, password, configuration=None, domain=None
 ):
-    """Build internal service and scheduled-job resources for a v1alpha2 application.
+    """Build internal service and scheduled-job resources for a v1 application.
 
     Component names are scoped by the application namespace, so they form the stable
     DNS names used for service-to-service communication (``<component>`` or

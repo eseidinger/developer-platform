@@ -47,6 +47,8 @@ class BackupTests(unittest.TestCase):
             "platform",
             "infrastructure/identity",
             "infrastructure/persistence",
+            "operations/maintenance",
+            "operations/backup/scripts",
         ):
             (self.root / name).mkdir(parents=True)
         for name in ("compose.yaml", ".env", ".env.example"):

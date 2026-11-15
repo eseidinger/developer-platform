@@ -1,4 +1,4 @@
-"""Provider observations for v1alpha2 application components."""
+"""Provider observations for v1 application components."""
 
 from datetime import UTC, datetime, timedelta
 from typing import Any

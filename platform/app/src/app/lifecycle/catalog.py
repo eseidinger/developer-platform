@@ -211,3 +211,13 @@ def expire_receipts(conn):
             "DELETE FROM project_lifecycle_operations WHERE operation_id=%s",
             (identity,),
         )
+
+
+def retirement_actor(conn, identity, principal):
+    """A retiring caller may observe its own receipt after project roles revoke."""
+    return bool(
+        conn.execute(
+            "SELECT 1 FROM project_lifecycle_operations WHERE operation_id=%s AND action='retire' AND actor->>'issuer'=%s AND actor->>'subject'=%s",
+            (identity, principal.issuer, principal.subject),
+        ).fetchone()
+    )

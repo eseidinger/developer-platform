@@ -11936,7 +11936,7 @@
     },
     "/v1/projects/{project}/components": {
       "get": {
-        "description": "Live, per-component status for a v1alpha2 application revision.",
+        "description": "Live, per-component status for a v1 application revision.",
         "operationId": "component_status_v1_projects__project__components_get",
         "parameters": [
           {

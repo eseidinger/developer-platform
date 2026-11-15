@@ -58,6 +58,11 @@ def scope(conn, control, name, action):
     blockers = []
     if conn.execute(control.ACTIVE_OPERATION_SQL, (name,)).fetchone():
         blockers.append("application_operation_active")
+    if conn.execute(
+        "SELECT 1 FROM hosted_access_operations WHERE state IN ('queued','running') AND resource_id IN (SELECT id FROM hosted_access_resources WHERE project=%s OR spec->>'providerProject'=%s) LIMIT 1",
+        (name, name),
+    ).fetchone():
+        blockers.append("access_operation_active")
     control.ai_store.fail_interrupted_runs(conn, name)
     if conn.execute(
         "SELECT 1 FROM ai_runs WHERE project=%s AND state='running' LIMIT 1", (name,)

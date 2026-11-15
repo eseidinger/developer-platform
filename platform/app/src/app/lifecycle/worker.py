@@ -3,6 +3,7 @@
 from fastapi import HTTPException
 from psycopg.types.json import Jsonb
 
+from ..api_routes import LIFECYCLE_HTTP_LOCK
 from ..identity import Principal
 from . import catalog
 from .restore import restore
@@ -41,7 +42,13 @@ def process_one(control):
             "SELECT pg_try_advisory_lock(%s)", (WORKER_LOCK,)
         ).fetchone()[0]:
             return False
+        http_acquired = False
         try:
+            http_acquired = conn.execute(
+                "SELECT pg_try_advisory_lock(%s)", (LIFECYCLE_HTTP_LOCK,)
+            ).fetchone()[0]
+            if not http_acquired:
+                return False
             catalog.expire_receipts(conn)
             selected = conn.execute("""SELECT operation_id::text,project_id::text,project,action,actor,result,step FROM project_lifecycle_operations
                 WHERE state IN ('queued','running','blocked') ORDER BY updated_at LIMIT 1""").fetchone()
@@ -101,9 +108,15 @@ def process_one(control):
                 with conn.transaction():
                     if operation["action"] == "purge":
                         conn.execute(
-                            "UPDATE project_lifecycle_operations SET result=result || %s WHERE operation_id=%s",
+                            "UPDATE project_lifecycle_operations SET actor='{}',intent='{}',result=%s WHERE operation_id=%s",
                             (
-                                Jsonb({"backups_removed": True}),
+                                Jsonb(
+                                    {
+                                        "live_resources_removed": True,
+                                        "operational_data_removed": True,
+                                        "backups_removed": True,
+                                    }
+                                ),
                                 operation["operation_id"],
                             ),
                         )
@@ -133,6 +146,8 @@ def process_one(control):
                 )
             return False
         finally:
+            if http_acquired:
+                conn.execute("SELECT pg_advisory_unlock(%s)", (LIFECYCLE_HTTP_LOCK,))
             conn.execute("SELECT pg_advisory_unlock(%s)", (WORKER_LOCK,))
 
 

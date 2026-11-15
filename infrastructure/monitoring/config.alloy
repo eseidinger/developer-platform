@@ -9,6 +9,13 @@ loki.source.file "docker" {
 
 loki.process "docker" {
 	stage.docker { }
+    // Shared Docker files cannot be erased per project. Retain only code-only
+    // console events; dependency messages and interpolated identifiers drop.
+    stage.match {
+        selector = `{job="docker"} !~ "^\\{\"level\":\"(debug|info|warning|error|critical)\",\"event\":\"[A-Za-z0-9_.]+\"(,\"error_type\":\"[A-Za-z0-9_]+\")?\\}$"`
+        action = "drop"
+        drop_counter_reason = "unscoped_console_message"
+    }
 	forward_to = [loki.write.local.receiver]
 }
 

@@ -11,9 +11,17 @@ datasources:
     type: loki
     uid: loki
     url: http://loki:3100
+    jsonData:
+      httpHeaderName1: X-Scope-OrgID
+    secureJsonData:
+      httpHeaderValue1: platform
     access: proxy
   - name: Tempo
     type: tempo
     uid: tempo
     url: http://tempo:3200
+    jsonData:
+      httpHeaderName1: X-Scope-OrgID
+    secureJsonData:
+      httpHeaderValue1: platform
     access: proxy

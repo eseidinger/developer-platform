@@ -85,7 +85,7 @@ class ComponentApiTests(unittest.TestCase):
         self.assertEqual(error.exception.status_code, 422)
         queued.assert_not_called()
 
-    def test_component_status_returns_each_observed_component_for_v1alpha2(self):
+    def test_component_status_returns_each_observed_component_for_v1(self):
         spec = {
             "components": [
                 {

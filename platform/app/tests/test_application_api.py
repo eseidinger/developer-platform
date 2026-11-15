@@ -35,6 +35,11 @@ class ApplicationReadTests(unittest.TestCase):
             "issuer", "human"
         )
         self.addCleanup(main.app.dependency_overrides.clear)
+        connection = patch.object(
+            main, "connect", side_effect=lambda: nullcontext(Mock())
+        )
+        connection.start()
+        self.addCleanup(connection.stop)
         self.client = TestClient(main.app)
 
     def test_export_is_read_only_and_provides_the_revision(self):
@@ -70,7 +75,13 @@ class ApplicationReadTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["valid"])
         queue.assert_not_called()
-        conn.execute.assert_not_called()
+        self.assertEqual(
+            [call.args[0] for call in conn.execute.call_args_list],
+            [
+                "SELECT pg_advisory_lock_shared(%s)",
+                "SELECT pg_advisory_unlock_shared(%s)",
+            ],
+        )
 
     def test_retired_project_requires_explicit_restore(self):
         with (

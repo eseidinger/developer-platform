@@ -528,7 +528,7 @@ https://*.apps.localhost {
         "Content-Type": "application/json",
     }
     with urllib.request.urlopen(
-        urllib.request.Request("http://127.0.0.1:8000/projects", headers=headers),
+        urllib.request.Request("http://127.0.0.1:8000/v1/projects", headers=headers),
         timeout=15,
     ) as response:
         catalog = json.load(response)
@@ -564,10 +564,18 @@ https://*.apps.localhost {
             raise RuntimeError(
                 "Recovered store consumers require fresh explicit approval and updated bindings before reapply"
             )
+        application_url = "http://127.0.0.1:8000/v1/projects/" + name + "/application"
+        # Export the public desired-state declaration; internal catalog rows also
+        # contain resolved images and execution fields that v1 rejects on input.
+        with urllib.request.urlopen(
+            urllib.request.Request(application_url, headers=headers), timeout=15
+        ) as response:
+            declaration = json.load(response)
+            revision = response.headers.get("ETag")
         request = urllib.request.Request(
-            "http://127.0.0.1:8000/projects/" + name,
-            headers=headers,
-            data=json.dumps(selected[0]["spec"]).encode(),
+            application_url,
+            headers={**headers, **({"If-Match": revision} if revision else {})},
+            data=json.dumps(declaration).encode(),
             method="PUT",
         )
         with urllib.request.urlopen(request, timeout=30) as response:

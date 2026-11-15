@@ -950,7 +950,7 @@ export interface paths {
         };
         /**
          * Component Status
-         * @description Live, per-component status for a v1alpha2 application revision.
+         * @description Live, per-component status for a v1 application revision.
          */
         get: operations["component_status_v1_projects__project__components_get"];
         put?: never;

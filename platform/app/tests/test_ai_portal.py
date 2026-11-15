@@ -2,7 +2,7 @@
 
 import unittest
 from contextlib import ExitStack
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 from uuid import uuid4
 
 from app.identity import Principal
@@ -127,6 +127,7 @@ class PortalTests(unittest.TestCase):
                 patch.object(
                     main, "require_permission", side_effect=HTTPException(403, "Denied")
                 ),
+                patch.object(main, "connect", return_value=MagicMock()),
                 patch.object(ai_store, "history") as history,
                 patch.object(ai_changes, "history") as proposals,
             ):
