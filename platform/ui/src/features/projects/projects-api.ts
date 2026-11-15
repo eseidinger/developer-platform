@@ -36,6 +36,7 @@ type OperationAccepted = {
   revision: number
 }
 type OperationStatus = {
+  kind: string
   state: string
   revision: number
   errorCode: string | null
@@ -297,7 +298,7 @@ async function deployProject(name: string, body: ProjectDeployment) {
     {
       params: {
         path: { project: name },
-        header: { 'If-Match': current.response.headers.get('ETag') ?? '0' },
+        header: { 'if-match': current.response.headers.get('ETag') ?? '0' },
       },
       body: application,
     },
@@ -397,6 +398,7 @@ async function getOperation(operationId: string) {
     throw new Error('The platform returned an invalid operation status.')
   }
   return {
+    kind: typeof record.kind === 'string' ? record.kind : 'deployment',
     state: record.state,
     revision: typeof record.revision === 'number' ? record.revision : 0,
     errorCode: record.error_code,

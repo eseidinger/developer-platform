@@ -329,6 +329,10 @@ def model_for(endpoint):
     if module.endswith(".main"):
         return MAIN.get(name)
     if module.endswith(".access_api"):
+        if name == "retry_operation":
+            return AccessResource | envelope(
+                "LifecycleRetry", operation_id=UUID, kind=str, state=str, status_url=str
+            )
         if name in {
             "list_groups",
             "revisions",

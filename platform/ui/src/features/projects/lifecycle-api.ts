@@ -8,7 +8,15 @@ const previewSchema = z.object({
   project_id: z.uuid(),
   status: z.string(),
   action: z.enum(['retire', 'restore', 'purge']),
-  inventory: z.record(z.string(), z.unknown()),
+  inventory: z
+    .object({
+      workloads: z.array(z.object({ kind: z.string(), name: z.string() })),
+      named_store_resources: z.array(
+        z.object({ name: z.string(), provider: z.string() }),
+      ),
+      named_store_grants: z.array(z.unknown()),
+    })
+    .passthrough(),
   blockers: z.array(z.string()),
   scope_token: z.string(),
 })

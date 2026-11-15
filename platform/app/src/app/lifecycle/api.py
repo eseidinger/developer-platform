@@ -5,6 +5,7 @@ import json
 from uuid import UUID
 
 from fastapi import Depends, HTTPException
+from psycopg.types.json import Jsonb
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..identity import Principal
@@ -168,6 +169,37 @@ def install(app, control):
             ):
                 snapshot.capture(conn, control, project, result["project_id"])
         return accepted
+
+    def retry(identity, principal, if_match):
+        with control.connect() as conn, conn.transaction():
+            conn.execute("SELECT pg_advisory_xact_lock(%s)", (catalog.LOCK,))
+            operation = catalog.read(conn, identity)
+            if not operation:
+                return None
+            administrator(principal, operation["project"], operation["kind"])
+            if if_match.strip('"') != operation["updated_at"].isoformat():
+                raise HTTPException(412, "Lifecycle operation changed")
+            if operation["state"] != "blocked":
+                raise HTTPException(
+                    409, "Only blocked lifecycle operations can be retried"
+                )
+            result = operation["result"]
+            deployment = result.get("deployment_operation_id")
+            if operation["kind"] == "restore" and deployment:
+                row = conn.execute(
+                    "SELECT state FROM application_operations WHERE operation_id=%s",
+                    (deployment,),
+                ).fetchone()
+                if row and row[0] == "failed":
+                    result.pop("deployment_operation_id", None)
+                    result.pop("revision", None)
+            conn.execute(
+                "UPDATE project_lifecycle_operations SET state='queued',error_code=NULL,result=%s,updated_at=now() WHERE operation_id=%s",
+                (Jsonb(result), identity),
+            )
+            return catalog.accepted(identity, "queued", operation["kind"])
+
+    app.state.retry_lifecycle_operation = retry
 
     @app.get("/v1/projects/{project}/retirement-preview")
     def retirement_preview(project: str, principal: Principal = caller):

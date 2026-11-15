@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { Badge } from '@mantine/core'
 import { Button } from '@mantine/core'
@@ -38,6 +38,7 @@ function memoryMebibytes(bytes: number) {
 
 function ProjectWorkspace() {
   const { name } = useParams()
+  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const { status } = useAuth()
   const queryClient = useQueryClient()
@@ -91,6 +92,13 @@ function ProjectWorkspace() {
         ? 2_000
         : false,
   })
+  React.useEffect(() => {
+    const operation = operationQuery.data
+    if (operation?.state !== 'succeeded') return
+    void queryClient.invalidateQueries({ queryKey: ['projects'] })
+    if (['retire', 'purge'].includes(operation.kind)) void navigate('/')
+  }, [operationQuery.data, queryClient, navigate])
+
   const usageQuery = useQuery({
     queryKey: ['projects', name, 'resource-usage'],
     queryFn: () => getResourceUsage(name ?? ''),
@@ -263,12 +271,9 @@ function ProjectWorkspace() {
             Platform operation
           </h2>
           <p className={styles.mutedSmallBelowMedium}>
-            Revision {operationQuery.data.revision}: {operationQuery.data.state}
-            ; readiness {operationQuery.data.readinessState}
-            {operationQuery.data.readinessReason
-              ? ` (${operationQuery.data.readinessReason})`
-              : ''}
-            .
+            {operationQuery.data.kind === 'deployment'
+              ? `Revision ${operationQuery.data.revision}: ${operationQuery.data.state}; readiness ${operationQuery.data.readinessState}${operationQuery.data.readinessReason ? ` (${operationQuery.data.readinessReason})` : ''}.`
+              : `${operationQuery.data.kind}: ${operationQuery.data.state}.`}
           </p>
           {operationQuery.data.errorCode && (
             <p role="alert" className={styles.errorBelow}>

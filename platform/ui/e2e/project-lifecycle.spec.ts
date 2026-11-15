@@ -84,7 +84,7 @@ test('creates, deploys, rolls back, and retires a project through the portal', a
   ).toBeVisible()
 
   await page.getByRole('button', { name: 'Retire project' }).click()
-  await expect(page.getByRole('dialog')).toContainText('namespace project-demo')
+  await expect(page.getByRole('dialog')).toContainText('Namespace project-demo')
   await page.getByLabel('Type demo to confirm').fill('demo')
   await page
     .getByRole('dialog')
@@ -99,11 +99,11 @@ test('creates, deploys, rolls back, and retires a project through the portal', a
   expect(
     fixture.mutations.map(({ method, path }) => `${method} ${path}`),
   ).toEqual([
-    'POST /projects',
-    'PUT /projects/demo',
-    'PUT /projects/demo',
-    'POST /projects/demo/rollback',
-    'POST /projects/demo/retire',
+    'POST /v1/projects',
+    'PUT /v1/projects/demo/application',
+    'PUT /v1/projects/demo/application',
+    'POST /v1/projects/demo/rollback',
+    'POST /v1/projects/demo/retire',
   ])
   expect(
     fixture.mutations.find(({ path }) => path.endsWith('/rollback'))?.ifMatch,
@@ -128,5 +128,51 @@ test('keeps a denied project creation visible as an error', async ({
   expect(fixture.unexpected).toEqual([])
   expect(
     fixture.mutations.map(({ method, path }) => `${method} ${path}`),
-  ).toEqual(['POST /projects'])
+  ).toEqual(['POST /v1/projects'])
+})
+
+test('restores a retired project and allows confirmed complete purge', async ({
+  page,
+}) => {
+  const fixture = await projectFixture(page, { retired: true })
+  await page.goto('/e2e/project-harness.html')
+  await page.getByRole('checkbox', { name: 'Show retired projects' }).check()
+  await page.getByRole('link', { name: 'demo' }).click()
+  await page.getByRole('button', { name: 'Restore project' }).click()
+  await page.getByLabel('Type demo to confirm').fill('demo')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Restore project' })
+    .click()
+  await expect(
+    page.getByRole('button', { name: 'Retire project' }),
+  ).toBeVisible()
+  await page.getByRole('button', { name: 'Retire project' }).click()
+  await page.getByLabel('Type demo to confirm').fill('demo')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Retire project' })
+    .click()
+  await page.getByRole('checkbox', { name: 'Show retired projects' }).check()
+  await page.getByRole('link', { name: 'demo' }).click()
+  await page.getByRole('button', { name: 'Permanently purge' }).click()
+  await expect(page.getByRole('dialog')).toContainText('backups')
+  await expect(
+    page.getByRole('dialog').getByRole('button', { name: 'Permanently purge' }),
+  ).toBeDisabled()
+  await page.getByLabel('Type demo to confirm').fill('demo')
+  await page
+    .getByRole('dialog')
+    .getByRole('button', { name: 'Permanently purge' })
+    .click()
+  await expect(
+    page.getByRole('heading', { name: 'Projects', exact: true }),
+  ).toBeVisible()
+  await expect(page.getByRole('link', { name: 'demo' })).toHaveCount(0)
+  expect(fixture.unexpected).toEqual([])
+  expect(fixture.mutations.map(({ path }) => path)).toEqual([
+    '/v1/operator/projects/demo/restore',
+    '/v1/projects/demo/retire',
+    '/v1/operator/projects/demo/purge',
+  ])
 })

@@ -25,10 +25,10 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
         ],
       })
     }
-    if (path === '/v1/projects/alpha/resources' && method === 'GET') {
+    if (path === '/v1/projects/alpha/stores' && method === 'GET') {
       return send({ resources: resource ? [resource] : [] })
     }
-    if (path === '/v1/projects/alpha/resources' && method === 'POST') {
+    if (path === '/v1/projects/alpha/stores' && method === 'POST') {
       const body = request.postDataJSON() as Record<string, unknown>
       mutations.push(`${method} ${path}`)
       if (
@@ -60,10 +60,7 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
       }
       return send(resource, 201)
     }
-    if (
-      path === `/v1/resources/${resourceId}/retirement` &&
-      method === 'POST'
-    ) {
+    if (path === `/v1/stores/${resourceId}/retirement` && method === 'POST') {
       mutations.push(`${method} ${path}`)
       const body = request.postDataJSON() as { version?: number }
       if (body.version !== 1 || !resource) {
@@ -77,13 +74,13 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
       }
       return send(resource)
     }
-    if (path === '/v1/projects/alpha/resource-bindings' && method === 'GET') {
+    if (path === '/v1/projects/alpha/store-bindings' && method === 'GET') {
       return send({ bindings: [] })
     }
     if (path === '/v1/store-access/me' && method === 'GET') {
       return send({ grants: [] })
     }
-    if (path === `/v1/resources/${resourceId}/grants` && method === 'GET') {
+    if (path === `/v1/stores/${resourceId}/grants` && method === 'GET') {
       return send({ grants: [] })
     }
     return send(
@@ -135,15 +132,15 @@ test('creates a PostgreSQL resource and confirms its retirement', async ({
       animations: 'disabled',
     })
   }
-  expect(mutations).toEqual(['POST /v1/projects/alpha/resources'])
+  expect(mutations).toEqual(['POST /v1/projects/alpha/stores'])
   await dialog.getByRole('button', { name: 'Confirm' }).click()
   await expect(page.getByText(/Desired: retired · allocation:/)).toBeVisible()
   await expect(page.getByText('retired', { exact: true })).toBeVisible()
   await expect(dialog).toBeHidden()
   await expect(page.locator('.mantine-Modal-overlay')).toBeHidden()
   expect(mutations).toEqual([
-    'POST /v1/projects/alpha/resources',
-    `POST /v1/resources/${resourceId}/retirement`,
+    'POST /v1/projects/alpha/stores',
+    `POST /v1/stores/${resourceId}/retirement`,
   ])
 
   await page.setViewportSize({ width: 390, height: 844 })

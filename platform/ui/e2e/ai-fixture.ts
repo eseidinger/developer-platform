@@ -108,7 +108,15 @@ export async function aiFixture(
         }
       : {}),
   })
-  await page.route('**/projects/**', async (route) => {
+  await page.route(/\/projects\/[^/]+\/ai(?:\?.*)?$/, async (route) => {
+    if (!route.request().isNavigationRequest()) return route.fallback()
+    return route.fulfill({
+      response: await route.fetch({
+        url: new URL('/e2e/ai-harness.html', route.request().url()).href,
+      }),
+    })
+  })
+  await page.route('**/v1/projects/**', async (route) => {
     const request = route.request()
     const url = new URL(request.url())
     const path = url.pathname
@@ -122,7 +130,7 @@ export async function aiFixture(
         }),
       })
     const method = request.method()
-    const project = path.split('/')[2] ?? 'demo'
+    const project = path.split('/')[3] ?? 'demo'
     const body = JSON.parse(request.postData() ?? '{}') as Record<
       string,
       unknown

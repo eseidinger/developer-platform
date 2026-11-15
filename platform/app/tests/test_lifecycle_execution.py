@@ -241,3 +241,28 @@ class LifecycleExecutionTests(unittest.TestCase):
         erasure.atomic(erasure.directory() / (identity + ".final.json"), payload)
         worker.process_one(main)
         self.assertEqual(self.operation(identity)["state"], "succeeded")
+
+    def test_failed_restore_can_be_retried_with_current_operation_version(self):
+        self.start("retire")
+        worker.process_one(main)
+        identity = self.start("restore")
+        worker.process_one(main)
+        previous = self.operation(identity)["result"]["deployment_operation_id"]
+        with self.connect() as conn:
+            conn.execute("UPDATE application_operations SET state='failed'")
+        worker.process_one(main)
+        operation = self.operation(identity)
+        self.assertEqual(operation["state"], "blocked")
+        stale = self.client.post(
+            "/v1/operations/" + identity + "/retry", headers={"If-Match": "stale"}
+        )
+        self.assertEqual(stale.status_code, 412)
+        response = self.client.post(
+            "/v1/operations/" + identity + "/retry",
+            headers={"If-Match": operation["updated_at"].isoformat()},
+        )
+        self.assertEqual(response.status_code, 202, response.text)
+        worker.process_one(main)
+        result = self.operation(identity)["result"]
+        self.assertTrue(result["prepared"])
+        self.assertNotEqual(result["deployment_operation_id"], previous)

@@ -853,6 +853,11 @@ def install(app, control):
         principal: Principal = caller,
         if_match: str = Header(alias="If-Match"),
     ):
+        lifecycle = app.state.retry_lifecycle_operation(
+            operation_id, principal, if_match
+        )
+        if lifecycle:
+            return JSONResponse(lifecycle, status_code=202)
         with control.connect() as conn, store.locked(conn):
             op = conn.execute(
                 "SELECT resource_id, action, state FROM hosted_access_operations WHERE id::text=%s",

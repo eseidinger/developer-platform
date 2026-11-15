@@ -96,6 +96,22 @@ export function LifecycleDialog({
           {preview.data && (
             <>
               <p>Project ID: {preview.data.project_id}</p>
+              <ul>
+                {preview.data.inventory.workloads.map((resource) => (
+                  <li key={`${resource.kind}/${resource.name}`}>
+                    {resource.kind} {resource.name}
+                  </li>
+                ))}
+                {preview.data.inventory.named_store_resources.map((store) => (
+                  <li key={store.name}>
+                    {store.provider} store {store.name}
+                  </li>
+                ))}
+              </ul>
+              <p>
+                {preview.data.inventory.named_store_grants.length} store grants
+                in scope.
+              </p>
               {preview.data.blockers.length > 0 && (
                 <p role="alert">Blocked: {preview.data.blockers.join(', ')}</p>
               )}

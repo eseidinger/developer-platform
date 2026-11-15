@@ -1639,6 +1639,36 @@
         "title": "LifecyclePreview",
         "type": "object"
       },
+      "LifecycleRetry": {
+        "additionalProperties": true,
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "operation_id": {
+            "format": "uuid",
+            "title": "Operation Id",
+            "type": "string"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "status_url": {
+            "title": "Status Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation_id",
+          "kind",
+          "state",
+          "status_url"
+        ],
+        "title": "LifecycleRetry",
+        "type": "object"
+      },
       "Metadata": {
         "additionalProperties": false,
         "properties": {
@@ -4100,7 +4130,15 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/AccessResource"
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/AccessResource"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LifecycleRetry"
+                    }
+                  ],
+                  "title": "Response Retry Operation V1 Operations  Operation Id  Retry Post"
                 }
               }
             },

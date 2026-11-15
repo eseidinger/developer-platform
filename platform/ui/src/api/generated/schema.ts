@@ -2547,6 +2547,22 @@ export interface components {
         } & {
             [key: string]: unknown;
         };
+        /** LifecycleRetry */
+        LifecycleRetry: {
+            /** Kind */
+            kind: string;
+            /**
+             * Operation Id
+             * Format: uuid
+             */
+            operation_id: string;
+            /** State */
+            state: string;
+            /** Status Url */
+            status_url: string;
+        } & {
+            [key: string]: unknown;
+        };
         /** Metadata */
         Metadata: {
             /** Name */
@@ -3662,7 +3678,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["AccessResource"];
+                    "application/json": components["schemas"]["AccessResource"] | components["schemas"]["LifecycleRetry"];
                 };
             };
             /** @description Invalid request */

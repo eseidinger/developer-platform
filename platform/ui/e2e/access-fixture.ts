@@ -145,7 +145,7 @@ export async function accessFixture(
     tasks.set(op.id, { ticks: 0, finish })
     return op.id
   }
-  await page.route('**/projects/*/components', (route) =>
+  await page.route('**/v1/projects/*/components', (route) =>
     route.fulfill({
       json: {
         components: [
@@ -172,11 +172,12 @@ export async function accessFixture(
       route.fulfill({ json: data, status })
     if (method !== 'GET')
       mutations.push({ method, path, body, headers: request.headers() })
+    if (path.endsWith('/components')) return route.fallback()
     if (path === '/v1/capabilities')
       return send({
         hostedApplicationAccess: {
           modes: ['browser-session', 'bearer-token'],
-          requires: 'platform.example/v1alpha2',
+          requires: 'platform.eseidinger.de/v1',
           authorization: 'anyOfGroups',
           maxAuthorizationStalenessSeconds: 300,
           credentialIsolation: 'project',
@@ -190,7 +191,7 @@ export async function accessFixture(
         eligible: options.eligible ?? true,
         reason:
           options.eligible === false
-            ? 'Deploy a v1alpha2 application before configuring access'
+            ? 'Deploy a v1 application before configuring access'
             : null,
         component: options.eligible === false ? null : 'api',
         url:
