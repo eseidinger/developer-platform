@@ -4,9 +4,9 @@ Status: current lab procedure with future capabilities explicitly labelled.
 
 ## Lab validation scope
 
-[ADR-010](../architecture/decisions/ADR-010-single-environment-lab.md) selects
+[ADR-010](../history/adrs/ADR-010-single-environment-lab.md) selects
 the existing lab and watchdog for reversible operational exercises.
-[ADR-016](../architecture/decisions/ADR-016-phase-1a-recovery-scope.md) omits
+[ADR-016](../history/adrs/ADR-016-phase-1a-recovery-scope.md) omits
 isolated recovery exercises from Phase 1A. Fresh-VM commands below document
 historical drills and the procedure for a future explicitly selected recovery;
 they are not a current Phase 1A acceptance step. Use the
@@ -95,10 +95,10 @@ recovery, live alert receipt, unavailable backup and key failures, denied
 network destinations, and database-backed application transactions remain
 separate acceptance work. Deliberate corruption injection into the sole live
 repository is an accepted lab limitation under
-[ADR-011](../architecture/decisions/ADR-011-watchdog-monitoring-boundary.md);
+[ADR-011](../history/adrs/ADR-011-watchdog-monitoring-boundary.md);
 repository `check`, verified readback, and checksum-rejection tests remain the
 available evidence. The
-[delivery backlog progress checklist](../maintainers/delivery/backlog.md#current-backup-and-recovery-progress)
+[delivery backlog progress checklist](../history/backlog.md#current-backup-and-recovery-progress)
 owns task status; this guide explains execution and the scope of reported
 evidence.
 
@@ -167,7 +167,7 @@ data/credential backups; Tempo's bounded filesystem is outside the backup.
 
 The implemented bundle, verification, retention and notification boundaries are
 recorded in
-[ADR-015](../architecture/decisions/ADR-015-verified-backup-bundles.md).
+[ADR-015](../history/adrs/ADR-015-verified-backup-bundles.md).
 Readback validates captured bytes; it does not establish SQL/application
 restoration.
 
@@ -191,7 +191,7 @@ This prepares storage only. The separate
 adds capture, exact-snapshot readback, retention and independent backup alerts;
 successful-path restore has operator-reported evidence; remaining acceptance is
 described above. The confirmed policy and implementation evidence are tracked
-under OPS-006 in the [delivery backlog](../maintainers/delivery/backlog.md).
+under OPS-006 in the [delivery backlog](../history/backlog.md).
 
 ## Make a current backup
 
@@ -342,7 +342,7 @@ review current authority before traffic resumes. Precise recovery measurement
 and deployed store-backed application reconnection remain open.
 
 See [Deployment](lifecycle.md), [Runbook](runbooks/README.md), and
-[ADR-003](../architecture/decisions/ADR-003-postgresql-provisioning.md).
+[ADR-003](../history/adrs/ADR-003-postgresql-provisioning.md).
 
 ## Retrieve a scheduled recovery bundle
 

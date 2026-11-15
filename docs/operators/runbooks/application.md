@@ -109,7 +109,7 @@ Run with a short-lived `PLATFORM_ACCESS_TOKEN`. Set
 `P=http://127.0.0.1:8000/projects/demo` and include the authorization header
 shown above. Each write returns 202 and `rollout_required`; check `activation`
 on the matching GET before relying on a change. Evidence: EV-30, EV-33 to EV-37
-in the [backlog](../../maintainers/delivery/backlog.md). The scoped
+in the [backlog](../../history/backlog.md). The scoped
 `scripts/tests/platform/check-lifecycle.py` runner consolidates configuration,
 secret rotation/revert/confirm, failed-pod log redaction, authorization/audit,
 and retirement checks. See the

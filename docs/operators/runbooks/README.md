@@ -17,5 +17,5 @@ when the boundary is unclear. Record the time, host, code revision, affected
 project, latest declaration, observed symptoms, and recovery result.
 
 The procedures were reviewed against source. The
-[delivery evidence register](../../maintainers/delivery/backlog.md#evidence-conventions)
+[delivery evidence register](../../history/backlog.md#evidence-conventions)
 records which checks have actually run and their environment limits.

@@ -65,7 +65,7 @@ secrets, personal data, raw paths with identifiers and unbounded labels.
 Operators may use the shared Prometheus/Grafana backends; project readers
 receive only fixed project-scoped views through the Platform API. Missing or
 failed scrapes are explicit, not healthy zeros. See
-[Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023).
+[Phase 4](../history/plans/phase-4-tracing-and-dashboards.md#43-collect-hosted-application-metrics-plan-023).
 
 ## Application tracing declaration
 
@@ -85,9 +85,9 @@ are untrusted. Raw traces remain operator-only; any project-facing read is a
 fixed, bounded, server-scoped Platform API view. Span export excludes secrets,
 personal data, bodies, SQL text and raw identifier-bearing URLs, with explicit
 sampling and storage limits. See
-[Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md#44-let-hosted-applications-participate-in-tracing-plan-024).
+[Phase 4](../history/plans/phase-4-tracing-and-dashboards.md#44-let-hosted-applications-participate-in-tracing-plan-024).
 The chosen backend, collector path, token verification, budget and read contract
-are recorded in [ADR-021](decisions/ADR-021-phase-4-tracing-boundary.md).
+are recorded in [ADR-021](../history/adrs/ADR-021-phase-4-tracing-boundary.md).
 
 ## Generic cross-project integration profile
 
@@ -127,7 +127,7 @@ requires `browser-session` or `bearer-token`; anonymous routes are unsupported.
 Policies use immutable atomically activated revisions. Authorization snapshots,
 machine tokens, and browser claim refresh are bounded to five minutes and fail
 closed after expiry.
-[ADR-020](decisions/ADR-020-generic-hosted-application-integration.md) defines
+[ADR-020](../history/adrs/ADR-020-generic-hosted-application-integration.md) defines
 request retention, session lifetime, credential rotation, and recovery
 reconciliation.
 
@@ -154,7 +154,7 @@ Applications own domain data, fine-grained domain authorization, and row-level
 retention. The platform owns application-group lifecycle, coarse route
 authorization, infrastructure retention, and handling boundaries. Projects
 declare classification as governance metadata separate from desired deployment
-state. [ADR-020](decisions/ADR-020-generic-hosted-application-integration.md)
+state. [ADR-020](../history/adrs/ADR-020-generic-hosted-application-integration.md)
 defines the accepted authentication, authorization, retention, and Public,
 Internal, Confidential, and Restricted handling rules.
 
@@ -175,5 +175,5 @@ New capabilities first require a bounded contract, capability advertisement,
 rejection behavior on unsupported environments, migration/rollback rules, and
 acceptance evidence. Optional provider or service extraction must preserve the
 public concepts and identifiers described here. See
-[Architecture evolution](evolution.md) and
-[ADR-001](decisions/ADR-001-platform-api-abstraction.md).
+[Architecture evolution](../history/plans/architecture-evolution.md) and
+[ADR-001](../history/adrs/ADR-001-platform-api-abstraction.md).

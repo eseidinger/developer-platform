@@ -109,8 +109,8 @@ explicitly enables reconciliation.
 
 See the [current provisioning sequence](diagrams/provisioning.md),
 [ApplicationSpec](application-contract.md),
-[security model](../maintainers/delivery/history/security-design.md), and
-[Phase 2C capability plan](../maintainers/delivery/history/phase-2c-platform-capabilities.md).
+[security model](../history/plans/security-design.md), and
+[Phase 2C capability plan](../history/plans/phase-2c-platform-capabilities.md).
 
 ## Historical architecture work
 
@@ -119,5 +119,5 @@ their original dates. They are historical records. The implemented
 reference is this architecture, the
 [declaration contract](application-contract.md), the generated OpenAPI
 schema and current operator runbooks. Proposed compute adapters and
-service extraction in [evolution notes](evolution.md) are not
-implemented.
+service extraction in
+[evolution notes](../history/plans/architecture-evolution.md) are not implemented.

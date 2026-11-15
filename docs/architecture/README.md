@@ -93,7 +93,8 @@ durable operation and audit identifiers.
 A direct Docker application adapter and Kotlin/Spring catalog, Java/Quarkus
 control plane, or separately deployed Python workers are outside the current
 architecture. They may be considered independently in
-[Architecture evolution](evolution.md) only after a concrete need is recorded
+[Historical expansion plan](../history/plans/architecture-evolution.md)
+only after a concrete need is recorded
 and migration, parity, recovery, and rollback gates are defined.
 
 ## Architecture map
@@ -105,4 +106,4 @@ and migration, parity, recovery, and rollback gates are defined.
 - [Observability](observability.md)
 - [Application contract](application-contract.md)
 - [Diagrams](diagrams/README.md)
-- [Architecture decisions](decisions/README.md)
+- [Historical architecture decisions](../history/adrs/README.md)

@@ -18,6 +18,6 @@ python3 -m pytest platform/cli/tests
 ```
 
 See the source-adjacent [CLI README](../../platform/cli/README.md) for its
-minimal runtime example and the [implementation plan](delivery/plans/cli.md) for
+minimal runtime example and the [implementation plan](../history/plans/cli.md) for
 active increments. Stable commands and authentication behavior belong in the
 [developer CLI guide](../developers/cli.md), not only in the plan.

@@ -33,14 +33,14 @@ for both remains open. AI runs provide bounded project
 explanations/investigations and curated guidance; a separate approved proposal
 can execute a rollback. The API and CLI provide automation. Source
 implementation and local tests do not establish every deployed acceptance
-criterion; see the [roadmap](roadmap.md).
+criterion; see the [roadmap](../history/plans/product-roadmap.md).
 
-[ADR-022](../architecture/decisions/ADR-022-postgresql-and-s3-storage-scope.md)
+[ADR-022](../history/adrs/ADR-022-postgresql-and-s3-storage-scope.md)
 narrows the target store set to PostgreSQL with its extensions and S3-compatible
 object storage. Other implemented providers are pending removal, with storage
 experiments moving to a planned separate lab outside this repository. After that
 reduction,
-[PLAN-040](../maintainers/delivery/plans/postgresql-extension-expansion.md)
+[PLAN-040](../history/plans/postgresql-extension-expansion.md)
 adds TimescaleDB, PostGIS, pgmq, and pg_duckdb to PostgreSQL.
 
 ## Users and value

@@ -56,4 +56,4 @@ applications. Register each consuming application's metrics endpoint and verify
 its workload panels after integration. See the
 [store monitoring workflow](../../infrastructure/monitoring/CAPACITY-AND-STORES.md#named-store-performance)
 and the
-[Phase 9 measurement plan](../../docs/maintainers/delivery/plans/phase-9-store-measurement-and-comparison.md#eight-performance-dashboards).
+[Phase 9 measurement plan](../../docs/history/plans/phase-9-store-measurement-and-comparison.md#eight-performance-dashboards).

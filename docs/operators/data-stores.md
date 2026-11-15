@@ -5,7 +5,7 @@ storage through RustFS. PostgreSQL resources can select extensions installed in
 the reviewed server image. The retired OpenSearch, Qdrant, Neo4j, CouchDB, and
 HugeGraph providers are recorded in the
 [PLAN-039 cutover evidence](validation/storage-scope-2026-11-12.md) and the
-[historical backlog](../maintainers/delivery/backlog.md). Their pre-removal
+[historical backlog](../history/backlog.md). Their pre-removal
 implementation is pinned at Git commit `632b921` for recovery of older snapshots.
 
 ## Selecting shared services
@@ -126,7 +126,7 @@ lease. Its connection is limited to the named database and current grant mode.
 Saving a database password is disabled. A revoked or expired grant denies a new
 connection and closes an active one. The console itself has no server-wide
 administration grant. See the
-[PostgreSQL verification record](../maintainers/delivery/backlog.md#verification-register)
+[PostgreSQL verification record](../history/backlog.md#verification-register)
 for the exercised browser paths and their limits.
 
 ## AGE authoritative snapshots and rebuild
@@ -134,9 +134,9 @@ for the exercised browser paths and their limits.
 If an application uses AGE as a projection, retain its authoritative source,
 loader, graph definition, and a validation procedure. Restore keeps access
 quarantined until the graph and source agree. The
-[AGE operations guide](../maintainers/delivery/plans/data-store-expansion.md)
+[AGE operations guide](../history/plans/data-store-expansion.md)
 contains the historical verification context. The four-extension expansion is
-tracked separately in [PLAN-040](../maintainers/delivery/plans/postgresql-extension-expansion.md).
+tracked separately in [PLAN-040](../history/plans/postgresql-extension-expansion.md).
 
 ## Retention and capacity
 

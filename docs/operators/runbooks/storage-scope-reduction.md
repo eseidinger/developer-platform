@@ -1,6 +1,6 @@
 # PLAN-039 storage scope reduction: operator record
 
-Use this record with the [delivery plan](../../maintainers/delivery/plans/storage-scope-reduction.md)
+Use this record with the [delivery plan](../../history/plans/storage-scope-reduction.md)
 for each installation. PostgreSQL and S3 remain the project data stores.
 On an installation still running a pre-removal revision, OpenSearch, Qdrant,
 Neo4j, CouchDB, and HugeGraph may be used only for existing-resource migration

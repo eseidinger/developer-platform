@@ -6,7 +6,7 @@ Use this one-time procedure to introduce the supported Keycloak reference
 identity provider to an existing deployed lab, establish the first individual
 `platform-admin`, and remove the bootstrap path. It implements the identity
 boundary selected in
-[ADR-004](../architecture/decisions/ADR-004-identity-and-access-management.md);
+[ADR-004](../history/adrs/ADR-004-identity-and-access-management.md);
 it does not complete the Phase 1B acceptance tasks by itself.
 
 Run host commands from the installation directory, normally
@@ -132,7 +132,7 @@ not mark Phase 1B closed from bootstrap alone.
 The hosted-access implementation has deployed core evidence: node-01 run
 `c927adee1d50` passed all 39 named checks, including timed token expiry, on
 October 11, 2026
-([EV-45](../maintainers/delivery/backlog.md#verification-register)). The
+([EV-45](../history/backlog.md#verification-register)). The
 [run record](validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026)
 lists the nine deferred checks; full PLAN-009/F-10 acceptance remains open.
 Hosted access is not authorization to manage this Platform API. Follow the

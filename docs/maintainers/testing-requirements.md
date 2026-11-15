@@ -40,7 +40,7 @@ prerequisites are met.
 The API stage is the next implementation milestone. CLI and UI stages must not
 be counted as passed merely because the API stage succeeds. Its proposed
 implementation is the
-[deployed API acceptance suite plan](delivery/plans/deployed-api-acceptance.md).
+[deployed API acceptance suite plan](../history/plans/deployed-api-acceptance.md).
 
 ## Test boundaries
 
@@ -186,7 +186,7 @@ acceptance.
 1. Decide when installed-platform acceptance runs and whether it is a release
    gate. It need not run in CI on every push or pull request.
 1. Record how this newly requested disposable-test approach updates
-   [ADR-010's earlier single-environment lab policy](../architecture/decisions/ADR-010-single-environment-lab.md)
+   [ADR-010's earlier single-environment lab policy](../history/adrs/ADR-010-single-environment-lab.md)
    before provisioning a new environment. The policy rejected a standing extra
    test platform; the proposed environment is disposable and run-scoped.
 1. Define ownership and retention for installation artifacts, protected test

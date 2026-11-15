@@ -85,7 +85,7 @@ After setup, test correct and incorrect tokens, rate limiting, heartbeat loss,
 recovery email, and a failed cron job. The backlog records selected deployed
 heartbeat and backup DOWN/UP receipts. Those dated outcomes do not prove every
 channel/failure scenario; see
-[current monitoring evidence](../../docs/maintainers/delivery/backlog.md#current-monitoring-progress).
+[current monitoring evidence](../../docs/history/backlog.md#current-monitoring-progress).
 
 ## Repository layout and tests
 

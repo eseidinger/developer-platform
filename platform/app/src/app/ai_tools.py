@@ -335,11 +335,11 @@ def make_tools(project, current_spec, connect, runtime=None):
                     "fact": "Deployment queues an operation; inspect its status and readiness.",
                 },
                 {
-                    "path": "docs/architecture/decisions/ADR-020-generic-hosted-application-integration.md",
+                    "path": "docs/history/adrs/ADR-020-generic-hosted-application-integration.md",
                     "fact": "Hosted application integration is declaration based and project scoped.",
                 },
                 {
-                    "path": "docs/architecture/decisions/ADR-021-phase-4-tracing-boundary.md",
+                    "path": "docs/history/adrs/ADR-021-phase-4-tracing-boundary.md",
                     "fact": "Telemetry is opt-in and trace context is bounded at the platform boundary.",
                 },
             ],

@@ -7,10 +7,10 @@ maintenance guidance belongs in the
 
 This directory contains the React and TypeScript workspace for the Platform
 Control Plane portal. The component and styling selection is recorded in
-[ADR-023](../../docs/architecture/decisions/ADR-023-mantine-portal-components.md),
-which updates the original [stack decision](../../docs/architecture/decisions/ADR-019-react-ui-technology-stack.md).
+[ADR-023](../../docs/history/adrs/ADR-023-mantine-portal-components.md),
+which updates the original [stack decision](../../docs/history/adrs/ADR-019-react-ui-technology-stack.md).
 Delivery is sequenced in the
-[UI implementation plan](../../docs/maintainers/delivery/plans/ui.md).
+[UI implementation plan](../../docs/history/plans/ui.md).
 
 ## Status
 

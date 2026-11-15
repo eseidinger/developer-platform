@@ -1,7 +1,7 @@
 # Deployment topology
 
 Status: the hybrid solution is the selected starting topology.
-[ADR-009](decisions/ADR-009-edge-and-cluster-ingress.md) accepts the implemented
+[ADR-009](../history/adrs/ADR-009-edge-and-cluster-ingress.md) accepts the implemented
 Caddy edge / Traefik cluster ingress split. Source and capability-specific
 deployed evidence are recorded in the backlog; complete target-host acceptance
 remains open. Operator-reported marker-based recovery and selected email
@@ -98,7 +98,7 @@ certificate authorization therefore depends on the API and PostgreSQL.
 This gate does not check every application request or prove workload
 health. Keep the edge independent of Kubernetes/Docker API
 credentials. See
-[ADR-009](decisions/ADR-009-edge-and-cluster-ingress.md) for
+[ADR-009](../history/adrs/ADR-009-edge-and-cluster-ingress.md) for
 alternatives and required issuance, rejection, outage, header, and
 certificate-recovery tests.
 
@@ -140,7 +140,7 @@ API/Prometheus checks stop its heartbeat. The external watchdog detects expiry,
 including during host loss. Broader host checks remain target work. The operator
 has reported receipt for heartbeat, selected Alertmanager and backup scenarios;
 see
-[current monitoring evidence](../maintainers/delivery/backlog.md#current-monitoring-progress).
+[current monitoring evidence](../history/backlog.md#current-monitoring-progress).
 
 ## Expansion option
 
@@ -155,5 +155,5 @@ five-VM topology is an option, not the current deployment scope. It still has
 database and monitoring single points of failure unless additional measures are
 introduced.
 
-Decision: [ADR-002](decisions/ADR-002-docker-vs-kubernetes.md). Installation
+Decision: [ADR-002](../history/adrs/ADR-002-docker-vs-kubernetes.md). Installation
 sequence: [Deployment](../operators/lifecycle.md).

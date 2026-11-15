@@ -10,7 +10,7 @@ a separate scope decision.
 gates: 1A operational protection, 1B accountable access, and 1C durable
 single-application lifecycle. It is not a separate stage before the numbered
 phases. See the
-[Phase 1 gates](../maintainers/delivery/history/phase-1-foundation.md#ordered-work-packages-and-acceptance-gates).
+[Phase 1 gates](../history/plans/phase-1-foundation.md#ordered-work-packages-and-acceptance-gates).
 
 The delivery phase identifies when the listed acceptance evidence is first
 required. Requirements continue to apply in later phases and to new
@@ -205,13 +205,13 @@ completing every backlog story.
 F-03's original implicit project database has been replaced by independent named
 resources and explicit component bindings. Current declarations do not create a
 project database automatically. Store provider scope and remaining acceptance
-are recorded in the [data-store roadmap](data-store-roadmap.md).
+are recorded in the [data-store roadmap](../history/plans/data-store-roadmap.md).
 
 ## Delivery acceptance
 
-The [delivery backlog](../maintainers/delivery/backlog.md) retains detailed
+The [delivery backlog](../history/backlog.md) retains detailed
 DEV/OPS acceptance criteria. The
-[development plan crosswalk](../maintainers/delivery/README.md#backlog-delivery-commitments)
+[development plan crosswalk](../history/delivery.md#backlog-delivery-commitments)
 assigns them to phases, including security-event notifications and project
 retirement as explicit extensions of these broad requirements. F-13 and F-14
 have accepted Phase 2 evidence under the recorded lab limitations; the roadmap
@@ -229,18 +229,18 @@ Availability, p95 provisioning time, API latency and concurrent application
 count remain to be defined. The owner selected a 24-hour RPO and four-hour RTO,
 twelve-hour backups and 14 daily / 8 weekly / 6 monthly retention points; these
 are targets, not measured guarantees.
-[ADR-020](../architecture/decisions/ADR-020-generic-hosted-application-integration.md)
+[ADR-020](../history/adrs/ADR-020-generic-hosted-application-integration.md)
 accepts a seven-day centralized workload-log target and Public, Internal,
 Confidential, and Restricted classification rules for the Phase 3 integration
 profile. Minimized Kubernetes operational-envelope collection and authorized
 retained-log reads are implemented; ordinary free-text logs remain kubelet best
 effort. Seven elapsed days and compactor deletion remain unverified. The lab
 initial response target is 24 hours with one responder. See
-[backup policy evidence](../maintainers/delivery/backlog.md#current-backup-and-recovery-progress)
+[backup policy evidence](../history/backlog.md#current-backup-and-recovery-progress)
 and [alert ownership](../operators/monitoring.md#alert-process). Measure
 representative baselines before promising SLAs.
 
 Multi-cluster operation, automatic multi-node HA, a broad data-service catalog,
 complex autoscaling, and unattended AI remediation are outside Phase 1 (MVP).
-See the [development plan](../maintainers/delivery/README.md) for phases and
+See the [development plan](../history/delivery.md) for phases and
 dependencies.

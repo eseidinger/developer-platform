@@ -109,7 +109,7 @@ that the application is down.
 There is no additional external watchdog monitor. The existing heartbeat checks
 API and Prometheus readiness; it does not prove Alertmanager delivery. Watchdog
 silent failure remains accepted under
-[ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md).
+[ADR-011](../../docs/history/adrs/ADR-011-watchdog-monitoring-boundary.md).
 
 ## Retirement
 

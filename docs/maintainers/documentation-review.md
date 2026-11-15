@@ -3,7 +3,7 @@
 Status: dated source review of `390f5e92fe630926d20899a2a3eaa71485f87621` and
 the documentation changes accompanying this report. This is not new deployed
 acceptance evidence. Current guides describe supported source behavior; the
-[delivery register](delivery/backlog.md#verification-register) retains the exact
+[delivery register](../history/backlog.md#verification-register) retains the exact
 scope of earlier local and deployed results.
 
 ## Coverage and review passes
@@ -264,4 +264,4 @@ acceptance result. The original findings above remain the dated review record.
     now runs in CI.
   - **Still needed:** Implement and run the installed API/CLI/UI acceptance
     stages; settle the disposable-environment approach against
-    [ADR-010](../architecture/decisions/ADR-010-single-environment-lab.md).
+    [ADR-010](../history/adrs/ADR-010-single-environment-lab.md).

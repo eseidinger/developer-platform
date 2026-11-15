@@ -154,7 +154,7 @@ exception. Other egress requires an approved declaration and is denied after
 policy convergence. New pods can briefly have egress before kube-router rules
 apply. Compose DNS does not resolve from pods, so PostgreSQL uses a fixed
 private IP. PostgreSQL TLS is not configured.
-[ADR-020](../architecture/decisions/ADR-020-generic-hosted-application-integration.md)
+[ADR-020](../history/adrs/ADR-020-generic-hosted-application-integration.md)
 accepts that transport as outside the first-release cross-project
 encrypted-channel requirement; operators must not describe the profile as
 encrypting all application traffic.

@@ -10,7 +10,7 @@ project workspace has lifecycle, diagnostics, project grants and deployment
 credentials, with separate pages for **Application access**, **Data stores** and
 **AI assistance**. **My store access** lists the signed-in human's explicit
 store grants and leases across projects. Implementation and acceptance evidence
-are tracked in the [delivery backlog](../maintainers/delivery/backlog.md).
+are tracked in the [delivery backlog](../history/backlog.md).
 
 The desktop portal has a persistent sidebar for **Projects**, **My store
 access**, and **Platform admin**. On narrow screens, open the menu in the
@@ -92,7 +92,7 @@ first-login and service-access journey checks. Their behavior through the portal
 remains unverified; the supported [API](api.md#hosted-application-access)
 remains available. The exception and original acceptance criteria are recorded
 in
-[UI increment 4a](../maintainers/delivery/plans/ui.md#4a-deliver-hosted-application-access-plan-020).
+[UI increment 4a](../history/plans/ui.md#4a-deliver-hosted-application-access-plan-020).
 
 Open a project and select **Application access**. Keep this area separate from
 **Project access** and **Deployment credentials**: permission to deploy or

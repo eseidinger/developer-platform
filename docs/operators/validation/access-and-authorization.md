@@ -169,14 +169,14 @@ redaction review remain deferred too. The retired fixture databases remain
 retained under the normal data-retention policy. This record does not close
 PLAN-008 or the Phase 10 gate; the three remaining reviews are the final,
 lowest-priority
-[10.8 work package](../../maintainers/delivery/plans/phase-10-anytime-leftovers.md#108-complete-the-lowest-priority-human-database-leftovers-plan-008).
-See [EV-47](../../maintainers/delivery/backlog.md#verification-register).
+[10.8 work package](../../history/plans/phase-10-anytime-leftovers.md#108-complete-the-lowest-priority-human-database-leftovers-plan-008).
+See [EV-47](../../history/backlog.md#verification-register).
 
 ## Neutral hosted-application acceptance harness
 
 Validation status (October 11, 2026): the deployed neutral-fixture core suite,
 including held-token expiry, passed in run `c927adee1d50`
-([EV-45](../../maintainers/delivery/backlog.md#verification-register)). The
+([EV-45](../../history/backlog.md#verification-register)). The
 [dated evidence below](#executed-hosted-access-core-acceptance-october-11-2026)
 records its scope and remaining checks; the full hosted-access gate is still
 open. Run it only after the
@@ -592,7 +592,7 @@ running platform or substitute for the live acceptance run.
 ## Executed hosted-access core acceptance: October 11, 2026
 
 Evidence ID:
-[EV-45](../../maintainers/delivery/backlog.md#verification-register). Source:
+[EV-45](../../history/backlog.md#verification-register). Source:
 the operator-provided `report.json` from the live node-01 lab, reviewed after
 the run. This documentation records that report; it is not an independent rerun,
 a fresh host inspection, or full Phase 3/F-10 acceptance.
@@ -704,7 +704,7 @@ this neutral suite.
 ## Executed hosted-access monitoring acceptance: October 11, 2026
 
 Evidence ID:
-[EV-46](../../maintainers/delivery/backlog.md#verification-register). Source:
+[EV-46](../../history/backlog.md#verification-register). Source:
 the operator-provided live node-01 `report.json`, following the
 operator-confirmed deployment and healthy Alloy startup. This records supplied
 evidence, not an independent rerun or full Phase 3/F-10 acceptance. EV-45

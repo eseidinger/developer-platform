@@ -30,13 +30,11 @@ For administrators responsible for the shared installation:
 
 ## Change the platform
 
-For contributors and maintainers changing platform code or delivery plans:
+For contributors and maintainers changing the implemented platform:
 
 1. [Maintainer overview](maintainers/README.md)
 1. [Platform API](maintainers/platform-api.md), [CLI](maintainers/cli.md),
    [UI](maintainers/ui.md), and [monitoring](maintainers/monitoring.md)
-1. [Delivery status and plans](maintainers/delivery/README.md)
-1. [Delivery backlog and evidence](maintainers/delivery/backlog.md)
 
 ## Understand the design
 
@@ -49,17 +47,23 @@ For architects and reviewers:
 1. [Deployment topology](architecture/deployment-topology.md),
    [security and authorization](architecture/security-and-authorization.md), and
    [observability](architecture/observability.md)
-1. [Application contract](architecture/application-contract.md),
-   [architecture evolution](architecture/evolution.md), and
-   [decision records](architecture/decisions/README.md)
+1. [Application contract](architecture/application-contract.md)
 
 ## Product direction
 
 - [Overview and vision](product/overview.md)
 - [Use cases](product/use-cases.md)
 - [Requirements](product/requirements.md)
-- [Roadmap](product/roadmap.md)
-- [Data store roadmap](product/data-store-roadmap.md)
+
+## Historical documents
+
+The [historical archive](history/README.md) contains earlier decisions and
+planning material. Its original statuses do not describe the current release.
+
+- [Architecture Decision Records](history/adrs/README.md)
+- [Plans and roadmaps](history/plans/README.md)
+- [Delivery status and sequence](history/delivery.md)
+- [Backlog and evidence](history/backlog.md)
 
 ## Document status
 

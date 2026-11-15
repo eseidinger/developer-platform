@@ -9,7 +9,7 @@ Run deployment commands from the repository root.
 
 ## Current lab policy
 
-[ADR-010](../../docs/architecture/decisions/ADR-010-single-environment-lab.md)
+[ADR-010](../../docs/history/adrs/ADR-010-single-environment-lab.md)
 selects the existing platform and watchdog for controlled, reversible checks. Do
 not create an additional test or recovery environment as a routine next step.
 The isolated recovery procedures below remain references for past drills or a
@@ -221,7 +221,7 @@ recovery service/timer remains responsible for recovery.
 
 These exercises cover natural backup age and a stalled attempt while local
 monitoring remains available.
-[ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md)
+[ADR-011](../../docs/history/adrs/ADR-011-watchdog-monitoring-boundary.md)
 accepts skipping the missing-update/local-monitoring-outage exercise for this
 lab. Notification-delivery-failure injection is an accepted limitation under
 ADR-011; these exercises do not claim restoration acceptance.
@@ -281,7 +281,7 @@ Select a subset with, for example,
 successful preflight proves only that the negative cases failed; it does not
 prove an unavailable bundle can be restored. Deliberately corrupting the sole
 live repository is an accepted limitation under
-[ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md);
+[ADR-011](../../docs/history/adrs/ADR-011-watchdog-monitoring-boundary.md);
 repository `check`, verified readback, and checksum-rejection tests remain the
 available evidence. Do not run it against `node-01`.
 
@@ -385,7 +385,7 @@ backup or restore. Use
 [scheduled backup deployment](#scheduled-backups-and-independent-backup-alerts)
 for capture, retention and independent reporting. Live verification and restore
 remain OPS-006-T02/T03 work in the
-[delivery backlog](../../docs/maintainers/delivery/backlog.md). Preserve
+[delivery backlog](../../docs/history/backlog.md). Preserve
 platform configuration, database roles/data, secrets and required service state
 in the recovery bundle; a repository alone does not cover that inventory.
 
@@ -541,7 +541,7 @@ last successful capture. Notifications are deduplicated and failed mail handoff
 is retried by cron. Host and backup channels share the external hosting/mail
 provider; silent watchdog-hosting/scheduler failure is an accepted lab
 limitation under
-[ADR-011](../../docs/architecture/decisions/ADR-011-watchdog-monitoring-boundary.md),
+[ADR-011](../../docs/history/adrs/ADR-011-watchdog-monitoring-boundary.md),
 with no additional observer required.
 
 Notification transport failure does not invalidate a verified snapshot. A
@@ -555,7 +555,7 @@ including a pre-backup SQL marker. Precisely measured RPO/RTO, live S3 failure
 tests, scenario-specific backup-alert receipt, and database-backed application
 acceptance remain separate evidence requirements. Selected DOWN/UP paths have
 since been reported; see the
-[current backlog](../../docs/maintainers/delivery/backlog.md#current-backup-and-recovery-progress).
+[current backlog](../../docs/history/backlog.md#current-backup-and-recovery-progress).
 Exact-file readback is not an application restore exercise. Continue with
 [backup and recovery](../../docs/operators/backup-and-recovery.md).
 

@@ -7,7 +7,7 @@ and tests belong in the [maintainer guide](../maintainers/monitoring.md).
 
 Status: implemented lab signals plus target coverage. Source configuration is
 not deployment evidence;
-[current monitoring progress](../maintainers/delivery/backlog.md#current-monitoring-progress)
+[current monitoring progress](../history/backlog.md#current-monitoring-progress)
 records local preparation and operator-reported outcomes separately.
 
 ## Current signals and placement
@@ -76,7 +76,7 @@ access is administrative. Project users read centralized logs only through the
 authorized Platform API's fixed project selector, never an unfiltered
 Grafana/Loki link.
 
-[ADR-020](decisions/ADR-020-generic-hosted-application-integration.md) accepts
+[ADR-020](../history/adrs/ADR-020-generic-hosted-application-integration.md) accepts
 seven-day centralized workload-log retention for the initial cross-project
 integration profile. PLAN-017 now implements attributed workload collection and
 authorized reads; deployed neutral probes/readiness and immediate central
@@ -93,16 +93,16 @@ HTTPS GET checks status codes, not the application content contract. The systemd
 component sends heartbeats only on successful readiness checks; it is not a
 local notification service.
 
-[ADR-014](decisions/ADR-014-catalog-availability-monitoring.md) records catalog
+[ADR-014](../history/adrs/ADR-014-catalog-availability-monitoring.md) records catalog
 membership, bounded profiles, monitoring-only reconciliation and retirement
 semantics. [Application monitoring](../../infrastructure/monitoring/README.md)
 supplies configuration and verification procedures. Discovery retains failed
 applications and excludes only explicitly retired catalog entries. The thread
 does not repair workloads.
 
-[ADR-015](decisions/ADR-015-verified-backup-bundles.md) records capture-time
+[ADR-015](../history/adrs/ADR-015-verified-backup-bundles.md) records capture-time
 freshness and separate backup notifications. Under
-[ADR-011](decisions/ADR-011-watchdog-monitoring-boundary.md), the monitoring
+[ADR-011](../history/adrs/ADR-011-watchdog-monitoring-boundary.md), the monitoring
 chain ends at the external watchdog; silent hosting/scheduler/mail failure is
 accepted for the lab. Maintenance windows are not implemented.
 
@@ -111,7 +111,7 @@ accepted for the lab. Maintenance windows are not implemented.
 PostgreSQL exporter metrics, native-store collection and workload CPU/memory
 scrapes are implemented. Attributed centralized operational logs are
 implemented.
-[Phase 4](../maintainers/delivery/plans/phase-4-tracing-and-dashboards.md) has
+[Phase 4](../history/plans/phase-4-tracing-and-dashboards.md) has
 source for bounded platform and opt-in hosted-application tracing, private Tempo
 collection, operator dashboards, and opt-in private hosted metrics. Phase 4 was
 accepted for lab sequencing under its recorded exception; remaining checks are
@@ -120,7 +120,7 @@ dashboards are recorded in the
 [AI evidence](../../infrastructure/monitoring/AI.md#deployed-smoke-check-october-17-2026).
 Application spans require verified workload provenance; raw trace search remains
 operator-only. The
-[Phase 4 tracing decision](decisions/ADR-021-phase-4-tracing-boundary.md) fixes
+[Phase 4 tracing decision](../history/adrs/ADR-021-phase-4-tracing-boundary.md) fixes
 Tempo/Alloy placement, workload authentication, retention and resource limits,
 and the bounded project-read contract. Spring Boot, Quarkus and FastAPI
 dashboard templates require matching application instrumentation; source
@@ -156,11 +156,11 @@ Selected heartbeat, SMTP, scrape-rule and backup DOWN/UP notifications have
 operator-reported receipt in the backlog. Application probe fixtures do not
 establish live application-rule delivery or complete host/cluster failure
 acceptance. Continue controlled checks on the existing lab under
-[ADR-010](decisions/ADR-010-single-environment-lab.md); no duplicate
+[ADR-010](../history/adrs/ADR-010-single-environment-lab.md); no duplicate
 installation is required.
 
 Phase 5 AI reads authorized telemetry alongside deployment history and redacted
 changes, separating observations, gaps and hypotheses.
-[ADR-005](decisions/ADR-005-observability-watchdog.md) explains target failure
+[ADR-005](../history/adrs/ADR-005-observability-watchdog.md) explains target failure
 boundaries; [Monitoring](../operators/monitoring.md) covers current checks and
 remaining acceptance.

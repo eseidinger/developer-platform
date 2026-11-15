@@ -1,7 +1,7 @@
 # Monitoring and Alerting
 
 Status: operational draft based on
-[ADR-005](../architecture/decisions/ADR-005-observability-watchdog.md).
+[ADR-005](../history/adrs/ADR-005-observability-watchdog.md).
 
 ## Current inspection and evidence
 
@@ -37,14 +37,14 @@ age/failure independently of heartbeat. Backup deployment and selected DOWN/UP
 receipt have operator-reported evidence; remaining scenarios are tracked in the
 backlog.
 
-The [backlog evidence](../maintainers/delivery/backlog.md#evidence-conventions)
+The [backlog evidence](../history/backlog.md#evidence-conventions)
 records passing local watchdog freshness and SMTP fixture tests. The operator
 confirmed heartbeat outage/recovery mail and recovery after correcting the HTTPS
 probe from HEAD to GET. The recorded recovery checks passed Prometheus/Grafana
 health and the three scrape targets configured at that time. Broader
 cluster/host failure exercises, application-rule delivery, notification failures
 and remaining backup scenarios stay open; see
-[current monitoring progress](../maintainers/delivery/backlog.md#current-monitoring-progress).
+[current monitoring progress](../history/backlog.md#current-monitoring-progress).
 Commands in the runbook were reviewed against source, not executed as live
 acceptance for this update.
 
@@ -194,7 +194,7 @@ responder or escalation coverage. Automated detection and notifications continue
 independently of operator availability.
 
 Under
-[ADR-011](../architecture/decisions/ADR-011-watchdog-monitoring-boundary.md),
+[ADR-011](../history/adrs/ADR-011-watchdog-monitoring-boundary.md),
 the existing external watchdog is the end of the lab monitoring chain. No
 additional external service is required to monitor its hosting or scheduler.
 Silent watchdog failure, including missed platform or backup notifications
@@ -228,7 +228,7 @@ backup age.
 
 Verify a real BACKUP DOWN/UP cycle after deployment. Use controlled, reversible
 exercises on the existing lab platform and watchdog, following
-[ADR-010](../architecture/decisions/ADR-010-single-environment-lab.md). A
+[ADR-010](../history/adrs/ADR-010-single-environment-lab.md). A
 separate test installation is not required. Describe impact, retain original
 settings, restore normal operation and verify recovery; do not forge a success
 signal for a backup that has not passed readback. No timer or external channel

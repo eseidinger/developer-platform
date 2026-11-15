@@ -3,7 +3,7 @@
 Status: current. Last reviewed October 18, 2026.
 
 Use this section when changing platform code, contracts, operational automation,
-or delivery plans. Application users should start in the
+or implementation documentation. Application users should start in the
 [developer guide](../developers/README.md); administrators should start in the
 [operator guide](../operators/README.md).
 
@@ -21,17 +21,15 @@ maintainer pages explain cross-component ownership and validation expectations.
 - [Time-dependent test requirements (draft)](time-dependent-test-requirements.md)
 - [Documentation review, October 18, 2026](documentation-review.md)
 
-## Delivery
+## Historical decisions and planning
 
-- [Current delivery status and sequence](delivery/README.md)
-- [Acceptance backlog and evidence](delivery/backlog.md)
-- [Active plans](delivery/plans/)
-- [Historical plans and analyses](delivery/history/)
+- [Historical documentation archive](../history/README.md)
+- [Architecture Decision Records](../history/adrs/README.md)
+- [Plans and roadmaps](../history/plans/README.md)
+- [Delivery status and sequence](../history/delivery.md)
+- [Backlog and acceptance evidence](../history/backlog.md)
 
-When work ships, promote lasting behavior into developer, operator,
-architecture, or reference documentation. Completed plans remain evidence but
-must not be the only place where supported behavior is documented.
-
-For an architectural change, update or supersede the relevant
-[ADR](../architecture/decisions/README.md), then update affected contracts and
-guides. Do not rewrite accepted ADR history to match a newer implementation.
+Use these records as context. Describe shipped behavior in developer, operator,
+architecture, or reference documentation; earlier plans are not the authority for
+current support. For architectural changes, consult the relevant historical ADR
+and update the current contracts and guides. Preserve original decision history.

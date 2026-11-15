@@ -2,13 +2,13 @@
 
 Status: active source and deployed portal.
 
-[ADR-023](../architecture/decisions/ADR-023-mantine-portal-components.md)
+[ADR-023](../history/adrs/ADR-023-mantine-portal-components.md)
 selects Mantine components and a shared theme with focused CSS modules. The
-[migration plan](delivery/plans/mantine-ui-migration.md) records the change and
+[migration plan](../history/plans/mantine-ui-migration.md) records the change and
 its acceptance evidence. Keep the theme and component styles in
 `platform/ui/src/app/theme.tsx` and feature-local CSS modules. Import only the
 Mantine styles used by production components through `src/index.css`.
-The [design refresh plan](delivery/plans/mantine-design-refresh.md) records
+The [design refresh plan](../history/plans/mantine-design-refresh.md) records
 PLAN-042's visual hierarchy and acceptance evidence.
 
 ## Visual conventions
@@ -43,8 +43,8 @@ npm run check
 
 `npm run test:e2e` additionally requires Playwright browser binaries. See the
 [source README](../../platform/ui/README.md),
-[active UI plan](delivery/plans/ui.md), and
-[ADR-019](../architecture/decisions/ADR-019-react-ui-technology-stack.md).
+[historical UI plan](../history/plans/ui.md), and
+[ADR-019](../history/adrs/ADR-019-react-ui-technology-stack.md).
 
 Bearer tokens and one-time secrets must not enter persistent browser storage,
 URLs, logs, query-cache keys, screenshots, or test artifacts. Client-side role
@@ -74,6 +74,6 @@ harness. It loads an isolated authenticated context and intercepts the API; it
 is not live authentication or model acceptance. Run
 `scripts/tests/components/ai/verify-ai-portal-history.py` in the API environment
 for rollback-only PostgreSQL pagination/scope guards. The
-[Phase 5 plan](delivery/plans/phase-5-ai-operations.md#56-integrate-ai-into-the-project-portal-plan-025)
+[Phase 5 plan](../history/plans/phase-5-ai-operations.md#56-integrate-ai-into-the-project-portal-plan-025)
 records the owner’s deployed UI acceptance on October 16, 2026 (PLAN-025 / Phase
 5.6 complete).

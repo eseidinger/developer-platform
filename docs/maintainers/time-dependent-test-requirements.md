@@ -8,7 +8,7 @@ change a product retention policy.
 ## Rule for the deployed API suite
 
 The routine
-[deployed API acceptance suite](delivery/plans/deployed-api-acceptance.md) must
+[deployed API acceptance suite](../history/plans/deployed-api-acceptance.md) must
 omit a check when the assertion can pass only after a token, lease, session,
 request, schedule, retention period, rotation window, or similar configured
 deadline has elapsed. It may inspect the published deadline or retention
@@ -117,4 +117,4 @@ invoked; the new routine API suite must not absorb their elapsed-time
 assertions.
 
 Related scope: [testing requirements](testing-requirements.md) and the
-[deployed API suite plan](delivery/plans/deployed-api-acceptance.md).
+[deployed API suite plan](../history/plans/deployed-api-acceptance.md).

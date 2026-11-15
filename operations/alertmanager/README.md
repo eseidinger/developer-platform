@@ -90,7 +90,7 @@ watchdog failure detection.
 
 Record deployed revision, environment, response owner, send/receipt times for
 both emails and any failures under OPS-007-T01 in the
-[backlog](../../docs/maintainers/delivery/backlog.md#current-monitoring-progress).
+[backlog](../../docs/history/backlog.md#current-monitoring-progress).
 The playbook never marks live acceptance complete.
 
 ## Backup and recovery

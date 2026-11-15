@@ -38,8 +38,8 @@ pins a preview scope, commits the named-store access fence, deletes the managed
 namespace and records retained data/catalog state. It rejects active operations.
 Without a scope token, the compatibility path only acknowledges an already
 absent namespace. See
-[ADR-012](../decisions/ADR-012-admin-provisioning-baseline.md) and
-[ADR-014](../decisions/ADR-014-catalog-availability-monitoring.md).
+[ADR-012](../../history/adrs/ADR-012-admin-provisioning-baseline.md) and
+[ADR-014](../../history/adrs/ADR-014-catalog-availability-monitoring.md).
 
 ## Optional Phase 6 extracted-service contract
 

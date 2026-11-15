@@ -440,7 +440,8 @@ application route anonymous; Internal data remains authenticated; Confidential
 application data receives project-scoped access and encrypted backup handling;
 Restricted data is limited to managed secrets and credentials in the initial
 profile. See
-[ADR-020](decisions/ADR-020-generic-hosted-application-integration.md) for the
+[ADR-020](../history/adrs/ADR-020-generic-hosted-application-integration.md)
+for the
 complete handling and retention decision.
 
 ## PostgreSQL and named-store authorization
@@ -502,8 +503,8 @@ intent. Restore quarantines recovered stores, revokes recovered grants and
 credentials, replays the latest verified purge intent, and requires fresh
 approval. See [named-store operations and recovery](../operators/data-stores.md)
 for limits and provider-specific evidence.
-[ADR-003](decisions/ADR-003-postgresql-provisioning.md) and
-[ADR-013](decisions/ADR-013-database-credential-lifecycle.md) preserve the
+[ADR-003](../history/adrs/ADR-003-postgresql-provisioning.md) and
+[ADR-013](../history/adrs/ADR-013-database-credential-lifecycle.md) preserve the
 earlier implicit-database decision and are historical baselines for that
 behavior.
 
@@ -549,7 +550,7 @@ shared replicated request boundary. See the
 resource bodies and the
 [installation/recovery runbook](../operators/identity-and-access.md#hosted-application-access-installation-and-recovery)
 for operational safeguards. Deployed core evidence is recorded in
-[EV-45](../maintainers/delivery/backlog.md#verification-register):
+[EV-45](../history/backlog.md#verification-register):
 human/machine access, IPv4 backend/egress isolation, rotation, timed
 expiry and existing-session/ token revocation passed on node-01. This
 does not close PLAN-009/F-10; dependency outage, restored access, long

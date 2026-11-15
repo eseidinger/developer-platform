@@ -80,7 +80,7 @@ hypothesis.
 A proposed change includes a concrete diff. Only after approval and renewed
 authorization does the Platform API execute it. The same boundaries apply to a
 later development assistant using documentation, ADRs, and API contracts as
-context. See [Phase 5](../maintainers/delivery/plans/phase-5-ai-operations.md).
+context. See [Phase 5](../history/plans/phase-5-ai-operations.md).
 
 ## UC-07 – Deploy cooperating services with a scheduled component
 
@@ -108,7 +108,7 @@ logs distinguish every service and scheduled run; a failed component does not
 hide the health of other components; and migration from the existing
 single-component shape preserves configuration, secrets, database data,
 revisions, and rollback. See
-[Phase 2A](../maintainers/delivery/history/phase-2a-multi-service-scheduled-application.md).
+[Phase 2A](../history/plans/phase-2a-multi-service-scheduled-application.md).
 
 ## UC-08 – Deploy an application from CI
 
@@ -133,7 +133,7 @@ surfaces do not disclose its secret or bearer tokens; cross-project,
 grant/credential administration, secret-value, retirement, data-deletion, and
 operator actions are denied; and revocation denies the next Platform API request
 even if an earlier OIDC token has not expired. See
-[Phase 2B](../maintainers/delivery/history/phase-2b-ci-deployment-credentials.md).
+[Phase 2B](../history/plans/phase-2b-ci-deployment-credentials.md).
 
 ## UC-09 – Run platform acceptance without a reusable human token
 
@@ -164,4 +164,4 @@ secrets and bearer tokens never appear in reports, logs, inventories, or audit
 details; expiry and revocation are checked against platform state on every
 request; and operational backup, watchdog, heartbeat, and Alertmanager drills
 remain separate. See the
-[Phase 2B automation plan](../maintainers/delivery/history/phase-2b-automation-implementation-plan.md).
+[Phase 2B automation plan](../history/plans/phase-2b-automation-implementation-plan.md).

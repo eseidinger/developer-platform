@@ -368,7 +368,7 @@ PHP CLI extensions, and cron diagnostics using the
 [watchdog guide](../../../operations/watchdog/README.md). A stale cron stops
 scheduled freshness evaluation and mail; the HTTP status page can remain
 reachable with stale records. There is no independent notifier. Under
-[ADR-011](../../architecture/decisions/ADR-011-watchdog-monitoring-boundary.md),
+[ADR-011](../../history/adrs/ADR-011-watchdog-monitoring-boundary.md),
 silent watchdog failure is an accepted lab limitation; no additional external
 observer is required. Manually running cron can send real email; use the
 documented alert exercise with intended recipients. Verify both the down and
