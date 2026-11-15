@@ -90,14 +90,17 @@ traffic goes directly from Caddy to the API. Caddy owns public certificates;
 Traefik does not manage a second public certificate for these routes. Local
 `*.apps.localhost` requests use the explicit HTTP development route.
 
-For application certificates, Caddy asks the API at `/internal/tls`; the API
-authorizes recognized application hosts for applied projects and console hosts
-for current human leases. Component hostnames are derived from the accepted
-declaration. New certificate authorization therefore depends on the API and
-PostgreSQL. This gate does not check every application request or prove workload
-health. Keep the edge independent of Kubernetes/Docker API credentials. See
-[ADR-009](decisions/ADR-009-edge-and-cluster-ingress.md) for alternatives and
-required issuance, rejection, outage, header, and certificate-recovery tests.
+For application certificates, Caddy asks the API at
+`/v1/internal/tls`; the API authorizes recognized application hosts
+for applied projects and console hosts for current human leases.
+Component hostnames are derived from the accepted declaration. New
+certificate authorization therefore depends on the API and PostgreSQL.
+This gate does not check every application request or prove workload
+health. Keep the edge independent of Kubernetes/Docker API
+credentials. See
+[ADR-009](decisions/ADR-009-edge-and-cluster-ingress.md) for
+alternatives and required issuance, rejection, outage, header, and
+certificate-recovery tests.
 
 PostgreSQL data, platform metadata, identity-provider state, and relevant
 configuration require persistent storage and external backups. Recreating k3d

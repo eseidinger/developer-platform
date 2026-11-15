@@ -14,6 +14,7 @@ observability, backups, and independent watchdog components.
 - [Identity and access](identity-and-access.md)
 - [Named data-store resources](data-stores.md)
 - [Lifecycle and upgrades](lifecycle.md)
+- [Project retirement, restoration and complete purge](project-lifecycle.md)
 - [Monitoring and alerting](monitoring.md)
 - [Backup and recovery](backup-and-recovery.md)
 - [Incident runbooks](runbooks/README.md)

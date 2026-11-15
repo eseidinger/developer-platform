@@ -68,11 +68,11 @@ delete a database to repair a failed workload.
 
 Run on the node with a short-lived `PLATFORM_ACCESS_TOKEN` (see
 [human access and authorization validation](../validation/access-and-authorization.md)).
-This deliberately uses the legacy flat declaration and its direct sample route,
-not the hosted-access contract. `scripts/tests/platform/smoke.py` checks this
-legacy flow; the
+This deliberately uses the legacy flat declaration and its direct
+sample route, not the hosted-access contract.
+`scripts/tests/platform/smoke.py` checks this legacy flow; the
 [neutral hosted-access harness](../validation/access-and-authorization.md#neutral-hosted-application-acceptance-harness)
-checks protected `v1alpha2` applications.
+checks protected `v1` applications.
 
 ```bash
 OP=$(curl -fsS -X PUT http://127.0.0.1:8000/projects/demo \
@@ -94,13 +94,14 @@ done
 curl -fsS -H 'Host: demo.apps.<apps-domain>' http://127.0.0.1/
 ```
 
-Then restart it with `POST /projects/demo/restart`. To retire the disposable
-demo, use `GET /projects/demo/retirement-preview` and submit its exact
-`scope_token` with `confirm_name: demo` to `POST /projects/demo/retire` as an
-authorized project administrator. The platform removes the namespace and queues
-credential cleanup; poll until retirement completes. SQL data and the catalog
-remain retained. Do not manually delete the namespace as the normal retirement
-procedure.
+Then restart it with `POST /v1/projects/demo/restart`. To retire the
+disposable demo, use `GET /v1/projects/demo/retirement-preview` and
+submit its exact `scope_token` with `confirm_name: demo` to
+`POST /v1/projects/demo/retire` as an authorized project
+administrator. The platform removes the namespace and queues
+credential cleanup; poll until retirement completes. SQL data and the
+catalog remain retained. Do not manually delete the namespace as the
+normal retirement procedure.
 
 ## Day-2 application flow
 
@@ -223,24 +224,27 @@ never implicitly drops named resources. See the
 
 ## Restart an application
 
-`POST /projects/{name}/restart` (same `change` permission as PUT) queues a
-rolling restart of the current spec without creating a revision. It returns an
-operation ID; poll `GET /v1/operations/{id}`, where readiness reports
-`progressing` until the new pods are ready. Repeating the call while a restart
-is pending reuses that operation. Only `applied` projects can be restarted.
+`POST /v1/projects/{project}/restart` (same `change` permission as
+PUT) queues a rolling restart of the current spec without creating a
+revision. It returns an operation ID; poll `GET /v1/operations/{id}`,
+where readiness reports `progressing` until the new pods are ready.
+Repeating the call while a restart is pending reuses that operation.
+Only `applied` projects can be restarted.
 
 ## Application unhealthy after deployment
 
-Inspect rollout, logs, pod events, image pulls, resource limits, probes, and
-database connectivity. The platform retains desired revisions within the
-configured revision-retention limit (default 25). Use
-`GET /projects/{name}/revisions` and compare retained images, components and
-dependency semantics with your application migration records. For an available
-compatible revision, use `POST /projects/{name}/rollback` with `{"revision": N}`
-and an optional current-revision `If-Match`; poll the returned operation and
-verify live readiness and application behavior. Alternatively, apply a complete
-known compatible declaration as a new desired revision. Neither path rolls back
-database contents/migrations or restores historical secret values.
+Inspect rollout, logs, pod events, image pulls, resource limits,
+probes, and database connectivity. The platform retains desired
+revisions within the configured revision-retention limit (default 25).
+Use `GET /v1/projects/{project}/revisions` and compare retained
+images, components and dependency semantics with your application
+migration records. For an available compatible revision, use
+`POST /v1/projects/{project}/rollback` with `{"revision": N}` and an
+optional current-revision `If-Match`; poll the returned operation and
+verify live readiness and application behavior. Alternatively, apply a
+complete known compatible declaration as a new desired revision.
+Neither path rolls back database contents/migrations or restores
+historical secret values.
 
 For the legacy flat local sample route only:
 
@@ -248,20 +252,21 @@ For the legacy flat local sample route only:
 curl --fail-with-body -H 'Host: hello.apps.localhost' http://127.0.0.1/
 ```
 
-Use the configured HTTPS hostname for public applications. The legacy sample
-only echoes HTTP; acceptance additionally requires an application-specific
-PostgreSQL write/read with known test data. Protected `v1alpha2` routes need the
-hosted policy and approvals below; the legacy route is not evidence of hosted
-authentication or authorization.
+Use the configured HTTPS hostname for public applications. The legacy
+sample only echoes HTTP; acceptance additionally requires an
+application-specific PostgreSQL write/read with known test data.
+Protected `v1` routes need the hosted policy and approvals below; the
+legacy route is not evidence of hosted authentication or
+authorization.
 
 ## Public access denied while the workload is ready
 
-For `v1alpha2`, public ingress traverses the authorizer and the backend accepts
-only authorizer traffic. First inspect
-`GET /v1/projects/{project}/applications/{application}/access-policy` and its
-operation as an authorized project administrator. Missing/pending/inactive
-policy denies public access; workload readiness does not prove policy
-activation.
+For `v1`, public ingress traverses the authorizer and the backend
+accepts only authorizer traffic. First inspect
+`GET /v1/projects/{project}/applications/{application}/access-policy`
+and its operation as an authorized project administrator.
+Missing/pending/inactive policy denies public access; workload
+readiness does not prove policy activation.
 
 Check the exact path/method and authentication mode. A browser route redirects
 to login and first login can return pending `403` until a provider administrator

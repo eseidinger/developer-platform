@@ -805,29 +805,36 @@ The following controlled checks completed on the local lab. They are local
 verification evidence, not Phase 1B task closure; the remaining checks below are
 still required.
 
-- [x] Fresh Keycloak/PostgreSQL bootstrap completed with a new individual
-  Keycloak user receiving the one-time persisted `platform-admin` grant.
-- [x] `platform-cli` Device Authorization with PKCE issued a short-lived OIDC
-  token for that administrator, and `GET /projects` succeeded.
-- [x] The audit boundary was repaired and deployed: a controlled append through
-  the restricted writer succeeded, while a direct writer `INSERT` was denied.
-- [x] Disposable authorization project A exists and received separate `viewer`,
-  `developer`, and `project-admin` grants.
-- [x] The browser PKCE portal completed Keycloak login for the deployed identity
-  provider without retaining an access token outside the browser tab.
+- [x] Fresh Keycloak/PostgreSQL bootstrap completed with a new
+  individual Keycloak user receiving the one-time persisted
+  `platform-admin` grant.
+- [x] `platform-cli` Device Authorization with PKCE issued a
+  short-lived OIDC token for that administrator, and
+  `GET /v1/projects` succeeded.
+- [x] The audit boundary was repaired and deployed: a controlled
+  append through the restricted writer succeeded, while a direct
+  writer `INSERT` was denied.
+- [x] Disposable authorization project A exists and received separate
+  `viewer`, `developer`, and `project-admin` grants.
+- [x] The browser PKCE portal completed Keycloak login for the
+  deployed identity provider without retaining an access token outside
+  the browser tab.
 - [x] Separate viewer/developer/project-admin users completed the
   role-denial/cross-project matrix.
-- [x] A second platform-admin grant was revoked; its unchanged token received
-  `403` on the next request and the outcomes were correlated with audit records.
-- [x] A platform administrator completed restricted inspection/export and a
-  developer was denied operator access; audit export was redacted.
-- [x] The SMTP synthetic delivery test succeeded and controlled authentication,
-  authorization-denial, and privileged-change events fired their security rules.
-- [x] Real security-rule notifications were received and repeated events stayed
-  one grouped ongoing incident. Retained evidence is not required for these
-  owner-confirmed checks.
-- [x] The controlled notification-delivery-failure exercise is omitted from this
-  Phase 1B task by owner direction.
+- [x] A second platform-admin grant was revoked; its unchanged token
+  received `403` on the next request and the outcomes were correlated
+  with audit records.
+- [x] A platform administrator completed restricted inspection/export
+  and a developer was denied operator access; audit export was
+  redacted.
+- [x] The SMTP synthetic delivery test succeeded and controlled
+  authentication, authorization-denial, and privileged-change events
+  fired their security rules.
+- [x] Real security-rule notifications were received and repeated
+  events stayed one grouped ongoing incident. Retained evidence is not
+  required for these owner-confirmed checks.
+- [x] The controlled notification-delivery-failure exercise is omitted
+  from this Phase 1B task by owner direction.
 
 ## Bootstrap a fresh local identity service
 
@@ -985,16 +992,17 @@ Record timestamp, code revision, principal, target project, HTTP status, and
 redacted response for every assertion.
 
 - **Principal:** Viewer on A
-  - **Expected result:** Lists A; `PUT /projects/A`, retirement, and grant
-    changes return `403`
-- **Principal:** Developer on A
-  - **Expected result:** Lists A and may reapply A's complete spec; retirement
+  - **Expected result:** Lists A; `PUT /v1/projects/A`, retirement,
     and grant changes return `403`
+- **Principal:** Developer on A
+  - **Expected result:** Lists A and may reapply A's complete spec;
+    retirement and grant changes return `403`
 - **Principal:** Project admin on A
-  - **Expected result:** May manage grants on A; mutation and grant changes on B
-    return `403`
+  - **Expected result:** May manage grants on A; mutation and grant
+    changes on B return `403`
 - **Principal:** Platform admin
-  - **Expected result:** May access both projects and manage platform grants
+  - **Expected result:** May access both projects and manage platform
+    grants
 
 Use the actual project variables. A non-mutating grant attempt is useful for
 negative assertions:
@@ -1050,12 +1058,13 @@ export DEVELOPER_TOKEN='…' # optional; enables the 403 assertions
 .venv/bin/python scripts/tests/platform/check-operator-security.py
 ```
 
-The API allows only platform administrators to use `/operator/*`. The inspection
-result reports the managed workload security and network-policy contract and
-secret references by name; it never returns secret values. Audit export requires
-an offset-bearing UTC time window no longer than 31 days and is capped at 10,000
-events. Use the JSON export for controlled evidence or `format=csv` for a
-redacted operator export.
+The API allows only platform administrators to use `/v1/operator/*`.
+The inspection result reports the managed workload security and
+network-policy contract and secret references by name; it never
+returns secret values. Audit export requires an offset-bearing UTC
+time window no longer than 31 days and is capped at 10,000 events. Use
+the JSON export for controlled evidence or `format=csv` for a redacted
+operator export.
 
 ## Test security-event notifications
 

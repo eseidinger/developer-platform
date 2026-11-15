@@ -18,12 +18,13 @@ You need the following from the platform team:
 
 - a project name, such as `orders`;
 - the Platform API URL;
-- the OIDC token endpoint, deployment-credential client ID, and one-time client
-  secret;
+- the OIDC token endpoint, deployment-credential client ID, and
+  one-time client secret;
 - the public application-domain convention, normally
-  `https://<component>-<project>.<apps-domain>` for `v1alpha2`; and
-- the project administrator responsible for configuring the application's access
-  policy, groups, human approvals, and machine service-access approvals.
+  `https://<component>-<project>.<apps-domain>` for `v1`; and
+- the project administrator responsible for configuring the
+  application's access policy, groups, human approvals, and machine
+  service-access approvals.
 
 The current platform profile accepts images from the configured public
 registries (by default Docker Hub, GitHub Container Registry, and Quay). It does
@@ -70,18 +71,15 @@ For repository development instead, install the local package with
 
 ## Declare the application
 
-Create `application.json`. The `metadata.name` and `metadata.project` values
-must match the project passed to the CLI. This example deploys one public HTTP
-service.
+Create `application.json`. Its `metadata.name` must match the project
+passed to the CLI. This example deploys one public HTTP service.
 
 ```json
 {
-  "apiVersion": "platform.example/v1alpha2",
+  "apiVersion": "platform.eseidinger.de/v1",
   "kind": "Application",
   "metadata": {
-    "name": "orders",
-    "project": "orders",
-    "environment": "default"
+    "name": "orders"
   },
   "spec": {
     "components": [
@@ -111,12 +109,13 @@ service.
 }
 ```
 
-The supported `v1alpha2` profile allows up to five components. A `service` can
-be public or private; only one service may be public. Scheduled components use a
-five-field UTC cron schedule and cannot expose a port. A service can have up to
-five replicas, subject to project policy. Query `GET /v1/capabilities` or
-consult the platform team before relying on optional capacity, egress,
-configuration, or database features.
+The supported `v1` profile allows up to five components. A `service`
+can be public or private; only one service may be public. Scheduled
+components use a five-field UTC cron schedule and cannot expose a
+port. A service can have up to five replicas, subject to project
+policy. Query `GET /v1/capabilities` or consult the platform team
+before relying on optional capacity, egress, configuration, or
+database features.
 
 The named `status` and `hello-world` profiles retain TCP workload readiness. Use
 a custom HTTP readiness path when accepting connections alone does not prove
@@ -188,11 +187,12 @@ the printed operation ID and inspect it through the platform UI or API.
 
 ## Enable hosted application access
 
-A ready workload is not yet an authorized public application. `v1alpha2` public
-routes go through the platform access boundary; a missing, pending, or inactive
-access policy denies access. A project administrator must create application
-groups and a separate `ApplicationAccessPolicy` for the public component using
-the [hosted application API](api.md#hosted-application-access). Do not add
+A ready workload is not yet an authorized public application. `v1`
+public routes go through the platform access boundary; a missing,
+pending, or inactive access policy denies access. A project
+administrator must create application groups and a separate
+`ApplicationAccessPolicy` for the public component using the
+[hosted application API](api.md#hosted-application-access). Do not add
 identity settings to `application.json`.
 
 The policy selects explicit non-overlapping paths/methods and either

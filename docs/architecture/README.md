@@ -4,12 +4,11 @@ Status: selected single-host hybrid topology with one Python/FastAPI Platform
 API. Project workloads run in Kubernetes/k3d; no additional compute adapter or
 deployable platform-service split is in the current scope.
 
-[ADR-022](decisions/ADR-022-postgresql-and-s3-storage-scope.md) narrows the
-target project data-store set to PostgreSQL with extensions and S3-compatible
-object storage. The other implemented providers remain present until their
-migration and retirement are completed. The
-[follow-on plan](../maintainers/delivery/plans/postgresql-extension-expansion.md)
-adds TimescaleDB, PostGIS, pgmq, and pg_duckdb after that reduction.
+Current named-store providers are PostgreSQL with configured
+extensions and optional S3-compatible object storage through RustFS.
+ADRs and existing delivery plans remain historical records; their
+proposed target scopes do not replace the current implementation
+described here.
 
 ## Implemented platform
 
@@ -20,10 +19,10 @@ and explicit component bindings, applies Kubernetes resources, and exposes
 runtime status and diagnostics. Its in-process worker recovers queued or
 interrupted work after restart.
 
-Docker runs the platform API, Keycloak, PostgreSQL, selected shared stores,
-dedicated Neo4j instances, edge, monitoring, and k3d containers. Docker is host
-infrastructure, not an application workload provider. Kubernetes/k3d is the only
-supported application compute environment.
+Docker runs the platform API, Keycloak, PostgreSQL, selected shared
+stores, edge, monitoring, and k3d containers. Docker is host
+infrastructure, not an application workload provider. Kubernetes/k3d
+is the only supported application compute environment.
 
 ```mermaid
 flowchart TB
@@ -76,12 +75,13 @@ contract discipline does not require a second provider.
 
 ## Infrastructure and lifecycle boundaries
 
-PostgreSQL data is independent of workload lifecycle. Removing or replacing
-Kubernetes resources does not implicitly remove named stores. Only explicitly
-bound components receive resource credentials. Independent human grants provide
-expiring native/console access. Neo4j Community uses full-instance access; other
-supported providers offer read-only and read-write modes. Retirement and
-permanent deletion require explicit scoped decisions and auditable operations.
+PostgreSQL data is independent of workload lifecycle. Removing or
+replacing Kubernetes resources does not implicitly remove named
+stores. Only explicitly bound components receive resource credentials.
+Independent human grants provide expiring native/console access.
+PostgreSQL and S3 support read-only and read-write modes. Retirement
+and permanent deletion require explicit scoped decisions and auditable
+operations.
 
 The Platform API directly integrates with Kubernetes, PostgreSQL, monitoring
 discovery, routing configuration, and Keycloak administration needed for machine

@@ -1,18 +1,18 @@
 # Application declaration reference
 
-Status: current. Last reviewed October 18, 2026.
+Status: current v1 implementation. Last reviewed November 15, 2026.
 
 This is the developer reference for the JSON body accepted by
-`PUT /projects/{name}` and by:
+`PUT /v1/projects/{project}/application` and by:
 
 ```bash
 devplat deploy apply --project PROJECT --file application.json
 ```
 
-Use **`platform.example/v1alpha2`** for new applications. It is the current,
-component-based schema. The API also accepts the earlier `v1alpha1` envelope and
-a flat legacy body; they are documented below only to support existing
-deployments.
+The sole declaration is **`platform.eseidinger.de/v1`**,
+`kind: Application`, with `metadata.name` and `spec.components`.
+Unknown metadata fields and earlier or flat formats are rejected.
+Every update replaces the complete declaration.
 
 The generated [OpenAPI contract](../api/openapi.json) is the machine-readable
 source of truth. This page explains the same currently implemented constraints
@@ -30,32 +30,33 @@ framework setup.
 
 ## Rules that apply to every request
 
-- Send one complete declaration. This is a desired-state `PUT`, not a patch.
-- The URL project name, `metadata.name`, and, when present, `metadata.project`
-  must be the same project slug.
-- A project slug or component name is 1–32 lowercase letters, digits, or
-  hyphens; it starts with a letter and ends with a letter or digit.
-- Unknown fields are rejected. The API returns `422` with `invalid_spec` for a
-  malformed body or `unsupported_capability` for a valid-looking but unavailable
-  capability.
-- An image must be a public OCI image reference of 1–512 characters. The
-  platform resolves accepted images to a digest. Use a digest yourself when
-  reproducibility matters; private image pull credentials are not supported.
-- `If-Match` is optional but recommended for updates. Pass the current revision
-  to avoid overwriting another deployment; a stale revision returns `409`.
+- Send one complete declaration. This is a desired-state `PUT`, not a
+  patch.
+- The URL project name and `metadata.name` must be the same project
+  slug. Metadata contains only `name`.
+- A project slug or component name is 1–32 lowercase letters, digits,
+  or hyphens; it starts with a letter and ends with a letter or digit.
+- Unknown fields are rejected. The API returns `422` with
+  `invalid_spec` for a malformed body or `unsupported_capability` for
+  a valid-looking but unavailable capability.
+- An image must be a public OCI image reference of 1–512 characters.
+  The platform resolves accepted images to a digest. Use a digest
+  yourself when reproducibility matters; private image pull
+  credentials are not supported.
+- `If-Match` is optional but recommended for updates. Pass the current
+  revision to avoid overwriting another deployment; a stale revision
+  returns `409`.
 
-## Current schema: `platform.example/v1alpha2`
+## Current schema: `platform.eseidinger.de/v1`
 
 ### Complete shape
 
 ```json
 {
-  "apiVersion": "platform.example/v1alpha2",
+  "apiVersion": "platform.eseidinger.de/v1",
   "kind": "Application",
   "metadata": {
-    "name": "orders",
-    "project": "orders",
-    "environment": "default"
+    "name": "orders"
   },
   "spec": {
     "components": [
@@ -65,21 +66,42 @@ framework setup.
         "runtime": {
           "type": "container",
           "image": "ghcr.io/acme/orders:2026.10.07",
-          "command": ["./orders"],
-          "args": ["serve"]
+          "command": [
+            "./orders"
+          ],
+          "args": [
+            "serve"
+          ]
         },
         "ports": [
-          {"name": "http", "protocol": "http", "port": 8080}
+          {
+            "name": "http",
+            "protocol": "http",
+            "port": 8080
+          }
         ],
         "replicas": 2,
         "exposure": "public",
         "resources": {
-          "requests": {"cpu": "250m", "memory": "256Mi"},
-          "limits": {"cpu": "500m", "memory": "512Mi"}
+          "requests": {
+            "cpu": "250m",
+            "memory": "256Mi"
+          },
+          "limits": {
+            "cpu": "500m",
+            "memory": "512Mi"
+          }
         },
-        "health": {"readiness": {"profile": "status"}},
+        "health": {
+          "readiness": {
+            "profile": "status"
+          }
+        },
         "outbound": [
-          {"cidr": "198.51.100.0/24", "port": 443}
+          {
+            "cidr": "198.51.100.0/24",
+            "port": 443
+          }
         ]
       },
       {
@@ -88,7 +110,9 @@ framework setup.
         "runtime": {
           "type": "container",
           "image": "ghcr.io/acme/orders:2026.10.07",
-          "args": ["report"]
+          "args": [
+            "report"
+          ]
         },
         "schedule": "0 2 * * *",
         "timeZone": "UTC",
@@ -96,7 +120,9 @@ framework setup.
       }
     ],
     "configuration": {
-      "values": {"LOG_LEVEL": "info"}
+      "values": {
+        "LOG_LEVEL": "info"
+      }
     }
   }
 }
@@ -111,7 +137,7 @@ CIDR and port. Omit `outbound` unless the operator has approved it.
 
 - **Field:** `apiVersion`
   - **Required:** Yes
-  - **Accepted value:** Exact string `platform.example/v1alpha2`.
+  - **Accepted value:** Exact string `platform.eseidinger.de/v1`.
 - **Field:** `kind`
   - **Required:** Yes
   - **Accepted value:** Exact string `Application`.
@@ -126,15 +152,16 @@ CIDR and port. Omit `outbound` unless the operator has approved it.
   - **Accepted value:** Only `default`.
 - **Field:** `spec.components`
   - **Required:** Yes
-  - **Accepted value:** Array of 1–5 service or scheduled components. Names must
-    be unique.
+  - **Accepted value:** Array of 1–5 service or scheduled components.
+    Names must be unique.
 - **Field:** `spec.configuration`
   - **Required:** No
-  - **Accepted value:** Object containing only `values`; described below.
+  - **Accepted value:** Object containing only `values`; described
+    below.
 - **Field:** `spec.resources`
   - **Required:** Rejected
-  - **Accepted value:** Stores have an independent named-resource lifecycle;
-    bind them explicitly on the consuming component.
+  - **Accepted value:** Stores have an independent named-resource
+    lifecycle; bind them explicitly on the consuming component.
 
 ### Fields shared by all components
 
@@ -217,25 +244,28 @@ CIDR and port. Omit `outbound` unless the operator has approved it.
     OTLP endpoint and forwarder; only the forwarder mounts the short-lived
     Pod-bound token.
 
-For Spring Boot, add Actuator and the Prometheus Micrometer registry, expose
-`/actuator/prometheus` on a declared service port, and use that path in the
-declaration. For Quarkus, add `quarkus-micrometer-registry-prometheus` and
-declare `/q/metrics`. For FastAPI, instrument requests with
+For Spring Boot, add Actuator and the Prometheus Micrometer registry,
+expose `/actuator/prometheus` on a declared service port, and use that
+path in the declaration. For Quarkus, add
+`quarkus-micrometer-registry-prometheus` and declare `/q/metrics`. For
+FastAPI, instrument requests with
 [`prometheus-fastapi-instrumentator`](https://github.com/trallnag/prometheus-fastapi-instrumentator)
 or an equivalent library that emits `http_requests_total` and
-`http_request_duration_seconds_{sum,count}` at `/metrics`. These are that
-library's conventions, rather than a built-in FastAPI metric standard. The
-platform keeps supported request series and fixed project/component labels; raw
-path, handler, URI, user and custom metric labels are discarded. The first two
-frameworks emit Micrometer's `http_server_requests_seconds_{count,sum}`;
+`http_request_duration_seconds_{sum,count}` at `/metrics`. These are
+that library's conventions, rather than a built-in FastAPI metric
+standard. The platform keeps supported request series and fixed
+project/component labels; raw path, handler, URI, user and custom
+metric labels are discarded. The first two frameworks emit
+Micrometer's `http_server_requests_seconds_{count,sum}`;
 [Spring Actuator](https://docs.spring.io/spring-boot/reference/actuator/metrics.html)
-and [Quarkus Micrometer](https://quarkus.io/guides/telemetry-micrometer/)
+and
+[Quarkus Micrometer](https://quarkus.io/guides/telemetry-micrometer/)
 document their setup. Project readers can use the fixed
-`GET /projects/{name}/application-metrics?component={component}` view; operators
-have one **Application metrics** dashboard with project, application and
-component selectors. It supports both conventions, preferring Micrometer when
-both are emitted by the same component. A failed scrape is reported separately
-from a zero rate.
+`GET /v1/projects/{project}/application-metrics?component={component}`
+view; operators have one **Application metrics** dashboard with
+project, application and component selectors. It supports both
+conventions, preferring Micrometer when both are emitted by the same
+component. A failed scrape is reported separately from a zero rate.
 
 The additional **Micrometer JVM** dashboard shows heap/non-heap memory and
 pools, GC pauses/allocation/pressure, CPU, threads/states, classes, buffers and
@@ -270,26 +300,28 @@ A public service gets an ingress at
 `https://<component>-<project>.<apps-domain>`. Private services get in-project
 DNS and can be reached by other project workloads through their component name.
 
-Public `v1alpha2` ingress always traverses the platform authentication and
-authorization boundary. Readiness or `exposure: public` does not authorize a
-caller: without an active access policy, public access is denied. A project
-administrator creates groups and a separate `ApplicationAccessPolicy` selecting
-`browser-session` or `bearer-token`, allowed groups, and explicit
-non-overlapping paths/methods. Human access requires approval/group assignment
-after first login; machine access requires provider approval before credential
-activation. Platform roles and CI deployment credentials do not imply
-application membership.
+Public `v1` ingress always traverses the platform authentication and
+authorization boundary. Readiness or `exposure: public` does not
+authorize a caller: without an active access policy, public access is
+denied. A project administrator creates groups and a separate
+`ApplicationAccessPolicy` selecting `browser-session` or
+`bearer-token`, allowed groups, and explicit non-overlapping
+paths/methods. Human access requires approval/group assignment after
+first login; machine access requires provider approval before
+credential activation. Platform roles and CI deployment credentials do
+not imply application membership.
 
-Use the [hosted application API guide](api.md#hosted-application-access) for the
-separate policy, membership, service-access, and governance resources. Do not
-put OIDC clients, audiences, redirect URIs, group mappings, or credentials into
-this declaration. Anonymous public routes and direct access to the public
-backend, including from other components in the same project, are unsupported.
-Private services retain in-project connectivity. Applications read the
+Use the
+[hosted application API guide](api.md#hosted-application-access) for
+the separate policy, membership, service-access, and governance
+resources. Do not put OIDC clients, audiences, redirect URIs, group
+mappings, or credentials into this declaration. Anonymous public
+routes and direct access to the public backend, including from other
+components in the same project, are unsupported. Private services
+retain in-project connectivity. Applications read the
 [trusted principal headers](../architecture/security-and-authorization.md#upstream-identity-transport);
-they need only any finer domain-level authorization. Legacy single-service
-declarations retain their existing routing and must migrate to `v1alpha2` for
-hosted protection.
+they implement any finer domain-level authorization required by the
+application.
 
 ### `scheduled` component fields
 
@@ -324,19 +356,19 @@ hosted protection.
 
 Scheduled components do not accept `ports`, `replicas`, `exposure`, or `health`.
 
-Public monitoring uses the component hostname and declared health path, with no
-target for private-only applications. For protected `v1alpha2` services it
-checks the authentication boundary's expected denial/login response, not backend
-content; Kubernetes readiness is the independent semantic health signal. It
-never creates an anonymous health route or implicitly authorizes a monitoring
-identity. Applications may emit normal Quarkus/Spring JSON logs or the
-domain-neutral
+Public monitoring uses the component hostname and declared health
+path, with no target for private-only applications. For protected `v1`
+services it checks the authentication boundary's expected denial/login
+response, not backend content; Kubernetes readiness is the independent
+semantic health signal. It never creates an anonymous health route or
+implicitly authorizes a monitoring identity. Applications may emit
+normal Quarkus/Spring JSON logs or the domain-neutral
 [operational log envelope](../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#central-workload-logs-and-correlation)
-for seven-day configured central retention and authorized retained-log reads. No
-declaration field is required. JSON `message` and `level` are retained with
-optional logger/trace metadata; unknown fields are discarded and known
-credential patterns receive best-effort redaction. Keep secrets out of messages.
-Plain-text logs stay kubelet-only.
+for seven-day configured central retention and authorized retained-log
+reads. No declaration field is required. JSON `message` and `level`
+are retained with optional logger/trace metadata; unknown fields are
+discarded and known credential patterns receive best-effort redaction.
+Keep secrets out of messages. Plain-text logs stay kubelet-only.
 
 For an application such as Spring Boot that becomes reachable before its
 database migrations and initialization are complete, use its application
@@ -426,79 +458,24 @@ SSH or the isolated network; the raw store port is not public. See the
 objects in `spec.resources` are rejected; recreate declarations against this
 contract.
 
-## Earlier accepted forms
+## Read and validate the complete declaration
 
-Do not choose these forms for new applications. They remain accepted for unbound
-applications. Store consumers must use `v1alpha2` component bindings; these
-forms do not provision an implicit database.
-
-### `platform.example/v1alpha1`
-
-The earlier envelope has the same top-level `apiVersion`, `kind`, and `metadata`
-rules, but `spec` contains a single `application` object instead of
-`components`:
-
-```json
-{
-  "apiVersion": "platform.example/v1alpha1",
-  "kind": "Application",
-  "metadata": {"name": "orders"},
-  "spec": {
-    "application": {
-      "runtime": {"type": "container", "image": "ghcr.io/acme/orders:2026.10.07"},
-      "endpoints": [
-        {"name": "http", "protocol": "http", "port": 8080, "exposure": "public"}
-      ],
-      "scaling": {"minInstances": 1, "maxInstances": 1},
-      "resources": {
-        "requests": {"cpu": "250m", "memory": "256Mi"},
-        "limits": {"cpu": "500m", "memory": "512Mi"}
-      },
-      "health": {"readiness": {"profile": "status"}}
-    },
-    "configuration": {"values": {"LOG_LEVEL": "info"}}
-  }
-}
-```
-
-`runtime` is required. `endpoints` is optional but, when present, has exactly
-one public HTTP endpoint. `scaling` is optional but only accepts exactly one
-instance. The resource, configuration, health, image, and resource-limit rules
-are the same as `v1alpha2`.
-
-### Flat legacy body
-
-The legacy form has no `apiVersion` or `kind`:
-
-```json
-{
-  "name": "orders",
-  "image": "ghcr.io/acme/orders:2026.10.07",
-  "port": 8080,
-  "probe_profile": "status",
-  "resources": {
-    "requests": {"cpu": "250m", "memory": "256Mi"},
-    "limits": {"cpu": "500m", "memory": "512Mi"}
-  },
-  "configuration": {"LOG_LEVEL": "info"}
-}
-```
-
-`name` and `image` are required. `port` defaults to `8080` and must be
-1024–65535; `probe_profile` defaults to `status` and accepts `status` or
-`hello-world`. `resources` and `configuration` follow the same validation rules
-above. Components cannot be expressed in the flat form.
-
-## Validate before deploying
-
-The CLI validates that the file is JSON and lets the API validate the schema:
+`GET /v1/projects/{project}/application` exports desired state and its
+revision ETag without secret values or execution-only fields. Image
+tags remain the original desired references; deployment history
+records resolved digests.
+`POST /v1/projects/{project}/application/validate` checks the
+declaration, project name, optional `If-Match`, images, bindings and
+current admission limits without scheduling work or issuing
+credentials. Admission can change before apply. Empty projects have no
+declaration and return 404.
 
 ```bash
-devplat deploy apply --project orders --file application.json \
-  --if-match 7 --wait --output json
+devplat deploy get --project orders
+devplat deploy validate --project orders --file application.json
 ```
 
-For a capability view specific to the deployed platform, request
-`GET /v1/capabilities` with your access token. Use the response and a `422`
-error's stable `code` as the final authority when the platform's operator policy
-differs from the defaults in this reference.
+The CLI validates JSON against its packaged OpenAPI schema before
+sending it. GET/edit/PUT clients must preserve every component and
+configuration value they want to retain; omitted configuration is
+removed by a complete PUT.

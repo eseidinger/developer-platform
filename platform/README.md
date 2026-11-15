@@ -22,14 +22,15 @@ injected only into explicitly bound components. Keycloak owns identity-provider
 accounts and clients. See the
 [platform database model](../docs/platform-model/platform-database.md).
 
-Stores have an independent lifecycle. The default provider is PostgreSQL;
-operator-selected RustFS S3, OpenSearch, Qdrant, dedicated Neo4j Community,
-CouchDB and HugeGraph providers are also implemented. No deployment format
-provisions an implicit project database or `database` Secret. New consumers use
-approved `v1alpha2` component bindings. Application removal and resource
-retirement retain data;
-resource purge requires scoped confirmation and verified off-host backup intent.
-See the [named-store reference](../docs/operators/data-stores.md).
+Stores have an independent lifecycle. The default provider is
+PostgreSQL; operator-selected RustFS provides S3-compatible object
+storage. These are the only providers available for live resources. No
+deployment format provisions an implicit project database or
+`database` Secret. New consumers use approved `v1` component bindings.
+Application removal and resource retirement retain data; resource
+purge requires scoped confirmation and verified off-host backup
+intent. See the
+[named-store reference](../docs/operators/data-stores.md).
 
 ## Local endpoints
 
@@ -52,11 +53,12 @@ After [bootstrap](../docs/operators/install-local.md):
 - **Endpoint:** `http://localhost:9090`
   - **Purpose:** Operator Prometheus
 
-API and monitoring host ports bind to loopback. Caddy serves the configured
-platform and identity domains; public deployments use HTTPS. Protected
-`v1alpha2` application traffic follows Caddy → k3d/Traefik → hosted-access
-boundary → application Service. Separate store console routes expose only
-authorized human leases. Local `.localhost` HTTP routes are development paths.
+API and monitoring host ports bind to loopback. Caddy serves the
+configured platform and identity domains; public deployments use
+HTTPS. Protected `v1` application traffic follows Caddy → k3d/Traefik
+→ hosted-access boundary → application Service. Separate store console
+routes expose only authorized human leases. Local `.localhost` HTTP
+routes are development paths.
 
 ## Identity and API contracts
 
@@ -75,13 +77,14 @@ credential lifecycles. Follow the
 [identity guide](../docs/operators/identity-and-access.md) and
 [API guide](../docs/developers/api.md).
 
-The preferred deployment body is `platform.example/v1alpha2`. Earlier `v1alpha1`
-and flat forms remain accepted for unbound applications; their public routes
-retain legacy behavior. The
-[declaration reference](../docs/developers/application-spec.md) covers component
-counts, probes, resources, bindings, telemetry and egress. The
-[committed OpenAPI schema](../docs/api/openapi.json) lists all public
-operations.
+The sole deployment body is `platform.eseidinger.de/v1`,
+`kind: Application`, with `metadata.name` and `spec.components`. All
+public API routes use `/v1`; private callbacks use `/v1/internal`. The
+[declaration reference](../docs/developers/application-spec.md) covers
+implemented limits. The [OpenAPI schema](../docs/api/openapi.json)
+defines request, success, and error contracts. Export desired state
+using GET on the same `/application` URL used by PUT, or preflight it
+with POST `/application/validate`.
 
 Accepted deployments return `202` with an operation ID, revision and status URL.
 The durable worker rechecks authority and revision freshness before applying
@@ -204,3 +207,13 @@ does not close outstanding operational criteria.
 Reusable acceptance runners and hosted test fixtures live in
 [`tests/`](../tests/README.md). Operator entry points remain under
 `scripts/tests/platform/`; API unit tests remain beside the API.
+
+## Project lifecycle
+
+Retirement stops workloads and revokes access while preserving
+history, store data, and an encrypted recovery point. Restoration uses
+the same project UUID and issues fresh credentials. Complete project
+purge also removes catalog, audit, AI records, telemetry, provider
+data and managed backups. The durable operation remains blocked until
+private host maintenance verifies erasure. See the
+[lifecycle runbook](../docs/operators/project-lifecycle.md).

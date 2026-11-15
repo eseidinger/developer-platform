@@ -64,14 +64,14 @@ is still subject to Tempo's ingest limit and filesystem cap.
 
 ## Hosted application setup
 
-Declare `spec.components[].telemetry.tracing.enabled: true` in a `v1alpha2`
-application. The platform supplies a localhost OTLP HTTP/protobuf endpoint,
-stable `OTEL_SERVICE_NAME`, parent-based sampler settings, and the forwarder.
-The app must include framework instrumentation and export traces as
-HTTP/protobuf. The collector stores only its safe allowlist; applications should
-still avoid recording sensitive span data before export. Request context uses
-W3C `traceparent`; pass it through normal instrumented HTTP clients for
-in-project calls.
+Declare `spec.components[].telemetry.tracing.enabled: true` in a `v1`
+application. The platform supplies a localhost OTLP HTTP/protobuf
+endpoint, stable `OTEL_SERVICE_NAME`, parent-based sampler settings,
+and the forwarder. The app must include framework instrumentation and
+export traces as HTTP/protobuf. The collector stores only its safe
+allowlist; applications should still avoid recording sensitive span
+data before export. Request context uses W3C `traceparent`; pass it
+through normal instrumented HTTP clients for in-project calls.
 
 - Spring Boot:
   - **Instrumentation:** Add `spring-boot-starter-opentelemetry`; Boot maps

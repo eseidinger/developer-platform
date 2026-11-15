@@ -65,10 +65,11 @@ Request component access with
 {"resource_id":"RESOURCE_UUID","component":"web","mode":"read-write"}
 ```
 
-A same-project administrator's request is approved; cross-project requests need
-approval from the owning project's administrator or a platform administrator.
-Only an active approved binding supplies a managed Secret and lease-port egress
-to that component. Add the resulting binding ID to its v1alpha2 specification:
+A same-project administrator's request is approved; cross-project
+requests need approval from the owning project's administrator or a
+platform administrator. Only an active approved binding supplies a
+managed Secret and lease-port egress to that component. Add the
+resulting binding ID to its v1 specification:
 
 ```json
 "bindings": [{"bindingId":"BINDING_UUID","envPrefix":""}]

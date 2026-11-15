@@ -81,16 +81,18 @@ provides an independent outside-network vantage point. Existing external
 heartbeat/backup channels remain separate. Live deployment and outage/recovery
 receipt for these application rules remain acceptance work.
 
-For protected component applications, successful `probe_kind=access-boundary`
-means verified routing/TLS with an expected login/denial response, not
-application readiness. Inspect `kube_pod_status_ready` and
-`ApplicationComponentNotReady` separately. There is no monitoring authentication
-bypass or implicit group grant. Use the
+For protected component applications, successful
+`probe_kind=access-boundary` means verified routing/TLS with an
+expected login/denial response, not application readiness. Inspect
+`kube_pod_status_ready` and `ApplicationComponentNotReady` separately.
+There is no monitoring authentication bypass or implicit group grant.
+Use the
 [central log procedure](../../infrastructure/monitoring/WORKLOAD-TELEMETRY.md#central-workload-logs-and-correlation)
-and authorized `GET /projects/{name}/retained-logs`; ordinary `/logs` stays
-kubelet-only. Investigate `up{job="alloy"}`, Alloy drop/write counters,
-collector logs and Loki storage before interpreting missing entries as absence
-of activity. Do not grant project users direct access to shared Loki or Grafana.
+and authorized `GET /v1/projects/{project}/retained-logs`; ordinary
+`/logs` stays kubelet-only. Investigate `up{job="alloy"}`, Alloy
+drop/write counters, collector logs and Loki storage before
+interpreting missing entries as absence of activity. Do not grant
+project users direct access to shared Loki or Grafana.
 
 [EV-46](validation/access-and-authorization.md#executed-hosted-access-monitoring-acceptance-october-11-2026)
 records deployed component probes/readiness and immediate central correlation

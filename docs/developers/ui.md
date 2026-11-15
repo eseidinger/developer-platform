@@ -30,14 +30,16 @@ Until a workflow is available in the portal, use the [CLI](cli.md) or
 
 ## Manage named stores and human access
 
-Open **Data stores** at `/projects/{name}/stores` to create independent
-resources, request component bindings, review incoming requests, and manage
-explicit human grants. The server supplies enabled providers and management
-permissions. Resource and grant changes use their current versions. Retirement
-revokes access and retains data; purge is a separate UUID-confirmed action that
-waits for verified off-host backup intent. Use **Create resource** to expand
-the creation form. Resource cards show provider, observed state, desired state,
-allocation, and last measured usage before their grant and binding controls.
+Open **Data stores** at `/v1/projects/{project}/stores` to create
+independent resources, request component bindings, review incoming
+requests, and manage explicit human grants. The server supplies
+enabled providers and management permissions. Resource and grant
+changes use their current versions. Retirement revokes access and
+retains data; purge is a separate UUID-confirmed action that waits for
+verified off-host backup intent. Use **Create resource** to expand the
+creation form. Resource cards show provider, observed state, desired
+state, allocation, and last measured usage before their grant and
+binding controls.
 
 Open **My store access** at `/store-access` to issue a 24-hour credential for
 your own grant, inspect lease history, reveal connection values, or open an
@@ -60,11 +62,12 @@ issuance endpoints return HTTP 410; their former workspace panel is not mounted.
 
 ## Use AI assistance
 
-Open `/projects/{name}/ai` for explanations, incident investigations and curated
-development guidance. Human viewers may run assistance for Public/Internal
-projects when the external provider is configured and eligible. A human platform
-administrator sets AI classification; Confidential, Restricted and unclassified
-projects cannot start model runs.
+Open `/v1/projects/{project}/ai` for explanations, incident
+investigations and curated development guidance. Human viewers may run
+assistance for Public/Internal projects when the external provider is
+configured and eligible. A human platform administrator sets AI
+classification; Confidential, Restricted and unclassified projects
+cannot start model runs.
 
 Review observations, source references, hypotheses, gaps and usage completeness.
 A completed sourced incident investigation bound to the current failed revision
@@ -99,39 +102,44 @@ group permits application routes without granting control-plane authority.
 
 ### Define the application's access
 
-1. Deploy a `v1alpha2` application with one public service through the existing
-   deployment workflow. The access overview shows the application/project name,
-   public component, URL, workload readiness, and access-policy state
-   separately. Explain a missing policy as **Access not configured; public
-   requests denied**. Private-only and legacy applications show the requirement
-   for a public `v1alpha2` component before access configuration is available.
-1. In **Governance**, record data and telemetry classification, whether personal
-   data is stored, domain-retention owner and policy, purge authority, and
-   recovery owner. Save this separately from the deployment declaration. Email
-   release requires a governance record with personal-data handling enabled.
-1. In **Groups**, create named application groups with display names, for
-   example `readers`, `application-administrators`, and `machine-readers`. Group
-   selection uses stable IDs; names are labels. Creating a group grants nobody
-   membership.
-1. In **Policy**, select the declared public component and add route rules. Each
-   rule has a name, exact path or segment-aware path prefix, explicit HTTP
-   methods, **Browser session** or **Bearer token** authentication, and one or
-   more allowed groups. A caller needs any one of the selected groups. Include
-   the application's entry page, assets, and browser API calls where needed;
-   undeclared paths/methods remain denied. For example, use browser-session
-   rules for `/app/` and bearer-token rules for `/api/` with the intended
+1. Deploy a `v1` application with one public service through the
+   existing deployment workflow. The access overview shows the
+   application/project name, public component, URL, workload
+   readiness, and access-policy state separately. Explain a missing
+   policy as **Access not configured; public requests denied**.
+   Private-only and legacy applications show the requirement for a
+   public `v1` component before access configuration is available.
+1. In **Governance**, record data and telemetry classification,
+   whether personal data is stored, domain-retention owner and policy,
+   purge authority, and recovery owner. Save this separately from the
+   deployment declaration. Email release requires a governance record
+   with personal-data handling enabled.
+1. In **Groups**, create named application groups with display names,
+   for example `readers`, `application-administrators`, and
+   `machine-readers`. Group selection uses stable IDs; names are
+   labels. Creating a group grants nobody membership.
+1. In **Policy**, select the declared public component and add route
+   rules. Each rule has a name, exact path or segment-aware path
+   prefix, explicit HTTP methods, **Browser session** or **Bearer
+   token** authentication, and one or more allowed groups. A caller
+   needs any one of the selected groups. Include the application's
+   entry page, assets, and browser API calls where needed; undeclared
+   paths/methods remain denied. For example, use browser-session rules
+   for `/app/` and bearer-token rules for `/api/` with the intended
    methods and groups.
-1. Review the route/group summary and save the complete policy. The editor
-   rejects overlapping path/method rules, empty group selections, invalid or
-   reserved `/oauth2` paths, and browser policies without a `GET` entry route.
-   `HEAD` follows `GET`; `OPTIONS` needs an explicit rule. Unmatched requests
-   are denied. Display name and email release default to off. The platform
-   derives identity clients and routing settings; the form requests no
+1. Review the route/group summary and save the complete policy. The
+   editor rejects overlapping path/method rules, empty group
+   selections, invalid or reserved `/oauth2` paths, and browser
+   policies without a `GET` entry route. `HEAD` follows `GET`;
+   `OPTIONS` needs an explicit rule. Unmatched requests are denied.
+   Display name and email release default to off. The platform derives
+   identity clients and routing settings; the form requests no
    credentials or provider settings.
-1. Follow policy provisioning until the server reports the policy active. Keep
-   **Saved**, **Provisioning**, **Active**, and **Failed** distinct. Show safe
-   failure details and authorized retry, revision history, and rollback actions.
-   Only after activation should the administrator share the browser entry URL.
+1. Follow policy provisioning until the server reports the policy
+   active. Keep **Saved**, **Provisioning**, **Active**, and
+   **Failed** distinct. Show safe failure details and authorized
+   retry, revision history, and rollback actions. Only after
+   activation should the administrator share the browser entry URL.
 
 ### Approve a person's access
 

@@ -25,59 +25,68 @@ flowchart LR
 - **Domain:** Project identity and discovery
   - **API responsibility:** Create and list projects; report supported
     capabilities
-  - **State or provider involved:** Platform catalog and project grants
+  - **State or provider involved:** Platform catalog and project
+    grants
 - **Domain:** Application declaration
-  - **API responsibility:** Validate a flat or versioned `Application` body,
-    resolve images, assess capacity, record revisions and deployment operations
-  - **State or provider involved:** Platform DB, then Kubernetes with approved
-    component store bindings
+  - **API responsibility:** Validate the sole v1 `Application`
+    declaration, resolve images, assess capacity, record revisions and
+    deployment operations
+  - **State or provider involved:** Platform DB, then Kubernetes with
+    approved component store bindings
 - **Domain:** Lifecycle
-  - **API responsibility:** Restart, rollback, retire, and operator-controlled
-    purge with recorded operation or scope
+  - **API responsibility:** Restart, rollback, retire, and
+    operator-controlled purge with recorded operation or scope
   - **State or provider involved:** Platform DB and runtime resources
 - **Domain:** Configuration and secrets
-  - **API responsibility:** Replace ordinary configuration as desired state;
-    write, rotate, confirm, or revert secret values through a separate path
-  - **State or provider involved:** Revisions for configuration; Kubernetes
-    Secrets for values
+  - **API responsibility:** Replace ordinary configuration as desired
+    state; write, rotate, confirm, or revert secret values through a
+    separate path
+  - **State or provider involved:** Revisions for configuration;
+    Kubernetes Secrets for values
 - **Domain:** Observation
-  - **API responsibility:** Report operation status, readiness, components,
-    resources, usage, drift, and bounded logs
+  - **API responsibility:** Report operation status, readiness,
+    components, resources, usage, drift, and bounded logs
   - **State or provider involved:** Catalog plus live Kubernetes and
     observability queries
 - **Domain:** Project authority
-  - **API responsibility:** Manage project grants and automation-credential
-    metadata
-  - **State or provider involved:** Platform DB, with credential clients
-    projected to Keycloak
+  - **API responsibility:** Manage project grants and
+    automation-credential metadata
+  - **State or provider involved:** Platform DB, with credential
+    clients projected to Keycloak
 - **Domain:** Hosted application access
-  - **API responsibility:** Manage groups, route policies, governance, human
-    requests, memberships, service requests, and access operations
-  - **State or provider involved:** Platform DB, Keycloak, and the hosted-access
-    boundary
+  - **API responsibility:** Manage groups, route policies, governance,
+    human requests, memberships, service requests, and access
+    operations
+  - **State or provider involved:** Platform DB, Keycloak, and the
+    hosted-access boundary
 - **Domain:** Named stores
   - **API responsibility:** Independent resources, explicit human
-    grants/component bindings, expiring leases, consoles, retirement, quota and
-    verified-intent purge
-  - **State or provider involved:** Platform DB, provider adapters and private
-    relay
+    grants/component bindings, expiring leases, consoles, retirement,
+    quota and verified-intent purge
+  - **State or provider involved:** Platform DB, provider adapters and
+    private relay
 - **Domain:** AI assistance
-  - **API responsibility:** Classified, authorized evidence reads, bounded runs,
-    history and reviewed rollback proposals
-  - **State or provider involved:** Durable AI records, configured model and
-    deployment operations
+  - **API responsibility:** Classified, authorized evidence reads,
+    bounded runs, history and reviewed rollback proposals
+  - **State or provider involved:** Durable AI records, configured
+    model and deployment operations
 - **Domain:** Operator authority
-  - **API responsibility:** Inspect capacity, audit, recovery requests,
-    retirement and purge scope, and platform grants
-  - **State or provider involved:** Restricted platform-wide state and providers
+  - **API responsibility:** Inspect capacity, audit, recovery
+    requests, retirement and purge scope, and platform grants
+  - **State or provider involved:** Restricted platform-wide state and
+    providers
 
-The URL layout reflects these domains rather than one uniform prefix. Core
-project operations include paths such as `/projects/{name}`; deployment status
-uses `/v1/operations/{id}`; hosted-access resources use
-`/v1/projects/{project}/...`; and privileged functions use `/operator/...` or
-`/platform/...`. The capability response describes what the current deployment
-supports. The versioned application envelope is a contract for desired
-application behavior, not a direct Kubernetes API.
+All public API URLs begin with `/v1`. Desired application state is
+available at `/v1/projects/{project}/application`; runtime inventory
+is `/inventory`, named stores use `/v1/projects/{project}/stores` and
+`/v1/stores/{store_id}`, and all durable work is inspected at
+`/v1/operations/{operation_id}`. Operator and platform administration
+use `/v1/operator/...` and `/v1/platform/...`. Private gateway
+callbacks use `/v1/internal/...`. Portal navigation, OIDC callbacks,
+`/healthz`, `/readyz`, `/docs` and `/openapi.json` are separate web or
+operational entry points. The capability response describes
+implemented limits. Only `platform.eseidinger.de/v1` Application
+declarations are accepted.
 
 ## Acceptance, execution, and observation
 

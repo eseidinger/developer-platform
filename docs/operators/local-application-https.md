@@ -36,8 +36,8 @@ limit is 128 MiB and its CPU limit is 0.5 cores.
 
 ## Declare outbound access on the caller
 
-The calling component must declare both the configured identity host and the
-target application's host in its `v1alpha2` declaration:
+The calling component must declare both the configured identity host
+and the target application's host in its `v1` declaration:
 
 ```json
 {

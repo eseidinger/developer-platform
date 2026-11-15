@@ -21,10 +21,6 @@ Start the existing installation or rebuild the API from current sources:
 bash scripts/up.sh
 ```
 
-Dedicated Neo4j instances are created outside Compose; stopping Compose does not
-stop those instances. Inspect their controller-owned state before host
-maintenance.
-
 Bootstrap starts an existing k3d cluster; it does not migrate the Kubernetes
 image or reapply saved application declarations automatically. Expected
 heartbeat alerts may fire during dependency downtime because maintenance windows
@@ -51,12 +47,12 @@ PostgreSQL and the platform catalog. Reapply the stored declarations and verify
 application data. Retaining a PostgreSQL volume is not a supported major-version
 upgrade by itself.
 
-`bash scripts/down.sh --volumes` deletes the cluster and persistent Compose
-named volumes, including shared-store data. It does not remove the host-bound
-Tempo filesystem or controller-created Neo4j instance volumes/networks. Those
-are outside Compose teardown and need separately scoped retirement/purge or
-operator cleanup. It is only for a deliberate disposable-lab reset. Both modes
-retain `.env`, local backup files, and installed tools.
+`bash scripts/down.sh --volumes` deletes the cluster and persistent
+Compose named volumes, including shared-store data. It does not remove
+the host-bound Tempo filesystem. Those are outside Compose teardown
+and need separately scoped retirement/purge or operator cleanup. It is
+only for a deliberate disposable-lab reset. Both modes retain `.env`,
+local backup files, and installed tools.
 
 ## Rotate the controller credential
 
@@ -81,3 +77,16 @@ For an upgrade on the lab:
 Application release and rollback are developer workflows. A workload rollback
 does not reverse its database schema or restore historical secret values; use
 compatible expand/contract migrations.
+
+## v1 installation boundary
+
+The v1 release uses a fresh platform catalog and the sole
+`platform.eseidinger.de/v1` declaration. It provides no compatibility
+routes or migration of existing applications. Existing applications,
+retained provider data and old backups may be discarded as part of an
+explicitly scoped reset. `down.sh --volumes` removes Compose data,
+while host-bound Tempo data and local or offsite backups require
+separate cleanup. Use the normal local/Ansible installation after
+teardown; do not infer that stopping containers erased backups.
+Project-by-project removal on v1 uses the
+[complete purge workflow](project-lifecycle.md).

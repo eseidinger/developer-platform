@@ -52,13 +52,14 @@ checks may explain unavailable actions but never grant access.
 
 ## Project AI assistance
 
-Open a project and choose **AI assistance** (`/projects/:name/ai`). Human
-viewers can start the three bounded run types for eligible Public/Internal
-projects. Human platform administrators change classification with project
-confirmation; human project managers review, approve and execute rollback
-proposals separately. The API checks all permissions. Eligible investigations
-must be completed, sourced and bound to the current revision; older unbound runs
-are history only.
+Open a project and choose **AI assistance** (`/v1/projects/:name/ai`).
+Human viewers can start the three bounded run types for eligible
+Public/Internal projects. Human platform administrators change
+classification with project confirmation; human project managers
+review, approve and execute rollback proposals separately. The API
+checks all permissions. Eligible investigations must be completed,
+sourced and bound to the current revision; older unbound runs are
+history only.
 
 Run/proposal selection and opaque pagination cursors survive reload in the URL.
 AI result bodies are held only in memory and the query cache is removed when

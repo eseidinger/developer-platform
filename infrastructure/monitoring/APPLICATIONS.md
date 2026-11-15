@@ -14,15 +14,16 @@ namespace, URL-valued instance, health profile and probe kind. Legacy
 declarations retain project-host routing and status/content probes, now honoring
 custom paths.
 
-Hosted `v1alpha2` probes are `probe_kind=access-boundary`: they expect 302, 401
-or 403, never follow login redirects, reject backend 200 and policy-unavailable
-503, and validate public TLS. They carry no credentials and create no anonymous
-route or implicit membership. A successful denial proves boundary reachability,
-**not backend readiness or authorized business access**. Kubernetes HTTP
-readiness and the separate `ApplicationComponentNotReady` rule supply semantic
-workload health; kube-state-metrics exports bounded application/component pod
-labels. Readiness on a non-public port is observed by Kubernetes, not an
-invented public port mapping.
+Hosted `v1` probes are `probe_kind=access-boundary`: they expect 302,
+401 or 403, never follow login redirects, reject backend 200 and
+policy-unavailable 503, and validate public TLS. They carry no
+credentials and create no anonymous route or implicit membership. A
+successful denial proves boundary reachability, **not backend
+readiness or authorized business access**. Kubernetes HTTP readiness
+and the separate `ApplicationComponentNotReady` rule supply semantic
+workload health; kube-state-metrics exports bounded
+application/component pod labels. Readiness on a non-public port is
+observed by Kubernetes, not an invented public port mapping.
 
 A project PUT accepts optional `probe_profile`:
 

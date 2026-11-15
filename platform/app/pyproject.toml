@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "developer-platform-api"
-version = "0.1.0"
+version = "1.0.0"
 description = "Developer Platform control-plane API and hosted-access gateway"
 readme = "README.md"
 requires-python = ">=3.12"

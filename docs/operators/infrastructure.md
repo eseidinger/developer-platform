@@ -161,14 +161,15 @@ encrypting all application traffic.
 
 ## Metrics and capacity
 
-`kube-state-metrics` runs in `platform-system` with list/watch access to nodes,
-namespaces, pods, and workload controllers. Prometheus reaches it through
-NodePort 30090 on the k3d server. The Platform API combines Node allocatable
-values and active Pod requests with a fresh host resource snapshot for
-admission. Physical host CPU is counted once; node memory is bounded by Docker
-container limits. The audited `/operator/capacity` view exposes host and
-Kubernetes budgets, limiting constraints, and observed node metrics, with
-explicit unavailable states. Admission is opt-in and its budgets are managed by
+`kube-state-metrics` runs in `platform-system` with list/watch access
+to nodes, namespaces, pods, and workload controllers. Prometheus
+reaches it through NodePort 30090 on the k3d server. The Platform API
+combines Node allocatable values and active Pod requests with a fresh
+host resource snapshot for admission. Physical host CPU is counted
+once; node memory is bounded by Docker container limits. The audited
+`/v1/operator/capacity` view exposes host and Kubernetes budgets,
+limiting constraints, and observed node metrics, with explicit
+unavailable states. Admission is opt-in and its budgets are managed by
 the deployment inventory; see the
 [capacity accounting procedure](runbooks/platform.md#capacity-accounting).
 
@@ -179,13 +180,13 @@ read-only and does not receive the Docker socket. Container environment values
 and credentials are excluded from the snapshot. Missing/stale snapshots block
 enabled admission.
 
-The light-load profile caps shared services at 10.875 GiB RAM and 7.5 CPU cores
-with all optional shared providers enabled and no dedicated Neo4j instances.
-Monitoring services without CPU caps additionally share the configured host CPU
-overhead allowance. Kubernetes defaults to a 2 GiB server and two 7 GiB workers
-(16 GiB total). These ceilings are sized for the observed small datasets and low
-traffic; re-measure before increasing concurrency, ingestion or database sizes.
-The host/runtime overhead allowances and minimum reserve are unchanged.
+The current shared data services are PostgreSQL and optional RustFS
+S3. Read selected memory/CPU ceilings from `docker compose config` and
+the capacity API; the controller inventory includes the selected
+profiles. Monitoring services without CPU caps share the configured
+host CPU overhead allowance. Kubernetes node allocations come from the
+deployment inventory. Re-measure observed data, traffic and ingestion
+before increasing any budget.
 
 ## Persistence and failure domain
 

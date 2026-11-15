@@ -54,18 +54,20 @@ ansible-playbook -i ansible/inventory.yml \
 
 ## Verify component public exposure
 
-Component services are private unless their v1alpha2 declaration sets
-`exposure: public`. Only one public service is supported; its hostname is
-`<component>-<project>.<APPS_DOMAIN>`. The component acceptance playbook
-verifies the generated route object. On the protected lab, after DNS and
-certificate readiness, make one HTTPS request to that hostname; then deploy a
-private revision and confirm the ingress is removed and no application response
-remains. This is a manual edge/TLS check because local unit tests and cluster
-object checks do not prove public DNS, certificate issuance, or proxy
-forwarding. Follow ADR-009 before testing a public domain. The authorized
-`GET /projects/<project>/resources` response lists each declared HTTPS URL in
-`public_endpoints`. Its `tls.state: unknown` deliberately means the platform has
-not observed the edge certificate; do not treat it as a readiness signal.
+Component services are private unless their v1 declaration sets
+`exposure: public`. Only one public service is supported; its hostname
+is `<component>-<project>.<APPS_DOMAIN>`. The component acceptance
+playbook verifies the generated route object. On the protected lab,
+after DNS and certificate readiness, make one HTTPS request to that
+hostname; then deploy a private revision and confirm the ingress is
+removed and no application response remains. This is a manual edge/TLS
+check because local unit tests and cluster object checks do not prove
+public DNS, certificate issuance, or proxy forwarding. Follow ADR-009
+before testing a public domain. The authorized
+`GET /v1/projects/<project>/resources` response lists each declared
+HTTPS URL in `public_endpoints`. Its `tls.state: unknown` deliberately
+means the platform has not observed the edge certificate; do not treat
+it as a readiness signal.
 
 ## Approve component outbound connectivity
 
@@ -106,13 +108,15 @@ restrictions remain managed hardening controls. For example:
 PROJECT_QUOTAS_JSON={"default":{"pods":"6","requests.cpu":"1200m","requests.memory":"1536Mi","limits.cpu":"2400m","limits.memory":"3Gi"},"batch":{"pods":"3"}}
 ```
 
-The API validates a component rollout, including its rolling-update surge,
-against the same effective quota that it writes to the namespace. Invalid policy
-JSON or unsupported values fails closed; fix the operator configuration rather
-than retrying a developer request. Inspect the effective safe policy through
-`GET /operator/projects/<project>/security-configuration` as a platform
-administrator. Before raising a quota, perform the protected capacity exercise
-below; this local policy does not reserve physical host capacity.
+The API validates a component rollout, including its rolling-update
+surge, against the same effective quota that it writes to the
+namespace. Invalid policy JSON or unsupported values fails closed; fix
+the operator configuration rather than retrying a developer request.
+Inspect the effective safe policy through
+`GET /v1/operator/projects/<project>/security-configuration` as a
+platform administrator. Before raising a quota, perform the protected
+capacity exercise below; this local policy does not reserve physical
+host capacity.
 
 ## Inspect platform capacity
 
@@ -384,21 +388,23 @@ reconciler automatically restores workloads.
 
 ## PostgreSQL unreachable or slow
 
-Inspect current resources with `devplat stores list --project NAME` and
-`devplat stores get RESOURCE_UUID`, including observed state, usage freshness
-and provider error codes. Inspect the component's explicit binding and active
-credential generation before checking its relay connection.
-`GET /projects/{name}/data-services` summarizes visible named resources,
-component bindings and whether a current binding credential is active. An empty
-project has no reported data services. Check provider-specific native
-connectivity and an application write/read before declaring data recovery. The
-bounded `POST .../data-services/recovery-requests` remains an
-operator-assistance request rather than an automatic named-resource restore.
-Platform administrators review requests through
-`GET /operator/data-service-recovery-requests` and acknowledge or resolve them
-with its request-specific `PATCH` endpoint. These calls report control-plane
-state, not application transaction integrity; use the controlled database
-write/read procedure below before resolving an incident.
+Inspect current resources with `devplat stores list --project NAME`
+and `devplat stores get RESOURCE_UUID`, including observed state,
+usage freshness and provider error codes. Inspect the component's
+explicit binding and active credential generation before checking its
+relay connection. `GET /v1/projects/{project}/data-services`
+summarizes visible named resources, component bindings and whether a
+current binding credential is active. An empty project has no reported
+data services. Check provider-specific native connectivity and an
+application write/read before declaring data recovery. The bounded
+`POST .../data-services/recovery-requests` remains an
+operator-assistance request rather than an automatic named-resource
+restore. Platform administrators review requests through
+`GET /v1/operator/data-service-recovery-requests` and acknowledge or
+resolve them with its request-specific `PATCH` endpoint. These calls
+report control-plane state, not application transaction integrity; use
+the controlled database write/read procedure below before resolving an
+incident.
 
 Use the readiness and service-log commands above. Inspect host disk, connection
 limits, locks, database permissions, and connectivity from the affected

@@ -17,16 +17,15 @@ resources; a deployment declaration cannot mutate authority.
 
 ## Current schema family
 
-`platform.example/v1alpha2` is the preferred multi-component schema. It supports
-long-running services, scheduled components, stable internal discovery, one
-public service, component resources and readiness, and the current shared
-PostgreSQL profile. The API also accepts the earlier `v1alpha1` envelope and
-flat legacy form for compatibility.
-
-Compatibility forms map into the same canonical desired state, revisions, and
-operations. They are not separate provider implementations. A breaking semantic
-change requires a new schema version and an explicit migration path; an existing
-field must not silently acquire a different meaning.
+`platform.eseidinger.de/v1` is the sole Application schema. It
+supports services, scheduled components, private discovery, one
+protected public service, component resources/readiness, explicit
+named-store bindings and telemetry opt-ins. Metadata contains only
+`name`; `spec.components` carries the complete desired application.
+The API rejects earlier versions, flat declarations and unknown
+fields. All public HTTP endpoints use `/v1`; the declaration lives at
+`/v1/projects/{project}/application` and can be exported and
+preflighted there.
 
 ## Contract principles
 
@@ -48,12 +47,13 @@ field must not silently acquire a different meaning.
 
 ## Application metrics declaration
 
-A service component may opt in to platform collection of Prometheus-format
-application metrics with `telemetry.metrics: {port: "http", path: "/metrics"}`,
-where `http` names one declared HTTP service port. The API accepts this additive
-`v1alpha2` declaration and advertises `applicationMetrics`. Existing
-declarations remain valid. Unknown fields and invalid ports or paths fail before
-side effects.
+A service component may opt in to platform collection of
+Prometheus-format application metrics with
+`telemetry.metrics: {port: "http", path: "/metrics"}`, where `http`
+names one declared HTTP service port. The API accepts this additive
+`v1` declaration and advertises `applicationMetrics`. Existing
+declarations remain valid. Unknown fields and invalid ports or paths
+fail before side effects.
 
 The platform derives scrape targets from the accepted project/component identity
 and reaches them on a private, platform-controlled path. Metrics collection must
@@ -69,14 +69,15 @@ failed scrapes are explicit, not healthy zeros. See
 
 ## Application tracing declaration
 
-Service and scheduled components may opt in to a private OpenTelemetry trace
-export path with the additive `v1alpha2` field
-`spec.components[].telemetry.tracing.enabled: true`. The API accepts this
-additive field and advertises `applicationTracing`. Omission or `false` keeps
-tracing disabled. The platform supplies a private OTLP endpoint and verified
-project/application/ component identity. A workload cannot choose its own
-project identity through span attributes, and a declaration cannot configure an
-arbitrary exporter URL or bypass the authenticated application access boundary.
+Service and scheduled components may opt in to a private OpenTelemetry
+trace export path with the additive `v1` field
+`spec.components[].telemetry.tracing.enabled: true`. The API accepts
+this additive field and advertises `applicationTracing`. Omission or
+`false` keeps tracing disabled. The platform supplies a private OTLP
+endpoint and verified project/application/ component identity. A
+workload cannot choose its own project identity through span
+attributes, and a declaration cannot configure an arbitrary exporter
+URL or bypass the authenticated application access boundary.
 
 Safe W3C trace context may cross the platform boundary and permitted internal
 calls, but it conveys no authority. Incoming external baggage and trace metadata

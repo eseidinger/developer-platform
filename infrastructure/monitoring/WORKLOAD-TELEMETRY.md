@@ -147,14 +147,16 @@ redaction.
 
 Loki's persistent volume and compactor enforce the configured 168-hour
 retention. Alloy stores file positions in its own persistent volume.
-Collection/write outages may lose logs; neither retention nor a volume is a
-delivery guarantee. Loki/Grafana remain operator-only, with no tenant access to
-shared queries. `GET /projects/{name}/retained-logs` requires the existing
-project view permission, fixes the project/namespace selector server-side,
-supports bounded time/component/ pod filters, revalidates returned
-streams/records, and audits the read. It never accepts LogQL or returns raw
-backend diagnostics. Backend failure is unavailable, not an empty-success
-result; retention state `configured` is not live acceptance.
+Collection/write outages may lose logs; neither retention nor a volume
+is a delivery guarantee. Loki/Grafana remain operator-only, with no
+tenant access to shared queries.
+`GET /v1/projects/{project}/retained-logs` requires the existing
+project view permission, fixes the project/namespace selector
+server-side, supports bounded time/component/ pod filters, revalidates
+returned streams/records, and audits the read. It never accepts LogQL
+or returns raw backend diagnostics. Backend failure is unavailable,
+not an empty-success result; retention state `configured` is not live
+acceptance.
 
 Dated deployment observations are recorded in the
 [verification history](VERIFICATION-HISTORY.md).

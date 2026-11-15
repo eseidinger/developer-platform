@@ -88,6 +88,9 @@ report says `restore-failed-manual-action-required`, restore the k3d server and
 Platform API before investigating or retrying cleanup. This revised drill has
 not been run live.
 
+The [v1 contract verification record](v1-contract-2026-11-15.md) distinguishes
+repository/native-backend checks from installed-platform acceptance.
+
 ## 1. Deploy the platform
 
 Prepare DNS, an Ubuntu 22.04+ host, SSH access, Python 3, systemd, and the
@@ -217,15 +220,16 @@ is kept in the [backup and recovery](../backup-and-recovery.md) track.
 
 ## 4B. Run hosted-application access acceptance
 
-For protected `v1alpha2` public applications, use the
+For protected `v1` public applications, use the
 [neutral hosted-access harness](access-and-authorization.md#neutral-hosted-application-acceptance-harness).
-Prepare the public digest-pinned fixture, target-host runner environment, and a
-fresh
+Prepare the public digest-pinned fixture, target-host runner
+environment, and a fresh
 [private human administrator session](access-and-authorization.md#obtain-a-private-operator-session-for-the-hosted-access-harness).
-This is not the basic suite's reusable test-runner JSON. Generate an offline
-plan, then explicitly confirm the exact API origin for a live run. Each run
-needs a new run ID. Optional `--timed` proves actual machine-token expiry; do
-not enable global recovery reconciliation on a shared lab.
+This is not the basic suite's reusable test-runner JSON. Generate an
+offline plan, then explicitly confirm the exact API origin for a live
+run. Each run needs a new run ID. Optional `--timed` proves actual
+machine-token expiry; do not enable global recovery reconciliation on
+a shared lab.
 
 The harness creates neutral projects and attempts retirement/identity cleanup
 while retaining databases. It does not redeploy the platform or perform a backup
@@ -242,18 +246,18 @@ A platform administrator creates the durable scope without submitting an
 application:
 
 ```http
-POST /projects
+POST /v1/projects
 Authorization: Bearer <human-platform-admin-token>
 Content-Type: application/json
 
 {"name":"example"}
 ```
 
-The project is returned with `status: empty` and `spec: null`. Grant a human
-project administrator through `PUT /projects/example/grants`. That administrator
-creates a project-scoped deployment credential through
-`POST /projects/example/deployment-credentials` and stores the one-time returned
-client secret directly in the CI secret store.
+The project is returned with `status: empty` and `spec: null`. Grant a
+human project administrator through `PUT /v1/projects/example/grants`.
+That administrator creates a project-scoped deployment credential
+through `POST /v1/projects/example/deployment-credentials` and stores
+the one-time returned client secret directly in the CI secret store.
 
 Exchange the client ID and secret at the issuer token endpoint with the OAuth
 2.0 client-credentials grant. Use the returned short-lived bearer token for
@@ -265,7 +269,7 @@ has not expired.
 The existing desired-state endpoint performs the first and later deployments:
 
 ```http
-PUT /projects/example
+PUT /v1/projects/example
 Authorization: Bearer <short-lived-CI-token>
 Content-Type: application/json
 

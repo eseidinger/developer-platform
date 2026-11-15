@@ -75,31 +75,32 @@ details while retaining an operation ID for authorized diagnosis.
 
 The Python application integrates directly with the selected infrastructure:
 
-- Kubernetes/k3d for application services, scheduled components, Secrets,
-  Services, and Ingress;
-- PostgreSQL outside k3d for platform state and named-resource databases;
-- operator-selected RustFS, OpenSearch, Qdrant and dedicated Neo4j Community for
-  additional named resources;
+- Kubernetes/k3d for application services, scheduled components,
+  Secrets, Services, and Ingress;
+- PostgreSQL outside k3d for platform state and named-resource
+  databases;
+- operator-selected RustFS for named S3-compatible object storage;
 - Caddy and Traefik for edge and cluster routing;
-- Prometheus, Loki, Tempo, Alloy, Grafana, Alertmanager, and discovery files for
-  observability;
-- Keycloak through the generic OIDC boundary for authentication and machine
-  identities.
+- Prometheus, Loki, Tempo, Alloy, Grafana, Alertmanager, and discovery
+  files for observability;
+- Keycloak through the generic OIDC boundary for authentication and
+  machine identities.
 
 There is no direct Docker application-workload adapter. Docker remains the host
 runtime for the platform, identity, persistence, monitoring, and k3d containers.
 
 ## State and lifecycle
 
-The application persists stable project/application IDs, immutable desired
-revisions, operations, grants, credentials, audit records, and retirement
-inventories in platform-owned PostgreSQL state. Hosted application databases
-remain logically separate. Persistent data defaults to retention when workload
-resources are removed; permanent deletion requires an explicit authorized
-decision. Applications own row-level domain retention. The platform owns
-whole-database, backup, log, metric, revision, audit, credential, and
-release-evidence retention under
-[ADR-020](decisions/ADR-020-generic-hosted-application-integration.md).
+The catalog persists immutable UUIDs, desired revisions, operations,
+grants, credentials, audit and AI records. Retirement removes
+workloads and revokes access while retaining data and an encrypted
+recovery point. Restoration uses the same UUID with fresh credentials.
+Complete purge removes owned provider, catalog, audit, telemetry and
+managed backup data; a durable operation waits for private host
+verification before reporting completion. Name reuse creates a new
+UUID only after purge succeeds. The
+[lifecycle runbook](../operators/project-lifecycle.md) defines
+previews, blockers, receipt lifetime and failure recovery.
 
 An accepted operation means the desired state was recorded, not that the
 workload is healthy. Operation results and live runtime observations remain
@@ -111,11 +112,12 @@ See the [current provisioning sequence](diagrams/provisioning.md),
 [security model](../maintainers/delivery/history/security-design.md), and
 [Phase 2C capability plan](../maintainers/delivery/history/phase-2c-platform-capabilities.md).
 
-## Optional Phase 6
+## Historical architecture work
 
-If a concrete need is recorded, [optional Phase 6](evolution.md) may add a
-direct Docker workload adapter or extract one or more deployable services.
-Neither package is part of the current architecture, and neither gates Phases 2
-through 5. Any activated package requires contract parity, state migration,
-authorization, audit, backup/restore, operational evidence, and rollback before
-replacing an existing path.
+ADRs and delivery plans preserve the decisions and proposals made at
+their original dates. They are historical records. The implemented
+reference is this architecture, the
+[declaration contract](application-contract.md), the generated OpenAPI
+schema and current operator runbooks. Proposed compute adapters and
+service extraction in [evolution notes](evolution.md) are not
+implemented.

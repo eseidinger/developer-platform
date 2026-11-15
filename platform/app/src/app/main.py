@@ -2526,9 +2526,7 @@ def component_status(
         raise HTTPException(409, "Project has not been deployed")
     components = current[1].get("components")
     if components is None:
-        raise HTTPException(
-            409, "Component status requires a v1 application revision"
-        )
+        raise HTTPException(409, "Component status requires a v1 application revision")
     result = observe_components(runtime, name, components, log)
     required_audit(
         actor,

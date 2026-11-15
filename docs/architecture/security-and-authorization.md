@@ -542,20 +542,21 @@ the single shared Docker host suitable for hostile tenants.
 ## Revocation and rotation
 
 The generic hosted-access reference implementation is now in
-`platform/app/src/app/access_*`: PostgreSQL resources and durable operations,
-Keycloak projection, per-policy OAuth2 Proxy, and the shared replicated request
-boundary. See the [API guide](../developers/api.md#hosted-application-access)
-for exact resource bodies and the
+`platform/app/src/app/access_*`: PostgreSQL resources and durable
+operations, Keycloak projection, per-policy OAuth2 Proxy, and the
+shared replicated request boundary. See the
+[API guide](../developers/api.md#hosted-application-access) for exact
+resource bodies and the
 [installation/recovery runbook](../operators/identity-and-access.md#hosted-application-access-installation-and-recovery)
 for operational safeguards. Deployed core evidence is recorded in
-[EV-45](../maintainers/delivery/backlog.md#verification-register): human/machine
-access, IPv4 backend/egress isolation, rotation, timed expiry and
-existing-session/ token revocation passed on node-01. This does not close
-PLAN-009/F-10; dependency outage, restored access, long timers, retention and
-other deferred checks remain open in the
+[EV-45](../maintainers/delivery/backlog.md#verification-register):
+human/machine access, IPv4 backend/egress isolation, rotation, timed
+expiry and existing-session/ token revocation passed on node-01. This
+does not close PLAN-009/F-10; dependency outage, restored access, long
+timers, retention and other deferred checks remain open in the
 [dated run record](../operators/validation/access-and-authorization.md#executed-hosted-access-core-acceptance-october-11-2026).
-The existing legacy single-service route is not migrated implicitly; hosted
-protection requires `v1alpha2`.
+The existing legacy single-service route is not migrated implicitly;
+hosted protection requires `v1`.
 
 The boundary handles browser callback/start/logout itself. A browser policy
 includes a `GET` entry route; state-changing requests additionally require a

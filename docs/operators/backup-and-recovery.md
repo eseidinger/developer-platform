@@ -120,42 +120,44 @@ deployed off-host restore/reconnection remains open.
 ## Current backup scope
 
 - **Data:** Project databases, roles and password hashes
-  - **Current mechanism:** Compressed `pg_dumpall` in encrypted restic bundle
-  - **Remaining responsibility:** Verify pre-backup data and application
-    recovery
+  - **Current mechanism:** Compressed `pg_dumpall` in encrypted restic
+    bundle
+  - **Remaining responsibility:** Verify pre-backup data and
+    application recovery
 - **Data:** Platform metadata and identity
   - **Current mechanism:** Full SQL dump includes catalog, revisions,
-    operations, grants, audit, hosted-access/store/AI records and Keycloak's
-    separate database
-  - **Remaining responsibility:** Restore authorization under quarantine; review
-    current administrative authority
+    operations, grants, audit, hosted-access/store/AI records and
+    Keycloak's separate database
+  - **Remaining responsibility:** Restore authorization under
+    quarantine; review current administrative authority
 - **Data:** `.env`, especially `DATABASE_KEY` and `POSTGRES_PASSWORD`
   - **Current mechanism:** Deployment archive in encrypted bundle
-  - **Remaining responsibility:** Retain repository credentials/password
-    independently of the host
+  - **Remaining responsibility:** Retain repository
+    credentials/password independently of the host
 - **Data:** Caddy data/config and customized Grafana state
-  - **Current mechanism:** Stopped-service volume archives in encrypted bundle
-  - **Remaining responsibility:** Validate restored settings; disable production
-    notifications in recovery
+  - **Current mechanism:** Stopped-service volume archives in
+    encrypted bundle
+  - **Remaining responsibility:** Validate restored settings; disable
+    production notifications in recovery
 - **Data:** Infrastructure, alert rules, workload image identities
-  - **Current mechanism:** Deployed sources/config in the encrypted bundle plus
-    image metadata; images are not exported
+  - **Current mechanism:** Deployed sources/config in the encrypted
+    bundle plus image metadata; images are not exported
   - **Remaining responsibility:** Retain compatible images and record
     versions/digests
 - **Data:** Application Secrets
-  - **Current mechanism:** `project-secrets.json` captures current managed
-    `app-secrets` values
-  - **Remaining responsibility:** Restore through the controlled path; prior
-    rotation values are excluded
+  - **Current mechanism:** `project-secrets.json` captures current
+    managed `app-secrets` values
+  - **Remaining responsibility:** Restore through the controlled path;
+    prior rotation values are excluded
 - **Data:** Named-store data and recovery intent
-  - **Current mechanism:** SQL resource databases, retained native volumes,
-    Neo4j image/volume inventory and `store-recovery.json`
-  - **Remaining responsibility:** Validate provider archives, latest verified
-    intent, quarantine and fresh grants/bindings
+  - **Current mechanism:** SQL resource databases, retained native S3
+    volume and `store-recovery.json`
+  - **Remaining responsibility:** Validate provider archives, latest
+    verified intent, quarantine and fresh grants/bindings
 - **Data:** External watchdog MySQL/configuration
   - **Current mechanism:** Separate hosting service
-  - **Remaining responsibility:** Back up through the hosting provider;
-    PostgreSQL dump excludes it
+  - **Remaining responsibility:** Back up through the hosting
+    provider; PostgreSQL dump excludes it
 
 The workload contract has no PVCs; durable data belongs in explicitly bound
 named resources. The source bundle includes generated operator store
@@ -209,15 +211,15 @@ sudo journalctl -u platform-backup.service -n 40 --no-pager
 sudo /usr/local/sbin/platform-restic snapshots --host node-01 --tag developer-platform,verified
 ```
 
-The service captures PostgreSQL roles/databases, deployment configuration, and
-service data; encrypts and uploads the bundle; verifies an exact-snapshot
-readback; and applies retention. Caddy and Grafana briefly stop during capture.
-Native-store bundles additionally pause managed leases and stop selected native
-services/Neo4j instances while capturing their retained volumes; PostgreSQL-only
-capture uses the existing online logical dump. The bounded 35-minute lease
-pause, restart recovery and limits are in
-[store backup semantics](data-stores.md#retention-and-capacity). Starting an
-already-running service does not create another backup.
+The service captures PostgreSQL roles/databases, deployment
+configuration, and service data; encrypts and uploads the bundle;
+verifies an exact-snapshot readback; and applies retention. Caddy and
+Grafana briefly stop during capture. Native-store bundles additionally
+pause managed leases and stop RustFS while capturing retained S3 data;
+PostgreSQL-only capture uses the existing online logical dump. The
+bounded 35-minute lease pause, restart recovery and limits are in
+[store backup semantics](data-stores.md#retention-and-capacity).
+Starting an already-running service does not create another backup.
 
 Confirm `result: success`, a recent capture timestamp, and the matching verified
 snapshot. Record its full identifier and source revision. Notification delivery
@@ -258,12 +260,13 @@ evidence.
 
 ## Reapply restored projects
 
-Bootstrap creates cluster/controller resources but does not replay all stored
-workloads automatically. Reapply each reviewed public declaration from the
-application's versioned deployment source. `GET /projects` returns internal
-normalized specifications, including resolved-image/runtime fields; copying
-those objects directly back to `PUT /projects/{name}` is not a supported
-declaration export and can return 422.
+Bootstrap creates cluster/controller resources but does not replay all
+stored workloads automatically. Reapply each reviewed public
+declaration from the application's versioned deployment source.
+`GET /v1/projects` returns internal normalized specifications,
+including resolved-image/runtime fields; copying those objects
+directly back to `PUT /v1/projects/{project}/application` is not a
+supported declaration export and can return 422.
 
 For a full store restore, first complete quarantine reconciliation, obtain fresh
 owner approval for the consuming component, and update the declaration with its
@@ -289,11 +292,12 @@ and ordinary API reads. Reconcile hosted access using the separate
 [human-admin recovery action](identity-and-access.md#hosted-application-access-installation-and-recovery)
 and verify authorizer readiness before opening traffic.
 
-The automated restore script's selected-project replay still submits stored
-internal specs and refuses recovered bindings. It does not provide a complete
-automatic `v1alpha2` declaration export/fresh-binding workflow. Keep that
-implementation gap explicit when planning recovery; do not interpret SQL restore
-or an unbound echo rollout as store-backed application recovery.
+The automated selected-project replay exports the public v1
+declaration and reapplies it with the observed revision ETag.
+Recovered store bindings remain revoked: the script refuses bound
+applications until owners approve fresh bindings and the operator
+updates the declaration. SQL recovery or an unbound echo rollout alone
+does not establish store-backed application recovery.
 
 ## Recovery verification and evidence
 
@@ -390,3 +394,30 @@ bindings are required afterward. AGE recovery additionally requires
 authoritative graph rebuild and Cypher validation. See the
 [named-store operator workflow](data-stores.md). Local encrypted intent fixtures
 are not a complete deployed recovery or RTO test.
+
+## v1 project erasure and recovery snapshots
+
+Every newly captured manifest includes the UUIDs of all captured
+projects under `project_ids`, collected while holding the catalog
+snapshot lock. Lifecycle completion receipts for already deleted
+projects are omitted from the clean catalog dump. Encrypted retirement
+recovery points remain project-owned data until restoration or
+complete purge.
+
+Complete project purge creates and verifies a new recovery point for
+remaining projects, removes every managed snapshot containing the
+purged UUID, prunes its unreferenced repository data, and checks the
+repository before signing final completion. Shared historical
+snapshots may be removed as part of that scope. Historical snapshots
+without ownership manifests are also removed because their ownership
+cannot be certified. Unreadable snapshots block completion. See the
+[project lifecycle runbook](project-lifecycle.md).
+
+S3 versioned backup repositories also require `s3:ListBucketVersions`
+and `s3:DeleteObjectVersion` access for their dedicated prefix. After
+restic pruning, maintenance erases noncurrent object versions and
+delete markers, re-lists them, and checks the current repository
+again. Object locks, retention policies or missing permissions leave
+purge blocked. Only the current clean repository objects are retained;
+historical copies of shared backup objects are removed. The
+repository's local restic cache is also removed.
