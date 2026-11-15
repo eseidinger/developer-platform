@@ -201,7 +201,8 @@ add(
     P + "/retire",
     "Retire a project using a pinned preview scope.",
     body="retirement",
-    fields=("scope_token",),
+    fields=("scope_token", "confirm_project_id"),
+    family="lifecycle",
     destructive=True,
 )
 add(
@@ -256,34 +257,6 @@ add(
     P + "/deployment-credentials/{credential_id}",
     "Revoke a CI credential.",
     destructive=True,
-)
-add(
-    "database-access grants list",
-    "GET",
-    P + "/database-access/grants",
-    "List named human database grants.",
-)
-add(
-    "database-access grants revoke",
-    "DELETE",
-    P + "/database-access/grants",
-    "Revoke a human database grant and terminate its sessions.",
-    body="grant",
-    fields=("issuer", "subject"),
-    destructive=True,
-)
-add(
-    "database-access me",
-    "GET",
-    P + "/database-access/me",
-    "Inspect your database tunnel identity.",
-)
-add(
-    "database-access key replace",
-    "PUT",
-    P + "/database-access/me/key",
-    "Replace your SSH public key using a JSON file.",
-    body="file",
 )
 
 for command, suffix, description, query, resource in (
@@ -533,7 +506,8 @@ add(
     "/v1/operator/projects/{project}/purge",
     "Permanently purge a retired project using its preview scope.",
     body="retirement",
-    fields=("scope_token",),
+    fields=("scope_token", "confirm_project_id"),
+    family="lifecycle",
     destructive=True,
 )
 for action, method in (("set", "PUT"), ("delete", "DELETE")):
@@ -593,14 +567,6 @@ EXCLUSIONS = {
     ("GET", "/readyz"): "Service readiness probe",
     (
         "POST",
-        P + "/database-access/grants",
-    ): "Obsolete endpoint always returns HTTP 410",
-    (
-        "POST",
-        P + "/database-access/me/credential",
-    ): "Obsolete endpoint always returns HTTP 410",
-    (
-        "POST",
         "/v1/store-access/credentials/{credential_id}/console",
     ): "Browser-only console launch assertion",
 }
@@ -615,7 +581,7 @@ add(
     "Create a named store resource from JSON.",
     body="file",
 )
-S = "/v1/stores/{resource_id}"
+S = "/v1/stores/{store_id}"
 add("stores get", "GET", S, "Inspect resource provisioning and quota enforcement.")
 add(
     "stores rename",
@@ -775,3 +741,22 @@ add(
     "Validate a v1 application without deploying.",
     body="file",
 )
+
+add(
+    "operator restore preview",
+    "GET",
+    "/v1/operator/projects/{project}/restore-preview",
+    "Preview restoration from retained project data.",
+)
+add(
+    "operator restore apply",
+    "POST",
+    "/v1/operator/projects/{project}/restore",
+    "Restore a retired project with new credentials.",
+    body="retirement",
+    fields=("scope_token", "confirm_project_id"),
+    family="lifecycle",
+    destructive=True,
+)
+
+add("projects get", "GET", P, "Read project identity and lifecycle state.")

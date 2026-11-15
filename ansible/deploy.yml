@@ -63,5 +63,8 @@
         - name: Reconcile services and wait for API readiness
           ansible.builtin.import_tasks: tasks/deploy/startup.yml
 
+        - name: Install project lifecycle maintenance
+          ansible.builtin.import_tasks: tasks/deploy/lifecycle-maintenance.yml
+
         - name: Record source and runtime versions after startup
           ansible.builtin.import_tasks: tasks/deploy/installation-record.yml

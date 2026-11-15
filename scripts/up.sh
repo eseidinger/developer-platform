@@ -33,6 +33,11 @@ python3 scripts/checks/check-network-addresses.py
 # Only generated KEY=value settings are accepted; never source arbitrary shell code.
 eval "$(python3 scripts/internal/env.py)"
 
+# The API writes only signed maintenance requests. Host root owns execution.
+mkdir -p .runtime/maintenance
+chmod 700 .runtime/maintenance
+setfacl -m u:10001:rwx .runtime/maintenance
+
 # Keep generated credentials private from the moment they are written.
 umask 077
 mkdir -p .runtime

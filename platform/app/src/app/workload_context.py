@@ -15,7 +15,17 @@ def pod_template(manifest):
     return spec["template"]
 
 
-def stamp(manifest, revision, operation_id):
+def stamp(manifest, revision, operation_id, project_id=None):
+    if project_id is not None:
+        manifest = copy.deepcopy(manifest)
+        label = "platform.eseidinger.de/project-id"
+        manifest.setdefault("metadata", {}).setdefault("labels", {})[label] = str(
+            project_id
+        )
+        if manifest["kind"] in {"Deployment", "CronJob"}:
+            pod_template(manifest).setdefault("metadata", {}).setdefault("labels", {})[
+                label
+            ] = str(project_id)
     if manifest["kind"] not in {"Deployment", "CronJob"}:
         return manifest
     marked = copy.deepcopy(manifest)

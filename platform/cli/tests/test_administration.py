@@ -520,15 +520,10 @@ def test_ai_approval_and_execution_require_project_confirmation(
     assert not requests
 
 
-def test_obsolete_database_issuance_commands_are_excluded():
-    commands = {item.command for item in COMMANDS}
-    assert "database-access grants create" not in commands
-    assert "database-access credential issue" not in commands
-    assert ("POST", "/v1/projects/{project}/database-access/grants") in EXCLUSIONS
-    assert (
-        "POST",
-        "/v1/projects/{project}/database-access/me/credential",
-    ) in EXCLUSIONS
+def test_obsolete_database_commands_are_removed():
+    assert not any(item.command.startswith("database-access ") for item in COMMANDS)
+    assert not any("database-access" in path for _, path in EXCLUSIONS)
+
 
 
 @pytest.mark.parametrize("provider", ["postgresql", "s3"])

@@ -16,6 +16,13 @@ def initialize(conn):
         FROM projects p
         CROSS JOIN LATERAL jsonb_array_elements(COALESCE(p.spec->'components', '[]'::jsonb)) AS c(item)
         WHERE p.status = 'applied' AND c.item->'tracing'->>'enabled' = 'true'""")
+    conn.execute("""CREATE OR REPLACE VIEW telemetry_project_partitions AS
+        SELECT p.name AS project,p.project_id FROM projects p
+        WHERE p.status='applied' AND NOT EXISTS(SELECT 1 FROM project_lifecycle_operations l
+        WHERE l.project_id=p.project_id AND l.state IN ('queued','running','blocked'))""")
+    conn.execute(
+        "CREATE OR REPLACE VIEW telemetry_project_identities AS SELECT name AS project,project_id FROM projects"
+    )
     if not conn.execute(
         "SELECT 1 FROM pg_roles WHERE rolname='telemetry_catalog'"
     ).fetchone():
@@ -29,4 +36,9 @@ def initialize(conn):
     )
     conn.execute("GRANT CONNECT ON DATABASE platform TO telemetry_catalog")
     conn.execute("REVOKE ALL ON telemetry_component_opt_ins FROM PUBLIC")
-    conn.execute("GRANT SELECT ON telemetry_component_opt_ins TO telemetry_catalog")
+    conn.execute(
+        "GRANT SELECT ON telemetry_component_opt_ins,telemetry_project_partitions,telemetry_project_identities TO telemetry_catalog"
+    )
+    conn.execute(
+        "REVOKE ALL ON telemetry_project_partitions,telemetry_project_identities FROM PUBLIC"
+    )

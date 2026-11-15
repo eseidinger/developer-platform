@@ -2,9 +2,10 @@
 
 import os
 from contextlib import contextmanager
+from typing import Annotated
 from uuid import UUID
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Path
 from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from psycopg.errors import UniqueViolation
@@ -201,8 +202,11 @@ def install(app, control):
             audit(conn, principal, "create", row)
         return reply(row, 202)
 
-    @app.get("/v1/stores/{resource_id}")
-    def get_resource(resource_id: UUID, principal: Principal = caller):
+    @app.get("/v1/stores/{store_id}")
+    def get_resource(
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        principal: Principal = caller,
+    ):
         with mutation(principal) as conn:
             row = owner(conn, resource_id, principal)
             return reply(
@@ -213,9 +217,11 @@ def install(app, control):
                 }
             )
 
-    @app.patch("/v1/stores/{resource_id}")
+    @app.patch("/v1/stores/{store_id}")
     def rename_resource(
-        resource_id: UUID, body: ResourceRename, principal: Principal = caller
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        body: ResourceRename,
+        principal: Principal = caller,
     ):
         with mutation(principal) as conn:
             row = owner(conn, resource_id, principal)
@@ -231,8 +237,12 @@ def install(app, control):
             audit(conn, principal, "rename", row)
         return reply(row)
 
-    @app.put("/v1/stores/{resource_id}/quota")
-    def set_quota(resource_id: UUID, body: QuotaChange, principal: Principal = caller):
+    @app.put("/v1/stores/{store_id}/quota")
+    def set_quota(
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        body: QuotaChange,
+        principal: Principal = caller,
+    ):
         control.require_platform_admin(principal)
         with mutation(principal) as conn:
             row = owner(conn, resource_id, principal)
@@ -251,9 +261,11 @@ def install(app, control):
             audit(conn, principal, "quota", row)
         return reply(row, 202)
 
-    @app.post("/v1/stores/{resource_id}/retirement", status_code=202)
+    @app.post("/v1/stores/{store_id}/retirement", status_code=202)
     def retire_resource(
-        resource_id: UUID, body: Version, principal: Principal = caller
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        body: Version,
+        principal: Principal = caller,
     ):
         with mutation(principal) as conn:
             row = catalog.retire(
@@ -262,8 +274,11 @@ def install(app, control):
             audit(conn, principal, "retire", row)
         return reply(row, 202)
 
-    @app.get("/v1/stores/{resource_id}/purge-preview")
-    def purge_preview(resource_id: UUID, principal: Principal = caller):
+    @app.get("/v1/stores/{store_id}/purge-preview")
+    def purge_preview(
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        principal: Principal = caller,
+    ):
         with mutation(principal) as conn:
             row = owner(conn, resource_id, principal)
             return reply(
@@ -279,15 +294,22 @@ def install(app, control):
                 }
             )
 
-    @app.post("/v1/stores/{resource_id}/purge", status_code=202)
-    def purge_resource(resource_id: UUID, body: Purge, principal: Principal = caller):
+    @app.post("/v1/stores/{store_id}/purge", status_code=202)
+    def purge_resource(
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        body: Purge,
+        principal: Principal = caller,
+    ):
         with mutation(principal) as conn:
             row = catalog.request_purge(conn, owner(conn, resource_id, principal), body)
             audit(conn, principal, "purge-request", row)
         return reply(row, 202)
 
-    @app.get("/v1/stores/{resource_id}/grants")
-    def list_grants(resource_id: UUID, principal: Principal = caller):
+    @app.get("/v1/stores/{store_id}/grants")
+    def list_grants(
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        principal: Principal = caller,
+    ):
         with mutation(principal) as conn:
             owner(conn, resource_id, principal)
             rows = conn.execute(
@@ -296,9 +318,11 @@ def install(app, control):
             ).fetchall()
         return reply({"grants": [r[0] for r in rows]})
 
-    @app.post("/v1/stores/{resource_id}/human-grants", status_code=202)
+    @app.post("/v1/stores/{store_id}/human-grants", status_code=202)
     def create_human_grant(
-        resource_id: UUID, body: HumanGrant, principal: Principal = caller
+        resource_id: Annotated[UUID, Path(alias="store_id")],
+        body: HumanGrant,
+        principal: Principal = caller,
     ):
         with mutation(principal) as conn:
             resource = owner(conn, resource_id, principal)

@@ -109,8 +109,8 @@ export const getBindings = async (project: string) =>
 export const getGrants = async (resource_id: string) =>
   z.object({ grants: z.array(grant) }).parse(
     checked(
-      await apiClient.GET('/v1/stores/{resource_id}/grants', {
-        params: { path: { resource_id } },
+      await apiClient.GET('/v1/stores/{store_id}/grants', {
+        params: { path: { store_id: resource_id } },
       }),
     ),
   ).grants
@@ -133,37 +133,37 @@ export const renameResource = async (
   body: Schema['ResourceRename'],
 ) =>
   checked(
-    await apiClient.PATCH('/v1/stores/{resource_id}', {
-      params: { path: { resource_id } },
+    await apiClient.PATCH('/v1/stores/{store_id}', {
+      params: { path: { store_id: resource_id } },
       body,
     }),
   )
 export const quota = async (resource_id: string, body: Schema['QuotaChange']) =>
   checked(
-    await apiClient.PUT('/v1/stores/{resource_id}/quota', {
-      params: { path: { resource_id } },
+    await apiClient.PUT('/v1/stores/{store_id}/quota', {
+      params: { path: { store_id: resource_id } },
       body,
     }),
   )
 export const retireResource = async (resource_id: string, version: number) =>
   checked(
-    await apiClient.POST('/v1/stores/{resource_id}/retirement', {
-      params: { path: { resource_id } },
+    await apiClient.POST('/v1/stores/{store_id}/retirement', {
+      params: { path: { store_id: resource_id } },
       body: { version },
     }),
   )
 export const getPreview = async (resource_id: string) =>
   preview.parse(
     checked(
-      await apiClient.GET('/v1/stores/{resource_id}/purge-preview', {
-        params: { path: { resource_id } },
+      await apiClient.GET('/v1/stores/{store_id}/purge-preview', {
+        params: { path: { store_id: resource_id } },
       }),
     ),
   )
 export const purgeResource = async (row: Preview) =>
   checked(
-    await apiClient.POST('/v1/stores/{resource_id}/purge', {
-      params: { path: { resource_id: row.resource_id } },
+    await apiClient.POST('/v1/stores/{store_id}/purge', {
+      params: { path: { store_id: row.resource_id } },
       body: {
         version: row.version,
         confirm_resource_id: row.resource_id,
@@ -176,8 +176,8 @@ export const createHuman = async (
   body: Schema['HumanGrant'],
 ) =>
   checked(
-    await apiClient.POST('/v1/stores/{resource_id}/human-grants', {
-      params: { path: { resource_id } },
+    await apiClient.POST('/v1/stores/{store_id}/human-grants', {
+      params: { path: { store_id: resource_id } },
       body,
     }),
   )

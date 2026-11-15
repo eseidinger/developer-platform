@@ -50,4 +50,5 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PATH="/app/.venv/bin:$PATH"
 CMD ["uvicorn", "app.main:app", \
     "--host", "0.0.0.0", "--port", "8000", \
+    "--log-config", "/app/src/app/console-logging.json", \
     "--ws-max-size", "1056768", "--ws-max-queue", "4", "--no-access-log"]

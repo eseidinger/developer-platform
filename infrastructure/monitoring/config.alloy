@@ -15,6 +15,7 @@ loki.process "docker" {
 loki.write "local" {
 	endpoint {
 		url = "http://loki:3100/loki/api/v1/push"
+        tenant_id = "platform"
 	}
 }
 
@@ -32,6 +33,16 @@ discovery.kubernetes "workloads" {
 
 discovery.relabel "workloads" {
 	targets = discovery.kubernetes.workloads.targets
+
+    rule {
+        source_labels = ["__meta_kubernetes_pod_label_platform_eseidinger_de_project_id"]
+        target_label = "project_id"
+    }
+    rule {
+        source_labels = ["project_id"]
+        regex = "[a-f0-9-]{36}"
+        action = "keep"
+    }
 
 	rule {
 		source_labels = ["__meta_kubernetes_namespace"]
@@ -110,6 +121,9 @@ loki.source.kubernetes "workloads" {
 // Structured framework messages and the existing operational envelope. Discard
 // arbitrary attributes; keep message/trace identifiers in the body, never labels.
 loki.process "workloads" {
+    stage.tenant {
+        label = "project_id"
+    }
 	stage.drop {
 		longer_than         = "4KB"
 		drop_counter_reason = "oversized_workload_envelope"
@@ -257,7 +271,7 @@ otelcol.processor.batch "platform" {
 
 otelcol.exporter.otlphttp "tempo" {
 	client {
-		endpoint = "http://tempo:4318"
+		endpoint = "http://trace-router:4318"
 		timeout  = "2s"
 	}
 

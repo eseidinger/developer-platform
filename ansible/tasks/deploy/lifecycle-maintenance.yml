@@ -1,0 +1,54 @@
+---
+- name: Prepare the private API maintenance handoff
+  ansible.builtin.file:
+    path: "{{ platform_install_dir }}/.runtime/maintenance"
+    state: directory
+    owner: '10001'
+    group: '10001'
+    mode: '0700'
+
+- name: Install the project purge maintenance service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/platform-project-purge.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Complete confirmed platform project purges
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=oneshot
+      User=root
+      UMask=0077
+      WorkingDirectory={{ platform_install_dir }}
+      ExecStart=/usr/bin/python3 \
+        operations/maintenance/scripts/purge-project.py \
+        --platform-dir {{ platform_install_dir }}
+      TimeoutStartSec=3600
+
+- name: Install the project purge maintenance timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/platform-project-purge.timer
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Retry confirmed project purge maintenance
+
+      [Timer]
+      OnBootSec=2min
+      OnUnitInactiveSec=1min
+
+      [Install]
+      WantedBy=timers.target
+
+- name: Enable the project purge maintenance timer
+  ansible.builtin.systemd_service:
+    name: platform-project-purge.timer
+    daemon_reload: true
+    enabled: true
+    state: started

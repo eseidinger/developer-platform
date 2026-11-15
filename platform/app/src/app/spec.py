@@ -1,7 +1,7 @@
 """The v1 application declaration and its internal execution projection."""
 
 import re
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -58,7 +58,7 @@ class Configuration(_Strict):
 class ComponentRuntime(_Strict):
     type: Literal["container"]
     image: str = Field(
-        min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$"
+        min_length=1, max_length=512, pattern=r"^[a-zA-Z0-9][a-zA-Z0-9./_:@-]*$"
     )
     command: list[str] | None = Field(default=None, max_length=20)
     args: list[str] | None = Field(default=None, max_length=50)
@@ -215,7 +215,9 @@ class ScheduledComponent(_Component):
         return _check_cron(value)
 
 
-Component = ServiceComponent | ScheduledComponent
+Component = Annotated[
+    ServiceComponent | ScheduledComponent, Field(discriminator="type")
+]
 
 
 class ComponentSpec(_Strict):
@@ -262,8 +264,12 @@ CAPABILITIES = {
     "environments": {
         "default": {
             "runtime": {"types": ["container"], "registries": "see imageRegistries"},
-            "endpoints": {"protocols": ["http"], "exposure": ["public"], "maxCount": 1},
-            "scaling": {"minInstances": 1, "maxInstances": 1, "autoscaling": False},
+            "publicIngress": {
+                "protocols": ["http"],
+                "maxComponents": 1,
+                "authenticationRequired": True,
+            },
+            "scaling": {"minReplicas": 1, "maxReplicas": 5, "autoscaling": False},
             "resources": {
                 "requests": "up to 1 CPU / 1Gi",
                 "limits": "up to 2 CPU / 2Gi",
@@ -282,7 +288,6 @@ CAPABILITIES = {
                 "maxValues": 50,
                 "maxValueLength": 1024,
                 "secrets": True,
-                "bindings": ["PG"],
             },
             "components": {
                 "types": ["service", "scheduled"],
@@ -293,7 +298,12 @@ CAPABILITIES = {
                     "operatorAllowListRequired": True,
                     "dnsResolvedAtApply": True,
                 },
-                "service": {"internalHttpPorts": True, "maxReplicas": 5},
+                "service": {
+                    "internalHttpPorts": True,
+                    "maxPorts": 10,
+                    "defaultExposure": "private",
+                    "maxReplicas": 5,
+                },
                 "scheduled": {
                     "cronFields": 5,
                     "timeZone": ["UTC"],
@@ -335,29 +345,8 @@ def error_code(body, errors):
         body.get("apiVersion") != API_VERSION or body.get("kind") != "Application"
     ):
         return "invalid_spec"
-    for error in errors:
-        # Union validation tags each error's location with the branch it came from.
-        loc = tuple(str(part) for part in error.get("loc", ()))
-        branch = next(
-            (
-                part
-                for part in loc
-                if "ApplicationEnvelope" in part or "Project" in part
-            ),
-            "",
-        )
-        if envelope and "ApplicationEnvelope" in branch:
-            if loc[-1] not in ("apiVersion", "kind") and error.get("type") in (
-                "extra_forbidden",
-                "literal_error",
-            ):
-                return "unsupported_capability"
-        elif (
-            not envelope
-            and "Project" in branch
-            and error.get("type") == "extra_forbidden"
-        ):
-            return "unsupported_capability"
+    if envelope and any(error.get("type") == "extra_forbidden" for error in errors):
+        return "unsupported_capability"
     return "invalid_spec"
 
 

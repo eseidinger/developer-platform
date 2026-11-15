@@ -78,6 +78,7 @@ class Job:
         self.restic = config.get("restic", "/usr/local/sbin/platform-restic")
         self.docker = config.get("docker", "/usr/bin/docker")
         self.stage = "starting"
+        self.captured_project_ids = []
 
     def read(self, name, default):
         path = self.state / name
@@ -313,24 +314,78 @@ END $$;
                 raise BackupError("catalog snapshot connection failed")
 
     def dump(self, bundle):
+        # Purge receipts outlive their project for 24 hours, but must never be
+        # copied into the clean recovery point used to finish that purge.
+        commands = (
+            self.postgres_argv(
+                "pg_dumpall", "-U", "postgres", "--exclude-database=platform"
+            ),
+            self.postgres_argv(
+                "pg_dump",
+                "-U",
+                "postgres",
+                "--create",
+                "--exclude-table-data=public.project_lifecycle_operations",
+                "platform",
+            ),
+        )
         with (
             (bundle / "postgres.sql.gz").open("wb") as output,
-            subprocess.Popen(
-                self.postgres_argv("pg_dumpall", "-U", "postgres"),
-                cwd=self.root,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.DEVNULL,
-            ) as process,
+            gzip.GzipFile(fileobj=output, mode="wb") as compressed,
         ):
-            try:
-                with gzip.GzipFile(fileobj=output, mode="wb") as compressed:
-                    shutil.copyfileobj(process.stdout, compressed)
-            except BaseException:
-                process.kill()
-                process.wait()
-                raise
-            if process.wait() != 0:
-                raise BackupError("database capture failed")
+            for arguments in commands:
+                with subprocess.Popen(
+                    arguments,
+                    cwd=self.root,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.DEVNULL,
+                ) as process:
+                    try:
+                        shutil.copyfileobj(process.stdout, compressed)
+                    except BaseException:
+                        process.kill()
+                        process.wait()
+                        raise
+                    if process.wait() != 0:
+                        raise BackupError("database capture failed")
+            live_work = self.compose(
+                "exec",
+                "-T",
+                "postgres",
+                "psql",
+                "-U",
+                "postgres",
+                "-d",
+                "platform",
+                "-At",
+                "-c",
+                "SELECT row_to_json(l) FROM project_lifecycle_operations l WHERE EXISTS(SELECT 1 FROM projects p WHERE p.project_id=l.project_id)",
+            )
+            for record in live_work.splitlines():
+                value = json.loads(record)
+                encoded = json.dumps(value).encode().hex()
+                statement = (
+                    "INSERT INTO public.project_lifecycle_operations SELECT * FROM json_populate_record(NULL::public.project_lifecycle_operations,convert_from(decode('"
+                    + encoded
+                    + "','hex'),'UTF8')::json);\n"
+                )
+                compressed.write(statement.encode())
+
+    def project_ids(self):
+        value = self.compose(
+            "exec",
+            "-T",
+            "postgres",
+            "psql",
+            "-U",
+            "postgres",
+            "-d",
+            "platform",
+            "-At",
+            "-c",
+            "SELECT COALESCE(json_agg(project_id::text ORDER BY project_id),'[]'::json) FROM projects",
+        )
+        return json.loads(value)
 
     def check_graph_sources(self):
         """A retained AGE graph must have a protected source before backup succeeds."""
@@ -509,6 +564,7 @@ END $$;
         with self.catalog_snapshot():
             self.check_graph_sources()
             self.stage = "store recovery intent capture"
+            self.captured_project_ids = self.project_ids()
             self.store_recovery_manifest(bundle)
             self.stage = "coordinated data-store volume capture"
             self.data_store_state(bundle)
@@ -643,6 +699,7 @@ END $$;
                 "run_id": run_id,
                 "captured_at": started,
                 "instance": self.config["instance"],
+                "project_ids": self.captured_project_ids,
                 "sha256": {p.name: digest(p) for p in sorted(bundle.iterdir())},
             }
             atomic_json(bundle / "manifest.json", manifest)

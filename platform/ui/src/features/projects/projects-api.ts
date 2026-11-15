@@ -87,20 +87,6 @@ type ProjectSecrets = {
   activationState: string
   activationReason: string | null
 }
-type RetirementPreview = {
-  removes: { kind: string; name: string }[]
-  retains: Record<string, string | boolean | null>
-  blockers: string[]
-  scopeToken: string
-}
-type PurgePreview = {
-  database: string
-  role: string
-  catalog: string[]
-  auditRecordsRetained: boolean
-  credentialCleanup: Record<string, number>
-  scopeToken: string
-}
 type DataServices = {
   services: {
     resourceId: string
@@ -257,28 +243,63 @@ async function getProjectRevisions(name: string) {
 }
 
 async function deployProject(name: string, body: ProjectDeployment) {
+  // Read the complete declaration so the simple form preserves other components,
+  // their bindings and configuration. The observed ETag prevents lost updates.
+  const current = await apiClient.GET('/v1/projects/{project}/application', {
+    params: { path: { project: name } },
+  })
+  if (current.error && current.response.status !== 404) {
+    throw apiErrorFromResponse(current.response, current.error)
+  }
+  const application = current.data ?? {
+    apiVersion: 'platform.eseidinger.de/v1' as const,
+    kind: 'Application' as const,
+    metadata: { name },
+    spec: {
+      components: [
+        {
+          name: 'web',
+          type: 'service' as const,
+          replicas: 1,
+          exposure: 'private' as const,
+          runtime: { type: 'container' as const, image: body.image },
+          ports: [{ name: 'http', protocol: 'http' as const, port: body.port }],
+        },
+      ],
+    },
+  }
+  const serviceIndex = application.spec.components.findIndex(
+    (component) => component.type === 'service',
+  )
+  if (serviceIndex < 0)
+    throw new Error(
+      'This application contains scheduled components only. Deploy its complete declaration with the CLI.',
+    )
+  application.spec.components = application.spec.components.map(
+    (component, index) => {
+      if (index !== serviceIndex || component.type !== 'service')
+        return component
+      const ports = component.ports?.length
+        ? component.ports.map((port, index) =>
+            index === 0 ? { ...port, port: body.port } : port,
+          )
+        : [{ name: 'http', protocol: 'http' as const, port: body.port }]
+      return {
+        ...component,
+        runtime: { ...component.runtime, image: body.image },
+        ports,
+        health: { readiness: { profile: body.probe_profile } },
+      }
+    },
+  )
   const { data, error, response } = await apiClient.PUT(
     '/v1/projects/{project}/application',
     {
-      params: { path: { project: name } },
-      body: {
-        apiVersion: 'platform.eseidinger.de/v1',
-        kind: 'Application',
-        metadata: { name },
-        spec: {
-          components: [
-            {
-              name: 'web',
-              type: 'service',
-              replicas: 1,
-              exposure: 'private',
-              runtime: { type: 'container', image: body.image },
-              ports: [{ name: 'http', protocol: 'http', port: body.port }],
-              health: { readiness: { profile: body.probe_profile } },
-            },
-          ],
-        },
+      params: {
+        path: { project: name },
+        header: { 'If-Match': current.response.headers.get('ETag') ?? '0' },
       },
+      body: application,
     },
   )
   if (error) {
@@ -361,24 +382,27 @@ async function getOperation(operationId: string) {
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
-  const readiness = record && asRecord(record.readiness)
+  const readiness =
+    record &&
+    (asRecord(record.readiness) ?? { state: 'not_applicable', reason: null })
   if (
     !record ||
     !readiness ||
     typeof record.state !== 'string' ||
-    typeof record.revision !== 'number' ||
+    (record.revision !== undefined && typeof record.revision !== 'number') ||
     (record.error_code !== null && typeof record.error_code !== 'string') ||
     typeof readiness.state !== 'string' ||
-    (readiness.reason !== null && typeof readiness.reason !== 'string')
+    (readiness.reason != null && typeof readiness.reason !== 'string')
   ) {
     throw new Error('The platform returned an invalid operation status.')
   }
   return {
     state: record.state,
-    revision: record.revision,
+    revision: typeof record.revision === 'number' ? record.revision : 0,
     errorCode: record.error_code,
     readinessState: readiness.state,
-    readinessReason: readiness.reason,
+    readinessReason:
+      typeof readiness.reason === 'string' ? readiness.reason : null,
   }
 }
 
@@ -665,66 +689,6 @@ async function deleteProjectSecret(name: string, secret: string) {
     { params: { path: { project: name, secret } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
-}
-
-async function getRetirementPreview(name: string) {
-  const { data, error, response } = await apiClient.GET(
-    '/v1/projects/{project}/retirement-preview',
-    { params: { path: { project: name } } },
-  )
-  if (error) throw apiErrorFromResponse(response, error)
-  const record = asRecord(data)
-  const retains = record && asRecord(record.retains)
-  if (
-    !record ||
-    !retains ||
-    !Array.isArray(record.removes) ||
-    !Array.isArray(record.blockers) ||
-    typeof record.scope_token !== 'string' ||
-    record.blockers.some((blocker) => typeof blocker !== 'string')
-  )
-    throw new Error('The platform returned an invalid retirement preview.')
-  const removes = record.removes.map((resource) => {
-    const item = asRecord(resource)
-    if (!item || typeof item.kind !== 'string' || typeof item.name !== 'string')
-      throw new Error('The platform returned an invalid retirement preview.')
-    return { kind: item.kind, name: item.name }
-  })
-  if (
-    Object.values(retains).some(
-      (value) =>
-        value !== null &&
-        typeof value !== 'string' &&
-        typeof value !== 'boolean',
-    )
-  )
-    throw new Error('The platform returned an invalid retirement preview.')
-  const access = asRecord(record.access)
-  const stores = Array.isArray(access?.named_store_resources)
-    ? access.named_store_resources.map((value) => {
-        const item = asRecord(value)
-        if (
-          !item ||
-          typeof item.resource_id !== 'string' ||
-          typeof item.name !== 'string'
-        )
-          throw new Error(
-            'The platform returned an invalid retirement preview.',
-          )
-        return { id: item.resource_id, name: item.name }
-      })
-    : []
-  const storeGrantCount = Array.isArray(access?.named_store_grants)
-    ? access.named_store_grants.length
-    : 0
-  return {
-    removes,
-    retains: retains as Record<string, string | boolean | null>,
-    stores,
-    storeGrantCount,
-    blockers: record.blockers as string[],
-    scopeToken: record.scope_token,
-  }
 }
 
 async function getDataServices(name: string) {
@@ -1057,66 +1021,6 @@ async function rotateDeploymentCredential(
   }
 }
 
-async function retireProject(name: string, scopeToken: string) {
-  const { data, error, response } = await apiClient.POST(
-    '/v1/projects/{project}/retire',
-    {
-      params: { path: { project: name } },
-      body: { confirm_name: name, scope_token: scopeToken },
-    },
-  )
-  if (error) throw apiErrorFromResponse(response, error)
-  const record = asRecord(data)
-  if (!record || typeof record.status !== 'string')
-    throw new Error('The platform returned an invalid retirement result.')
-  return { status: record.status }
-}
-
-async function getPurgePreview(name: string): Promise<PurgePreview> {
-  const { data, error, response } = await apiClient.GET(
-    '/v1/operator/projects/{project}/purge-preview',
-    { params: { path: { project: name } } },
-  )
-  if (error) throw apiErrorFromResponse(response, error)
-  const record = asRecord(data)
-  const credentials = record && asRecord(record.credential_cleanup)
-  if (
-    !record ||
-    typeof record.database !== 'string' ||
-    typeof record.role !== 'string' ||
-    !Array.isArray(record.catalog) ||
-    record.catalog.some((item) => typeof item !== 'string') ||
-    typeof record.audit_records_retained !== 'boolean' ||
-    !credentials ||
-    Object.values(credentials).some((count) => typeof count !== 'number') ||
-    typeof record.scope_token !== 'string'
-  ) {
-    throw new Error('The platform returned an invalid purge preview.')
-  }
-  return {
-    database: record.database,
-    role: record.role,
-    catalog: record.catalog as string[],
-    auditRecordsRetained: record.audit_records_retained,
-    credentialCleanup: credentials as Record<string, number>,
-    scopeToken: record.scope_token,
-  }
-}
-
-async function purgeProject(name: string, scopeToken: string) {
-  const { data, error, response } = await apiClient.POST(
-    '/v1/operator/projects/{project}/purge',
-    {
-      params: { path: { project: name } },
-      body: { confirm_name: name, scope_token: scopeToken },
-    },
-  )
-  if (error) throw apiErrorFromResponse(response, error)
-  const record = asRecord(data)
-  if (!record || record.status !== 'purged')
-    throw new Error('The platform returned an invalid purge result.')
-}
-
 export {
   confirmProjectSecretRotation,
   createDeploymentCredential,
@@ -1134,19 +1038,15 @@ export {
   getProjectLogs,
   getProjectRevisions,
   getProjectSecrets,
-  getPurgePreview,
   getResourceInventory,
   getResourceUsage,
-  getRetirementPreview,
   listProjects,
   parseProjectList,
   parseProjectRevisions,
-  purgeProject,
   putPlatformGrant,
   putProjectGrant,
   requestDataServiceRecovery,
   restartProject,
-  retireProject,
   revertProjectSecretRotation,
   revokeDeploymentCredential,
   rollbackProject,
@@ -1171,8 +1071,6 @@ export type {
   ProjectRevisions,
   ProjectSecrets,
   ProjectSummary,
-  PurgePreview,
   ResourceInventory,
   ResourceUsage,
-  RetirementPreview,
 }

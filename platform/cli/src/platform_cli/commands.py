@@ -58,6 +58,10 @@ class AccessOperationFailed(RuntimeError):
         self.operation_id = operation_id
 
 
+class LifecycleOperationFailed(RuntimeError):
+    pass
+
+
 def context_state(ctx: typer.Context):
     root = ctx.find_root()
     if root.obj is not None:
@@ -163,7 +167,9 @@ def fail(
     if isinstance(error, ConfigurationError):
         typer.echo(clean(str(error), secrets), err=True)
         return typer.Exit(2)
-    if isinstance(error, (OperationFailed, AccessOperationFailed)):
+    if isinstance(
+        error, (OperationFailed, AccessOperationFailed, LifecycleOperationFailed)
+    ):
         typer.echo(clean(str(error), secrets), err=True)
         return typer.Exit(9)
     if isinstance(error, OperationTimeout):
@@ -306,6 +312,7 @@ def _body(spec: CommandSpec, values: dict) -> dict | None:
     if kind == "retirement":
         return {
             "confirm_name": require(values, "project"),
+            "confirm_project_id": require(values, "confirm_project_id"),
             "scope_token": require(values, "scope_token"),
         }
     if kind == "grant":
@@ -344,6 +351,8 @@ def require(values: dict, key: str) -> Any:
 def _path(spec: CommandSpec, values: dict) -> str:
     def replacement(match):
         key = match.group(1)
+        if key == "store_id":
+            key = "resource_id"
         val = require(
             values,
             "project"
@@ -616,6 +625,25 @@ def execute(spec: CommandSpec, state, values: dict):
                     if observed:
                         result = resource_output(observed, access=True)
                 result = {**result, "operation": status}
+            elif spec.family == "lifecycle":
+                deadline = time.monotonic() + timeout
+                while True:
+                    status, _ = client.request_json(
+                        "GET",
+                        "/v1/operations/" + quote(result["operation_id"], safe=""),
+                    )
+                    if status["state"] == "succeeded":
+                        result = status
+                        break
+                    if status["state"] == "failed":
+                        raise LifecycleOperationFailed(
+                            status.get("error_code") or "lifecycle_failed"
+                        )
+                    if time.monotonic() >= deadline:
+                        raise OperationTimeout(
+                            "Lifecycle operation is still " + status["state"]
+                        )
+                    time.sleep(interval)
             elif spec.family == "deployment":
                 accepted = OperationAccepted.model_validate(
                     {
@@ -672,6 +700,7 @@ def execute(spec: CommandSpec, state, values: dict):
         OperationTimeout,
         OperationFailed,
         AccessOperationFailed,
+        LifecycleOperationFailed,
         ValueError,
         OSError,
     ) as error:
@@ -702,6 +731,8 @@ def register(app: typer.Typer, spec: CommandSpec):
             "grant_id",
         )
         if "{" + name + "}" in spec.path
+        or name == "resource_id"
+        and "{store_id}" in spec.path
     ]
     params = [
         inspect.Parameter(

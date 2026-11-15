@@ -67,6 +67,7 @@ services:
     command:
       - "--config.file=/etc/prometheus/prometheus.yml"
       - "--web.enable-otlp-receiver"
+      - "--web.enable-admin-api"
       - "--storage.tsdb.retention.time=7d"
       - "--storage.tsdb.retention.size=4GB"
     volumes:

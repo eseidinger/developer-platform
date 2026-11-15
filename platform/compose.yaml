@@ -44,6 +44,8 @@ services:
       - "--port"
       - "4318"
       - "--no-access-log"
+      - "--log-config"
+      - "/app/src/app/console-logging.json"
     environment:
       POSTGRES_HOST: postgres
       TELEMETRY_CATALOG_PASSWORD: >-
@@ -76,11 +78,38 @@ services:
       timeout: 5s
       retries: 5
 
+  # Route sanitized traces into erasable project UUID tenants.
+  trace-router:
+    build: .
+    restart: unless-stopped
+    command:
+      - uvicorn
+      - app.trace_router:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - '4318'
+      - --no-access-log
+      - --log-config
+      - /app/src/app/console-logging.json
+    environment:
+      POSTGRES_HOST: postgres
+      TELEMETRY_CATALOG_PASSWORD: >-
+        ${TELEMETRY_CATALOG_PASSWORD:?Run scripts/init.py}
+    networks: [platform]
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    mem_limit: 128m
+    cpus: 0.25
+
   # API and portal runtime with separate controller and store credential mounts.
   platform-api:
     build: .
     restart: unless-stopped
     environment:
+      PLATFORM_MAINTENANCE_DIR: /var/lib/platform-maintenance
       POSTGRES_HOST: postgres
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run scripts/init.py}
       DATABASE_KEY: ${DATABASE_KEY:?Run scripts/init.py}
@@ -162,6 +191,7 @@ services:
         ${CAPACITY_KUBERNETES_OVERHEAD_MEMORY_MIB:-4096}
       KUBECONFIG: /run/platform/kubeconfig
     volumes:
+      - ../.runtime/maintenance:/var/lib/platform-maintenance
       - monitoring_discovery:/var/lib/platform-monitoring
       - ../.runtime/controller.kubeconfig:/run/platform/kubeconfig:ro
       - ../.runtime/stores/public:/run/stores:ro

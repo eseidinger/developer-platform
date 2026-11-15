@@ -10,6 +10,13 @@ from .spec import ApplicationEnvelope, from_flat, to_flat
 from .stores import catalog
 
 
+class ProjectRecord(BaseModel):
+    project_id: str
+    name: str
+    status: str
+    updated_at: str
+
+
 class ValidationResult(BaseModel):
     model_config = ConfigDict(extra="forbid")
     valid: bool
@@ -20,6 +27,23 @@ class ValidationResult(BaseModel):
 
 def install(app, control):
     caller = Depends(control.current_principal)
+
+    @app.get("/v1/projects/{project}", response_model=ProjectRecord)
+    def get_project(project: str, principal: Principal = caller):
+        control.require_permission(principal, "view", project)
+        with control.connect() as conn:
+            row = conn.execute(
+                "SELECT project_id::text,name,status,updated_at FROM projects WHERE name=%s",
+                (project,),
+            ).fetchone()
+        if not row:
+            raise HTTPException(404, "Unknown project")
+        return {
+            "project_id": row[0],
+            "name": row[1],
+            "status": row[2],
+            "updated_at": row[3].isoformat(),
+        }
 
     @app.get("/v1/projects/{project}/application", response_model=ApplicationEnvelope)
     def get_application(project: str, principal: Principal = caller):

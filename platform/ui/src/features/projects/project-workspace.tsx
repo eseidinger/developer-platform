@@ -24,8 +24,7 @@ import { SetSecretDialog } from '@/features/projects/set-secret-dialog'
 import { RollbackProjectDialog } from '@/features/projects/rollback-project-dialog'
 import { RestartProjectDialog } from '@/features/projects/restart-project-dialog'
 import { EditConfigurationDialog } from '@/features/projects/edit-configuration-dialog'
-import { RetireProjectDialog } from '@/features/projects/retire-project-dialog'
-import { PurgeProjectDialog } from '@/features/projects/purge-project-dialog'
+import { LifecycleDialog } from '@/features/projects/lifecycle-dialog'
 import { RequestRecoveryDialog } from '@/features/projects/request-recovery-dialog'
 import { CreateDeploymentCredentialDialog } from '@/features/projects/create-deployment-credential-dialog'
 import { RevokeDeploymentCredentialDialog } from '@/features/projects/revoke-deployment-credential-dialog'
@@ -88,7 +87,7 @@ function ProjectWorkspace() {
     queryFn: () => getOperation(operationId ?? ''),
     enabled: status === 'authenticated' && Boolean(operationId),
     refetchInterval: (query) =>
-      ['queued', 'running'].includes(query.state.data?.state ?? '')
+      ['queued', 'running', 'blocked'].includes(query.state.data?.state ?? '')
         ? 2_000
         : false,
   })
@@ -205,7 +204,7 @@ function ProjectWorkspace() {
             </p>
           </div>
           <div className={styles.actions}>
-            {revisionsQuery.data && (
+            {revisionsQuery.data && projectStatus !== 'retired' && (
               <DeployProjectDialog
                 name={name}
                 onAccepted={(operation) =>
@@ -221,9 +220,24 @@ function ProjectWorkspace() {
               {isRefreshing ? 'Refreshing…' : 'Refresh'}
             </Button>
             {projectStatus === 'retired' ? (
-              <PurgeProjectDialog name={name} />
+              <>
+                <LifecycleDialog
+                  name={name}
+                  action="restore"
+                  onAccepted={setOperationId}
+                />
+                <LifecycleDialog
+                  name={name}
+                  action="purge"
+                  onAccepted={setOperationId}
+                />
+              </>
             ) : (
-              <RetireProjectDialog name={name} />
+              <LifecycleDialog
+                name={name}
+                action="retire"
+                onAccepted={setOperationId}
+              />
             )}
           </div>
         </div>
@@ -246,7 +260,7 @@ function ProjectWorkspace() {
       {operationQuery.data && (
         <section aria-labelledby="operation-title" className={styles.panel}>
           <h2 id="operation-title" className={styles.sectionTitle}>
-            Deployment operation
+            Platform operation
           </h2>
           <p className={styles.mutedSmallBelowMedium}>
             Revision {operationQuery.data.revision}: {operationQuery.data.state}

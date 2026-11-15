@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+from importlib.resources import files
 from typing import Any
 
+from jsonschema import Draft202012Validator, FormatChecker
+from jsonschema.exceptions import ValidationError as SchemaValidationError
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -65,4 +69,18 @@ class OperationStatus(BaseModel):
 def application_body(value: Any) -> dict[str, Any]:
     if not isinstance(value, dict):
         raise TypeError("application specification must be a JSON object")
+    contract = json.loads(
+        files("platform_cli").joinpath("api_contract.json").read_text()
+    )
+    schema = {
+        **contract["paths"]["/v1/projects/{project}/application"]["put"]["requestBody"][
+            "content"
+        ]["application/json"]["schema"],
+        "components": contract["components"],
+    }
+    try:
+        Draft202012Validator(schema, format_checker=FormatChecker()).validate(value)
+    except SchemaValidationError as exc:
+        location = ".".join(str(part) for part in exc.absolute_path) or "document"
+        raise ValueError("Invalid v1 application declaration at " + location) from None
     return value

@@ -13,6 +13,7 @@ from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from app.identity import AuthenticationError, Principal
+from app.spec import to_flat
 from fastapi.testclient import TestClient
 from kubernetes.client.exceptions import ApiException
 
@@ -49,6 +50,7 @@ class Catalog:
 
     def execute(self, query, params=()):
         self.events.append(query)
+        self.result = []
         if "FROM hosted_access_resources" in query:
             self.result = []
         elif query.startswith("INSERT INTO projects"):
@@ -242,8 +244,57 @@ class Catalog:
         return self.result[0] if self.result else None
 
 
+def declaration(**fields):
+    component = {
+        "name": "app",
+        "type": "service",
+        "runtime": {"type": "container", "image": fields.pop("image", "example:v1")},
+        "ports": [
+            {"name": "http", "protocol": "http", "port": fields.pop("port", 8080)}
+        ],
+        "exposure": "public",
+        "health": {
+            "readiness": {"profile": fields.pop("probe_profile", "hello-world")}
+        },
+    }
+    if "resources" in fields:
+        component["resources"] = fields.pop("resources")
+    spec = {"components": [component]}
+    if "configuration" in fields:
+        spec["configuration"] = {"values": fields.pop("configuration")}
+    return {
+        "apiVersion": "platform.eseidinger.de/v1",
+        "kind": "Application",
+        "metadata": {"name": fields.pop("name", "smoke")},
+        "spec": spec,
+        **fields,
+    }
+
+
+def internal_response(function, *args):
+    """Exercise the private worker helper; public lifecycle is tested with PostgreSQL."""
+    import httpx2
+    from fastapi import HTTPException
+    from fastapi.encoders import jsonable_encoder
+    from fastapi.responses import JSONResponse
+
+    try:
+        result = function(*args)
+        if isinstance(result, JSONResponse):
+            return httpx2.Response(result.status_code, content=result.body)
+        return httpx2.Response(200, json=jsonable_encoder(result))
+    except HTTPException as exc:
+        return httpx2.Response(exc.status_code, json={"detail": exc.detail})
+
+
 class LifecycleTests(unittest.TestCase):
     def setUp(self):
+        tenant = patch(
+            "app.trace_router.project_partition",
+            return_value="11111111-1111-1111-1111-111111111111",
+        )
+        tenant.start()
+        self.addCleanup(tenant.stop)
         self.directory = tempfile.TemporaryDirectory()
         self.addCleanup(self.directory.cleanup)
         self.catalog = Catalog()
@@ -288,23 +339,30 @@ class LifecycleTests(unittest.TestCase):
         self.principal = Principal("https://issuer.example", "person-1", "person")
         self.mocks[5].verify.return_value = self.principal
         self.headers = {"Authorization": "Bearer valid-token"}
-        self.spec = {
-            "name": "smoke",
-            "image": "example:v1",
-            "probe_profile": "hello-world",
-        }
+        self.spec = declaration()
 
     def targets(self):
         return json.loads((Path(self.directory.name) / "applications.json").read_text())
 
     def deploy(self):
-        return self.client.put("/projects/smoke", json=self.spec, headers=self.headers)
+        return self.client.put(
+            ("/v1/projects/smoke") + "/application",
+            json=self.spec,
+            headers=self.headers,
+        )
 
     def retire(self, headers=None, confirmation="smoke"):
-        return self.client.post(
-            "/projects/smoke/retire",
-            json={"confirm_name": confirmation},
-            headers=self.headers if headers is None else headers,
+        if headers is not None:
+            return self.client.post(
+                "/v1/projects/smoke/retire",
+                json={"confirm_name": confirmation},
+                headers=headers,
+            )
+        return internal_response(
+            main.retire,
+            "smoke",
+            main.Retirement(confirm_name=confirmation),
+            self.principal,
         )
 
     def complete_operations(self):
@@ -329,26 +387,28 @@ class LifecycleTests(unittest.TestCase):
 
     def rollback(self, revision, **headers):
         return self.client.post(
-            "/projects/smoke/rollback",
+            "/v1/projects/smoke/rollback",
             json={"revision": revision},
             headers=dict(self.headers, **headers),
         )
 
     def test_rollback_reapplies_a_retained_spec_as_a_new_revision(self):
         self.deploy()
-        self.spec["image"] = "example:v2"
+        self.spec["spec"]["components"][0]["runtime"]["image"] = "example:v2"
         self.deploy()
         self.complete_operations()
 
         listing = self.client.get(
-            "/projects/smoke/revisions", headers=self.headers
+            "/v1/projects/smoke/revisions", headers=self.headers
         ).json()
         self.assertEqual(listing["current_revision"], 2)
         self.assertEqual(
             [(r["revision"], r["current"]) for r in listing["revisions"]],
             [(2, True), (1, False)],
         )
-        self.assertEqual(listing["revisions"][1]["image"], "example@" + self.digest)
+        self.assertEqual(
+            listing["revisions"][1]["components"][0]["image"], "example@" + self.digest
+        )
 
         response = self.rollback(1, **{"If-Match": "2"})
         self.assertEqual(response.status_code, 202)
@@ -372,12 +432,12 @@ class LifecycleTests(unittest.TestCase):
             if k != "resources"
         }
         self.catalog.revisions[app_id][0] = (1, legacy)
-        self.spec["image"] = "example:v2"
+        self.spec["spec"]["components"][0]["runtime"]["image"] = "example:v2"
         self.deploy()
         self.complete_operations()
 
         listing = self.client.get(
-            "/projects/smoke/revisions", headers=self.headers
+            "/v1/projects/smoke/revisions", headers=self.headers
         ).json()
         self.assertIsNone(listing["revisions"][1]["resources"])
         response = self.rollback(1)
@@ -398,13 +458,15 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.rollback(1).status_code, 409)
         self.assertEqual(
             self.client.post(
-                "/projects/smoke/rollback", json={"revision": 0}, headers=self.headers
+                "/v1/projects/smoke/rollback",
+                json={"revision": 0},
+                headers=self.headers,
             ).status_code,
             422,
         )
         self.assertEqual(
             self.client.get(
-                "/projects/none/revisions", headers=self.headers
+                "/v1/projects/none/revisions", headers=self.headers
             ).status_code,
             404,
         )
@@ -420,7 +482,7 @@ class LifecycleTests(unittest.TestCase):
         }
         with patch.object(main, "observe_usage", return_value=usage) as observe:
             response = self.client.get(
-                "/projects/smoke/resource-usage", headers=self.headers
+                "/v1/projects/smoke/resource-usage", headers=self.headers
             )
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"project": "smoke", **usage})
@@ -430,14 +492,14 @@ class LifecycleTests(unittest.TestCase):
             )
             self.assertEqual(
                 self.client.get(
-                    "/projects/none/resource-usage", headers=self.headers
+                    "/v1/projects/none/resource-usage", headers=self.headers
                 ).status_code,
                 404,
             )
             self.mocks[4].return_value = False
             self.assertEqual(
                 self.client.get(
-                    "/projects/smoke/resource-usage", headers=self.headers
+                    "/v1/projects/smoke/resource-usage", headers=self.headers
                 ).status_code,
                 403,
             )
@@ -455,7 +517,7 @@ class LifecycleTests(unittest.TestCase):
         }
         with patch.object(main, "observe_logs", return_value=logs) as observe:
             response = self.client.get(
-                "/projects/smoke/logs?tail=50&since_seconds=60", headers=self.headers
+                "/v1/projects/smoke/logs?tail=50&since_seconds=60", headers=self.headers
             )
             self.assertEqual(response.status_code, 200)
             self.assertEqual(response.json(), {"project": "smoke", **logs})
@@ -481,20 +543,20 @@ class LifecycleTests(unittest.TestCase):
             ):
                 self.assertEqual(
                     self.client.get(
-                        "/projects/smoke/logs?" + query, headers=self.headers
+                        "/v1/projects/smoke/logs?" + query, headers=self.headers
                     ).status_code,
                     422,
                 )
             self.assertEqual(
                 self.client.get(
-                    "/projects/none/logs", headers=self.headers
+                    "/v1/projects/none/logs", headers=self.headers
                 ).status_code,
                 404,
             )
             self.mocks[4].return_value = False
             self.assertEqual(
                 self.client.get(
-                    "/projects/smoke/logs", headers=self.headers
+                    "/v1/projects/smoke/logs", headers=self.headers
                 ).status_code,
                 403,
             )
@@ -516,7 +578,7 @@ class LifecycleTests(unittest.TestCase):
         logs = {"state": "no_output", "lines": []}
         with patch.object(main, "observe_retained_logs", return_value=logs) as observe:
             response = self.client.get(
-                "/projects/smoke/retained-logs?component=api", headers=self.headers
+                "/v1/projects/smoke/retained-logs?component=api", headers=self.headers
             )
             self.assertEqual(response.status_code, 200)
             observe.assert_called_once_with(
@@ -528,6 +590,7 @@ class LifecycleTests(unittest.TestCase):
                 instance=None,
                 after=None,
                 before=None,
+                tenant="11111111-1111-1111-1111-111111111111",
             )
             self.assertEqual(
                 self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke")
@@ -535,14 +598,15 @@ class LifecycleTests(unittest.TestCase):
             for query in ("tail=1001", "since_seconds=604801", "component=other%22%7D"):
                 self.assertEqual(
                     self.client.get(
-                        "/projects/smoke/retained-logs?" + query, headers=self.headers
+                        "/v1/projects/smoke/retained-logs?" + query,
+                        headers=self.headers,
                     ).status_code,
                     422,
                 )
             self.mocks[4].return_value = False
             self.assertEqual(
                 self.client.get(
-                    "/projects/smoke/retained-logs", headers=self.headers
+                    "/v1/projects/smoke/retained-logs", headers=self.headers
                 ).status_code,
                 403,
             )
@@ -556,11 +620,13 @@ class LifecycleTests(unittest.TestCase):
             headers = dict(
                 self.headers, **({"If-Match": value} if value is not None else {})
             )
-            return self.client.put("/projects/smoke", json=self.spec, headers=headers)
+            return self.client.put(
+                ("/v1/projects/smoke") + "/application", json=self.spec, headers=headers
+            )
 
         self.assertEqual(put("1").status_code, 409)
         self.assertEqual(put("0").status_code, 202)
-        self.spec["image"] = "example:v2"
+        self.spec["spec"]["components"][0]["runtime"]["image"] = "example:v2"
         stale = put("0")
         self.assertEqual(stale.status_code, 409)
         self.assertEqual(stale.json()["code"], "revision_conflict")
@@ -569,16 +635,20 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(
             [revision for revision, _ in self.catalog.revisions[app_id]], [1]
         )
-        self.assertEqual(self.catalog.rows["smoke"][0]["image"], "example:v1")
+        self.assertEqual(
+            self.catalog.rows["smoke"][0]["components"][0]["image"], "example:v1"
+        )
         self.assertEqual(put('"1"').json()["revision"], 2)
-        self.spec["image"] = "example:v3"
+        self.spec["spec"]["components"][0]["runtime"]["image"] = "example:v3"
         self.assertEqual(put().json()["revision"], 3)
         self.assertEqual(put("abc").status_code, 400)
         self.assertEqual(put("-1").status_code, 400)
 
     def test_drift_is_reported_and_audited_without_changing_the_cluster(self):
         self.assertEqual(
-            self.client.get("/projects/smoke/drift", headers=self.headers).status_code,
+            self.client.get(
+                "/v1/projects/smoke/drift", headers=self.headers
+            ).status_code,
             404,
         )
         self.deploy()
@@ -587,7 +657,7 @@ class LifecycleTests(unittest.TestCase):
             "differences": [{"field": "replicas", "desired": 1, "observed": 3}],
         }
         with patch.object(main, "observe_drift", return_value=drifted) as observe:
-            response = self.client.get("/projects/smoke/drift", headers=self.headers)
+            response = self.client.get("/v1/projects/smoke/drift", headers=self.headers)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(), {"project": "smoke", "revision": 1, **drifted}
@@ -603,7 +673,7 @@ class LifecycleTests(unittest.TestCase):
         project_id = self.catalog.project_ids["smoke"]
         environment_id = next(iter(self.catalog.environment_ids.values()))
         app_id = next(iter(self.catalog.application_ids.values()))
-        self.spec["image"] = "example:v2"
+        self.spec["spec"]["components"][0]["runtime"]["image"] = "example:v2"
         self.assertEqual(self.deploy().status_code, 202)
         self.assertEqual(self.catalog.project_ids["smoke"], project_id)
         self.assertEqual(
@@ -613,7 +683,8 @@ class LifecycleTests(unittest.TestCase):
         revisions = self.catalog.revisions[app_id]
         self.assertEqual([revision for revision, _ in revisions], [1, 2])
         self.assertEqual(
-            [spec["image"] for _, spec in revisions], ["example:v1", "example:v2"]
+            [spec["components"][0]["image"] for _, spec in revisions],
+            ["example:v1", "example:v2"],
         )
 
     def test_deploy_persists_revision_and_versioned_operation_before_returning_accepted(
@@ -630,7 +701,15 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(operation["envelope_version"], 1)
         self.assertEqual(
             operation["envelope"]["spec"],
-            {**self.spec, "port": 8080, "resolved_image": "example@" + self.digest},
+            {
+                "name": "smoke",
+                "components": [
+                    {
+                        **to_flat(self.spec)["components"][0],
+                        "resolved_image": "example@" + self.digest,
+                    }
+                ],
+            },
         )
         committed_at = self.catalog.events.index("transaction.commit")
         revision_insert = next(
@@ -685,7 +764,7 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(response.json()["result"], {"api_token": "[REDACTED]"})
         self.assertEqual(response.json()["readiness"], readiness)
         observe.assert_called_once_with(
-            self.runtime, "smoke", "example@" + self.digest, main.log
+            self.runtime, "smoke", "example@" + self.digest, main.log, "app"
         )
         self.assertEqual(
             self.mocks[4].call_args.args[1:], (self.principal, "view", "smoke")
@@ -698,7 +777,7 @@ class LifecycleTests(unittest.TestCase):
         )
 
     def restart(self):
-        return self.client.post("/projects/smoke/restart", headers=self.headers)
+        return self.client.post("/v1/projects/smoke/restart", headers=self.headers)
 
     def deploy_applied(self):
         self.assertEqual(self.deploy().status_code, 202)
@@ -783,19 +862,18 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.targets(), [])
         self.assertIn("smoke", self.catalog.rows)
         self.assertEqual(self.retire().status_code, 200)
-        self.assertEqual(self.deploy().status_code, 202)
+        self.assertEqual(self.deploy().status_code, 409)
         self.assertEqual(self.targets(), [])
 
     def preview(self):
-        return self.client.get(
-            "/projects/smoke/retirement-preview", headers=self.headers
-        )
+        return internal_response(main.retirement_preview, "smoke", self.principal)
 
     def confirmed_retire(self, token):
-        return self.client.post(
-            "/projects/smoke/retire",
-            headers=self.headers,
-            json={"confirm_name": "smoke", "scope_token": token},
+        return internal_response(
+            main.retire,
+            "smoke",
+            main.Retirement(confirm_name="smoke", scope_token=token),
+            self.principal,
         )
 
     def test_retirement_preview_lists_removed_and_retained_scope(self):
@@ -806,13 +884,12 @@ class LifecycleTests(unittest.TestCase):
         self.complete_operations()
         body = self.preview().json()
         self.assertEqual(body["blockers"], [])
-        self.assertEqual(body["route"], "smoke.apps.localhost")
+        self.assertEqual(body["route"], "app-smoke.apps.localhost")
         kinds = {(item["kind"], item["name"]) for item in body["removes"]}
         self.assertTrue(
             {
                 ("Namespace", "project-smoke"),
-                ("Deployment", "smoke"),
-                ("Ingress", "smoke"),
+                ("Deployment", "app"),
                 ("Secret", "database"),
             }
             <= kinds
@@ -879,7 +956,7 @@ class LifecycleTests(unittest.TestCase):
         self.deploy()
         self.complete_operations()
         token = self.preview().json()["scope_token"]
-        self.spec["image"] = "example:v2"
+        self.spec["spec"]["components"][0]["runtime"]["image"] = "example:v2"
         self.deploy()
         self.complete_operations()
         response = self.confirmed_retire(token)
@@ -925,7 +1002,9 @@ class LifecycleTests(unittest.TestCase):
         self.assertEqual(self.targets(), [])
 
     def test_invalid_profile_rejected_before_catalog_mutation(self):
-        self.spec["probe_profile"] = "arbitrary"
+        self.spec["spec"]["components"][0]["health"]["readiness"]["profile"] = (
+            "arbitrary"
+        )
         self.assertEqual(self.deploy().status_code, 422)
         self.assertEqual(self.catalog.rows, {})
         rejected = self.mocks[3].call_args
@@ -934,31 +1013,20 @@ class LifecycleTests(unittest.TestCase):
             ("request.validation", "platform-api", "smoke", "rejected"),
         )
 
-    def test_versioned_envelope_is_accepted_and_shares_revisions_with_the_flat_body(
-        self,
-    ):
-        envelope = {
-            "apiVersion": "platform.example/v1alpha1",
-            "kind": "Application",
-            "metadata": {"name": "smoke"},
-            "spec": {
-                "application": {"runtime": {"type": "container", "image": "example:v1"}}
-            },
-        }
-        first = self.client.put("/projects/smoke", json=envelope, headers=self.headers)
+    def test_only_v1_component_declarations_are_accepted(self):
+        first = self.deploy()
         self.assertEqual(first.status_code, 202)
-        stored = self.catalog.rows["smoke"][0]
-        self.assertEqual(
-            (stored["image"], stored["port"], stored["probe_profile"]),
-            ("example:v1", 8080, "status"),
-        )
-        self.complete_operations()
-        flat = self.client.put(
-            "/projects/smoke",
-            json={"name": "smoke", "image": "example:v1"},
-            headers=self.headers,
-        )
-        self.assertEqual(flat.json()["revision"], first.json()["revision"])
+        repeated = self.deploy()
+        self.assertEqual(first.json()["revision"], repeated.json()["revision"])
+        for body in (
+            {"name": "smoke", "image": "example:v1"},
+            {**self.spec, "apiVersion": "platform.example/v1alpha1"},
+            {**self.spec, "apiVersion": "platform.example/v1alpha2"},
+        ):
+            response = self.client.put(
+                "/v1/projects/smoke/application", json=body, headers=self.headers
+            )
+            self.assertEqual(response.status_code, 422)
 
     def test_invalid_envelopes_are_rejected_and_audited_before_catalog_mutation(self):
         base = {
@@ -1000,7 +1068,9 @@ class LifecycleTests(unittest.TestCase):
             with self.subTest(label):
                 self.assertEqual(
                     self.client.put(
-                        "/projects/smoke", json=body, headers=self.headers
+                        ("/v1/projects/smoke") + "/application",
+                        json=body,
+                        headers=self.headers,
                     ).status_code,
                     422,
                 )
@@ -1029,20 +1099,22 @@ class LifecycleTests(unittest.TestCase):
             },
         }
         cases = (
-            (scaled, "unsupported_capability"),
+            (scaled, "invalid_spec"),
             (
                 {**base, "spec": {**base["spec"], "configuration": {"secrets": {}}}},
-                "unsupported_capability",
+                "invalid_spec",
             ),
             ({**base, "apiVersion": "platform.example/v9"}, "invalid_spec"),
             ({**self.spec, "scaling": 2}, "unsupported_capability"),
-            ({**self.spec, "probe_profile": "arbitrary"}, "invalid_spec"),
-            ({**self.spec, "port": 80}, "invalid_spec"),
+            (declaration(probe_profile="arbitrary"), "invalid_spec"),
+            (declaration(port=80), "invalid_spec"),
         )
         for body, code in cases:
             with self.subTest(body=body):
                 response = self.client.put(
-                    "/projects/smoke", json=body, headers=self.headers
+                    ("/v1/projects/smoke") + "/application",
+                    json=body,
+                    headers=self.headers,
                 )
                 self.assertEqual(
                     (response.status_code, response.json()["code"]), (422, code)
@@ -1063,7 +1135,7 @@ class LifecycleTests(unittest.TestCase):
 
     def test_configuration_is_a_validated_revision_with_activation(self):
         self.assertEqual(self.deploy().status_code, 202)
-        path = "/projects/smoke/configuration"
+        path = "/v1/projects/smoke/configuration"
         for values in (
             {"PGHOST": "x"},
             {"DB_PASSWORD": "x"},
@@ -1154,13 +1226,13 @@ class LifecycleTests(unittest.TestCase):
     def test_component_deployment_preserves_separately_managed_configuration(self):
         self.assertEqual(self.deploy().status_code, 202)
         configured = self.client.put(
-            "/projects/smoke/configuration",
+            "/v1/projects/smoke/configuration",
             json={"values": {"MODE": "fast"}},
             headers=self.headers,
         )
         self.assertEqual(configured.status_code, 202)
         component_body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "smoke"},
             "spec": {
@@ -1175,7 +1247,9 @@ class LifecycleTests(unittest.TestCase):
             },
         }
         migrated = self.client.put(
-            "/projects/smoke", json=component_body, headers=self.headers
+            ("/v1/projects/smoke") + "/application",
+            json=component_body,
+            headers=self.headers,
         )
         self.assertEqual(migrated.status_code, 202)
         self.assertEqual(
@@ -1189,7 +1263,7 @@ class LifecycleTests(unittest.TestCase):
         fake = cluster()
         self.runtime.resources = fake.resources
         self.assertEqual(self.deploy().status_code, 202)
-        base = "/projects/smoke/secrets"
+        base = "/v1/projects/smoke/secrets"
         value = "hunter2-very-secret"
         for name, body in (
             ("PGHOST", {"value": "x"}),
@@ -1277,13 +1351,13 @@ class LifecycleTests(unittest.TestCase):
             404,
         )
         configured = self.client.put(
-            "/projects/smoke/configuration",
+            "/v1/projects/smoke/configuration",
             json={"values": {"DB_PASSWORD": "x"}},
             headers=self.headers,
         )
         self.assertEqual(configured.status_code, 422)
         self.client.put(
-            "/projects/smoke/configuration",
+            "/v1/projects/smoke/configuration",
             json={"values": {"MODE": "a"}},
             headers=self.headers,
         )
@@ -1305,7 +1379,7 @@ class LifecycleTests(unittest.TestCase):
         )
         self.assertEqual(
             self.client.get(
-                "/projects/other/secrets", headers=self.headers
+                "/v1/projects/other/secrets", headers=self.headers
             ).status_code,
             404,
         )
@@ -1369,8 +1443,10 @@ class LifecycleTests(unittest.TestCase):
 
         self.assertEqual(response.status_code, 202)
         stored = self.catalog.rows["smoke"][0]
-        self.assertEqual(stored["image"], "example:v1")
-        self.assertEqual(stored["resolved_image"], "example@" + self.digest)
+        self.assertEqual(stored["components"][0]["image"], "example:v1")
+        self.assertEqual(
+            stored["components"][0]["resolved_image"], "example@" + self.digest
+        )
         self.assertEqual(
             self.catalog.operations[response.json()["operation_id"]]["envelope"][
                 "spec"
@@ -1381,13 +1457,13 @@ class LifecycleTests(unittest.TestCase):
     def test_empty_project_accepts_grants_before_its_first_ci_deployment(self):
         with patch.object(main, "require_platform_admin"):
             created = self.client.post(
-                "/projects", json={"name": "smoke"}, headers=self.headers
+                "/v1/projects", json={"name": "smoke"}, headers=self.headers
             )
         self.assertEqual(created.status_code, 201)
         self.assertEqual(created.json()["status"], "empty")
         self.assertIsNone(created.json()["spec"])
         granted = self.client.put(
-            "/projects/smoke/grants",
+            "/v1/projects/smoke/grants",
             headers=self.headers,
             json={
                 "issuer": "https://issuer.example",
@@ -1396,13 +1472,17 @@ class LifecycleTests(unittest.TestCase):
             },
         )
         self.assertEqual(granted.status_code, 200)
-        revisions = self.client.get("/projects/smoke/revisions", headers=self.headers)
+        revisions = self.client.get(
+            "/v1/projects/smoke/revisions", headers=self.headers
+        )
         self.assertEqual(
             revisions.json(),
             {"project": "smoke", "current_revision": None, "revisions": []},
         )
         self.assertEqual(
-            self.client.get("/projects/smoke/logs", headers=self.headers).status_code,
+            self.client.get(
+                "/v1/projects/smoke/logs", headers=self.headers
+            ).status_code,
             409,
         )
 
@@ -1423,24 +1503,22 @@ class LifecycleTests(unittest.TestCase):
         plain = self.deploy().json()["revision"]
         self.assertNotIn("resources", self.catalog.rows["smoke"][0])
         self.complete_operations()
-        self.spec = {
-            **self.spec,
-            "resources": {"limits": {"cpu": "1", "memory": "1Gi"}},
+        self.spec["spec"]["components"][0]["resources"] = {
+            "limits": {"cpu": "1", "memory": "1Gi"}
         }
         response = self.deploy()
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json()["revision"], plain + 1)
         self.assertEqual(
-            self.catalog.rows["smoke"][0]["resources"],
+            self.catalog.rows["smoke"][0]["components"][0]["resources"],
             {
                 "requests": {"cpu": "100m", "memory": "128Mi"},
                 "limits": {"cpu": "1000m", "memory": "1024Mi"},
             },
         )
         self.complete_operations()
-        self.spec = {
-            **self.spec,
-            "resources": {"limits": {"cpu": "1000m", "memory": "1024Mi"}},
+        self.spec["spec"]["components"][0]["resources"] = {
+            "limits": {"cpu": "1000m", "memory": "1024Mi"}
         }
         self.assertEqual(self.deploy().json()["revision"], plain + 1)
 
@@ -1453,7 +1531,7 @@ class LifecycleTests(unittest.TestCase):
             {"requests": {"cpu": "500m"}, "limits": {"cpu": "250m"}},
         ):
             with self.subTest(resources=resources):
-                self.spec = {**self.spec, "resources": resources}
+                self.spec["spec"]["components"][0]["resources"] = resources
                 self.assertEqual(self.deploy().status_code, 422)
         self.assertEqual(self.catalog.rows, before)
         self.assertEqual(self.catalog.operations, {})
@@ -1502,7 +1580,7 @@ class LifecycleTests(unittest.TestCase):
         }
         with patch.object(main, "grant_role") as grant_role:
             response = self.client.put(
-                "/projects/smoke/grants", json=grant, headers=self.headers
+                "/v1/projects/smoke/grants", json=grant, headers=self.headers
             )
         self.assertEqual(response.status_code, 200)
         grant_role.assert_called_once()
@@ -1519,7 +1597,7 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(main, "revoke_role", return_value=True) as revoke_role:
             response = self.client.request(
                 "DELETE",
-                "/projects/smoke/grants",
+                "/v1/projects/smoke/grants",
                 json={"issuer": "https://issuer.example", "subject": "person-2"},
                 headers=self.headers,
             )
@@ -1542,7 +1620,9 @@ class LifecycleTests(unittest.TestCase):
                 ("https://issuer.example", "person-2", "Viewer", "viewer", granted_at)
             ],
         ):
-            response = self.client.get("/projects/smoke/grants", headers=self.headers)
+            response = self.client.get(
+                "/v1/projects/smoke/grants", headers=self.headers
+            )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(
             response.json(),
@@ -1599,19 +1679,20 @@ class LifecycleTests(unittest.TestCase):
             ),
         ):
             permissions = self.client.get(
-                "/operator/projects/smoke/permissions", headers=self.headers
+                "/v1/operator/projects/smoke/permissions", headers=self.headers
             )
             self.assertEqual(permissions.status_code, 200)
             self.assertEqual(permissions.json()["grants"][0]["role"], "viewer")
             security = self.client.get(
-                "/operator/projects/smoke/security-configuration", headers=self.headers
+                "/v1/operator/projects/smoke/security-configuration",
+                headers=self.headers,
             )
             self.assertEqual(security.status_code, 200)
             self.assertFalse(
                 security.json()["workload_security"]["service_account_token_automount"]
             )
             exported = self.client.get(
-                "/operator/audit/events",
+                "/v1/operator/audit/events",
                 headers=self.headers,
                 params={
                     "start": "2026-10-02T00:00:00Z",
@@ -1625,7 +1706,7 @@ class LifecycleTests(unittest.TestCase):
         with patch.object(main, "is_platform_admin", return_value=False):
             self.assertEqual(
                 self.client.get(
-                    "/operator/projects/smoke/permissions", headers=self.headers
+                    "/v1/operator/projects/smoke/permissions", headers=self.headers
                 ).status_code,
                 403,
             )
@@ -1633,13 +1714,13 @@ class LifecycleTests(unittest.TestCase):
     def test_audit_export_rejects_unbounded_or_offsetless_windows(self):
         with patch.object(main, "is_platform_admin", return_value=True):
             response = self.client.get(
-                "/operator/audit/events",
+                "/v1/operator/audit/events",
                 headers=self.headers,
                 params={"start": "2026-10-02T00:00:00", "end": "2026-10-02T01:00:00"},
             )
             self.assertEqual(response.status_code, 400)
             response = self.client.get(
-                "/operator/audit/events",
+                "/v1/operator/audit/events",
                 headers=self.headers,
                 params={"start": "2026-10-01T00:00:00Z", "end": "2026-11-02T00:00:01Z"},
             )

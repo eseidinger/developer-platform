@@ -203,6 +203,11 @@ class DiagnosticSignatureTests(unittest.TestCase):
         with (
             patch.object(ai_tools, "observe_retained_logs", return_value=retained),
             patch.object(
+                ai_tools,
+                "project_partition",
+                return_value="11111111-1111-1111-1111-111111111111",
+            ),
+            patch.object(
                 ai_diagnostics,
                 "observe_failure_signals",
                 return_value={"state": "no_match", "failure_codes": []},

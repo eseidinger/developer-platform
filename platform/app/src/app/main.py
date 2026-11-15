@@ -16,7 +16,6 @@ from uuid import UUID, uuid4
 import psycopg
 from fastapi import Body, Depends, FastAPI, Header, HTTPException, Path, Query, Request
 from fastapi.encoders import jsonable_encoder
-from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -29,6 +28,7 @@ from psycopg.types.json import Jsonb
 from pydantic import (
     ValidationError,
 )
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import (
     access_store,
@@ -197,6 +197,9 @@ async def lifespan(app):
             reason TEXT NOT NULL, status TEXT NOT NULL, requested_at TIMESTAMPTZ NOT NULL DEFAULT now(),
             requested_by TEXT NOT NULL, reviewed_at TIMESTAMPTZ, reviewed_by TEXT)""")
         initialize_catalog(conn)
+        from .lifecycle.catalog import initialize as initialize_lifecycle
+
+        initialize_lifecycle(conn)
         telemetry_catalog.initialize(conn)
         ai_store.initialize(conn)
         ai_changes.initialize(conn)
@@ -285,10 +288,17 @@ async def lifespan(app):
         target=native_monitoring.loop, args=(stop, sys.modules[__name__]), daemon=True
     )
     native_metrics_worker.start()
+    from .lifecycle.worker import loop as lifecycle_loop
+
+    lifecycle_worker = threading.Thread(
+        target=lifecycle_loop, args=(stop, sys.modules[__name__]), daemon=True
+    )
+    lifecycle_worker.start()
     try:
         yield
     finally:
         stop.set()
+        lifecycle_worker.join(timeout=6)
         worker.join(timeout=6)
         security_worker.join(timeout=6)
         operation_worker.join(timeout=6)
@@ -300,7 +310,15 @@ async def lifespan(app):
         tracing.shutdown()
 
 
-app = FastAPI(title="Docker-based Developer Platform Lab", lifespan=lifespan)
+from .api_routes import ContractRoute
+
+app = FastAPI(
+    title="Developer Platform",
+    version="1.0.0",
+    lifespan=lifespan,
+    separate_input_output_schemas=False,
+)
+app.router.route_class = ContractRoute
 
 
 # Request tracing and browser portal delivery
@@ -480,6 +498,17 @@ def require_permission(
     with connect() as conn:
         allowed = is_allowed(conn, principal, permission, project)
     if allowed:
+        if project and permission not in {"view", "retire"}:
+            with connect() as conn:
+                held = conn.execute(
+                    "SELECT 1 FROM project_lifecycle_operations WHERE project=%s AND state IN ('queued','running','blocked')",
+                    (project,),
+                ).fetchone()
+                state = conn.execute(
+                    "SELECT status FROM projects WHERE name=%s", (project,)
+                ).fetchone()
+            if held or (state and state[0] == "retired"):
+                raise HTTPException(409, "Project lifecycle blocks changes")
         return
     actor = actor_for(principal)
     required_audit(
@@ -553,6 +582,31 @@ def require_test_identity_manager(principal: Principal) -> None:
     )
 
 
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, exc: StarletteHTTPException):
+    codes = {
+        400: "invalid_request",
+        401: "authentication_required",
+        403: "permission_denied",
+        404: "not_found",
+        409: "state_conflict",
+        412: "version_conflict",
+        422: "invalid_spec",
+        428: "precondition_required",
+        503: "dependency_unavailable",
+    }
+    code = (
+        exc.detail.get("code", codes.get(exc.status_code, "request_failed"))
+        if isinstance(exc.detail, dict)
+        else codes.get(exc.status_code, "request_failed")
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=jsonable_encoder({"detail": exc.detail, "code": code}),
+        headers=exc.headers,
+    )
+
+
 @app.exception_handler(RequestValidationError)
 async def validation_error(request: Request, exc: RequestValidationError):
     actor = getattr(request.state, "audit_actor", None)
@@ -587,7 +641,13 @@ async def validation_error(request: Request, exc: RequestValidationError):
                 "code": error_code(getattr(exc, "body", None), exc.errors()),
             },
         )
-    return await request_validation_exception_handler(request, exc)
+    return JSONResponse(
+        status_code=422,
+        content={
+            "detail": jsonable_encoder(exc.errors()),
+            "code": error_code(getattr(exc, "body", None), exc.errors()),
+        },
+    )
 
 
 @app.exception_handler(psycopg.OperationalError)
@@ -596,7 +656,10 @@ async def database_unavailable(request: Request, exc: psycopg.OperationalError):
     log.error("Platform database unavailable while handling request")
     return JSONResponse(
         status_code=503,
-        content={"detail": "Platform database is temporarily unavailable"},
+        content={
+            "detail": "Platform database is temporarily unavailable",
+            "code": "dependency_unavailable",
+        },
     )
 
 
@@ -713,6 +776,11 @@ def create_empty_project(
     require_platform_admin(principal)
     actor = actor_for(principal)
     with connect() as conn:
+        if conn.execute(
+            "SELECT 1 FROM project_lifecycle_operations WHERE project=%s AND state<>'succeeded'",
+            (body.name,),
+        ).fetchone():
+            raise HTTPException(409, "Project name is reserved by lifecycle cleanup")
         row = conn.execute(
             """INSERT INTO projects(name, spec, status) VALUES (%s, NULL, 'empty')
             ON CONFLICT(name) DO NOTHING RETURNING name, status, updated_at""",
@@ -1613,6 +1681,8 @@ def queue_deploy(
     spec: dict | None,
     expected: int | None,
     target: int | None = None,
+    *,
+    lifecycle: bool = False,
 ):
     """Persist a revision and its deploy operation under the global lock.
 
@@ -1623,6 +1693,14 @@ def queue_deploy(
     conn.execute("SELECT pg_advisory_lock(731904)")
     try:
         with conn.transaction():
+            if (
+                not lifecycle
+                and conn.execute(
+                    "SELECT 1 FROM project_lifecycle_operations WHERE project=%s AND state IN ('queued','running','blocked')",
+                    (name,),
+                ).fetchone()
+            ):
+                raise HTTPException(409, "A project lifecycle operation is active")
             if expected is not None:
                 current = conn.execute(
                     """SELECT max(r.revision) FROM projects p
@@ -1784,16 +1862,11 @@ def provision(
         raise HTTPException(status_code, messages[exc.reason])
     spec = project.model_dump(exclude_none=True)
     if project.components is not None:
+        spec.pop("port", None)
+        spec.pop("probe_profile", None)
         spec["components"] = resolved_components
     else:
         spec["resolved_image"] = resolved_image
-    # Configuration is managed by its dedicated, revisioned endpoint. A deployment
-    # envelope that omits it must not erase those separately managed values while
-    # migrating a legacy application or updating one component.
-    if "configuration" not in spec:
-        current = current_spec(name)
-        if current and current[1] and current[1].get("configuration"):
-            spec["configuration"] = current[1]["configuration"]
     capacity = assess_capacity(runtime, spec, log)
     if capacity["state"] == "unavailable":
         raise HTTPException(
@@ -1960,7 +2033,13 @@ def project_trace(
     require_permission(principal, "view", name)
     validate_name(name)
     try:
-        result = trace_read.read(name, trace_id)
+        from .trace_router import project_partition
+
+        result = trace_read.read(
+            name,
+            trace_id,
+            tenant=project_partition(name, for_read=True) or "unavailable",
+        )
     except ValueError:
         raise HTTPException(422, "Invalid trace ID") from None
     except trace_read.TraceUnavailable:
@@ -3172,7 +3251,6 @@ def require_human_database_principal(principal: Principal, project: str) -> None
         raise HTTPException(403, "A human identity is required")
 
 
-@app.get("/v1/projects/{project}/database-access/grants")
 def list_human_database_grants(
     name: Annotated[str, Path(alias="project")],
     principal: Principal = Depends(current_principal),
@@ -3198,9 +3276,6 @@ def list_human_database_grants(
     return {"project": name, "grants": [_database_access_record(row) for row in rows]}
 
 
-@app.post(
-    "/v1/projects/{project}/database-access/grants", status_code=201, deprecated=True
-)
 def grant_human_database_access(
     name: Annotated[str, Path(alias="project")],
     body: HumanDatabaseGrant,
@@ -3211,7 +3286,6 @@ def grant_human_database_access(
     )
 
 
-@app.get("/v1/projects/{project}/database-access/me")
 def my_human_database_access(
     name: Annotated[str, Path(alias="project")],
     principal: Principal = Depends(current_principal),
@@ -3240,7 +3314,6 @@ def my_human_database_access(
     }
 
 
-@app.put("/v1/projects/{project}/database-access/me/key")
 def update_my_human_database_key(
     name: Annotated[str, Path(alias="project")],
     body: HumanDatabaseKey,
@@ -3269,7 +3342,6 @@ def update_my_human_database_key(
     return _database_access_record(row)
 
 
-@app.post("/v1/projects/{project}/database-access/me/credential", deprecated=True)
 def issue_my_human_database_credential(
     name: Annotated[str, Path(alias="project")],
     principal: Principal = Depends(current_principal),
@@ -3280,7 +3352,6 @@ def issue_my_human_database_credential(
     )
 
 
-@app.delete("/v1/projects/{project}/database-access/grants")
 def revoke_human_database_access(
     name: Annotated[str, Path(alias="project")],
     reference: HumanDatabaseReference,
@@ -3635,6 +3706,8 @@ def retained_project_logs(
     if known[0] == "empty":
         raise HTTPException(409, "Project has not been deployed")
     try:
+        from .trace_router import project_partition
+
         result = observe_retained_logs(
             name,
             log,
@@ -3644,6 +3717,7 @@ def retained_project_logs(
             instance=instance,
             after=after,
             before=before,
+            tenant=project_partition(name, for_read=True) or "unavailable",
         )
     except ValueError:
         required_audit(
@@ -3926,6 +4000,12 @@ def operation_status(
     operation_id: UUID, principal: Principal = Depends(current_principal)
 ):
     with connect() as conn:
+        from .lifecycle.catalog import read as read_lifecycle
+
+        lifecycle = read_lifecycle(conn, str(operation_id))
+        if lifecycle:
+            require_platform_admin(principal)
+            return lifecycle
         row = conn.execute(
             """SELECT o.operation_id, o.revision, o.state, o.result_version,
                 o.result, o.error_code, p.name, r.spec
@@ -4221,7 +4301,6 @@ def inspect_retirement(
     }
 
 
-@app.get("/v1/operator/projects/{project}/purge-preview")
 def purge_preview(
     name: Annotated[str, Path(alias="project")],
     principal: Principal = Depends(current_principal),
@@ -4248,7 +4327,6 @@ def purge_preview(
     return scope
 
 
-@app.post("/v1/operator/projects/{project}/purge")
 def purge_project(
     name: Annotated[str, Path(alias="project")],
     confirmation: ProjectPurge,
@@ -4388,7 +4466,6 @@ def namespace_exists(name):
     return True
 
 
-@app.get("/v1/projects/{project}/retirement-preview")
 def retirement_preview(
     name: Annotated[str, Path(alias="project")],
     principal: Principal = Depends(current_principal),
@@ -4439,7 +4516,6 @@ def retirement_preview(
     return {**scope, "status": status[0], "blockers": blockers}
 
 
-@app.post("/v1/projects/{project}/retire")
 def retire(
     name: Annotated[str, Path(alias="project")],
     confirmation: Retirement,
@@ -4913,3 +4989,7 @@ install_store_api(app, sys.modules[__name__])
 from .application_api import install as install_application_api
 
 install_application_api(app, sys.modules[__name__])
+
+from .lifecycle.api import install as install_lifecycle_api
+
+install_lifecycle_api(app, sys.modules[__name__])

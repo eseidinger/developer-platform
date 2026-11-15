@@ -10,6 +10,7 @@ from langchain_core.tools import StructuredTool
 from . import ai_diagnostics, ai_startup, application_metrics, trace_read
 from .readiness import observe_deployment
 from .retained_logs import observe_retained_logs
+from .trace_router import project_partition
 
 
 def application_view(current):
@@ -161,7 +162,11 @@ def make_tools(project, current_spec, connect, runtime=None):
     def get_traces(trace_id: str) -> dict:
         """Read one trace by ID, filtered to spans verified for this project."""
         try:
-            result = trace_read.read(project, trace_id)
+            result = trace_read.read(
+                project,
+                trace_id,
+                tenant=project_partition(project, for_read=True) or "unavailable",
+            )
         except (ValueError, trace_read.TraceUnavailable):
             return {"source": "project-traces", "state": "unavailable"}
         return (
@@ -179,7 +184,11 @@ def make_tools(project, current_spec, connect, runtime=None):
     def get_logs() -> dict:
         """Read recent event counts and revision-scoped database/pool failure codes; never raw logs."""
         result = observe_retained_logs(
-            project, logging.getLogger(__name__), tail=50, since_seconds=3600
+            project,
+            logging.getLogger(__name__),
+            tail=50,
+            since_seconds=3600,
+            tenant=project_partition(project, for_read=True) or "unavailable",
         )
         current = _current()
         service = (

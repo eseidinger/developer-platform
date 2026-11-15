@@ -103,6 +103,7 @@ def observe_retained_logs(
     before=None,
     now=None,
     client_factory=httpx.Client,
+    tenant="platform",
 ):
     validate_name(project)
     if component:
@@ -155,6 +156,7 @@ def observe_retained_logs(
                 "GET",
                 os.environ.get("LOKI_URL", "http://loki:3100")
                 + "/loki/api/v1/query_range",
+                headers={"X-Scope-OrgID": tenant},
                 params={
                     "query": query,
                     "start": str(start),

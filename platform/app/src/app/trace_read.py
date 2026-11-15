@@ -14,7 +14,9 @@ class TraceUnavailable(Exception):
     pass
 
 
-def read(project: str, trace_id: str, opener=None, now=None) -> dict | None:
+def read(
+    project: str, trace_id: str, opener=None, now=None, tenant="platform"
+) -> dict | None:
     if not re.fullmatch(r"[0-9a-f]{32}", trace_id) or int(trace_id, 16) == 0:
         raise ValueError("Invalid trace ID")
     now = int(time.time() if now is None else now)
@@ -22,7 +24,9 @@ def read(project: str, trace_id: str, opener=None, now=None) -> dict | None:
     opener = opener or urllib.request.build_opener(urllib.request.ProxyHandler({}))
     try:
         with opener.open(
-            urllib.request.Request(url, headers={"Accept": "application/json"}),
+            urllib.request.Request(
+                url, headers={"Accept": "application/json", "X-Scope-OrgID": tenant}
+            ),
             timeout=2,
         ) as response:
             raw = response.read(1048577)

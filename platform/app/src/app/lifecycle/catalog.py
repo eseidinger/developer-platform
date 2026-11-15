@@ -197,9 +197,17 @@ def read(conn, identity):
 
 
 def expire_receipts(conn):
-    # Purge receipts have no FK to projects so they remain readable briefly after
-    # catalog deletion. They are the last project record and expire as promised.
-    conn.execute(
-        "DELETE FROM project_lifecycle_operations WHERE action='purge' AND state='succeeded' AND completed_at<%s",
+    """Erase the final receipt and its host handoff files after 24 hours."""
+    from .erasure import directory
+
+    expired = conn.execute(
+        "SELECT operation_id::text FROM project_lifecycle_operations WHERE action='purge' AND state='succeeded' AND completed_at<%s",
         (datetime.now(UTC) - timedelta(hours=24),),
-    )
+    ).fetchall()
+    for (identity,) in expired:
+        for suffix in (".request.json", ".receipt.json", ".final.json"):
+            (directory() / (identity + suffix)).unlink(missing_ok=True)
+        conn.execute(
+            "DELETE FROM project_lifecycle_operations WHERE operation_id=%s",
+            (identity,),
+        )

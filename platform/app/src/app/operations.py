@@ -342,7 +342,7 @@ def _execute_locked(
                     for m in manifests
                 ]
         for manifest in manifests:
-            manifest = _with_telemetry(manifest, revision, operation_id)
+            manifest = _with_telemetry(manifest, revision, operation_id, project_id)
             step = f"apply:{manifest['kind']}"
             with tracing.span(
                 "platform.operation.step",

@@ -38,6 +38,20 @@ def test_existing_deploy_apply_works_with_environment_auth_and_broken_profile(
     monkeypatch.setenv("PLATFORM_API_URL", "https://platform.example")
     monkeypatch.setenv("PLATFORM_ACCESS_TOKEN", "existing-token")
     seen = []
+    declaration = {
+        "apiVersion": "platform.eseidinger.de/v1",
+        "kind": "Application",
+        "metadata": {"name": "orders"},
+        "spec": {
+            "components": [
+                {
+                    "name": "web",
+                    "type": "service",
+                    "runtime": {"type": "container", "image": "example:v1"},
+                }
+            ]
+        },
+    }
 
     def handler(request):
         seen.append(request)
@@ -45,7 +59,7 @@ def test_existing_deploy_apply_works_with_environment_auth_and_broken_profile(
         assert request.url.path == "/v1/projects/orders/application"
         assert request.headers["authorization"] == "Bearer existing-token"
         assert request.headers["if-match"] == '"2"'
-        assert json.loads(request.content) == {"name": "orders", "components": []}
+        assert json.loads(request.content) == declaration
         return httpx.Response(
             202,
             json={
@@ -75,7 +89,7 @@ def test_existing_deploy_apply_works_with_environment_auth_and_broken_profile(
             "--output",
             "json",
         ],
-        input='{"name":"orders","components":[]}',
+        input=json.dumps(declaration),
     )
 
     assert result.exit_code == 0, result.output
