@@ -277,6 +277,29 @@ class LifecycleExecutionTests(unittest.TestCase):
         self.assertTrue(result["prepared"])
         self.assertNotEqual(result["deployment_operation_id"], previous)
 
+    def test_restore_discards_only_known_hosted_credentials(self):
+        secret = self.runtime.objects[("Secret", "app-secrets", "project-demo")]
+        secret["data"].update(
+            ACCESS_TOKEN="dXNlci1zZWNyZXQ=",
+            ACCESS_ABCDEF123456_CLIENT_SECRET="b2xkLW1hbmFnZWQ=",
+        )
+        self.start("retire")
+        worker.process_one(main)
+        with self.connect() as conn:
+            from app.lifecycle import snapshot
+
+            saved = snapshot.load(conn, self.identity)
+            saved["hosted"] = [{"id": "service-abcdef123456", "kind": "service-access"}]
+            conn.execute(
+                "UPDATE project_recovery_points SET encrypted_snapshot=%s",
+                (catalog.seal(self.identity, saved),),
+            )
+        self.start("restore")
+        worker.process_one(main)
+        restored = self.runtime.objects[("Secret", "app-secrets", "project-demo")]
+        self.assertEqual(restored["data"]["ACCESS_TOKEN"], "dXNlci1zZWNyZXQ=")
+        self.assertNotIn("ACCESS_ABCDEF123456_CLIENT_SECRET", restored["data"])
+
     def test_purge_erases_owned_stores_and_consumed_grants_but_preserves_foreign_data(
         self,
     ):
