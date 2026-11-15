@@ -61,13 +61,16 @@ def operational_storage(operation):
 
 
 def verify_loki(operation):
+    end = time.time_ns()
     with httpx.Client(timeout=10, trust_env=False, follow_redirects=False) as client:
         response = client.get(
             "http://loki:3100/loki/api/v1/query_range",
             params={
                 "query": '{job="kubernetes-workloads"}',
-                "start": "0",
-                "end": str(time.time_ns()),
+                # Query the full retained interval, rather than generating
+                # decades of empty Loki query shards back to the Unix epoch.
+                "start": str(end - log_rebuild.RETENTION_NS),
+                "end": str(end),
                 "limit": 1,
             },
             headers={"X-Scope-OrgID": operation["project_id"]},

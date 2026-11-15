@@ -5,7 +5,7 @@ import sys
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
@@ -18,6 +18,25 @@ from fastapi import HTTPException
 
 
 class RecoveryBoundaryTests(unittest.TestCase):
+    def test_log_erasure_verification_queries_only_the_retained_interval(self):
+        from app.lifecycle import maintenance
+
+        client = Mock()
+        client.get.return_value.json.return_value = {"data": {"result": []}}
+        end = 1_800_000_000_000_000_000
+        with (
+            patch.object(maintenance.time, "time_ns", return_value=end),
+            patch.object(maintenance.httpx, "Client") as factory,
+        ):
+            factory.return_value.__enter__.return_value = client
+            self.assertTrue(maintenance.verify_loki({"project_id": "fixture"}))
+        query = client.get.call_args.kwargs["params"]
+        self.assertEqual(int(query["end"]), end)
+        self.assertEqual(
+            int(query["end"]) - int(query["start"]),
+            maintenance.log_rebuild.RETENTION_NS,
+        )
+
     def setUp(self):
         self.environment = patch.dict(os.environ, {"DATABASE_KEY": "test-only-" * 5})
         self.environment.start()
