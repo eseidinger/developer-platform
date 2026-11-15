@@ -17,6 +17,27 @@ spec.loader.exec_module(maintenance)
 
 
 class TenantErasureTests(unittest.TestCase):
+    def test_workload_logs_are_removed_only_from_kubernetes_nodes(self):
+        def execute(arguments, root):
+            if arguments[:2] == ["docker", "ps"]:
+                return (
+                    b"k3d-workloads-serverlb\n"
+                    b"k3d-workloads-server-0\n"
+                    b"k3d-workloads-agent-0\n"
+                )
+            if arguments[2] == "k3d-workloads-serverlb":
+                raise maintenance.MaintenanceError("Load balancer has no pod logs")
+            return b""
+
+        with patch.object(maintenance, "command", side_effect=execute) as command:
+            maintenance.remove_workload_logs(Path("/unused"), "demo")
+        nodes = {
+            call.args[0][2]
+            for call in command.call_args_list
+            if call.args[0][:2] == ["docker", "exec"]
+        }
+        self.assertEqual(nodes, {"k3d-workloads-server-0", "k3d-workloads-agent-0"})
+
     def test_erases_the_exact_uuid_and_restarts_storage(self):
         identity = str(uuid4())
         with tempfile.TemporaryDirectory() as directory:

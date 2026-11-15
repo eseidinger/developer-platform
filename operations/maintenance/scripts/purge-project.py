@@ -131,6 +131,9 @@ def remove_workload_logs(root, project):
         .splitlines()
     )
     for node in nodes:
+        # k3d's serverlb is an nginx load balancer and has no kubelet logs.
+        if not re.fullmatch(r"k3d-workloads-(?:server|agent)-[0-9]+", node):
+            continue
         for directory, pattern in (
             ("/var/log/pods", "project-" + project + "_*"),
             ("/var/log/containers", "*_project-" + project + "_*"),
