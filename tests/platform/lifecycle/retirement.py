@@ -39,7 +39,11 @@ def check_retirement(fixture):
     rejected = fixture.request(
         "POST",
         "/retire",
-        {"confirm_name": fixture.project, "scope_token": "0" * 32},
+        {
+            "confirm_name": fixture.project,
+            "confirm_project_id": preview["project_id"],
+            "scope_token": "0" * 64,
+        },
         statuses=(409,),
     )
     require(rejected["code"] == "scope_changed", "stale_retirement_scope_accepted")
@@ -85,15 +89,17 @@ def check_retirement(fixture):
         "retired_namespace_present",
     )
     inventory = fixture.api.request(
-        "GET", "/operator/projects/" + fixture.project + "/retirement"
+        "GET", "/v1/operator/projects/" + fixture.project + "/retirement"
     )
     require(
         inventory["status"] == "retired"
-        and inventory["retained"]["database"] == preview["retains"]["database"],
+        and inventory["retained"]["database"]
+        == preview["inventory"]["retains"]["database"],
         "retirement_inventory_missing",
     )
     require(
-        preview["retains"]["database"] == database, "retained_database_scope_mismatch"
+        preview["inventory"]["retains"]["database"] == database,
+        "retained_database_scope_mismatch",
     )
     result = fixture.command(command)
     require(result.stdout.strip() == before, "retirement_sql_data_not_retained")

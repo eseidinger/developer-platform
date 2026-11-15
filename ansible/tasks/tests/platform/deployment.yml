@@ -3,7 +3,8 @@
     Create a project-scoped deployment credential as project administrator
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials
+      {{
+      platform_api_url }}/v1/projects/{{ test_project }}/deployment-credentials
     method: POST
     headers:
       Authorization: "Bearer {{ project_admin_token }}"
@@ -31,17 +32,32 @@
 - name: >-
     Perform the project's first deployment through CI credentials
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ test_project }}"
+    url: "{{ platform_api_url }}/v1/projects/{{ test_project }}/application"
     method: PUT
     headers:
       Authorization: >-
         Bearer {{ deployment_token_response.json.access_token }}
     body_format: json
     body:
-      name: "{{ test_project }}"
-      image: "{{ platform_test_image }}"
-      port: 5678
-      probe_profile: hello-world
+      apiVersion: platform.eseidinger.de/v1
+      kind: Application
+      metadata:
+        name: "{{ test_project }}"
+      spec:
+        components:
+          - name: "{{ test_project }}"
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_test_image }}"
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+            exposure: public
+            health:
+              readiness:
+                profile: hello-world
     status_code: 202
   register: first_deployment
   no_log: true
@@ -66,7 +82,7 @@
     Verify deployment identity cannot access another project
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ forbidden_project }}/logs
+      {{ platform_api_url }}/v1/projects/{{ forbidden_project }}/logs
     headers:
       Authorization: >-
         Bearer {{ deployment_token_response.json.access_token }}
@@ -77,7 +93,8 @@
     Verify deployment identity cannot administer credentials
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/deployment-credentials
+      {{
+      platform_api_url }}/v1/projects/{{ test_project }}/deployment-credentials
     headers:
       Authorization: >-
         Bearer {{ deployment_token_response.json.access_token }}
@@ -87,7 +104,7 @@
 - name: Verify deployment identity cannot mutate application secrets
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/secrets/CI_FORBIDDEN
+      {{ platform_api_url }}/v1/projects/{{ test_project }}/secrets/CI_FORBIDDEN
     method: PUT
     headers:
       Authorization: >-

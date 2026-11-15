@@ -178,7 +178,7 @@ def main():
                 request("api-provider.apps.localhost", "/", "platform.localhost") == 421
             ), "Mismatched SNI/Host accepted"
             try:
-                request("platform.localhost", "/projects")
+                request("platform.localhost", "/v1/projects")
             except ssl.SSLError:
                 pass
             else:

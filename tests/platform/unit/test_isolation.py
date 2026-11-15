@@ -37,11 +37,11 @@ class IsolationTests(TestCase):
             self.assertFalse((Path(temporary) / ".runtime").exists())
 
     def test_public_declarations_bind_distinct_scoped_projects(self):
-        from app.spec import ApplicationEnvelopeV1Alpha2, to_flat
+        from app.spec import ApplicationEnvelope, to_flat
 
         for project in drill.project_names(RUN_ID):
             declaration = drill.declaration(project, IMAGE, RUN_ID, BINDING)
-            ApplicationEnvelopeV1Alpha2.model_validate(declaration)
+            ApplicationEnvelope.model_validate(declaration)
             flat = to_flat(declaration)
             self.assertEqual(flat["name"], project)
             self.assertEqual(flat["components"][0]["bindings"][0]["bindingId"], BINDING)

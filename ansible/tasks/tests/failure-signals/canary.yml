@@ -3,12 +3,12 @@
     Temporarily isolate failure signals from unrelated admission policy
   ansible.builtin.lineinfile:
     path: "{{ platform_failure_drill_install_dir }}/.env"
-    regexp: '^CAPACITY_ADMISSION_ENABLED='
-    line: 'CAPACITY_ADMISSION_ENABLED=false'
+    regexp: "^CAPACITY_ADMISSION_ENABLED="
+    line: "CAPACITY_ADMISSION_ENABLED=false"
     create: false
     owner: root
     group: root
-    mode: '0600'
+    mode: "0600"
   delegate_to: "{{ platform_failure_drill_host }}"
   become: true
   no_log: true
@@ -24,7 +24,7 @@
       - --force-recreate
       - --wait
       - --wait-timeout
-      - '120'
+      - "120"
       - platform-api
     chdir: "{{ platform_failure_drill_install_dir }}"
   delegate_to: "{{ platform_failure_drill_host }}"
@@ -47,7 +47,7 @@
 
 - name: Create the disposable failure-signal project
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects"
+    url: "{{ platform_api_url }}/v1/projects"
     method: POST
     headers:
       Authorization: "Bearer {{ failure_runner_token.json.access_token }}"
@@ -60,16 +60,31 @@
 
 - name: Deploy the disposable public canary
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ failure_project }}"
+    url: "{{ platform_api_url }}/v1/projects/{{ failure_project }}/application"
     method: PUT
     headers:
       Authorization: "Bearer {{ failure_runner_token.json.access_token }}"
     body_format: json
     body:
-      name: "{{ failure_project }}"
-      image: "{{ platform_failure_drill_image }}"
-      port: 5678
-      probe_profile: hello-world
+      apiVersion: platform.eseidinger.de/v1
+      kind: Application
+      metadata:
+        name: "{{ failure_project }}"
+      spec:
+        components:
+          - name: "{{ failure_project }}"
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_failure_drill_image }}"
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+            exposure: public
+            health:
+              readiness:
+                profile: hello-world
     status_code:
       - 202
       - 422
@@ -100,8 +115,8 @@
     - >-
       (failure_deployment_operation.json.state | default('')) == 'succeeded'
     - >-
-        (failure_deployment_operation.json.readiness.state | default('')) ==
-        'ready'
+      (failure_deployment_operation.json.readiness.state | default('')) ==
+      'ready'
   retries: 60
   delay: 5
   no_log: true

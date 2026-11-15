@@ -1,7 +1,7 @@
 ---
 - name: Create the disposable rollback project
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects"
+    url: "{{ platform_api_url }}/v1/projects"
     method: POST
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
@@ -31,7 +31,7 @@
 - name: Wait for the named PostgreSQL resource
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/v1/resources/{{
+      {{ platform_api_url }}/v1/stores/{{
       rollback_resource_request.json.resource_id }}
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
@@ -47,7 +47,7 @@
   ansible.builtin.uri:
     url: >-
       {{ platform_api_url }}/v1/projects/{{ rollback_project
-      }}/resource-bindings
+      }}/store-bindings
     method: POST
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
@@ -64,7 +64,7 @@
   ansible.builtin.uri:
     url: >-
       {{ platform_api_url }}/v1/projects/{{ rollback_project
-      }}/resource-bindings
+      }}/store-bindings
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
     status_code: 200

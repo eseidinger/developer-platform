@@ -54,9 +54,9 @@ def web_postgres_declaration(project, image, run_id, binding_id, cpu_limit):
     except ValueError:
         raise DrillError("invalid_binding_id") from None
     return {
-        "apiVersion": "platform.example/v1alpha2",
+        "apiVersion": "platform.eseidinger.de/v1",
         "kind": "Application",
-        "metadata": {"name": project, "project": project},
+        "metadata": {"name": project},
         "spec": {
             "components": [
                 {
@@ -209,7 +209,8 @@ def visit(kubectl, kubeconfig, project):
 
 def project_row(api, project):
     return next(
-        (row for row in api.request("GET", "/projects") if row["name"] == project), None
+        (row for row in api.request("GET", "/v1/projects") if row["name"] == project),
+        None,
     )
 
 
@@ -251,16 +252,16 @@ def run(args, api, report):
         args.kubeconfig.is_file() and not args.kubeconfig.is_symlink(),
         "kubeconfig_missing",
     )
-    api.request("GET", "/platform/test-context")
+    api.request("GET", "/v1/platform/test-context")
     require(project_row(api, project) is None, "run_project_name_in_use")
     report.data["projectCreateAttempted"] = True
     report.save()
-    api.request("POST", "/projects", {"name": project}, statuses=(201,))
+    api.request("POST", "/v1/projects", {"name": project}, statuses=(201,))
     report.data["projectCreated"] = True
     report.save()
     resource = api.request(
         "POST",
-        "/v1/projects/" + project + "/resources",
+        "/v1/projects/" + project + "/stores",
         {"name": "state", "provider": "postgresql", "quota_bytes": 16 * 1024 * 1024},
         statuses=(202,),
     )
@@ -268,7 +269,7 @@ def run(args, api, report):
     report.save()
     wait_for(
         lambda: (
-            api.request("GET", "/v1/resources/" + resource["resource_id"])[
+            api.request("GET", "/v1/stores/" + resource["resource_id"])[
                 "observed_state"
             ]
             == "active"
@@ -277,7 +278,7 @@ def run(args, api, report):
     )
     binding = api.request(
         "POST",
-        "/v1/projects/" + project + "/resource-bindings",
+        "/v1/projects/" + project + "/store-bindings",
         {
             "resource_id": resource["resource_id"],
             "component": "web",
@@ -291,12 +292,12 @@ def run(args, api, report):
         lambda: any(
             row["grant_id"] == binding["grant_id"] and row["observed_state"] == "active"
             for row in api.request(
-                "GET", "/v1/projects/" + project + "/resource-bindings"
+                "GET", "/v1/projects/" + project + "/store-bindings"
             )["bindings"]
         ),
         "named_binding_not_ready",
     )
-    path = "/projects/" + project
+    path = "/v1/projects/" + project
     first = api.request(
         "PUT",
         path,

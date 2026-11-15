@@ -2,7 +2,7 @@
 - name: >-
     Create empty project scopes before any application deployment
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects"
+    url: "{{ platform_api_url }}/v1/projects"
     method: POST
     headers:
       Authorization: "Bearer {{ runner_token_response.json.access_token }}"
@@ -18,7 +18,7 @@
 
 - name: Create short-lived standard-role test personas
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/platform/test-identities"
+    url: "{{ platform_api_url }}/v1/platform/test-identities"
     method: POST
     headers:
       Authorization: "Bearer {{ runner_token_response.json.access_token }}"
@@ -73,7 +73,7 @@
 
 - name: Verify viewer can list only its granted project
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects"
+    url: "{{ platform_api_url }}/v1/projects"
     headers:
       Authorization: "Bearer {{ viewer_token }}"
     status_code: 200
@@ -85,15 +85,30 @@
 
 - name: Verify viewer cannot perform the first deployment
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ test_project }}"
+    url: "{{ platform_api_url }}/v1/projects/{{ test_project }}/application"
     method: PUT
     headers:
       Authorization: "Bearer {{ viewer_token }}"
     body_format: json
     body:
-      name: "{{ test_project }}"
-      image: "{{ platform_test_image }}"
-      port: 5678
-      probe_profile: hello-world
+      apiVersion: platform.eseidinger.de/v1
+      kind: Application
+      metadata:
+        name: "{{ test_project }}"
+      spec:
+        components:
+          - name: "{{ test_project }}"
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_test_image }}"
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+            exposure: public
+            health:
+              readiness:
+                profile: hello-world
     status_code: 403
   no_log: true

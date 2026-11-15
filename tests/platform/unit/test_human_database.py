@@ -52,11 +52,11 @@ class HumanDatabaseDrillTests(unittest.TestCase):
             drill.validate(args)
 
     def test_declaration_is_a_valid_private_postgres_fixture(self):
-        from app.spec import ApplicationEnvelopeV1Alpha2
+        from app.spec import ApplicationEnvelope
 
         project = "hd-0123456789ab-a"
         declaration = drill.declaration(project, IMAGE, RUN_ID)
-        ApplicationEnvelopeV1Alpha2.model_validate(declaration)
+        ApplicationEnvelope.model_validate(declaration)
         component = declaration["spec"]["components"][0]
         self.assertEqual(component["exposure"], "private")
         self.assertEqual(component["health"]["readiness"]["path"], "/health/ready")
@@ -65,7 +65,7 @@ class HumanDatabaseDrillTests(unittest.TestCase):
         bound = drill.declaration(
             project, IMAGE, RUN_ID, "11111111-1111-1111-1111-111111111111"
         )
-        ApplicationEnvelopeV1Alpha2.model_validate(bound)
+        ApplicationEnvelope.model_validate(bound)
         self.assertEqual(len(bound["spec"]["components"][0]["bindings"]), 1)
 
     def test_ssh_requires_pinned_host_key_and_only_one_forward(self):
@@ -129,7 +129,7 @@ class HumanDatabaseDrillTests(unittest.TestCase):
             subject = drill.Drill(SimpleNamespace(run_id=RUN_ID), {}, api, report)
             subject.persona_creation_attempted = True
             self.assertTrue(subject.cleanup())
-            self.assertEqual(api.deleted, ["/platform/test-identities/persona-id"])
+            self.assertEqual(api.deleted, ["/v1/platform/test-identities/persona-id"])
 
 
 if __name__ == "__main__":

@@ -525,7 +525,6 @@ def test_obsolete_database_commands_are_removed():
     assert not any("database-access" in path for _, path in EXCLUSIONS)
 
 
-
 @pytest.mark.parametrize("provider", ["postgresql", "s3"])
 def test_store_tunnel_uses_verified_host_and_does_not_print_credential(
     monkeypatch, tmp_path, provider

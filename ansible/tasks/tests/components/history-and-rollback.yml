@@ -1,17 +1,18 @@
 ---
 - name: >-
-    Verify migration preserved the legacy revision and component revision
+    Verify migration preserved the initial revision and component revision
     history
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/revisions
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/revisions
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
   register: component_revisions
   failed_when: >-
     component_revisions.json.revisions | length < 3 or
-    (component_revisions.json.revisions | selectattr('components', 'defined') |
+    (component_revisions.json.revisions | selectattr('components', 'defined')
+    |
     list | length) < 3
   no_log: true
 
@@ -19,7 +20,7 @@
     Verify configuration survived component migration and independent updates
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/configuration
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/configuration
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
@@ -37,7 +38,7 @@
     Verify the migrated secret remains present but write-only
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/secrets
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/secrets
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
@@ -49,11 +50,11 @@
   ansible.builtin.assert:
     that:
       - >-
-          migrated_secret_listing.json.secrets | selectattr('name', 'equalto',
-          'COMPONENT_ACCEPTANCE_SECRET') | list | length == 1
+        migrated_secret_listing.json.secrets | selectattr('name', 'equalto',
+        'COMPONENT_ACCEPTANCE_SECRET') | list | length == 1
       - >-
-          (component_run_id ~ '-secret') not in (migrated_secret_listing.json |
-          to_json)
+        (component_run_id ~ '-secret') not in (migrated_secret_listing.json |
+        to_json)
   no_log: true
 
 - name: Refresh the project administrator token before rollback
@@ -79,7 +80,7 @@
 - name: Roll back to the first component revision
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/rollback
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/rollback
     method: POST
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
@@ -110,7 +111,7 @@
 - name: Require both restored services to become ready
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/components
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/components
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
@@ -149,7 +150,8 @@
 - name: Read the component retirement scope
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/retirement-preview
+      {{
+      platform_api_url }}/v1/projects/{{ component_project }}/retirement-preview
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
@@ -162,18 +164,21 @@
   ansible.builtin.assert:
     that:
       - >-
-          component_retirement.json.removes | selectattr('kind', 'equalto',
-          'Deployment') | list | length == 2
+        component_retirement.json.inventory.workloads |
+        selectattr('kind', 'equalto',
+        'Deployment') | list | length == 2
       - >-
-          component_retirement.json.removes | selectattr('kind', 'equalto',
-          'CronJob') | list | length == 2
-      - component_retirement.json.retains | length > 0
+        component_retirement.json.inventory.workloads |
+        selectattr('kind', 'equalto',
+        'CronJob') | list | length == 2
+      - component_retirement.json.inventory.retains | length > 0
   no_log: true
 
 - name: Report non-secret Phase 2A acceptance evidence
   ansible.builtin.debug:
     msg: >-
-      PASS: {{ component_run_id }} migrated a legacy project to a protected API,
+      PASS: {{ component_run_id }} expanded a single-service v1 project to
+      a protected API,
       a private peer and two scheduled probes (one successful and one safely
       failed),
       observed non-overlap, preserved configuration and write-only secrets

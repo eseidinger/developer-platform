@@ -9,7 +9,7 @@ from playbook_helpers import load_playbook
 
 ROOT = Path(__file__).resolve().parents[3]
 sys.path.insert(0, str(ROOT / "platform/app/src"))
-from app.spec import ApplicationEnvelopeV1Alpha2, to_flat
+from app.spec import ApplicationEnvelope, to_flat
 
 PLAYBOOK = load_playbook(
     ROOT / "ansible/tests/platform/test-platform-rollback-data.yml"
@@ -49,7 +49,7 @@ class RollbackDataContractTests(unittest.TestCase):
             "Deploy a second application revision",
         ):
             body = render(task(name)["ansible.builtin.uri"]["body"])
-            ApplicationEnvelopeV1Alpha2.model_validate(body)
+            ApplicationEnvelope.model_validate(body)
             specs.append(to_flat(body))
         self.assertEqual(
             [spec["name"] for spec in specs], ["rollback-0123456789ab"] * 2

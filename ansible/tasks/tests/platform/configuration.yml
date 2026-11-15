@@ -2,7 +2,7 @@
 - name: Verify developer can create a configuration revision
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/configuration
+      {{ platform_api_url }}/v1/projects/{{ test_project }}/configuration
     method: PUT
     headers:
       Authorization: "Bearer {{ developer_token }}"
@@ -33,7 +33,7 @@
     Verify viewer can observe configuration but cannot change it
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/configuration
+      {{ platform_api_url }}/v1/projects/{{ test_project }}/configuration
     method: "{{ item.method }}"
     headers:
       Authorization: "Bearer {{ viewer_token }}"
@@ -53,7 +53,7 @@
 - name: Verify viewer cannot assign project grants
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/grants
+      {{ platform_api_url }}/v1/projects/{{ test_project }}/grants
     method: PUT
     headers:
       Authorization: "Bearer {{ viewer_token }}"
@@ -68,7 +68,7 @@
 - name: Restart the application as a developer persona
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/restart
+      {{ platform_api_url }}/v1/projects/{{ test_project }}/restart
     method: POST
     headers:
       Authorization: "Bearer {{ developer_token }}"
@@ -94,7 +94,7 @@
 - name: Roll back to the first revision as a developer persona
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ test_project }}/rollback
+      {{ platform_api_url }}/v1/projects/{{ test_project }}/rollback
     method: POST
     headers:
       Authorization: "Bearer {{ developer_token }}"

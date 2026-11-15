@@ -25,7 +25,7 @@ class HostedCleanupTests(unittest.TestCase):
         scopes = []
 
         def request(method, path, body=None, **kwargs):
-            if path == "/projects":
+            if path == "/v1/projects":
                 return [
                     {
                         "name": project,
@@ -37,16 +37,34 @@ class HostedCleanupTests(unittest.TestCase):
                     }
                 ]
             if path.endswith("/retirement-preview"):
-                return {"blockers": [], "scope_token": "after" if scopes else "before"}
+                return {
+                    "project_id": "uuid",
+                    "blockers": [],
+                    "scope_token": "after" if scopes else "before",
+                }
             if path.endswith("/retire"):
                 self.assertEqual(method, "POST")
                 expected = "after" if scopes else "before"
                 self.assertEqual(
-                    body, {"confirm_name": project, "scope_token": expected}
+                    body,
+                    {
+                        "confirm_name": project,
+                        "confirm_project_id": "uuid",
+                        "scope_token": expected,
+                    },
                 )
                 scopes.append(body["scope_token"])
-                return {"status": "retired" if len(scopes) == 2 else "retiring"}
-            self.assertTrue(path.startswith("/platform/test-identities?"))
+                return (
+                    {"code": "scope_changed"}
+                    if len(scopes) == 1
+                    else {
+                        "state": "queued",
+                        "status_url": "/v1/operations/retirement-op",
+                    }
+                )
+            if path == "/v1/operations/retirement-op":
+                return {"state": "succeeded"}
+            self.assertTrue(path.startswith("/v1/platform/test-identities?"))
             return {"credentials": []}
 
         with patch.object(

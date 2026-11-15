@@ -6,7 +6,6 @@
   vars:
     platform_test_image: hashicorp/http-echo:1.0.0
   tasks:
-
     - name: Require protected test-runner configuration
       ansible.builtin.assert:
         that:
@@ -49,7 +48,7 @@
         Verify the platform administrator can inspect Kubernetes capacity and
         node usage
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/operator/capacity"
+        url: "{{ platform_api_url }}/v1/operator/capacity"
         headers:
           Authorization: "Bearer {{ runner_token_response.json.access_token }}"
         status_code: 200
@@ -78,7 +77,6 @@
     - name: >-
         Exercise the platform using disposable identities and projects
       block:
-
         - name: Create disposable identities and verify initial grants
           ansible.builtin.import_tasks: >-
             ../../tasks/tests/platform/identities.yml
@@ -99,14 +97,14 @@
           ansible.builtin.import_tasks: >-
             ../../tasks/tests/platform/credential-rotation.yml
       always:
-
         - name: Select confirmed fixture ownership for cleanup
           ansible.builtin.set_fact:
             platform_cleanup_project_creation: >-
               {{ platform_cleanup_project_creation | default({}) }}
             platform_cleanup_personas: "{{ persona_credentials | default({}) }}"
             platform_cleanup_credentials: >-
-              {{ [{'project': test_project, 'creation': deployment_credential |
+              {{ [{'project': test_project, 'creation': deployment_credential
+              |
               default({})}, {'project': test_project, 'creation':
               rotated_credential | default({})}] }}
           no_log: true

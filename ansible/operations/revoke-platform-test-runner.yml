@@ -8,7 +8,6 @@
     platform_test_runner_revocation_retries: 12
     platform_test_runner_revocation_delay_seconds: 5
   tasks:
-
     - name: >-
         Require a runner name, human authority, and explicit confirmation
       ansible.builtin.assert:
@@ -27,7 +26,7 @@
 
     - name: List runner metadata to resolve the active named runner
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/platform/test-runner-credentials"
+        url: "{{ platform_api_url }}/v1/platform/test-runner-credentials"
         headers:
           Authorization: "Bearer {{ platform_human_admin_token }}"
         status_code: 200
@@ -61,7 +60,7 @@
         Revoke the resolved runner and retry provider cleanup until complete
       ansible.builtin.uri:
         url: >-
-          {{ platform_api_url }}/platform/test-runner-credentials/{{
+          {{ platform_api_url }}/v1/platform/test-runner-credentials/{{
           resolved_test_runner_credential_id }}
         method: DELETE
         headers:

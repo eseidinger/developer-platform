@@ -212,12 +212,12 @@ def probe(kubectl, kubeconfig, project, own, foreign, peer_service, mode):
 def deploy(api, report, project, image, run_id):
     report.data["createAttempted"].append(project)
     report.save()
-    api.request("POST", "/projects", {"name": project}, statuses=(201,))
+    api.request("POST", "/v1/projects", {"name": project}, statuses=(201,))
     report.data["created"].append(project)
     report.save()
     resource = api.request(
         "POST",
-        "/v1/projects/" + project + "/resources",
+        "/v1/projects/" + project + "/stores",
         {"name": "state", "provider": "postgresql", "quota_bytes": 16 * 1024 * 1024},
         statuses=(202,),
     )
@@ -226,14 +226,14 @@ def deploy(api, report, project, image, run_id):
     report.save()
     wait_for(
         lambda: (
-            api.request("GET", "/v1/resources/" + resource_id)["observed_state"]
+            api.request("GET", "/v1/stores/" + resource_id)["observed_state"]
             == "active"
         ),
         "named_database_not_ready",
     )
     binding = api.request(
         "POST",
-        "/v1/projects/" + project + "/resource-bindings",
+        "/v1/projects/" + project + "/store-bindings",
         {"resource_id": resource_id, "component": "web", "mode": "read-write"},
         statuses=(202,),
     )
@@ -244,14 +244,14 @@ def deploy(api, report, project, image, run_id):
         lambda: any(
             row["grant_id"] == binding_id and row["observed_state"] == "active"
             for row in api.request(
-                "GET", "/v1/projects/" + project + "/resource-bindings"
+                "GET", "/v1/projects/" + project + "/store-bindings"
             )["bindings"]
         ),
         "named_binding_not_ready",
     )
     accepted = api.request(
         "PUT",
-        "/projects/" + project,
+        ("/v1/projects/" + project) + "/application",
         declaration(project, image, run_id, binding_id),
         etag=0,
         statuses=(202,),
@@ -267,7 +267,7 @@ def run(args, api, report):
         args.kubeconfig.is_file() and not args.kubeconfig.is_symlink(),
         "kubeconfig_missing",
     )
-    api.request("GET", "/platform/test-context")
+    api.request("GET", "/v1/platform/test-context")
     project_a, project_b = project_names(args.run_id)
     for project in (project_a, project_b):
         require(project_row(api, project) is None, "run_project_name_in_use")

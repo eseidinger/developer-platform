@@ -17,7 +17,7 @@
 - name: >-
     Wait for admission capacity to recover after reservation removal
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/operator/capacity"
+    url: "{{ platform_api_url }}/v1/operator/capacity"
     headers:
       Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
     status_code: 200
@@ -26,8 +26,8 @@
     - >-
       capacity_after_padding.json.admission.state | default('') == 'ok'
     - >-
-        capacity_after_padding.json.admission.available.cpu_millicores | int >=
-        100
+      capacity_after_padding.json.admission.available.cpu_millicores | int >=
+      100
     - >-
       capacity_after_padding.json.admission.available.memory_mib | int >= 128
   retries: 24
@@ -36,13 +36,13 @@
 
 - name: Deploy a within-reserve workload
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ capacity_project }}"
+    url: "{{ platform_api_url }}/v1/projects/{{ capacity_project }}/application"
     method: PUT
     headers:
       Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
     body_format: json
     body:
-      apiVersion: platform.example/v1alpha2
+      apiVersion: platform.eseidinger.de/v1
       kind: Application
       metadata:
         name: "{{ capacity_project }}"
@@ -54,8 +54,8 @@
               type: container
               image: "{{ platform_capacity_image }}"
               args:
-                - '-listen=:5678'
-                - '-text=capacity-accepted'
+                - "-listen=:5678"
+                - "-text=capacity-accepted"
             ports:
               - name: http
                 protocol: http
@@ -83,8 +83,8 @@
     - >-
       (accepted_capacity_operation.json.state | default('')) == 'succeeded'
     - >-
-        (accepted_capacity_operation.json.readiness.state | default('')) ==
-        'ready'
+      (accepted_capacity_operation.json.readiness.state | default('')) ==
+      'ready'
   retries: 60
   delay: 5
   no_log: true

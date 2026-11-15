@@ -11,7 +11,7 @@ from ..harness import require, wait_for
 
 
 def check_edge(fixture, config, smoke):
-    host = fixture.project + "." + config["APPS_DOMAIN"]
+    host = fixture.project + "-" + fixture.project + "." + config["APPS_DOMAIN"]
     # This suite tests lifecycle without a named store binding. The fixture's
     # readiness endpoint requires PostgreSQL; its identity endpoint proves HTTP
     # routing without restoring the removed implicit database access.
@@ -29,7 +29,7 @@ def check_edge(fixture, config, smoke):
                     server_hostname=host,
                 )
             connection.request("GET", path, headers={"Host": host})
-            return connection.getresponse().status == 200
+            return connection.getresponse().status in {401, 403}
         except OSError:
             return False
         finally:
@@ -37,7 +37,7 @@ def check_edge(fixture, config, smoke):
                 connection.close()
 
     wait_for(ready, "edge_routing_timeout")
-    response = fixture.api.http.get(fixture.api.url + "/projects")
+    response = fixture.api.http.get(fixture.api.url + "/v1/projects")
     require(response.status_code in (401, 403), "unauthenticated_project_access")
     fixture.check("authentication-and-edge-routing")
 
@@ -77,7 +77,7 @@ def check_access_and_audit(fixture, other, secret_values):
             "limit": 10000,
         }
     )
-    payload = fixture.api.request("GET", "/operator/audit/events?" + query)
+    payload = fixture.api.request("GET", "/v1/operator/audit/events?" + query)
     text = json.dumps(payload)
     require(
         all(value not in text for value in secret_values),

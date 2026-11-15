@@ -41,7 +41,11 @@ class LifecycleTests(unittest.TestCase):
                     Mock(stdout=after),
                 ]
                 fixture.request.side_effect = [
-                    {"blockers": [], "retains": {"database": database}},
+                    {
+                        "project_id": "uuid",
+                        "blockers": [],
+                        "inventory": {"retains": {"database": database}},
+                    },
                     {"code": "scope_changed"},
                 ]
                 fixture.api.request.return_value = {
@@ -71,7 +75,7 @@ class LifecycleTests(unittest.TestCase):
         # The neutral fixture reports unavailable database readiness without a
         # binding, while its HTTP identity endpoint remains available.
         connection.getresponse.side_effect = lambda: Mock(
-            status=200 if requested[-1] == "/api/identity" else 503
+            status=401 if requested[-1] == "/api/identity" else 503
         )
         with (
             patch.object(
@@ -167,7 +171,7 @@ class LifecycleTests(unittest.TestCase):
         fixture.retire()
         self.assertEqual(fixture.report["cleanup"], "retired-data-retained")
         api.request.assert_called_once_with(
-            "GET", "/projects/lc-" + RUN + "/retirement-preview", None
+            "GET", "/v1/projects/lc-" + RUN + "/retirement-preview"
         )
 
     def test_run_attempts_cleanup_after_provision_failure(self):

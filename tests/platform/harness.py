@@ -151,7 +151,7 @@ def declaration(project, role, image, run_id, provider_url, issuer, bindings=Non
         }
 
     return {
-        "apiVersion": "platform.example/v1alpha2",
+        "apiVersion": "platform.eseidinger.de/v1",
         "kind": "Application",
         "metadata": {"name": project},
         "spec": {
@@ -860,7 +860,7 @@ class Drill:
         self.journal.save()
         self.api.request(
             "PUT",
-            "/platform/grants",
+            "/v1/platform/grants",
             {
                 "issuer": self.keycloak.issuer,
                 "subject": human["id"],
@@ -883,12 +883,12 @@ class Drill:
         operation_ids = {}
         human, password = self.bootstrap()
         for role, project in self.projects.items():
-            self.api.request("POST", "/projects", {"name": project}, statuses=(201,))
+            self.api.request("POST", "/v1/projects", {"name": project}, statuses=(201,))
             self.journal.state["createdProjects"].append(project)
             self.journal.save()
             persona = self.api.request(
                 "POST",
-                "/platform/test-identities",
+                "/v1/platform/test-identities",
                 {
                     "name": "ha-" + self.run_id + "-" + role,
                     "role": "project-admin",
@@ -913,13 +913,13 @@ class Drill:
             self.owners[role] = owner
             storage = owner.request(
                 "POST",
-                "/v1/projects/" + project + "/resources",
+                "/v1/projects/" + project + "/stores",
                 {"name": "state", "provider": "postgresql", "quota_bytes": 1073741824},
                 statuses=(202,),
             )
 
             def resource_ready(owner=owner, storage=storage):
-                found = owner.request("GET", "/v1/resources/" + storage["resource_id"])
+                found = owner.request("GET", "/v1/stores/" + storage["resource_id"])
                 return found["observed_state"] == "active"
 
             wait_for(resource_ready, "named_database_not_ready")
@@ -927,7 +927,7 @@ class Drill:
             for component in ("api", "worker"):
                 grant = owner.request(
                     "POST",
-                    "/v1/projects/" + project + "/resource-bindings",
+                    "/v1/projects/" + project + "/store-bindings",
                     {
                         "resource_id": storage["resource_id"],
                         "component": component,
@@ -939,7 +939,7 @@ class Drill:
 
             def bindings_ready(owner=owner, project=project, bindings=bindings):
                 found = owner.request(
-                    "GET", "/v1/projects/" + project + "/resource-bindings"
+                    "GET", "/v1/projects/" + project + "/store-bindings"
                 )["bindings"]
                 return all(
                     any(
@@ -960,7 +960,11 @@ class Drill:
                 bindings,
             )
             deployed = owner.request(
-                "PUT", "/projects/" + project, spec, etag=0, statuses=(202,)
+                "PUT",
+                ("/v1/projects/" + project) + "/application",
+                spec,
+                etag=0,
+                statuses=(202,),
             )
             operation = owner.operation(deployed)
             require(
@@ -1345,7 +1349,7 @@ class Drill:
             def retained(project=project):
                 result = self.api.request(
                     "GET",
-                    "/projects/"
+                    "/v1/projects/"
                     + project
                     + "/retained-logs?component=api&since_seconds=600",
                 )
@@ -1513,7 +1517,7 @@ class Drill:
         )
         operation = self.api.request(
             "POST",
-            "/projects/" + self.projects["provider"] + "/restart",
+            "/v1/projects/" + self.projects["provider"] + "/restart",
             statuses=(202,),
         )
         restarted = self.api.operation(operation)
@@ -1666,7 +1670,7 @@ class Drill:
         )
 
     def isolated_lab(self):
-        rows = self.api.request("GET", "/projects")
+        rows = self.api.request("GET", "/v1/projects")
         require(
             all(r["name"] in self.projects.values() for r in rows),
             "recovery_requires_empty_lab",
@@ -1678,13 +1682,13 @@ class Drill:
         previous = self.approved_identity(old_token)
         started = time.monotonic()
         response = self.api.request(
-            "POST", "/operator/application-access/recover", statuses=(202,)
+            "POST", "/v1/operator/application-access/recover", statuses=(202,)
         )
         require(
             response["browserSessionsInvalidated"], "recovery_sessions_not_invalidated"
         )
         for operation_id in response["operationIds"]:
-            self.api.operation({"status_url": "/v1/access-operations/" + operation_id})
+            self.api.operation({"status_url": "/v1/operations/" + operation_id})
         service = self.fetch_service(service)
         replacement = MachineTokens(
             self.kube.binding(service["project"], service["spec"]["secretPrefix"])
@@ -1826,7 +1830,7 @@ def cleanup(journal, api, keycloak):
         and set(state["createdProjects"]) <= set(names.values()),
         "cleanup_scope_mismatch",
     )
-    rows = {r["name"]: r for r in api.request("GET", "/projects")}
+    rows = {r["name"]: r for r in api.request("GET", "/v1/projects")}
     for project in state["createdProjects"]:
         row = rows.get(project)
         require(row is not None, "cleanup_project_missing")
@@ -1845,27 +1849,11 @@ def cleanup(journal, api, keycloak):
             "cleanup_project_changed",
         )
 
-        def retired(project=project):
-            # Retiring named stores advances the preview's scope token. Fetch
-            # the current scope on each poll rather than reusing the pre-retire
-            # token and aborting cleanup after the first accepted request.
-            preview = api.request("GET", "/projects/" + project + "/retirement-preview")
-            require(not preview["blockers"], "cleanup_retirement_blocked")
-            confirmation = {
-                "confirm_name": project,
-                "scope_token": preview["scope_token"],
-            }
-            result = api.request(
-                "POST",
-                "/projects/" + project + "/retire",
-                confirmation,
-                statuses=(200, 202),
-            )
-            return result.get("status") == "retired"
+        from .retirement import retire_project
 
-        wait_for(retired, "fixture_retirement", 300)
+        retire_project(api, project, seconds=300)
     known = api.request(
-        "GET", "/platform/test-identities?test_run_id=" + state["runId"]
+        "GET", "/v1/platform/test-identities?test_run_id=" + state["runId"]
     )["credentials"]
     require(
         set(state["personas"]) <= {p["credential_id"] for p in known},
@@ -1882,7 +1870,7 @@ def cleanup(journal, api, keycloak):
             return (
                 api.request(
                     "DELETE",
-                    "/platform/test-identities/" + persona["credential_id"],
+                    "/v1/platform/test-identities/" + persona["credential_id"],
                     statuses=(200, 202),
                 )["status"]
                 == "revoked"
@@ -1921,7 +1909,7 @@ def cleanup(journal, api, keycloak):
             )
         api.request(
             "DELETE",
-            "/platform/grants",
+            "/v1/platform/grants",
             {"issuer": state["issuer"], "subject": human["id"]},
             statuses=(200, 404),
         )
@@ -2095,7 +2083,7 @@ def main(argv=None):
         )
         api = API(args.api, operator_tokens(args.operator_token_file, keycloak))
         # Validate suite authority before provisioning anything; credential administration stays human-only.
-        api.request("GET", "/platform/test-context")
+        api.request("GET", "/v1/platform/test-context")
         journal = Journal(
             args.output, args.api, args.run_id, resume=args.command == "cleanup"
         )

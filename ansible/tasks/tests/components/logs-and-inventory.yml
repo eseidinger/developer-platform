@@ -23,7 +23,7 @@
     Verify scheduled logs show private connectivity and public backend denial
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project
+      {{ platform_api_url }}/v1/projects/{{ component_project
       }}/logs?component=probe&tail=100
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
@@ -42,7 +42,7 @@
     Verify authorized component log filtering and polling cursor
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project
+      {{ platform_api_url }}/v1/projects/{{ component_project
       }}/logs?component=probe&search=component-peer&tail=100
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
@@ -69,7 +69,7 @@
     Verify authorized resource inventory exposes the deployed component topology
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/resources
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/resources
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     status_code: 200
@@ -91,7 +91,7 @@
 - name: Verify the cursor accepts a no-new-lines poll
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project
+      {{ platform_api_url }}/v1/projects/{{ component_project
       }}/logs?component=probe&after={{ filtered_scheduled_logs.json.next_cursor
       | urlencode }}&tail=100
     headers:

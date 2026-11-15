@@ -4,11 +4,10 @@
   hosts: localhost
   gather_facts: false
   vars:
-    platform_postgres_outage_acknowledgement: ''
+    platform_postgres_outage_acknowledgement: ""
     platform_postgres_drill_install_dir: /opt/developer-platform
     platform_postgres_drill_image: hashicorp/http-echo:1.0.0
   tasks:
-
     - name: >-
         Require explicit approval and protected PostgreSQL outage-drill inputs
       ansible.builtin.assert:
@@ -16,8 +15,8 @@
           - >-
             platform_allow_postgres_outage_drill | default(false) | bool
           - >-
-              platform_postgres_outage_acknowledgement ==
-              'I_ACCEPT_POSTGRES_OUTAGE'
+            platform_postgres_outage_acknowledgement ==
+            'I_ACCEPT_POSTGRES_OUTAGE'
           - platform_api_url is defined
           - platform_oidc_token_url is defined
           - platform_test_runner_client_id is defined
@@ -26,7 +25,8 @@
           - platform_postgres_drill_host in groups['all']
           - platform_postgres_drill_install_dir | length > 1
         fail_msg: >-
-          This drill stops PostgreSQL. Supply protected runner configuration, a
+          This drill stops PostgreSQL. Supply protected runner configuration,
+          a
           reachable inventory host, and
           platform_allow_postgres_outage_drill=true with explicit
           acknowledgement.
@@ -57,7 +57,6 @@
         msg: >-
           PostgreSQL outage drill target: {{ postgres_drill_project }}
 
-
     - name: >-
         Exchange the runner credential for a fresh outage-drill token
       ansible.builtin.uri:
@@ -84,10 +83,9 @@
     - name: >-
         Exercise the controlled PostgreSQL outage with disposable identities
       block:
-
         - name: Create the disposable PostgreSQL outage project
           ansible.builtin.uri:
-            url: "{{ platform_api_url }}/projects"
+            url: "{{ platform_api_url }}/v1/projects"
             method: POST
             headers:
               Authorization: >-
@@ -102,7 +100,7 @@
         - name: >-
             Create a short-lived developer persona for database observation
           ansible.builtin.uri:
-            url: "{{ platform_api_url }}/platform/test-identities"
+            url: "{{ platform_api_url }}/v1/platform/test-identities"
             method: POST
             headers:
               Authorization: >-
@@ -135,17 +133,34 @@
         - name: Deploy a disposable unbound workload
           ansible.builtin.uri:
             url: >-
-              {{ platform_api_url }}/projects/{{ postgres_drill_project }}
+              {{
+              platform_api_url }}/v1/projects/{{ postgres_drill_project
+              }}/application
             method: PUT
             headers:
               Authorization: >-
                 Bearer {{ postgres_runner_token.json.access_token }}
             body_format: json
             body:
-              name: "{{ postgres_drill_project }}"
-              image: "{{ platform_postgres_drill_image }}"
-              port: 5678
-              probe_profile: hello-world
+              apiVersion: platform.eseidinger.de/v1
+              kind: Application
+              metadata:
+                name: "{{ postgres_drill_project }}"
+              spec:
+                components:
+                  - name: "{{ postgres_drill_project }}"
+                    type: service
+                    runtime:
+                      type: container
+                      image: "{{ platform_postgres_drill_image }}"
+                    ports:
+                      - name: http
+                        protocol: http
+                        port: 5678
+                    exposure: public
+                    health:
+                      readiness:
+                        profile: hello-world
             status_code: 202
           register: postgres_workload_deployment
           no_log: true
@@ -162,11 +177,11 @@
           register: postgres_workload_operation
           until:
             - >-
-                (postgres_workload_operation.json.state | default('')) ==
-                'succeeded'
+              (postgres_workload_operation.json.state | default('')) ==
+              'succeeded'
             - >-
-                (postgres_workload_operation.json.readiness.state | default(''))
-                == 'ready'
+              (postgres_workload_operation.json.readiness.state | default(''))
+              == 'ready'
           retries: 60
           delay: 5
           no_log: true
@@ -174,7 +189,7 @@
         - name: Require no implicit database before the outage
           ansible.builtin.uri:
             url: >-
-              {{ platform_api_url }}/projects/{{ postgres_drill_project
+              {{ platform_api_url }}/v1/projects/{{ postgres_drill_project
               }}/data-services
             headers:
               Authorization: >-
@@ -191,7 +206,7 @@
             outage
           ansible.builtin.uri:
             url: >-
-              {{ platform_api_url }}/projects/{{ postgres_drill_project
+              {{ platform_api_url }}/v1/projects/{{ postgres_drill_project
               }}/data-services/recovery-requests
             method: POST
             headers:
@@ -207,7 +222,6 @@
         - name: >-
             Run the controlled PostgreSQL outage and restoration sequence
           block:
-
             - name: Stop PostgreSQL for the approved outage drill
               ansible.builtin.command:
                 argv:
@@ -223,7 +237,7 @@
             - name: Wait for a safe catalog outage response
               ansible.builtin.uri:
                 url: >-
-                  {{ platform_api_url }}/projects/{{ postgres_drill_project
+                  {{ platform_api_url }}/v1/projects/{{ postgres_drill_project
                   }}/data-services
                 headers:
                   Authorization: >-
@@ -251,7 +265,6 @@
               changed_when: false
               failed_when: postgres_outage_readyz.rc == 0
           always:
-
             - name: Restore PostgreSQL even if the outage drill fails
               ansible.builtin.command:
                 argv:
@@ -261,7 +274,7 @@
                   - -d
                   - --wait
                   - --wait-timeout
-                  - '120'
+                  - "120"
                   - postgres
                 chdir: "{{ platform_postgres_drill_install_dir }}"
               delegate_to: "{{ platform_postgres_drill_host }}"
@@ -309,7 +322,7 @@
             Require recovered catalog access without an implicit database
           ansible.builtin.uri:
             url: >-
-              {{ platform_api_url }}/projects/{{ postgres_drill_project
+              {{ platform_api_url }}/v1/projects/{{ postgres_drill_project
               }}/data-services
             headers:
               Authorization: >-
@@ -327,7 +340,8 @@
         - name: Resolve the recovery request as platform administrator
           ansible.builtin.uri:
             url: >-
-              {{ platform_api_url }}/operator/data-service-recovery-requests/{{
+              {{
+              platform_api_url }}/v1/operator/data-service-recovery-requests/{{
               postgres_recovery_request.json.request_id }}
             method: PATCH
             headers:
@@ -343,7 +357,7 @@
             Require a redacted developer-visible resolved recovery outcome
           ansible.builtin.uri:
             url: >-
-              {{ platform_api_url }}/projects/{{ postgres_drill_project
+              {{ platform_api_url }}/v1/projects/{{ postgres_drill_project
               }}/data-services
             headers:
               Authorization: >-
@@ -358,8 +372,6 @@
             search('password|PGPASSWORD')
           no_log: true
       always:
-
-
         - name: Select confirmed fixture ownership for cleanup
           ansible.builtin.set_fact:
             platform_cleanup_project_creation: >-

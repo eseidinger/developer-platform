@@ -2,13 +2,15 @@
 - name: >-
     Reject an invalid scheduled-component specification before side effects
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ component_project
+      }}/application
     method: PUT
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     body_format: json
     body:
-      apiVersion: platform.example/v1alpha2
+      apiVersion: platform.eseidinger.de/v1
       kind: Application
       metadata:
         name: "{{ component_project }}"
@@ -27,13 +29,15 @@
     Reject a rollout that would exceed the namespace pod quota before side
     effects
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ component_project
+      }}/application
     method: PUT
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     body_format: json
     body:
-      apiVersion: platform.example/v1alpha2
+      apiVersion: platform.eseidinger.de/v1
       kind: Application
       metadata:
         name: "{{ component_project }}"
@@ -62,13 +66,15 @@
 - name: >-
     Reject outbound access to the private platform network
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ component_project
+      }}/application
     method: PUT
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     body_format: json
     body:
-      apiVersion: platform.example/v1alpha2
+      apiVersion: platform.eseidinger.de/v1
       kind: Application
       metadata:
         name: "{{ component_project }}"
@@ -83,7 +89,8 @@
               # Public egress may be enabled. The control-plane subnet remains
               # forbidden regardless of the operator's public allow-list.
               - cidr: >-
-                  {{ (hostvars[platform_component_drill_host].platform_network |
+                  {{ (hostvars[platform_component_drill_host].platform_network
+                  |
                   default({})).subnet |
                   default('172.30.80.0/24') }}
                 port: 443

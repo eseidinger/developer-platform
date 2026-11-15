@@ -7,7 +7,6 @@
     platform_test_runner_name: platform-acceptance-suite
     platform_test_runner_expires_in_days: 7
   tasks:
-
     - name: >-
         Require human bootstrap inputs and a protected output path
       ansible.builtin.assert:
@@ -59,7 +58,7 @@
 
     - name: Create an expiring test-runner identity
       ansible.builtin.uri:
-        url: "{{ platform_api_url }}/platform/test-runner-credentials"
+        url: "{{ platform_api_url }}/v1/platform/test-runner-credentials"
         method: POST
         headers:
           Authorization: "Bearer {{ platform_human_admin_token }}"

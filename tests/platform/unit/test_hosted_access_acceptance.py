@@ -23,7 +23,7 @@ import psycopg
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from app.access_contract import Governance, PolicyCreate
 from app.access_gateway import create_gateway
-from app.spec import ApplicationEnvelopeV1Alpha2
+from app.spec import ApplicationEnvelope
 
 from tests.platform import harness as h
 from tests.support.application_access import POLICY, claims, data
@@ -240,7 +240,7 @@ class HarnessTests(unittest.TestCase):
                 project, role, IMAGE, RUN, "https://provider.example", ISSUER
             )
             with patch("app.spec.resolve_egress_dns"):
-                envelope = ApplicationEnvelopeV1Alpha2.model_validate(body)
+                envelope = ApplicationEnvelope.model_validate(body)
             self.assertEqual(len(envelope.spec.components), 2)
             self.assertEqual(
                 sum(c.exposure == "public" for c in envelope.spec.components), 1
@@ -397,7 +397,7 @@ class HarnessTests(unittest.TestCase):
 
         def request(method, path, body=None, **kwargs):
             calls.append((method, path, body))
-            if path == "/projects":
+            if path == "/v1/projects":
                 return [
                     {
                         "name": project,
@@ -409,15 +409,24 @@ class HarnessTests(unittest.TestCase):
                     }
                 ]
             if path.endswith("retirement-preview"):
-                return {"blockers": [], "scope_token": "scope"}
+                return {"project_id": "uuid", "blockers": [], "scope_token": "scope"}
             if path.endswith("/retire"):
-                return {"status": "retired"}
+                return {"state": "queued", "status_url": "/v1/operations/retirement-op"}
+            if path == "/v1/operations/retirement-op":
+                return {"state": "succeeded"}
             return {"credentials": []}
 
         h.cleanup(journal, Mock(request=request), Mock())
         self.assertEqual(journal.report["cleanup"], "completed-data-retained")
         self.assertFalse(any("purge" in path for _, path, _ in calls))
-        self.assertEqual(calls[2][2], {"confirm_name": project, "scope_token": "scope"})
+        self.assertEqual(
+            calls[2][2],
+            {
+                "confirm_name": project,
+                "confirm_project_id": "uuid",
+                "scope_token": "scope",
+            },
+        )
 
     def test_global_recovery_rejects_even_foreign_retired_project(self):
         journal = self.journal()
@@ -549,12 +558,12 @@ class HarnessTests(unittest.TestCase):
         from app.stores.contract import BindingRequest, ResourceCreate
 
         def owned_request(method, path, body=None, **kwargs):
-            if path.endswith("/resources"):
+            if path.endswith("/stores"):
                 ResourceCreate.model_validate(body)
                 return {"resource_id": str(uuid4())}
-            if path.startswith("/v1/resources/"):
+            if path.startswith("/v1/stores/"):
                 return {"observed_state": "active"}
-            if path.endswith("/resource-bindings"):
+            if path.endswith("/store-bindings"):
                 if method == "POST":
                     BindingRequest.model_validate(body)
                     row = {"grant_id": str(uuid4()), "observed_state": "active"}
@@ -572,7 +581,7 @@ class HarnessTests(unittest.TestCase):
                     return {"operation_id": str(uuid4())}
                 return {"spec": {}}
             with patch("app.spec.resolve_egress_dns"):
-                ApplicationEnvelopeV1Alpha2.model_validate(body)
+                ApplicationEnvelope.model_validate(body)
             declarations.append(body)
             return {
                 "operation_id": str(uuid4()),

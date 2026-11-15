@@ -58,11 +58,11 @@ class InterruptedProvisioningTests(TestCase):
         drill.validate(args)
 
     def test_declaration_uses_current_named_binding(self):
-        from app.spec import ApplicationEnvelopeV1Alpha2, to_flat
+        from app.spec import ApplicationEnvelope, to_flat
 
         project = drill.project_name(RUN_ID)
         declaration = drill.declaration(project, IMAGE, RUN_ID, BINDING, "600m")
-        ApplicationEnvelopeV1Alpha2.model_validate(declaration)
+        ApplicationEnvelope.model_validate(declaration)
         flat = to_flat(declaration)
         self.assertEqual(flat["components"][0]["bindings"][0]["bindingId"], BINDING)
         self.assertEqual(flat["configuration"]["ACCEPTANCE_RUN_ID"], RUN_ID)

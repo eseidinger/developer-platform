@@ -14,8 +14,8 @@
       - "project-{{ component_project }}"
       - -o
       - >-
-          jsonpath={range
-          .items[*]}{.metadata.name}{'='}{.metadata.generation}{'\n'}{end}
+        jsonpath={range
+        .items[*]}{.metadata.name}{'='}{.metadata.generation}{'\n'}{end}
   delegate_to: "{{ platform_component_drill_host }}"
   become: "{{ platform_component_drill_become | bool }}"
   register: services_before_scheduled_update
@@ -44,17 +44,22 @@
 
 - name: Update only the failing scheduled component
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ component_project
+      }}/application
     method: PUT
     headers:
       Authorization: "Bearer {{ component_admin_access_token }}"
     body_format: json
     body:
-      apiVersion: platform.example/v1alpha2
+      apiVersion: platform.eseidinger.de/v1
       kind: Application
       metadata:
         name: "{{ component_project }}"
       spec:
+        configuration:
+          values:
+            COMPONENT_ACCEPTANCE_RUN: "{{ component_run_id }}"
         components:
           - name: api
             type: service
@@ -62,8 +67,8 @@
               type: container
               image: "{{ platform_component_service_image }}"
               args:
-                - '-listen=:5678'
-                - '-text=component-api-v2'
+                - "-listen=:5678"
+                - "-text=component-api-v2"
             ports:
               - name: http
                 protocol: http
@@ -74,8 +79,8 @@
               type: container
               image: "{{ platform_component_service_image }}"
               args:
-                - '-listen=:5678'
-                - '-text=component-peer'
+                - "-listen=:5678"
+                - "-text=component-peer"
             ports:
               - name: http
                 protocol: http
@@ -86,15 +91,15 @@
               type: container
               image: "{{ platform_component_job_image }}"
               command:
-                - '/bin/sh'
-                - '-ec'
+                - "/bin/sh"
+                - "-ec"
               args:
                 - >-
-                    for n in $(seq 1 10); do
-                    if wget -T 3 -qO- http://api:5678/ &&
-                    wget -T 3 -qO- http://peer:5678/; then
-                    sleep 75; exit 0; fi; sleep 2; done; exit 1
-            schedule: '* * * * *'
+                  for n in $(seq 1 10); do
+                  if wget -T 3 -qO- http://api:5678/ &&
+                  wget -T 3 -qO- http://peer:5678/; then
+                  sleep 75; exit 0; fi; sleep 2; done; exit 1
+            schedule: "* * * * *"
             timeZone: UTC
             concurrencyPolicy: Forbid
           - name: failing-probe
@@ -106,11 +111,11 @@
               type: container
               image: "{{ platform_component_job_image }}"
               command:
-                - '/bin/sh'
-                - '-ec'
+                - "/bin/sh"
+                - "-ec"
               args:
-                - 'echo scheduled-failure >&2; exit 1'
-            schedule: '*/2 * * * *'
+                - "echo scheduled-failure >&2; exit 1"
+            schedule: "*/2 * * * *"
             timeZone: UTC
             concurrencyPolicy: Forbid
     status_code: 202
@@ -146,8 +151,8 @@
       - "project-{{ component_project }}"
       - -o
       - >-
-          jsonpath={range
-          .items[*]}{.metadata.name}{'='}{.metadata.generation}{'\n'}{end}
+        jsonpath={range
+        .items[*]}{.metadata.name}{'='}{.metadata.generation}{'\n'}{end}
   delegate_to: "{{ platform_component_drill_host }}"
   become: "{{ platform_component_drill_become | bool }}"
   register: services_after_scheduled_update

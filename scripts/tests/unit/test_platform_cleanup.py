@@ -34,7 +34,7 @@ class CleanupTests(unittest.TestCase):
             }
         )
         client.request.assert_called_once_with(
-            "GET", "/projects/test-owned/retirement-preview"
+            "GET", "/v1/projects/test-owned/retirement-preview"
         )
         self.assertEqual(report["result"], "failed")
         self.assertIn("project_creation_unconfirmed", report["errors"])
@@ -48,10 +48,11 @@ class CleanupTests(unittest.TestCase):
     def test_scope_change_fetches_fresh_preview_before_retry(self):
         client = Mock()
         client.request.side_effect = [
-            (200, {"scope_token": "old"}),
+            (200, {"project_id": ID, "scope_token": "old"}),
             (409, {"code": "scope_changed"}),
-            (200, {"scope_token": "new"}),
-            (200, {"status": "retired"}),
+            (200, {"project_id": ID, "scope_token": "new"}),
+            (202, {"status_url": "/v1/operations/retire"}),
+            (200, {"state": "succeeded"}),
         ]
         report = self.cleaner(client).run({"project_creation": created(name=PROJECT)})
         self.assertEqual(report["result"], "passed")
@@ -68,7 +69,9 @@ class CleanupTests(unittest.TestCase):
         )
         self.assertEqual(report["result"], "failed")
         self.assertEqual(report["completed"], 1)
-        client.request.assert_called_with("DELETE", "/platform/test-identities/" + ID)
+        client.request.assert_called_with(
+            "DELETE", "/v1/platform/test-identities/" + ID
+        )
 
     def test_pending_provider_cleanup_does_not_count_as_complete(self):
         client = Mock()

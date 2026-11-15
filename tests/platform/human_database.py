@@ -69,9 +69,9 @@ def declaration(
 ) -> dict:
     require(bool(IMAGE.fullmatch(image)), "digest_pinned_fixture_image_required")
     return {
-        "apiVersion": "platform.example/v1alpha2",
+        "apiVersion": "platform.eseidinger.de/v1",
         "kind": "Application",
-        "metadata": {"name": project, "project": project},
+        "metadata": {"name": project},
         "spec": {
             "components": [
                 {
@@ -406,7 +406,7 @@ class Drill:
             Path("/etc/ssh/sshd_config_platform_db"), self.destination
         )
         self.report.check("isolated-bastion-configuration", True)
-        self.api.request("GET", "/platform/test-runner-credentials")
+        self.api.request("GET", "/v1/platform/test-runner-credentials")
         self.human_issuer, self.human_subject = self.human_identity()
         current_access = self.api.request("GET", "/v1/store-access/me")
         require(
@@ -417,27 +417,27 @@ class Drill:
         self.report.check("human-platform-administrator", True)
         for project in (self.project_a, self.project_b):
             require(
-                self.api_status("GET", f"/projects/{project}/revisions") == 404,
+                self.api_status("GET", f"/v1/projects/{project}/revisions") == 404,
                 "run_project_name_in_use",
             )
         identities = self.api.request(
-            "GET", "/platform/test-identities?test_run_id=" + self.args.run_id
+            "GET", "/v1/platform/test-identities?test_run_id=" + self.args.run_id
         )
         require(identities.get("credentials") == [], "run_test_identity_name_in_use")
 
     def deploy_projects(self) -> None:
         for project in (self.project_a, self.project_b):
-            self.api.request("POST", "/projects", {"name": project}, statuses=(201,))
+            self.api.request("POST", "/v1/projects", {"name": project}, statuses=(201,))
             resource = self.api.request(
                 "POST",
-                "/v1/projects/" + project + "/resources",
+                "/v1/projects/" + project + "/stores",
                 {"name": "state", "provider": "postgresql"},
                 statuses=(202,),
             )
             self.resources[project] = resource["resource_id"]
             wait_for(
                 lambda resource=resource: (
-                    self.api.request("GET", "/v1/resources/" + resource["resource_id"])[
+                    self.api.request("GET", "/v1/stores/" + resource["resource_id"])[
                         "observed_state"
                     ]
                     == "active"
@@ -446,7 +446,7 @@ class Drill:
             )
             binding = self.api.request(
                 "POST",
-                "/v1/projects/" + project + "/resource-bindings",
+                "/v1/projects/" + project + "/store-bindings",
                 {
                     "resource_id": resource["resource_id"],
                     "component": "api",
@@ -459,14 +459,14 @@ class Drill:
                     g["grant_id"] == binding["grant_id"]
                     and g["observed_state"] == "active"
                     for g in self.api.request(
-                        "GET", "/v1/projects/" + project + "/resource-bindings"
+                        "GET", "/v1/projects/" + project + "/store-bindings"
                     )["bindings"]
                 ),
                 "named_binding_not_ready",
             )
             accepted = self.api.request(
                 "PUT",
-                "/projects/" + project,
+                ("/v1/projects/" + project) + "/application",
                 declaration(
                     project,
                     self.args.fixture_image,
@@ -483,7 +483,7 @@ class Drill:
         self.persona_creation_attempted = True
         created = self.api.request(
             "POST",
-            "/platform/test-identities",
+            "/v1/platform/test-identities",
             {
                 "name": "human-db-denial-" + self.args.run_id,
                 "role": "project-admin",
@@ -615,7 +615,7 @@ class Drill:
             self.grant_requested = True
             grant = self.api.request(
                 "POST",
-                "/v1/resources/" + self.resources[self.project_a] + "/human-grants",
+                "/v1/stores/" + self.resources[self.project_a] + "/human-grants",
                 {
                     "issuer": self.human_issuer,
                     "subject": self.human_subject,
@@ -685,7 +685,7 @@ class Drill:
                 self.check_sql(username, password, local_port)
                 self.api.request(
                     "POST",
-                    "/v1/resource-grants/" + self.grant_id + "/revocation",
+                    "/v1/store-grants/" + self.grant_id + "/revocation",
                     {"version": grant["version"]},
                     statuses=(202,),
                 )
@@ -730,7 +730,7 @@ class Drill:
         start = (self.started - timedelta(minutes=1)).isoformat()
         end = (datetime.now(UTC) + timedelta(minutes=1)).isoformat()
         query = urlencode({"start": start, "end": end, "limit": 10000})
-        result = self.api.request("GET", "/operator/audit/events?" + query)
+        result = self.api.request("GET", "/v1/operator/audit/events?" + query)
         events = result.get("events")
         require(isinstance(events, list), "audit_export_invalid")
         scoped = [
@@ -756,7 +756,7 @@ class Drill:
         if self.grant_requested and not self.grant_revoked:
             try:
                 rows = self.api.request(
-                    "GET", "/v1/resources/" + self.resources[self.project_a] + "/grants"
+                    "GET", "/v1/stores/" + self.resources[self.project_a] + "/grants"
                 )["grants"]
                 for row in rows:
                     if (
@@ -767,7 +767,7 @@ class Drill:
                     ):
                         self.api.request(
                             "POST",
-                            "/v1/resource-grants/" + row["grant_id"] + "/revocation",
+                            "/v1/store-grants/" + row["grant_id"] + "/revocation",
                             {"version": row["version"]},
                             statuses=(202,),
                         )
@@ -777,7 +777,8 @@ class Drill:
         if self.persona_creation_attempted and not self.persona_revoked:
             try:
                 credentials = self.api.request(
-                    "GET", "/platform/test-identities?test_run_id=" + self.args.run_id
+                    "GET",
+                    "/v1/platform/test-identities?test_run_id=" + self.args.run_id,
                 )
                 records = credentials.get("credentials")
                 require(isinstance(records, list), "test_persona_list_invalid")
@@ -791,7 +792,7 @@ class Drill:
                     if record.get("status") != "revoked":
                         result = self.api.request(
                             "DELETE",
-                            "/platform/test-identities/" + record["credential_id"],
+                            "/v1/platform/test-identities/" + record["credential_id"],
                             statuses=(200, 202),
                         )
                         require(

@@ -19,15 +19,25 @@ class RetirementTests(unittest.TestCase):
         ):
             retirement.retire_project(api, "owned-fixture", seconds)
 
-    def test_pending_revocation_and_scope_conflict_each_fetch_a_fresh_preview(self):
+    def test_scope_conflict_refreshes_preview_then_polls_one_durable_operation(self):
         api = Mock()
         api.request.side_effect = [
-            {"status": "applied", "blockers": [], "scope_token": "first"},
-            {"status": "retiring"},
-            {"status": "applied", "blockers": [], "scope_token": "second"},
+            {
+                "status": "applied",
+                "project_id": "uuid",
+                "blockers": [],
+                "scope_token": "first",
+            },
             {"code": "scope_changed"},
-            {"status": "applied", "blockers": [], "scope_token": "third"},
-            {"status": "retired"},
+            {
+                "status": "applied",
+                "project_id": "uuid",
+                "blockers": [],
+                "scope_token": "second",
+            },
+            {"state": "queued", "status_url": "/v1/operations/retire"},
+            {"state": "running"},
+            {"state": "succeeded"},
         ]
         self.retire(api)
         tokens = [
@@ -35,7 +45,10 @@ class RetirementTests(unittest.TestCase):
             for call in api.request.call_args_list
             if call.args[0] == "POST"
         ]
-        self.assertEqual(tokens, ["first", "second", "third"])
+        self.assertEqual(tokens, ["first", "second"])
+        self.assertEqual(
+            api.request.call_args_list[-1].args, ("GET", "/v1/operations/retire")
+        )
 
     def test_transient_provider_failure_retries_but_authorization_failure_propagates(
         self,
@@ -54,13 +67,14 @@ class RetirementTests(unittest.TestCase):
         api = Mock()
         api.request.side_effect = [
             {"blockers": ["active-operation"]},
-            {"blockers": [], "scope_token": "ready"},
-            {"status": "retired"},
+            {"blockers": [], "project_id": "uuid", "scope_token": "ready"},
+            {"state": "queued", "status_url": "/v1/operations/retire"},
+            {"state": "succeeded"},
         ]
         self.retire(api)
         self.assertEqual(
             [call.args[0] for call in api.request.call_args_list],
-            ["GET", "GET", "POST"],
+            ["GET", "GET", "POST", "GET"],
         )
 
     def test_persistent_blocker_expires_without_retiring_or_purging_anything(self):

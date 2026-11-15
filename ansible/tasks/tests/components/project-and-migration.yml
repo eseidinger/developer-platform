@@ -1,7 +1,7 @@
 ---
 - name: Create the empty disposable project
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects"
+    url: "{{ platform_api_url }}/v1/projects"
     method: POST
     headers:
       Authorization: "Bearer {{ component_runner_token.json.access_token }}"
@@ -14,7 +14,7 @@
 
 - name: Create a short-lived project administrator persona
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/platform/test-identities"
+    url: "{{ platform_api_url }}/v1/platform/test-identities"
     method: POST
     headers:
       Authorization: "Bearer {{ component_runner_token.json.access_token }}"
@@ -43,43 +43,60 @@
   no_log: true
 
 - name: >-
-    Deploy the legacy single-service revision to establish migration history
+    Deploy the initial v1 single-service revision to establish migration history
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ component_project
+      }}/application
     method: PUT
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     body_format: json
     body:
-      name: "{{ component_project }}"
-      image: "{{ platform_component_service_image }}"
-      port: 5678
-      probe_profile: hello-world
+      apiVersion: platform.eseidinger.de/v1
+      kind: Application
+      metadata:
+        name: "{{ component_project }}"
+      spec:
+        components:
+          - name: "{{ component_project }}"
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_component_service_image }}"
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+            exposure: public
+            health:
+              readiness:
+                profile: hello-world
     status_code: 202
-  register: legacy_deployment
+  register: initial_deployment
   no_log: true
 
-- name: Wait for the legacy revision
+- name: Wait for the initial revision
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}{{ legacy_deployment.json.status_url }}
+      {{ platform_api_url }}{{ initial_deployment.json.status_url }}
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     status_code: 200
-  register: legacy_operation
+  register: initial_operation
   until:
     - >-
-      (legacy_operation.json.state | default('')) == 'succeeded'
+      (initial_operation.json.state | default('')) == 'succeeded'
     - >-
-      (legacy_operation.json.readiness.state | default('')) == 'ready'
+      (initial_operation.json.readiness.state | default('')) == 'ready'
   retries: 60
   delay: 5
   no_log: true
 
-- name: Add configuration before migrating the legacy revision
+- name: Add configuration before migrating the initial revision
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/configuration
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/configuration
     method: PUT
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
@@ -88,32 +105,32 @@
       values:
         COMPONENT_ACCEPTANCE_RUN: "{{ component_run_id }}"
     status_code: 202
-  register: legacy_configuration
+  register: initial_configuration
   no_log: true
 
 - name: Wait for configuration activation before migration
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}{{ legacy_configuration.json.status_url }}
+      {{ platform_api_url }}{{ initial_configuration.json.status_url }}
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     status_code: 200
-  register: legacy_configuration_operation
+  register: initial_configuration_operation
   until:
     - >-
-      (legacy_configuration_operation.json.state | default('')) == 'succeeded'
+      (initial_configuration_operation.json.state | default('')) == 'succeeded'
     - >-
-        (legacy_configuration_operation.json.readiness.state | default('')) ==
-        'ready'
+      (initial_configuration_operation.json.readiness.state | default('')) ==
+      'ready'
   retries: 60
   delay: 5
   no_log: true
 
 - name: >-
-    Add a write-only secret before migrating the legacy revision
+    Add a write-only secret before migrating the initial revision
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project
+      {{ platform_api_url }}/v1/projects/{{ component_project
       }}/secrets/COMPONENT_ACCEPTANCE_SECRET
     method: PUT
     headers:
@@ -122,19 +139,19 @@
     body:
       value: "{{ component_run_id }}-secret"
     status_code: 202
-  register: legacy_secret
+  register: initial_secret
   no_log: true
 
 - name: Require the migrated secret to remain write-only
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/secrets
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/secrets
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     status_code: 200
-  register: legacy_secret_listing
+  register: initial_secret_listing
   until: >-
-    legacy_secret_listing.json.secrets | selectattr('name', 'equalto',
+    initial_secret_listing.json.secrets | selectattr('name', 'equalto',
     'COMPONENT_ACCEPTANCE_SECRET') | list | length == 1
   retries: 24
   delay: 5

@@ -61,14 +61,14 @@ def main():
     start = datetime.now(UTC) - timedelta(minutes=20)
     end = datetime.now(UTC)
     checks = [
-        ("permissions", f"/operator/projects/{project}/permissions"),
+        ("permissions", f"/v1/operator/projects/{project}/permissions"),
         (
             "security configuration",
-            f"/operator/projects/{project}/security-configuration",
+            f"/v1/operator/projects/{project}/security-configuration",
         ),
         (
             "audit export",
-            "/operator/audit/events?"
+            "/v1/operator/audit/events?"
             + urlencode(
                 {
                     "start": start.isoformat(),

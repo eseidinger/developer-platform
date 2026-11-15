@@ -2,7 +2,7 @@
 - name: Roll back the application to revision one
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ rollback_project }}/rollback
+      {{ platform_api_url }}/v1/projects/{{ rollback_project }}/rollback
     method: POST
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
@@ -47,8 +47,9 @@
       - --
       - python
       - -c
-      - "import json,urllib.request; print(json.load(urllib.request.urlopen('ht\
-          tp://127.0.0.1:8080/api/visits',timeout=10))['visits'])"
+      - >-
+        import json,urllib.request;
+        print(json.load(urllib.request.urlopen('http://127.0.0.1:8080/api/visits',timeout=10))['visits'])
     chdir: "{{ platform_rollback_drill_install_dir }}"
   delegate_to: "{{ platform_rollback_drill_host }}"
   become: true
@@ -75,8 +76,8 @@
       - python
       - -c
       - >-
-          import os,sys; sys.exit(0 if os.environ.get('ROLLBACK_PROBE') ==
-          'current-' + os.environ.get('ACCEPTANCE_RUN_ID','') else 1)
+        import os,sys; sys.exit(0 if os.environ.get('ROLLBACK_PROBE') ==
+        'current-' + os.environ.get('ACCEPTANCE_RUN_ID','') else 1)
     chdir: "{{ platform_rollback_drill_install_dir }}"
   delegate_to: "{{ platform_rollback_drill_host }}"
   become: true
@@ -87,7 +88,7 @@
     Require rollback to retain the current secret metadata without disclosure
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ rollback_project }}/secrets
+      {{ platform_api_url }}/v1/projects/{{ rollback_project }}/secrets
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
     status_code: 200
@@ -97,7 +98,8 @@
     rollback_secret_after.json.secrets[0].name != 'ROLLBACK_PROBE' or
     rollback_secret_after.json.secrets[0].version | int != 2 or
     rollback_secret_after.json.secrets[0].state != 'active' or
-    rollback_secret_after.json | to_json is search('first-' + rollback_run_id +
+    rollback_secret_after.json | to_json is search('first-' + rollback_run_id
+    +
     '|current-' + rollback_run_id)
   no_log: true
 
@@ -105,7 +107,7 @@
     Require revision metadata to disclose current secret semantics
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ rollback_project }}/revisions
+      {{ platform_api_url }}/v1/projects/{{ rollback_project }}/revisions
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
     status_code: 200
@@ -121,7 +123,7 @@
     Require the named resource to remain active after rollback
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/v1/resources/{{
+      {{ platform_api_url }}/v1/stores/{{
       rollback_resource_request.json.resource_id }}
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
@@ -136,7 +138,7 @@
   ansible.builtin.uri:
     url: >-
       {{ platform_api_url }}/v1/projects/{{ rollback_project
-      }}/resource-bindings
+      }}/store-bindings
     headers:
       Authorization: "Bearer {{ rollback_access_token }}"
     status_code: 200

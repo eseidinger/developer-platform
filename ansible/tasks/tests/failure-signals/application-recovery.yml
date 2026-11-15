@@ -1,5 +1,5 @@
 ---
-- name: Delete the disposable application Deployment
+- name: Make the disposable application readiness probe fail
   ansible.builtin.command:
     argv:
       - kubectl
@@ -7,10 +7,15 @@
       - "{{ platform_failure_drill_kubeconfig }}"
       - -n
       - "project-{{ failure_project }}"
-      - delete
+      - patch
       - deployment
       - "{{ failure_project }}"
-      - --wait=true
+      - --type=strategic
+      - --patch
+      - >-
+        {"spec":{"template":{"spec":{"containers":[{
+        "name":"{{ failure_project }}",
+        "readinessProbe":{"tcpSocket":{"port":65534}}}]}}}}
   delegate_to: "{{ platform_failure_drill_host }}"
   become: true
   changed_when: true
@@ -19,7 +24,8 @@
   ansible.builtin.uri:
     url: >-
       http://127.0.0.1:9090/api/v1/query?query={{
-      ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+      ('ALERTS{alertname="ApplicationComponentNotReady",namespace="project-' +
+      failure_project +
       '",alertstate="firing"}') | urlencode }}
     status_code: 200
   delegate_to: "{{ platform_failure_drill_host }}"
@@ -30,6 +36,27 @@
   retries: 55
   delay: 5
   no_log: true
+
+- name: Restore the deliberately changed readiness probe
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig
+      - "{{ platform_failure_drill_kubeconfig }}"
+      - -n
+      - "project-{{ failure_project }}"
+      - patch
+      - deployment
+      - "{{ failure_project }}"
+      - --type=strategic
+      - --patch
+      - >-
+        {"spec":{"template":{"spec":{"containers":[{
+        "name":"{{ failure_project }}",
+        "readinessProbe":{"tcpSocket":{"port":5678}}}]}}}}
+  delegate_to: "{{ platform_failure_drill_host }}"
+  become: true
+  changed_when: true
 
 - name: Refresh the runner token before application recovery
   ansible.builtin.uri:
@@ -46,16 +73,31 @@
 
 - name: Reconcile the disposable application after failure
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ failure_project }}"
+    url: "{{ platform_api_url }}/v1/projects/{{ failure_project }}/application"
     method: PUT
     headers:
       Authorization: "Bearer {{ failure_recovery_token.json.access_token }}"
     body_format: json
     body:
-      name: "{{ failure_project }}"
-      image: "{{ platform_failure_drill_image }}"
-      port: 5678
-      probe_profile: hello-world
+      apiVersion: platform.eseidinger.de/v1
+      kind: Application
+      metadata:
+        name: "{{ failure_project }}"
+      spec:
+        components:
+          - name: "{{ failure_project }}"
+            type: service
+            runtime:
+              type: container
+              image: "{{ platform_failure_drill_image }}"
+            ports:
+              - name: http
+                protocol: http
+                port: 5678
+            exposure: public
+            health:
+              readiness:
+                profile: hello-world
     status_code: 202
   register: failure_recovery_deployment
   no_log: true
@@ -81,14 +123,16 @@
   ansible.builtin.uri:
     url: >-
       http://127.0.0.1:9090/api/v1/query?query={{
-      ('ALERTS{alertname="ApplicationUnavailable",project="' + failure_project +
+      ('ALERTS{alertname="ApplicationComponentNotReady",namespace="project-' +
+      failure_project +
       '",alertstate="firing"}') | urlencode }}
     status_code: 200
   delegate_to: "{{ platform_failure_drill_host }}"
   become: true
   register: failure_application_resolution
   until: >-
-    failure_application_resolution.json.data.result | default([]) | length == 0
+    failure_application_resolution.json.data.result | default([]) | length ==
+    0
   retries: 40
   delay: 5
   no_log: true

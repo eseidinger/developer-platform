@@ -2,17 +2,22 @@
 - name: >-
     Migrate to two services and a non-overlapping scheduled component
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects/{{ component_project }}"
+    url: >-
+      {{ platform_api_url }}/v1/projects/{{ component_project
+      }}/application
     method: PUT
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     body_format: json
     body:
-      apiVersion: platform.example/v1alpha2
+      apiVersion: platform.eseidinger.de/v1
       kind: Application
       metadata:
         name: "{{ component_project }}"
       spec:
+        configuration:
+          values:
+            COMPONENT_ACCEPTANCE_RUN: "{{ component_run_id }}"
         components:
           - name: api
             type: service
@@ -29,8 +34,8 @@
               type: container
               image: "{{ platform_component_service_image }}"
               args:
-                - '-listen=:5678'
-                - '-text=component-api'
+                - "-listen=:5678"
+                - "-text=component-api"
             ports:
               - name: http
                 protocol: http
@@ -41,8 +46,8 @@
               type: container
               image: "{{ platform_component_service_image }}"
               args:
-                - '-listen=:5678'
-                - '-text=component-peer'
+                - "-listen=:5678"
+                - "-text=component-peer"
             ports:
               - name: http
                 protocol: http
@@ -53,19 +58,19 @@
               type: container
               image: "{{ platform_component_job_image }}"
               command:
-                - '/bin/sh'
-                - '-ec'
+                - "/bin/sh"
+                - "-ec"
               # Retry the private peer until Service rules are ready. Public
               # backends must reject direct calls even from this same project.
               # Keep the Job alive to observe Forbid across a minute boundary.
               args:
                 - >-
-                    for n in $(seq 1 10); do
-                    if wget -T 3 -qO- http://peer:5678/; then
-                    if wget -T 3 -qO- http://api:5678/; then exit 1; fi;
-                    echo public-backend-denied; sleep 75; exit 0; fi;
-                    sleep 2; done; exit 1
-            schedule: '* * * * *'
+                  for n in $(seq 1 10); do
+                  if wget -T 3 -qO- http://peer:5678/; then
+                  if wget -T 3 -qO- http://api:5678/; then exit 1; fi;
+                  echo public-backend-denied; sleep 75; exit 0; fi;
+                  sleep 2; done; exit 1
+            schedule: "* * * * *"
             timeZone: UTC
             concurrencyPolicy: Forbid
           - name: failing-probe
@@ -77,11 +82,11 @@
               type: container
               image: "{{ platform_component_job_image }}"
               command:
-                - '/bin/sh'
-                - '-ec'
+                - "/bin/sh"
+                - "-ec"
               args:
-                - 'echo scheduled-failure >&2; exit 1'
-            schedule: '* * * * *'
+                - "echo scheduled-failure >&2; exit 1"
+            schedule: "* * * * *"
             timeZone: UTC
             concurrencyPolicy: Forbid
     status_code: 202
@@ -108,7 +113,7 @@
 - name: Wait for both long-running components to become ready
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/components
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/components
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     status_code: 200

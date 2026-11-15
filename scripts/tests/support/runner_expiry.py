@@ -72,7 +72,7 @@ def verify(payload, *, call=request, now=time.time, sleep=time.sleep):
             "run_active_near_expiry_so_held_jwt_outlives_credential",
         )
         require(
-            call(payload["api"].rstrip("/") + "/projects", token=bearer)[0] == 200,
+            call(payload["api"].rstrip("/") + "/v1/projects", token=bearer)[0] == 200,
             "active_api_access_failed",
         )
         descriptor = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
@@ -111,7 +111,8 @@ def verify(payload, *, call=request, now=time.time, sleep=time.sleep):
         )
         require(
             call(
-                payload["api"].rstrip("/") + "/projects", token=evidence["access_token"]
+                payload["api"].rstrip("/") + "/v1/projects",
+                token=evidence["access_token"],
             )[0]
             == 403,
             "held_unexpired_jwt_not_denied",

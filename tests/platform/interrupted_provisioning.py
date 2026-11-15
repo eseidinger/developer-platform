@@ -227,8 +227,8 @@ def host_preflight(config, api, report, args):
         args.kubeconfig.is_file() and not args.kubeconfig.is_symlink(),
         "kubeconfig_missing",
     )
-    api.request("GET", "/platform/test-context")
-    projects = api.request("GET", "/projects")
+    api.request("GET", "/v1/platform/test-context")
+    projects = api.request("GET", "/v1/projects")
     require(
         all(row["status"] in ("empty", "retired") for row in projects),
         "active_projects_in_lab",
@@ -249,12 +249,12 @@ def deploy_initial(args, api, report):
     project = report.data["project"]
     report.data["projectCreateAttempted"] = True
     report.save()
-    api.request("POST", "/projects", {"name": project}, statuses=(201,))
+    api.request("POST", "/v1/projects", {"name": project}, statuses=(201,))
     report.data["projectCreated"] = True
     report.save()
     resource = api.request(
         "POST",
-        "/v1/projects/" + project + "/resources",
+        "/v1/projects/" + project + "/stores",
         {"name": "state", "provider": "postgresql"},
         statuses=(202,),
     )
@@ -263,14 +263,14 @@ def deploy_initial(args, api, report):
     report.save()
     wait_for(
         lambda: (
-            api.request("GET", "/v1/resources/" + resource_id)["observed_state"]
+            api.request("GET", "/v1/stores/" + resource_id)["observed_state"]
             == "active"
         ),
         "named_database_not_ready",
     )
     binding = api.request(
         "POST",
-        "/v1/projects/" + project + "/resource-bindings",
+        "/v1/projects/" + project + "/store-bindings",
         {"resource_id": resource_id, "component": "web", "mode": "read-write"},
         statuses=(202,),
     )
@@ -281,14 +281,14 @@ def deploy_initial(args, api, report):
         lambda: any(
             row["grant_id"] == binding_id and row["observed_state"] == "active"
             for row in api.request(
-                "GET", "/v1/projects/" + project + "/resource-bindings"
+                "GET", "/v1/projects/" + project + "/store-bindings"
             )["bindings"]
         ),
         "named_binding_not_ready",
     )
     accepted = api.request(
         "PUT",
-        "/projects/" + project,
+        ("/v1/projects/" + project) + "/application",
         declaration(project, args.fixture_image, args.run_id, binding_id, "500m"),
         etag=0,
         statuses=(202,),
@@ -329,7 +329,11 @@ def interrupt(args, api, report, initial_revision):
         report.data["outage"] = "cluster-paused"
         report.save()
         accepted = api.request(
-            "PUT", "/projects/" + project, spec, etag=initial_revision, statuses=(202,)
+            "PUT",
+            ("/v1/projects/" + project) + "/application",
+            spec,
+            etag=initial_revision,
+            statuses=(202,),
         )
         require(accepted["revision"] == initial_revision + 1, "unexpected_revision")
         report.data["revision"] = accepted["revision"]
@@ -366,7 +370,7 @@ def run(args, config, api, report):
     wait_for(lambda: api_ready(api), "api_not_ready_after_restart", 120)
     repeated = api.request(
         "PUT",
-        "/projects/" + report.data["project"],
+        ("/v1/projects/" + report.data["project"]) + "/application",
         spec,
         etag=accepted["revision"],
         statuses=(202,),
@@ -374,7 +378,9 @@ def run(args, config, api, report):
     require(repeated["revision"] == accepted["revision"], "retry_created_revision")
     wait_deployment(api, accepted)
     wait_deployment(api, repeated)
-    revisions = api.request("GET", "/projects/" + report.data["project"] + "/revisions")
+    revisions = api.request(
+        "GET", "/v1/projects/" + report.data["project"] + "/revisions"
+    )
     outcomes = revision_outcomes(report.data["project"], accepted["revision"])
     report.check(
         "single-revision-after-retry",
@@ -388,12 +394,12 @@ def run(args, config, api, report):
         "data-survives-recovery",
         visit(args.kubectl, args.kubeconfig, report.data["project"]) == 2,
     )
-    resource = api.request("GET", "/v1/resources/" + report.data["resourceId"])
+    resource = api.request("GET", "/v1/stores/" + report.data["resourceId"])
     resources = api.request(
-        "GET", "/v1/projects/" + report.data["project"] + "/resources"
+        "GET", "/v1/projects/" + report.data["project"] + "/stores"
     )["resources"]
     bindings = api.request(
-        "GET", "/v1/projects/" + report.data["project"] + "/resource-bindings"
+        "GET", "/v1/projects/" + report.data["project"] + "/store-bindings"
     )["bindings"]
     report.check(
         "named-resource-unchanged",
@@ -427,22 +433,9 @@ def retire(api, report):
             == report.data["runId"],
             "cleanup_project_changed",
         )
-        preview = api.request("GET", "/projects/" + project + "/retirement-preview")
-        require(not preview["blockers"], "cleanup_retirement_blocked")
-        confirmation = {"confirm_name": project, "scope_token": preview["scope_token"]}
-        wait_for(
-            lambda: (
-                api.request(
-                    "POST",
-                    "/projects/" + project + "/retire",
-                    confirmation,
-                    statuses=(200, 202),
-                ).get("status")
-                == "retired"
-            ),
-            "fixture_retirement",
-            180,
-        )
+        from .retirement import retire_project
+
+        retire_project(api, project)
     report.data["cleanup"] = "retired-data-retained"
     report.save()
 

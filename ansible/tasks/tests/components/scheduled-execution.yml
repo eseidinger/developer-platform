@@ -4,7 +4,7 @@
     failure
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/components
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/components
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     status_code: 200
@@ -33,7 +33,7 @@
     Wait for a successful scheduled internal connectivity probe without overlap
   ansible.builtin.uri:
     url: >-
-      {{ platform_api_url }}/projects/{{ component_project }}/components
+      {{ platform_api_url }}/v1/projects/{{ component_project }}/components
     headers:
       Authorization: "Bearer {{ component_admin_token.json.access_token }}"
     status_code: 200

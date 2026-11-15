@@ -94,7 +94,7 @@
         Exercise the component contract with a disposable project
       block:
 
-        - name: Prepare identities and legacy migration inputs
+        - name: Prepare identities and the initial v1 declaration
           ansible.builtin.import_tasks: >-
             ../../tasks/tests/components/project-and-migration.yml
 

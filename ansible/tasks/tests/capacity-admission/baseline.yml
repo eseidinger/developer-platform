@@ -6,14 +6,14 @@
     line: "{{ item.key }}={{ item.value }}"
     owner: root
     group: root
-    mode: '0600'
+    mode: "0600"
   loop:
     - key: CAPACITY_ADMISSION_ENABLED
-      value: 'true'
+      value: "true"
     - key: CAPACITY_RESERVE_CPU_MILLICORES
-      value: '0'
+      value: "0"
     - key: CAPACITY_RESERVE_MEMORY_MIB
-      value: '0'
+      value: "0"
   delegate_to: "{{ platform_capacity_drill_host }}"
   become: true
   no_log: true
@@ -29,7 +29,7 @@
       - --force-recreate
       - --wait
       - --wait-timeout
-      - '120'
+      - "120"
       - platform-api
     chdir: "{{ platform_capacity_drill_install_dir }}"
   delegate_to: "{{ platform_capacity_drill_host }}"
@@ -54,7 +54,7 @@
 
 - name: Create the disposable capacity project
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/projects"
+    url: "{{ platform_api_url }}/v1/projects"
     method: POST
     headers:
       Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
@@ -68,7 +68,7 @@
 - name: >-
     Inspect current cluster capacity before admission checks
   ansible.builtin.uri:
-    url: "{{ platform_api_url }}/operator/capacity"
+    url: "{{ platform_api_url }}/v1/operator/capacity"
     headers:
       Authorization: "Bearer {{ capacity_runner_token.json.access_token }}"
     status_code: 200
@@ -114,7 +114,6 @@
       }}
     capacity_padding_memory_mib: >-
       {{ capacity_inventory.json.admission.available.memory_mib | int - 64 }}
-
 
 - name: Report the non-secret synthetic reservation size
   ansible.builtin.debug:

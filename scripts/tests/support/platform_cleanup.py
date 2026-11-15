@@ -78,6 +78,7 @@ class Cleanup:
         )
         self.errors = []
         self.completed = 0
+        self.retirements = {}
 
     def poll(self, action):
         deadline = self.clock() + self.seconds
@@ -104,7 +105,12 @@ class Cleanup:
         return status == 200 and body.get("status") == "revoked"
 
     def retire(self, project):
-        path = "/projects/" + project
+        if project in self.retirements:
+            status, result = self.client.request("GET", self.retirements[project])
+            if status != 200:
+                raise CleanupError("retirement_observation_failed")
+            return result["state"] == "succeeded"
+        path = "/v1/projects/" + project
         status, preview = self.client.request("GET", path + "/retirement-preview")
         if status == 404 or (status == 200 and preview.get("status") == "retired"):
             return True
@@ -115,12 +121,18 @@ class Cleanup:
         status, result = self.client.request(
             "POST",
             path + "/retire",
-            {"confirm_name": project, "scope_token": preview["scope_token"]},
+            {
+                "confirm_name": project,
+                "confirm_project_id": preview["project_id"],
+                "scope_token": preview["scope_token"],
+            },
         )
         if status == 409 and result.get("code") == "scope_changed":
             return False  # Next attempt obtains the current scope, not a stale token.
         if status not in (200, 202, 404):
             raise CleanupError("retirement_failed")
+        if status == 202:
+            self.retirements[project] = result["status_url"]
         return status == 404 or (status == 200 and result.get("status") == "retired")
 
     def run(self, payload):
@@ -140,7 +152,7 @@ class Cleanup:
             for row in confirmed(credential["creation"]):
                 self.attempt(
                     lambda p=credential["project"], r=row: self.revoke(
-                        "/projects/"
+                        "/v1/projects/"
                         + p
                         + "/deployment-credentials/"
                         + str(UUID(r["credential_id"]))
@@ -151,7 +163,7 @@ class Cleanup:
         for row in confirmed(payload.get("personas", {})):
             self.attempt(
                 lambda r=row: self.revoke(
-                    "/platform/test-identities/" + str(UUID(r["credential_id"]))
+                    "/v1/platform/test-identities/" + str(UUID(r["credential_id"]))
                 )
             )
         return {

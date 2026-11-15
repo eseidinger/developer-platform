@@ -42,12 +42,12 @@ class DataPreservationTests(TestCase):
             drill.validate(args)
 
     def test_declaration_is_valid_named_binding_and_has_real_revision_difference(self):
-        from app.spec import ApplicationEnvelopeV1Alpha2, to_flat
+        from app.spec import ApplicationEnvelope, to_flat
 
         one = drill.declaration("dp-" + RUN_ID, IMAGE, RUN_ID, BINDING, "500m")
         two = drill.declaration("dp-" + RUN_ID, IMAGE, RUN_ID, BINDING, "600m")
         for spec in (one, two):
-            ApplicationEnvelopeV1Alpha2.model_validate(spec)
+            ApplicationEnvelope.model_validate(spec)
             flat = to_flat(spec)
             self.assertEqual(flat["components"][0]["bindings"][0]["bindingId"], BINDING)
             self.assertEqual(flat["configuration"]["ACCEPTANCE_RUN_ID"], RUN_ID)

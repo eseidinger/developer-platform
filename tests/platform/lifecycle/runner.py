@@ -1,4 +1,4 @@
-"""Plan or run application lifecycle checks on a disposable legacy-compatibility project.
+"""Plan or run application lifecycle checks on a disposable v1 project.
 
 Run on the platform host with its kubeconfigs and Compose installation. The
 full suite uses the digest-pinned neutral acceptance fixture (Python, port 8080).
@@ -40,7 +40,7 @@ class Fixture:
     def __init__(self, args, api):
         self.args, self.api = args, api
         self.project = "lc-" + args.run_id
-        self.path = "/projects/" + self.project
+        self.path = "/v1/projects/" + self.project
         self.created = False
         self.report = {
             "runId": args.run_id,
@@ -115,30 +115,60 @@ class Fixture:
         )
 
     def provision(self):
-        self.api.request("GET", "/platform/test-context")
-        rows = self.api.request("GET", "/projects")
+        self.api.request("GET", "/v1/platform/test-context")
+        rows = self.api.request("GET", "/v1/projects")
         require(
             not any(row["name"] == self.project for row in rows),
             "fixture_project_exists",
         )
         self.report["cleanup"] = "incomplete-create-response-review-required"
         self.save()
-        self.api.request("POST", "/projects", {"name": self.project}, statuses=(201,))
+        self.api.request(
+            "POST", "/v1/projects", {"name": self.project}, statuses=(201,)
+        )
         self.created = True
         self.report["cleanup"] = "pending"
         self.save()
         spec = {
-            "name": self.project,
-            "image": self.args.fixture_image,
-            "port": self.args.fixture_port,
-            "probe_profile": "hello-world" if self.args.smoke else "status",
-            "configuration": {
-                "ACCEPTANCE_RUN_ID": self.args.run_id,
-                "FIXTURE_ROLE": "lifecycle",
+            "apiVersion": "platform.eseidinger.de/v1",
+            "kind": "Application",
+            "metadata": {"name": self.project},
+            "spec": {
+                "components": [
+                    {
+                        "name": self.project,
+                        "type": "service",
+                        "runtime": {
+                            "type": "container",
+                            "image": self.args.fixture_image,
+                        },
+                        "ports": [
+                            {
+                                "name": "http",
+                                "protocol": "http",
+                                "port": self.args.fixture_port,
+                            }
+                        ],
+                        "exposure": "public",
+                        "health": {
+                            "readiness": {
+                                "profile": "hello-world"
+                                if self.args.smoke
+                                else "status"
+                            }
+                        },
+                    }
+                ],
+                "configuration": {
+                    "values": {
+                        "ACCEPTANCE_RUN_ID": self.args.run_id,
+                        "FIXTURE_ROLE": "lifecycle",
+                    }
+                },
             },
         }
-        first = self.request("PUT", "", spec, etag=0, statuses=(202,))
-        second = self.request("PUT", "", spec, statuses=(202,))
+        first = self.request("PUT", "/application", spec, etag=0, statuses=(202,))
+        second = self.request("PUT", "/application", spec, statuses=(202,))
         self.check("idempotent-provisioning", first["revision"] == second["revision"])
         wait_deployment(self.api, second)
         self.check("deployment-ready")
@@ -146,27 +176,9 @@ class Fixture:
     def retire(self):
         if not self.created:
             return
-        # Wait for in-flight changes even after an assertion failed, then retire
-        # only the project whose successful creation this process observed.
-        preview = wait_for(lambda: self.retirement_preview(), "retirement_blocked", 300)
-        if preview["status"] == "retired":
-            self.report["cleanup"] = "retired-data-retained"
-            self.save()
-            return
-        confirmation = {
-            "confirm_name": self.project,
-            "scope_token": preview["scope_token"],
-        }
-        wait_for(
-            lambda: (
-                self.request("POST", "/retire", confirmation, statuses=(200, 202))[
-                    "status"
-                ]
-                == "retired"
-            ),
-            "retirement_timeout",
-            240,
-        )
+        from ..retirement import retire_project
+
+        retire_project(self.api, self.project, seconds=300)
         self.report["cleanup"] = "retired-data-retained"
         self.save()
 
@@ -270,7 +282,7 @@ def main(argv=None, *, smoke=False):
             other = API(args.api, Tokens(private_text(args.other_token_file).strip()))
             # Validate prerequisites before creating a project. Never silently skip
             # authorization/audit coverage because an optional token was omitted.
-            other.request("GET", "/projects")
+            other.request("GET", "/v1/projects")
         fixture = Fixture(args, api)
         error = None
         try:
