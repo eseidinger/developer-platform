@@ -225,8 +225,9 @@ class ProjectPurge(BaseModel):
 
 
 class ProjectGrant(BaseModel):
-    issuer: str = Field(min_length=1, max_length=2048)
-    subject: str = Field(min_length=1, max_length=1024)
+    issuer: str | None = Field(default=None, min_length=1, max_length=2048)
+    subject: str | None = Field(default=None, min_length=1, max_length=1024)
+    preferred_username: str | None = Field(default=None, min_length=1, max_length=256)
     role: Literal["viewer", "developer", "project-admin"]
     display_name: str | None = Field(default=None, max_length=512)
 

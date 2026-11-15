@@ -64,6 +64,27 @@ def _admin_token() -> str:
     return token
 
 
+def resolve_username(username: str) -> str | None:
+    """Return the immutable subject for one enabled, exact human username."""
+    token = _admin_token()
+    _, users = _request(
+        "/admin/realms/platform/users?"
+        + urllib.parse.urlencode({"username": username, "exact": "true", "max": 2}),
+        token=token,
+    )
+    matches = [
+        user
+        for user in users or []
+        if user.get("username") == username
+        and user.get("enabled") is True
+        and not user.get("serviceAccountClientId")
+        and isinstance(user.get("id"), str)
+    ]
+    if len(matches) != 1:
+        return None
+    return matches[0]["id"]
+
+
 def create_client(display_name: str) -> dict:
     token = _admin_token()
     client_id = "platform-ci-" + uuid4().hex

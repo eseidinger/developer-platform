@@ -72,8 +72,9 @@ class Purge(Version):
 
 
 class HumanGrant(Strict):
-    issuer: str = Field(min_length=1, max_length=512)
-    subject: str = Field(min_length=1, max_length=256)
+    issuer: str | None = Field(default=None, min_length=1, max_length=512)
+    subject: str | None = Field(default=None, min_length=1, max_length=256)
+    preferred_username: str | None = Field(default=None, min_length=1, max_length=256)
     mode: Mode
 
     @field_validator("issuer", "subject", mode="before")

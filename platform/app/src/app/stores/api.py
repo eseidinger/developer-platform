@@ -9,6 +9,7 @@ from fastapi.encoders import jsonable_encoder
 from fastapi.responses import JSONResponse
 from psycopg.errors import UniqueViolation
 
+from .. import human_identity
 from ..identity import Principal
 from . import catalog, providers, recovery
 from .contract import (
@@ -300,8 +301,15 @@ def install(app, control):
         resource_id: UUID, body: HumanGrant, principal: Principal = caller
     ):
         with mutation(principal) as conn:
+            resource = owner(conn, resource_id, principal)
+            issuer, subject = human_identity.resolve(
+                body.issuer, body.subject, body.preferred_username
+            )
+            resolved_grant = body.model_copy(
+                update={"issuer": issuer, "subject": subject}
+            )
             row = catalog.create_human_grant(
-                conn, owner(conn, resource_id, principal), body, principal.audit_id
+                conn, resource, resolved_grant, principal.audit_id
             )
             audit(conn, principal, "human-grant", row)
         return reply(row, 202)

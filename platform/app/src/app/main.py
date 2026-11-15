@@ -40,6 +40,7 @@ from . import (
     ai_tools,
     application_metrics,
     human_database_access,
+    human_identity,
     telemetry_catalog,
     trace_read,
     tracing,
@@ -4617,6 +4618,9 @@ def put_project_grant(
 ):
     actor = actor_for(principal)
     require_permission(principal, "grant", name)
+    issuer, subject = human_identity.resolve(
+        grant.issuer, grant.subject, grant.preferred_username
+    )
     with connect() as conn:
         if not conn.execute("SELECT 1 FROM projects WHERE name=%s", (name,)).fetchone():
             required_audit(
@@ -4631,7 +4635,7 @@ def put_project_grant(
             raise HTTPException(404, "Unknown project")
         grant_role(
             conn,
-            Principal(grant.issuer, grant.subject, grant.display_name),
+            Principal(issuer, subject, grant.preferred_username or grant.display_name),
             "project",
             name,
             grant.role,
@@ -4640,15 +4644,15 @@ def put_project_grant(
         actor,
         "membership.grant",
         "principal",
-        grant.issuer + "|" + grant.subject,
+        issuer + "|" + subject,
         "succeeded",
         {"project": name},
         {"role": grant.role},
     )
     return {
         "project": name,
-        "issuer": grant.issuer,
-        "subject": grant.subject,
+        "issuer": issuer,
+        "subject": subject,
         "role": grant.role,
     }
 
@@ -4694,10 +4698,13 @@ def put_platform_grant(
 ):
     actor = actor_for(principal)
     require_platform_admin(principal)
+    issuer, subject = human_identity.resolve(
+        grant.issuer, grant.subject, grant.preferred_username
+    )
     with connect() as conn:
         grant_role(
             conn,
-            Principal(grant.issuer, grant.subject, grant.display_name),
+            Principal(issuer, subject, grant.preferred_username or grant.display_name),
             "platform",
             None,
             grant.role,
@@ -4706,12 +4713,12 @@ def put_platform_grant(
         actor,
         "membership.grant",
         "principal",
-        grant.issuer + "|" + grant.subject,
+        issuer + "|" + subject,
         "succeeded",
         {"scope": "platform"},
         {"role": grant.role},
     )
-    return {"issuer": grant.issuer, "subject": grant.subject, "role": grant.role}
+    return {"issuer": issuer, "subject": subject, "role": grant.role}
 
 
 @app.get("/platform/grants")
