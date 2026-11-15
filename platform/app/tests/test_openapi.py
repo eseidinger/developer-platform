@@ -19,14 +19,11 @@ class OpenApiContract(unittest.TestCase):
             "run scripts/generate/export_openapi.py to refresh docs/api/openapi.json",
         )
 
-    def test_put_accepts_the_envelope_and_the_flat_body(self):
+    def test_put_accepts_only_the_v1_declaration(self):
         schema = app.openapi()["paths"]["/projects/{name}"]["put"]["requestBody"][
             "content"
         ]["application/json"]["schema"]
-        self.assertEqual(
-            {item["$ref"].rsplit("/", 1)[1] for item in schema["anyOf"]},
-            {"ApplicationEnvelope", "ApplicationEnvelopeV1Alpha2", "Project"},
-        )
+        self.assertEqual(schema, {"$ref": "#/components/schemas/ApplicationEnvelope"})
 
 
 if __name__ == "__main__":

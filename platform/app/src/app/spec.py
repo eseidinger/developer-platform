@@ -1,4 +1,4 @@
-"""Versioned ApplicationSpec envelope mapped onto the flat project contract."""
+"""The v1 application declaration and its internal execution projection."""
 
 import re
 from typing import Literal
@@ -12,8 +12,7 @@ from .manifests import normalize_resources
 from .project_policy import validate_component_capacity
 from .stores.contract import ResourceBinding
 
-API_VERSION = "platform.example/v1alpha1"
-COMPONENT_API_VERSION = "platform.example/v1alpha2"
+API_VERSION = "platform.eseidinger.de/v1"
 
 
 class _Strict(BaseModel):
@@ -21,26 +20,7 @@ class _Strict(BaseModel):
 
 
 class Metadata(_Strict):
-    name: str
-    project: str | None = None
-    environment: Literal["default"] | None = None
-
-
-class Runtime(_Strict):
-    type: Literal["container"]
-    image: str
-
-
-class Endpoint(_Strict):
-    name: str
-    protocol: Literal["http"]
-    port: int
-    exposure: Literal["public"]
-
-
-class Scaling(_Strict):
-    minInstances: Literal[1]
-    maxInstances: Literal[1]
+    name: str = Field(pattern=r"^[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?$")
 
 
 class Readiness(_Strict):
@@ -66,26 +46,6 @@ class Health(_Strict):
     readiness: Readiness
 
 
-class Application(_Strict):
-    runtime: Runtime
-    endpoints: list[Endpoint] | None = Field(default=None, min_length=1, max_length=1)
-    scaling: Scaling | None = None
-    resources: dict | None = None
-    health: Health | None = None
-
-    @field_validator("resources")
-    @classmethod
-    def check_resources(cls, value):
-        return None if value is None else normalize_resources(value)
-
-
-class ExternalResource(_Strict):
-    name: str
-    type: Literal["postgres"]
-    profile: Literal["shared-dev"]
-    deletionPolicy: Literal["retain"]
-
-
 class Configuration(_Strict):
     values: dict
 
@@ -93,24 +53,6 @@ class Configuration(_Strict):
     @classmethod
     def check_values(cls, value):
         return normalize_configuration(value)
-
-
-class Spec(_Strict):
-    application: Application
-    configuration: Configuration | None = None
-
-
-class ApplicationEnvelope(_Strict):
-    apiVersion: Literal["platform.example/v1alpha1"]
-    kind: Literal["Application"]
-    metadata: Metadata
-    spec: Spec
-
-    @model_validator(mode="after")
-    def check_project(self):
-        if self.metadata.project not in (None, self.metadata.name):
-            raise ValueError("metadata.project must equal metadata.name")
-        return self
 
 
 class ComponentRuntime(_Strict):
@@ -299,16 +241,14 @@ class ComponentSpec(_Strict):
         return self
 
 
-class ApplicationEnvelopeV1Alpha2(_Strict):
-    apiVersion: Literal["platform.example/v1alpha2"]
+class ApplicationEnvelope(_Strict):
+    apiVersion: Literal["platform.eseidinger.de/v1"]
     kind: Literal["Application"]
     metadata: Metadata
     spec: ComponentSpec
 
     @model_validator(mode="after")
     def check_project(self):
-        if self.metadata.project not in (None, self.metadata.name):
-            raise ValueError("metadata.project must equal metadata.name")
         validate_component_capacity(
             self.metadata.name,
             [component.model_dump() for component in self.spec.components],
@@ -318,7 +258,7 @@ class ApplicationEnvelopeV1Alpha2(_Strict):
 
 CAPABILITIES = {
     "apiVersion": API_VERSION,
-    "apiVersions": [API_VERSION, COMPONENT_API_VERSION],
+    "apiVersions": [API_VERSION],
     "environments": {
         "default": {
             "runtime": {"types": ["container"], "registries": "see imageRegistries"},
@@ -392,8 +332,7 @@ def error_code(body, errors):
         return "policy_denied"
     envelope = isinstance(body, dict) and ("apiVersion" in body or "kind" in body)
     if envelope and (
-        body.get("apiVersion") not in {API_VERSION, COMPONENT_API_VERSION}
-        or body.get("kind") != "Application"
+        body.get("apiVersion") != API_VERSION or body.get("kind") != "Application"
     ):
         return "invalid_spec"
     for error in errors:
@@ -423,92 +362,126 @@ def error_code(body, errors):
 
 
 def to_flat(body):
-    """Return the flat project fields for an envelope; flat bodies pass through unchanged."""
-    if not isinstance(body, dict) or "apiVersion" not in body and "kind" not in body:
-        return body
-    if body.get("apiVersion") == COMPONENT_API_VERSION:
-        envelope = ApplicationEnvelopeV1Alpha2.model_validate(body)
-        components = []
-        for component in envelope.spec.components:
-            flat_component = {
-                "name": component.name,
-                "type": component.type,
-                "image": component.runtime.image,
-            }
-            for key in ("command", "args"):
-                value = getattr(component.runtime, key)
-                if value is not None:
-                    flat_component[key] = value
-            if component.resources is not None:
-                flat_component["resources"] = component.resources
-            if isinstance(component, ServiceComponent):
-                flat_component["replicas"] = component.replicas
-                if component.exposure == "public":
-                    flat_component["exposure"] = "public"
-                if component.ports:
-                    flat_component["ports"] = [
-                        port.model_dump() for port in component.ports
-                    ]
-                if component.health:
-                    readiness = component.health.readiness
-                    if readiness.profile:
-                        flat_component["probe_profile"] = readiness.profile
-                    else:
-                        flat_component["readiness_path"] = readiness.path
-                        if readiness.port is not None:
-                            flat_component["readiness_port"] = readiness.port
-                if component.telemetry and component.telemetry.metrics:
-                    metrics = component.telemetry.metrics
-                    flat_component["metrics"] = {
-                        "port": metrics.port,
-                        "path": metrics.path,
-                    }
-            else:
-                flat_component.update(
-                    {
-                        "schedule": component.schedule,
-                        "time_zone": component.timeZone,
-                        "concurrency_policy": component.concurrencyPolicy,
-                        "retry_limit": component.retryLimit,
-                    }
-                )
-                if component.maxRunSeconds is not None:
-                    flat_component["max_run_seconds"] = component.maxRunSeconds
-            if component.bindings:
-                flat_component["bindings"] = [
-                    binding.model_dump(mode="json") for binding in component.bindings
-                ]
-            if component.outbound:
-                flat_component["outbound"] = [
-                    destination.model_dump(exclude_none=True)
-                    for destination in component.outbound
-                ]
-            if (
-                component.telemetry
-                and component.telemetry.tracing
-                and component.telemetry.tracing.enabled
-            ):
-                flat_component["tracing"] = {"enabled": True}
-            components.append(flat_component)
-        flat = {"name": envelope.metadata.name, "components": components}
-        if envelope.spec.configuration is not None:
-            flat["configuration"] = envelope.spec.configuration.values
-        return flat
+    """Validate the sole public declaration and build the worker's execution input."""
     envelope = ApplicationEnvelope.model_validate(body)
-    application = envelope.spec.application
-    flat = {"name": envelope.metadata.name, "image": application.runtime.image}
-    if application.endpoints:
-        flat["port"] = application.endpoints[0].port
-    if application.health:
-        readiness = application.health.readiness
-        if readiness.profile:
-            flat["probe_profile"] = readiness.profile
+    components = []
+    for component in envelope.spec.components:
+        flat_component = {
+            "name": component.name,
+            "type": component.type,
+            "image": component.runtime.image,
+        }
+        for key in ("command", "args"):
+            value = getattr(component.runtime, key)
+            if value is not None:
+                flat_component[key] = value
+        if component.resources is not None:
+            flat_component["resources"] = component.resources
+        if isinstance(component, ServiceComponent):
+            flat_component["replicas"] = component.replicas
+            if component.exposure == "public":
+                flat_component["exposure"] = "public"
+            if component.ports:
+                flat_component["ports"] = [
+                    port.model_dump() for port in component.ports
+                ]
+            if component.health:
+                readiness = component.health.readiness
+                if readiness.profile:
+                    flat_component["probe_profile"] = readiness.profile
+                else:
+                    flat_component["readiness_path"] = readiness.path
+                    if readiness.port is not None:
+                        flat_component["readiness_port"] = readiness.port
+            if component.telemetry and component.telemetry.metrics:
+                metrics = component.telemetry.metrics
+                flat_component["metrics"] = {
+                    "port": metrics.port,
+                    "path": metrics.path,
+                }
         else:
-            flat["readiness_path"] = readiness.path
-            if readiness.port is not None:
-                flat["readiness_port"] = readiness.port
-    if application.resources is not None:
-        flat["resources"] = application.resources
+            flat_component.update(
+                {
+                    "schedule": component.schedule,
+                    "time_zone": component.timeZone,
+                    "concurrency_policy": component.concurrencyPolicy,
+                    "retry_limit": component.retryLimit,
+                }
+            )
+            if component.maxRunSeconds is not None:
+                flat_component["max_run_seconds"] = component.maxRunSeconds
+        if component.bindings:
+            flat_component["bindings"] = [
+                binding.model_dump(mode="json") for binding in component.bindings
+            ]
+        if component.outbound:
+            flat_component["outbound"] = [
+                destination.model_dump(exclude_none=True)
+                for destination in component.outbound
+            ]
+        if (
+            component.telemetry
+            and component.telemetry.tracing
+            and component.telemetry.tracing.enabled
+        ):
+            flat_component["tracing"] = {"enabled": True}
+        components.append(flat_component)
+    flat = {"name": envelope.metadata.name, "components": components}
     if envelope.spec.configuration is not None:
         flat["configuration"] = envelope.spec.configuration.values
     return flat
+
+
+def from_flat(project: dict) -> dict:
+    """Export a desired declaration without provider observations or resolved digests."""
+    components = []
+    for stored in project["components"]:
+        component = {
+            key: stored[key]
+            for key in (
+                "name",
+                "type",
+                "ports",
+                "replicas",
+                "exposure",
+                "resources",
+                "bindings",
+                "outbound",
+                "schedule",
+            )
+            if key in stored
+        }
+        component["runtime"] = {"type": "container", "image": stored["image"]}
+        for key in ("command", "args"):
+            if key in stored:
+                component["runtime"][key] = stored[key]
+        for internal, external in (
+            ("time_zone", "timeZone"),
+            ("concurrency_policy", "concurrencyPolicy"),
+            ("retry_limit", "retryLimit"),
+            ("max_run_seconds", "maxRunSeconds"),
+        ):
+            if internal in stored:
+                component[external] = stored[internal]
+        if "readiness_path" in stored:
+            readiness = {"path": stored["readiness_path"]}
+            if "readiness_port" in stored:
+                readiness["port"] = stored["readiness_port"]
+            component["health"] = {"readiness": readiness}
+        elif "probe_profile" in stored:
+            component["health"] = {"readiness": {"profile": stored["probe_profile"]}}
+        telemetry = {
+            key: stored[key] for key in ("metrics", "tracing") if key in stored
+        }
+        if telemetry:
+            component["telemetry"] = telemetry
+        components.append(component)
+    result = {
+        "apiVersion": API_VERSION,
+        "kind": "Application",
+        "metadata": {"name": project["name"]},
+        "spec": {"components": components},
+    }
+    if "configuration" in project:
+        result["spec"]["configuration"] = {"values": project["configuration"]}
+    return result

@@ -3,7 +3,7 @@ import json
 import unittest
 from pathlib import Path
 
-from app.spec import ApplicationEnvelopeV1Alpha2
+from app.spec import ApplicationEnvelope
 
 ROOT = Path(__file__).resolve().parents[3]
 RENDER = ROOT / "examples/web-postgres/render.py"
@@ -19,7 +19,7 @@ class WebPostgresTemplateTests(unittest.TestCase):
             "ghcr.io/example/web@sha256:" + "a" * 64,
             binding_id="12345678-1234-1234-1234-123456789abc",
         )
-        ApplicationEnvelopeV1Alpha2.model_validate(body)
+        ApplicationEnvelope.model_validate(body)
         self.assertEqual(
             body["spec"]["components"][0]["health"]["readiness"]["path"],
             "/health/ready",

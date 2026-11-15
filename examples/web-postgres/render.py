@@ -25,9 +25,9 @@ def declaration(
         [{"bindingId": str(UUID(binding_id)), "envPrefix": ""}] if binding_id else []
     )
     return {
-        "apiVersion": "platform.example/v1alpha2",
+        "apiVersion": "platform.eseidinger.de/v1",
         "kind": "Application",
-        "metadata": {"name": project, "project": project, "environment": "default"},
+        "metadata": {"name": project},
         "spec": {
             "components": [
                 {

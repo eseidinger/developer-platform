@@ -1,10 +1,8 @@
 {
-  "apiVersion": "platform.example/v1alpha2",
+  "apiVersion": "platform.eseidinger.de/v1",
   "kind": "Application",
   "metadata": {
-    "name": "ai-acceptance",
-    "project": "ai-acceptance",
-    "environment": "default"
+    "name": "ai-acceptance"
   },
   "spec": {
     "components": [

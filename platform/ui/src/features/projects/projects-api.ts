@@ -259,7 +259,24 @@ async function getProjectRevisions(name: string) {
 async function deployProject(name: string, body: ProjectDeployment) {
   const { data, error, response } = await apiClient.PUT('/projects/{name}', {
     params: { path: { name } },
-    body,
+    body: {
+      apiVersion: 'platform.eseidinger.de/v1',
+      kind: 'Application',
+      metadata: { name },
+      spec: {
+        components: [
+          {
+            name: 'web',
+            type: 'service',
+            replicas: 1,
+            exposure: 'private',
+            runtime: { type: 'container', image: body.image },
+            ports: [{ name: 'http', protocol: 'http', port: body.port }],
+            health: { readiness: { profile: body.probe_profile } },
+          },
+        ],
+      },
+    },
   })
   if (error) {
     throw apiErrorFromResponse(response, error)

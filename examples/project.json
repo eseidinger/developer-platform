@@ -1,5 +1,27 @@
 {
-  "name": "hello",
-  "image": "hashicorp/http-echo:1.0.0",
-  "port": 5678
+  "apiVersion": "platform.eseidinger.de/v1",
+  "kind": "Application",
+  "metadata": {
+    "name": "hello"
+  },
+  "spec": {
+    "components": [
+      {
+        "name": "web",
+        "type": "service",
+        "runtime": {
+          "type": "container",
+          "image": "hashicorp/http-echo:1.0.0"
+        },
+        "ports": [
+          {
+            "name": "http",
+            "protocol": "http",
+            "port": 5678
+          }
+        ],
+        "exposure": "private"
+      }
+    ]
+  }
 }

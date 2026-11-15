@@ -70,101 +70,11 @@
         "title": "AIRunRequest",
         "type": "object"
       },
-      "Application": {
-        "additionalProperties": false,
-        "properties": {
-          "endpoints": {
-            "anyOf": [
-              {
-                "items": {
-                  "$ref": "#/components/schemas/Endpoint"
-                },
-                "maxItems": 1,
-                "minItems": 1,
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Endpoints"
-          },
-          "health": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Health"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "resources": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resources"
-          },
-          "runtime": {
-            "$ref": "#/components/schemas/Runtime"
-          },
-          "scaling": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Scaling"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "runtime"
-        ],
-        "title": "Application",
-        "type": "object"
-      },
       "ApplicationEnvelope": {
         "additionalProperties": false,
         "properties": {
           "apiVersion": {
-            "const": "platform.example/v1alpha1",
-            "title": "Apiversion",
-            "type": "string"
-          },
-          "kind": {
-            "const": "Application",
-            "title": "Kind",
-            "type": "string"
-          },
-          "metadata": {
-            "$ref": "#/components/schemas/Metadata"
-          },
-          "spec": {
-            "$ref": "#/components/schemas/Spec"
-          }
-        },
-        "required": [
-          "apiVersion",
-          "kind",
-          "metadata",
-          "spec"
-        ],
-        "title": "ApplicationEnvelope",
-        "type": "object"
-      },
-      "ApplicationEnvelopeV1Alpha2": {
-        "additionalProperties": false,
-        "properties": {
-          "apiVersion": {
-            "const": "platform.example/v1alpha2",
+            "const": "platform.eseidinger.de/v1",
             "title": "Apiversion",
             "type": "string"
           },
@@ -186,7 +96,7 @@
           "metadata",
           "spec"
         ],
-        "title": "ApplicationEnvelopeV1Alpha2",
+        "title": "ApplicationEnvelope",
         "type": "object"
       },
       "Authentication": {
@@ -471,37 +381,6 @@
           "name"
         ],
         "title": "EmptyProjectCreate",
-        "type": "object"
-      },
-      "Endpoint": {
-        "additionalProperties": false,
-        "properties": {
-          "exposure": {
-            "const": "public",
-            "title": "Exposure",
-            "type": "string"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "port": {
-            "title": "Port",
-            "type": "integer"
-          },
-          "protocol": {
-            "const": "http",
-            "title": "Protocol",
-            "type": "string"
-          }
-        },
-        "required": [
-          "name",
-          "protocol",
-          "port",
-          "exposure"
-        ],
-        "title": "Endpoint",
         "type": "object"
       },
       "Governance": {
@@ -833,32 +712,10 @@
       "Metadata": {
         "additionalProperties": false,
         "properties": {
-          "environment": {
-            "anyOf": [
-              {
-                "const": "default",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Environment"
-          },
           "name": {
+            "pattern": "^[a-z](?:[a-z0-9-]{0,30}[a-z0-9])?$",
             "title": "Name",
             "type": "string"
-          },
-          "project": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Project"
           }
         },
         "required": [
@@ -1027,116 +884,6 @@
           "routes"
         ],
         "title": "PolicyCreate",
-        "type": "object"
-      },
-      "Project": {
-        "additionalProperties": false,
-        "properties": {
-          "components": {
-            "anyOf": [
-              {
-                "items": {
-                  "additionalProperties": true,
-                  "type": "object"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Components"
-          },
-          "configuration": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Configuration"
-          },
-          "image": {
-            "anyOf": [
-              {
-                "maxLength": 512,
-                "minLength": 1,
-                "pattern": "^[a-zA-Z0-9][a-zA-Z0-9./_:@-]+$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Image"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "port": {
-            "default": 8080,
-            "maximum": 65535.0,
-            "minimum": 1024.0,
-            "title": "Port",
-            "type": "integer"
-          },
-          "probe_profile": {
-            "default": "status",
-            "enum": [
-              "status",
-              "hello-world"
-            ],
-            "title": "Probe Profile",
-            "type": "string"
-          },
-          "readiness_path": {
-            "anyOf": [
-              {
-                "maxLength": 256,
-                "minLength": 1,
-                "pattern": "^/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$",
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Readiness Path"
-          },
-          "readiness_port": {
-            "anyOf": [
-              {
-                "maximum": 65535.0,
-                "minimum": 1024.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Readiness Port"
-          },
-          "resources": {
-            "anyOf": [
-              {
-                "additionalProperties": true,
-                "type": "object"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Resources"
-          }
-        },
-        "required": [
-          "name"
-        ],
-        "title": "Project",
         "type": "object"
       },
       "ProjectGrant": {
@@ -1568,47 +1315,6 @@
         "title": "RouteMatch",
         "type": "object"
       },
-      "Runtime": {
-        "additionalProperties": false,
-        "properties": {
-          "image": {
-            "title": "Image",
-            "type": "string"
-          },
-          "type": {
-            "const": "container",
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "type",
-          "image"
-        ],
-        "title": "Runtime",
-        "type": "object"
-      },
-      "Scaling": {
-        "additionalProperties": false,
-        "properties": {
-          "maxInstances": {
-            "const": 1,
-            "title": "Maxinstances",
-            "type": "integer"
-          },
-          "minInstances": {
-            "const": 1,
-            "title": "Mininstances",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "minInstances",
-          "maxInstances"
-        ],
-        "title": "Scaling",
-        "type": "object"
-      },
       "ScheduledComponent": {
         "additionalProperties": false,
         "properties": {
@@ -1883,29 +1589,6 @@
           }
         },
         "title": "ServiceTelemetry",
-        "type": "object"
-      },
-      "Spec": {
-        "additionalProperties": false,
-        "properties": {
-          "application": {
-            "$ref": "#/components/schemas/Application"
-          },
-          "configuration": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/Configuration"
-              },
-              {
-                "type": "null"
-              }
-            ]
-          }
-        },
-        "required": [
-          "application"
-        ],
-        "title": "Spec",
         "type": "object"
       },
       "TestIdentityCreate": {
@@ -3018,7 +2701,7 @@
     },
     "/projects/{name}": {
       "put": {
-        "description": "Accept the flat project body or a versioned `Application` envelope.\n\nAn optional `If-Match: <revision>` header makes the update conditional on the\ncurrent desired revision; a stale value returns 409 with the current revision.",
+        "description": "Accept the platform.eseidinger.de/v1 Application declaration.\n\nAn optional `If-Match: <revision>` header makes the update conditional on the\ncurrent desired revision; a stale value returns 409 with the current revision.",
         "operationId": "provision_projects__name__put",
         "parameters": [
           {
@@ -3051,18 +2734,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "anyOf": [
-                  {
-                    "$ref": "#/components/schemas/ApplicationEnvelopeV1Alpha2"
-                  },
-                  {
-                    "$ref": "#/components/schemas/ApplicationEnvelope"
-                  },
-                  {
-                    "$ref": "#/components/schemas/Project"
-                  }
-                ],
-                "title": "Body"
+                "$ref": "#/components/schemas/ApplicationEnvelope"
               }
             }
           },

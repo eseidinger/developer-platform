@@ -375,7 +375,7 @@ export interface paths {
         get?: never;
         /**
          * Provision
-         * @description Accept the flat project body or a versioned `Application` envelope.
+         * @description Accept the platform.eseidinger.de/v1 Application declaration.
          *
          *     An optional `If-Match: <revision>` header makes the update conditional on the
          *     current desired revision; a stale value returns 409 with the current revision.
@@ -1929,40 +1929,13 @@ export interface components {
              */
             kind: "explain_application" | "investigate_incident" | "development_assistance";
         };
-        /** Application */
-        Application: {
-            /** Endpoints */
-            endpoints?: components["schemas"]["Endpoint"][] | null;
-            health?: components["schemas"]["Health"] | null;
-            /** Resources */
-            resources?: {
-                [key: string]: unknown;
-            } | null;
-            runtime: components["schemas"]["Runtime"];
-            scaling?: components["schemas"]["Scaling"] | null;
-        };
         /** ApplicationEnvelope */
         ApplicationEnvelope: {
             /**
              * Apiversion
              * @constant
              */
-            apiVersion: "platform.example/v1alpha1";
-            /**
-             * Kind
-             * @constant
-             */
-            kind: "Application";
-            metadata: components["schemas"]["Metadata"];
-            spec: components["schemas"]["Spec"];
-        };
-        /** ApplicationEnvelopeV1Alpha2 */
-        ApplicationEnvelopeV1Alpha2: {
-            /**
-             * Apiversion
-             * @constant
-             */
-            apiVersion: "platform.example/v1alpha2";
+            apiVersion: "platform.eseidinger.de/v1";
             /**
              * Kind
              * @constant
@@ -2076,23 +2049,6 @@ export interface components {
         EmptyProjectCreate: {
             /** Name */
             name: string;
-        };
-        /** Endpoint */
-        Endpoint: {
-            /**
-             * Exposure
-             * @constant
-             */
-            exposure: "public";
-            /** Name */
-            name: string;
-            /** Port */
-            port: number;
-            /**
-             * Protocol
-             * @constant
-             */
-            protocol: "http";
         };
         /** Governance */
         Governance: {
@@ -2212,12 +2168,8 @@ export interface components {
         };
         /** Metadata */
         Metadata: {
-            /** Environment */
-            environment?: "default" | null;
             /** Name */
             name: string;
-            /** Project */
-            project?: string | null;
         };
         /** MetricsDeclaration */
         MetricsDeclaration: {
@@ -2267,40 +2219,6 @@ export interface components {
             identityAttributes?: components["schemas"]["IdentityAttributes"];
             /** Routes */
             routes: components["schemas"]["Route"][];
-        };
-        /** Project */
-        Project: {
-            /** Components */
-            components?: {
-                [key: string]: unknown;
-            }[] | null;
-            /** Configuration */
-            configuration?: {
-                [key: string]: unknown;
-            } | null;
-            /** Image */
-            image?: string | null;
-            /** Name */
-            name: string;
-            /**
-             * Port
-             * @default 8080
-             */
-            port: number;
-            /**
-             * Probe Profile
-             * @default status
-             * @enum {string}
-             */
-            probe_profile: "status" | "hello-world";
-            /** Readiness Path */
-            readiness_path?: string | null;
-            /** Readiness Port */
-            readiness_port?: number | null;
-            /** Resources */
-            resources?: {
-                [key: string]: unknown;
-            } | null;
         };
         /** ProjectGrant */
         ProjectGrant: {
@@ -2438,29 +2356,6 @@ export interface components {
             /** Pathprefix */
             pathPrefix?: string | null;
         };
-        /** Runtime */
-        Runtime: {
-            /** Image */
-            image: string;
-            /**
-             * Type
-             * @constant
-             */
-            type: "container";
-        };
-        /** Scaling */
-        Scaling: {
-            /**
-             * Maxinstances
-             * @constant
-             */
-            maxInstances: 1;
-            /**
-             * Mininstances
-             * @constant
-             */
-            minInstances: 1;
-        };
         /** ScheduledComponent */
         ScheduledComponent: {
             /** Bindings */
@@ -2558,11 +2453,6 @@ export interface components {
         ServiceTelemetry: {
             metrics?: components["schemas"]["MetricsDeclaration"] | null;
             tracing?: components["schemas"]["TracingDeclaration"] | null;
-        };
-        /** Spec */
-        Spec: {
-            application: components["schemas"]["Application"];
-            configuration?: components["schemas"]["Configuration"] | null;
         };
         /** TestIdentityCreate */
         TestIdentityCreate: {
@@ -3334,7 +3224,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["ApplicationEnvelopeV1Alpha2"] | components["schemas"]["ApplicationEnvelope"] | components["schemas"]["Project"];
+                "application/json": components["schemas"]["ApplicationEnvelope"];
             };
         };
         responses: {

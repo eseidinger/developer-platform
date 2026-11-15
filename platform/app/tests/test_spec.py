@@ -1,3 +1,4 @@
+import copy
 import os
 import sys
 import unittest
@@ -7,177 +8,66 @@ from unittest.mock import patch
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from app import spec
 
-API = "platform.example/v1alpha1"
 
-
-def envelope(**changes):
-    body = {
-        "apiVersion": API,
+def envelope():
+    return {
+        "apiVersion": "platform.eseidinger.de/v1",
         "kind": "Application",
         "metadata": {"name": "smoke"},
         "spec": {
-            "application": {
-                "runtime": {"type": "container", "image": "hashicorp/http-echo:1.0.0"},
-                "endpoints": [
-                    {
-                        "name": "http",
-                        "protocol": "http",
-                        "port": 5678,
-                        "exposure": "public",
-                    }
-                ],
-                "scaling": {"minInstances": 1, "maxInstances": 1},
-                "resources": {"limits": {"cpu": "1", "memory": "512Mi"}},
-                "health": {"readiness": {"profile": "hello-world"}},
-            }
+            "components": [
+                {
+                    "name": "web",
+                    "type": "service",
+                    "runtime": {
+                        "type": "container",
+                        "image": "hashicorp/http-echo:1.0.0",
+                    },
+                    "ports": [{"name": "http", "protocol": "http", "port": 5678}],
+                    "health": {"readiness": {"path": "/ready", "port": 5678}},
+                    "telemetry": {"tracing": {"enabled": True}},
+                }
+            ],
+            "configuration": {"values": {"LOG_LEVEL": "info"}},
         },
     }
-    body.update(changes)
-    return body
 
 
 class EnvelopeContract(unittest.TestCase):
     def setUp(self):
-        self.environment = os.environ.copy()
-        self.addCleanup(self.restore_environment)
+        self.environment = patch.dict(os.environ, {})
+        self.environment.start()
+        self.addCleanup(self.environment.stop)
 
-    def restore_environment(self):
-        os.environ.clear()
-        os.environ.update(self.environment)
-
-    def test_flat_body_passes_through_unchanged(self):
-        flat = {"name": "smoke", "image": "example:v1"}
-        self.assertEqual(spec.to_flat(flat), flat)
-
-    def test_envelope_maps_to_the_flat_project_fields(self):
-        self.assertEqual(
-            spec.to_flat(envelope()),
-            {
-                "name": "smoke",
-                "image": "hashicorp/http-echo:1.0.0",
-                "port": 5678,
-                "probe_profile": "hello-world",
-                "resources": {
-                    "requests": {"cpu": "100m", "memory": "128Mi"},
-                    "limits": {"cpu": "1000m", "memory": "512Mi"},
-                },
-            },
-        )
-
-    def test_minimal_envelope_relies_on_defaults(self):
-        body = {
-            "apiVersion": API,
-            "kind": "Application",
-            "metadata": {"name": "a"},
-            "spec": {"application": {"runtime": {"type": "container", "image": "x:1"}}},
-        }
-        self.assertEqual(spec.to_flat(body), {"name": "a", "image": "x:1"})
-
-    def test_configuration_values_map_to_flat_field(self):
-        app = envelope()["spec"]["application"]
-        body = envelope(
-            spec={"application": app, "configuration": {"values": {"B": "2", "A": "1"}}}
-        )
-        self.assertEqual(spec.to_flat(body)["configuration"], {"A": "1", "B": "2"})
-
-    def test_unsupported_versions_kinds_and_capabilities_are_rejected(self):
-        app = envelope()["spec"]["application"]
-        cases = {
-            "version": envelope(apiVersion="platform.example/v2"),
-            "kind": envelope(kind="Job"),
-            "other project": envelope(metadata={"name": "smoke", "project": "other"}),
-            "environment": envelope(metadata={"name": "smoke", "environment": "prod"}),
-            "unknown top level": envelope(status={}),
-            "unknown spec field": envelope(spec={"application": app, "components": []}),
-            "autoscaling": envelope(
-                spec={
-                    "application": {
-                        **app,
-                        "scaling": {"minInstances": 1, "maxInstances": 3},
-                    }
-                }
-            ),
-            "two endpoints": envelope(
-                spec={"application": {**app, "endpoints": app["endpoints"] * 2}}
-            ),
-            "internal endpoint": envelope(
-                spec={
-                    "application": {
-                        **app,
-                        "endpoints": [
-                            {
-                                "name": "http",
-                                "protocol": "http",
-                                "port": 80,
-                                "exposure": "internal",
-                            }
-                        ],
-                    }
-                }
-            ),
-            "runtime type": envelope(
-                spec={"application": {**app, "runtime": {"type": "vm", "image": "x"}}}
-            ),
-            "other resource": envelope(
-                spec={
-                    "application": app,
-                    "resources": [
-                        {
-                            "name": "q",
-                            "type": "queue",
-                            "profile": "x",
-                            "deletionPolicy": "retain",
-                        }
-                    ],
-                }
-            ),
-            "delete policy": envelope(
-                spec={
-                    "application": app,
-                    "resources": [
-                        {
-                            "name": "database",
-                            "type": "postgres",
-                            "profile": "shared-dev",
-                            "deletionPolicy": "delete",
-                        }
-                    ],
-                }
-            ),
-            "configuration secrets": envelope(
-                spec={"application": app, "configuration": {"secrets": {}}}
-            ),
-            "reserved configuration": envelope(
-                spec={"application": app, "configuration": {"values": {"PGHOST": "b"}}}
-            ),
-        }
-        for label, body in cases.items():
-            with self.subTest(label), self.assertRaises(ValueError):
+    def test_rejects_old_formats_and_redundant_metadata(self):
+        invalid = [{"name": "smoke", "image": "example:v1"}]
+        for version in ("platform.example/v1alpha1", "platform.example/v1alpha2"):
+            invalid.append({**envelope(), "apiVersion": version})
+        for key, value in (("project", "smoke"), ("environment", "default")):
+            body = copy.deepcopy(envelope())
+            body["metadata"][key] = value
+            invalid.append(body)
+        for body in invalid:
+            with self.subTest(body=body), self.assertRaises(ValueError):
                 spec.to_flat(body)
 
-    def test_http_readiness_path_maps_to_the_flat_project_fields(self):
-        app = envelope()["spec"]["application"]
-        body = envelope(
-            spec={
-                "application": {
-                    **app,
-                    "health": {
-                        "readiness": {
-                            "path": "/actuator/health/readiness",
-                            "port": 5678,
-                        }
-                    },
-                }
-            }
-        )
-        self.assertEqual(
-            spec.to_flat(body)["readiness_path"], "/actuator/health/readiness"
-        )
-        self.assertEqual(spec.to_flat(body)["readiness_port"], 5678)
+    def test_export_round_trip_keeps_desired_state_and_hides_observations(self):
+        internal = spec.to_flat(envelope())
+        internal["components"][0]["resolved_image"] = "private-internal-digest"
+        exported = spec.from_flat(internal)
+        self.assertNotIn("private-internal-digest", str(exported))
+        internal["components"][0].pop("resolved_image")
+        self.assertEqual(spec.to_flat(exported), internal)
 
-    def test_v1alpha2_maps_service_and_scheduled_components(self):
+    def test_metadata_name_obeys_project_slug_constraints(self):
+        for name in ("Uppercase", "trailing-", "a" * 33, "../other", ""):
+            body = {**envelope(), "metadata": {"name": name}}
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                spec.to_flat(body)
+
+    def test_v1_maps_service_and_scheduled_components(self):
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {
@@ -237,7 +127,7 @@ class EnvelopeContract(unittest.TestCase):
             "telemetry": {"metrics": {"port": "http", "path": "/actuator/prometheus"}},
         }
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {"components": [component]},
@@ -274,9 +164,9 @@ class EnvelopeContract(unittest.TestCase):
         )
         self.assertEqual(traced["components"][0]["tracing"], {"enabled": True})
 
-    def test_v1alpha2_rejects_invalid_schedule(self):
+    def test_v1_rejects_invalid_schedule(self):
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {
@@ -293,7 +183,7 @@ class EnvelopeContract(unittest.TestCase):
         with self.assertRaises(ValueError):
             spec.to_flat(body)
 
-    def test_v1alpha2_rejects_component_capacity_that_cannot_roll_out_in_quota(self):
+    def test_v1_rejects_component_capacity_that_cannot_roll_out_in_quota(self):
         services = [
             {
                 "name": f"api-{index}",
@@ -304,7 +194,7 @@ class EnvelopeContract(unittest.TestCase):
             for index in range(5)
         ]
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {"components": services},
@@ -312,9 +202,9 @@ class EnvelopeContract(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "pod quota"):
             spec.to_flat(body)
 
-    def test_v1alpha2_exposes_one_declared_service_only(self):
+    def test_v1_exposes_one_declared_service_only(self):
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {
@@ -331,9 +221,9 @@ class EnvelopeContract(unittest.TestCase):
         }
         self.assertEqual(spec.to_flat(body)["components"][0]["exposure"], "public")
 
-    def test_v1alpha2_maps_http_readiness_and_scheduled_retry_controls(self):
+    def test_v1_maps_http_readiness_and_scheduled_retry_controls(self):
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {
@@ -361,9 +251,9 @@ class EnvelopeContract(unittest.TestCase):
         self.assertEqual(flattened[1]["retry_limit"], 8)
         self.assertEqual(flattened[1]["max_run_seconds"], 600)
 
-    def test_v1alpha2_allows_only_operator_approved_outbound_cidr_port(self):
+    def test_v1_allows_only_operator_approved_outbound_cidr_port(self):
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {
@@ -386,9 +276,9 @@ class EnvelopeContract(unittest.TestCase):
             [{"cidr": "203.0.113.10/32", "port": 443}],
         )
 
-    def test_v1alpha2_allows_scheduled_dns_egress(self):
+    def test_v1_allows_scheduled_dns_egress(self):
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {
@@ -416,9 +306,9 @@ class EnvelopeContract(unittest.TestCase):
                 [{"dns": "api.example.test", "port": 443}],
             )
 
-    def test_v1alpha2_rejects_unapproved_or_malformed_operator_egress_policy(self):
+    def test_v1_rejects_unapproved_or_malformed_operator_egress_policy(self):
         body = {
-            "apiVersion": "platform.example/v1alpha2",
+            "apiVersion": "platform.eseidinger.de/v1",
             "kind": "Application",
             "metadata": {"name": "shop"},
             "spec": {

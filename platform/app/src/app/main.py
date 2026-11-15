@@ -133,7 +133,6 @@ from .security_alerts import security_alert_loop
 from .spec import (
     CAPABILITIES,
     ApplicationEnvelope,
-    ApplicationEnvelopeV1Alpha2,
     error_code,
     to_flat,
 )
@@ -763,7 +762,7 @@ def capabilities(principal: Principal = Depends(current_principal)):
             "anonymousRoutes": False,
             "maxAuthorizationStalenessSeconds": 300,
             "credentialIsolation": "project",
-            "requires": "platform.example/v1alpha2",
+            "requires": "platform.eseidinger.de/v1",
         },
         "observability": {
             "componentAwarePublicProbes": True,
@@ -1706,16 +1705,16 @@ def queue_deploy(
 @app.put("/projects/{name}")
 def provision(
     name: str,
-    body: ApplicationEnvelopeV1Alpha2 | ApplicationEnvelope | Project,
+    body: ApplicationEnvelope,
     principal: Principal = Depends(current_principal),
     if_match: str | None = Header(None),
 ):
-    """Accept the flat project body or a versioned `Application` envelope.
+    """Accept the platform.eseidinger.de/v1 Application declaration.
 
     An optional `If-Match: <revision>` header makes the update conditional on the
     current desired revision; a stale value returns 409 with the current revision.
     """
-    if isinstance(body, (ApplicationEnvelope, ApplicationEnvelopeV1Alpha2)):
+    if isinstance(body, ApplicationEnvelope):
         try:
             project = Project.model_validate(
                 to_flat(body.model_dump(exclude_none=True)),

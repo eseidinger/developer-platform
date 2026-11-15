@@ -6,7 +6,7 @@ from unittest.mock import Mock, patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from app.identity import Principal
-from app.spec import ApplicationEnvelopeV1Alpha2
+from app.spec import ApplicationEnvelope
 
 from app import main
 
@@ -14,9 +14,9 @@ from app import main
 class ComponentApiTests(unittest.TestCase):
     def setUp(self):
         self.principal = Principal("https://issuer.example", "person-1", "Person")
-        self.body = ApplicationEnvelopeV1Alpha2.model_validate(
+        self.body = ApplicationEnvelope.model_validate(
             {
-                "apiVersion": "platform.example/v1alpha2",
+                "apiVersion": "platform.eseidinger.de/v1",
                 "kind": "Application",
                 "metadata": {"name": "shop"},
                 "spec": {
@@ -46,7 +46,7 @@ class ComponentApiTests(unittest.TestCase):
             }
         )
 
-    def test_v1alpha2_request_resolves_every_component_before_queuing_revision(self):
+    def test_v1_request_resolves_every_component_before_queuing_revision(self):
         queued = Mock(return_value=("operation-1", "queued", 4))
         with (
             patch.object(main, "require_permission"),
