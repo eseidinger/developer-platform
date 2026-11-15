@@ -372,11 +372,22 @@ def _execute_locked(
         )
         return
 
+    # Report the route that was actually generated. Component applications use
+    # <component>-<project>; private and scheduled applications have no public host.
+    public_hosts = sorted(
+        {
+            rule["host"]
+            for manifest in manifests
+            if manifest["kind"] == "Ingress"
+            for rule in manifest.get("spec", {}).get("rules", [])
+            if rule.get("host")
+        }
+    )
     result: dict[str, Any] = {
         "status": "restarted" if operation_kind == "restart" else "applied",
         "project": project,
         "namespace": "project-" + project,
-        "host": project + "." + os.environ["APPS_DOMAIN"],
+        "host": public_hosts[0] if public_hosts else None,
     }
     record_event(
         actor,

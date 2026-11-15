@@ -202,6 +202,20 @@ class OperationWorkerFixture(unittest.TestCase):
 
 
 class OperationWorkerTests(OperationWorkerFixture):
+    def test_operation_reports_the_generated_public_host(self):
+        ingress = {
+            "kind": "Ingress",
+            "metadata": {"name": "api"},
+            "spec": {"rules": [{"host": "api-smoke.apps.localhost"}]},
+        }
+        self.resources.return_value.append(ingress)
+        self.assertTrue(self.run_one())
+        self.assertEqual(self.conn.operation_result["host"], "api-smoke.apps.localhost")
+
+    def test_operation_without_ingress_reports_no_public_host(self):
+        self.assertTrue(self.run_one())
+        self.assertIsNone(self.conn.operation_result["host"])
+
     def test_component_revision_uses_component_manifests_and_applies_each_workload(
         self,
     ):
