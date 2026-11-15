@@ -18,6 +18,16 @@
           - tar
           - --exclude=__pycache__
           - --exclude=*.pyc
+          # Exclude development environments and generated test output.
+          - --exclude=.venv
+          - --exclude=node_modules
+          - --exclude=.pytest_cache
+          - --exclude=.ruff_cache
+          - --exclude=.runtime
+          - --exclude=platform/ui/dist
+          - --exclude=platform/ui/test-results
+          - --exclude=platform/ui/playwright-report
+          - --exclude=platform/ui/.tmp
           - --exclude=infrastructure/monitoring/private
           - -czf
           - "{{ platform_archive.path }}"
@@ -30,6 +40,7 @@
           - scripts
           - tests
           - operations/backup/scripts
+          - operations/maintenance
       delegate_to: localhost
       become: false
       changed_when: true
