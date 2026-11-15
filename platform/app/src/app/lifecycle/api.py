@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import Depends, HTTPException
@@ -182,7 +183,13 @@ def install(app, control):
             if not operation:
                 return None
             administrator(principal, operation["project"], operation["kind"])
-            if if_match.strip('"') != operation["updated_at"].isoformat():
+            # Response serialization uses Z for UTC while PostgreSQL's datetime
+            # uses +00:00. Compare instants so the returned version round-trips.
+            try:
+                expected_update = datetime.fromisoformat(if_match.strip('"'))
+            except ValueError:
+                expected_update = None
+            if expected_update != operation["updated_at"]:
                 raise HTTPException(412, "Lifecycle operation changed")
             if operation["state"] != "blocked":
                 raise HTTPException(

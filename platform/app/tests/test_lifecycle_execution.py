@@ -178,6 +178,9 @@ class LifecycleExecutionTests(unittest.TestCase):
             return catalog.read(conn, identity)
 
     def test_retirement_preserves_secrets_and_restore_rebuilds_same_identity(self):
+        self.runtime.objects[("Secret", "app-secrets", "project-demo")]["data"][
+            "ACCESS_TOKEN"
+        ] = "dXNlci1zZWNyZXQ="
         retirement = self.start("retire")
         worker.process_one(main)
         self.assertEqual(self.operation(retirement)["state"], "succeeded")
@@ -194,6 +197,12 @@ class LifecycleExecutionTests(unittest.TestCase):
                 "PASSWORD"
             ],
             "cHJpdmF0ZQ==",
+        )
+        self.assertEqual(
+            self.runtime.objects[("Secret", "app-secrets", "project-demo")]["data"][
+                "ACCESS_TOKEN"
+            ],
+            "dXNlci1zZWNyZXQ=",
         )
         # Polling must preserve credentials issued after snapshot preparation.
         self.runtime.objects[("Secret", "app-secrets", "project-demo")]["data"][
@@ -257,9 +266,10 @@ class LifecycleExecutionTests(unittest.TestCase):
             "/v1/operations/" + identity + "/retry", headers={"If-Match": "stale"}
         )
         self.assertEqual(stale.status_code, 412)
+        public_operation = self.client.get("/v1/operations/" + identity).json()
         response = self.client.post(
             "/v1/operations/" + identity + "/retry",
-            headers={"If-Match": operation["updated_at"].isoformat()},
+            headers={"If-Match": '"' + public_operation["updated_at"] + '"'},
         )
         self.assertEqual(response.status_code, 202, response.text)
         worker.process_one(main)
