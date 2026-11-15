@@ -19,6 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 sys.path.insert(0, str(Path(__file__).resolve().parents[3]))
 from app.access_provider import derived_secret
 from app.identity import Principal
+from app.lifecycle import catalog as lifecycle_catalog
 from tests.support.application_access import POLICY
 
 from app import access_store as store
@@ -42,7 +43,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
         )
         with self.connect() as conn:
             conn.execute(
-                "CREATE TABLE projects (name text PRIMARY KEY, project_id uuid DEFAULT gen_random_uuid(), status text, spec jsonb)"
+                "CREATE TABLE projects (name text PRIMARY KEY, project_id uuid UNIQUE DEFAULT gen_random_uuid(), status text, spec jsonb)"
             )
             conn.execute(
                 "CREATE TABLE project_environments (environment_id uuid PRIMARY KEY DEFAULT gen_random_uuid(), project_id uuid, name text)"
@@ -78,6 +79,9 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
                     (project, project),
                 )
             authorization.initialize(conn)
+            # Hosted-access mutations share the same retirement fence as the
+            # installed API, even when this fixture deploys no workloads.
+            lifecycle_catalog.initialize(conn)
             store.initialize(conn)
             from app.deployment_credentials import initialize
 
