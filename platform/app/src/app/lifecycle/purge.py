@@ -130,16 +130,26 @@ def delete_catalog(conn, control, project, project_id, operation_id):
         "DELETE FROM project_lifecycle_operations WHERE project_id=%s AND operation_id<>%s",
         (project_id, operation_id),
     )
-    conn.execute(
-        """DELETE FROM platform_audit.events WHERE scope->>'project'=%s OR
+    # Only the privileged catalog connection can perform this confirmed purge.
+    # Transactional DDL holds a write lock while the append-only guard is paused;
+    # ordinary writers remain blocked, and rollback also restores the guard.
+    with conn.transaction():
+        conn.execute(
+            "ALTER TABLE platform_audit.events DISABLE TRIGGER events_append_only"
+        )
+        conn.execute(
+            """DELETE FROM platform_audit.events WHERE scope->>'project'=%s OR
         target_id=ANY(%s::text[]) OR detail->>'grant_id'=ANY(%s::text[]) OR
         detail->>'consumer_project'=%s OR
         (target_kind='project' AND target_id=%s) OR operation_id IN
         (SELECT operation_id::text FROM application_operations WHERE application_id IN
         (SELECT a.application_id FROM project_applications a JOIN project_environments e USING(environment_id)
         WHERE e.project_id=%s))""",
-        (project, audit_ids, audit_ids, project, project, project_id),
-    )
+            (project, audit_ids, audit_ids, project, project, project_id),
+        )
+        conn.execute(
+            "ALTER TABLE platform_audit.events ENABLE TRIGGER events_append_only"
+        )
     control.delete_project_catalog(conn, project)
     for issuer, subject in machines:
         conn.execute(

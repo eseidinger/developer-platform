@@ -117,6 +117,17 @@ class LifecycleExecutionTests(unittest.TestCase):
             conn.execute(
                 "CREATE TABLE IF NOT EXISTS platform_audit.events(scope JSONB,target_kind TEXT,target_id TEXT,operation_id TEXT,detail JSONB)"
             )
+            # Exercise the installed append-only boundary, rather than an
+            # unprotected audit table that hides purge integration failures.
+            conn.execute("""CREATE OR REPLACE FUNCTION platform_audit.reject_change()
+                RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+                RAISE EXCEPTION 'platform audit records are append-only'; END; $$""")
+            conn.execute(
+                "DROP TRIGGER IF EXISTS events_append_only ON platform_audit.events"
+            )
+            conn.execute("""CREATE TRIGGER events_append_only
+                BEFORE UPDATE OR DELETE OR TRUNCATE ON platform_audit.events
+                FOR EACH STATEMENT EXECUTE FUNCTION platform_audit.reject_change()""")
             spec = to_flat(
                 {
                     "apiVersion": "platform.eseidinger.de/v1",
@@ -366,6 +377,11 @@ class LifecycleExecutionTests(unittest.TestCase):
                 ).fetchone()[0],
                 1,
             )
+            with self.assertRaises(psycopg.errors.RaiseException):
+                conn.execute(
+                    "DELETE FROM platform_audit.events WHERE target_id=%s",
+                    (str(foreign),),
+                )
         erasure.atomic(erasure.directory() / (identity + ".final.json"), receipt)
         worker.process_one(main)
         with self.connect() as conn:
@@ -376,6 +392,38 @@ class LifecycleExecutionTests(unittest.TestCase):
                 ).fetchone(),
                 ({}, {}),
             )
+
+    def test_audit_guard_is_restored_when_scoped_erasure_fails(self):
+        identity = self.start("purge")
+        for _ in range(3):
+            worker.process_one(main)
+        operation = self.operation(identity)
+        receipt = {
+            key: operation[key] for key in ("operation_id", "project_id", "project")
+        }
+        receipt["verified"] = True
+        erasure.atomic(erasure.directory() / (identity + ".receipt.json"), receipt)
+        with self.connect() as conn:
+            conn.execute("""CREATE FUNCTION platform_audit.fail_erasure()
+                RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN
+                RAISE EXCEPTION 'injected erasure failure'; END; $$""")
+            conn.execute("""CREATE TRIGGER fail_erasure BEFORE DELETE
+                ON platform_audit.events FOR EACH STATEMENT
+                EXECUTE FUNCTION platform_audit.fail_erasure()""")
+        try:
+            worker.process_one(main)
+            self.assertEqual(self.operation(identity)["state"], "blocked")
+            with self.connect() as conn:
+                self.assertEqual(
+                    conn.execute(
+                        "SELECT tgenabled FROM pg_trigger WHERE tgrelid='platform_audit.events'::regclass AND tgname='events_append_only'"
+                    ).fetchone()[0],
+                    "O",
+                )
+        finally:
+            with self.connect() as conn:
+                conn.execute("DROP TRIGGER fail_erasure ON platform_audit.events")
+                conn.execute("DROP FUNCTION platform_audit.fail_erasure()")
 
     def test_lifecycle_acceptance_drains_admitted_requests_before_secret_capture(self):
         import time
