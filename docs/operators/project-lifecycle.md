@@ -81,6 +81,12 @@ records, project audit entries and recovery points. Active foreign
 store bindings or hosted consumers must be disconnected explicitly
 before accepting the purge.
 
+Audit erasure uses the privileged catalog connection inside the confirmed
+purge transaction. A table write lock isolates the scoped deletion while its
+append-only trigger is paused. The trigger is enabled again before commit;
+transaction rollback also restores it. Ordinary audit writers retain no
+update, delete or truncate authority.
+
 A private root maintenance worker completes operational erasure. The
 API has no Docker socket or backup credentials. Its signed handoff is
 checked against the durable operation and immutable UUID before host
