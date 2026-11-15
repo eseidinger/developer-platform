@@ -239,7 +239,8 @@ class DataServiceTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 503)
         self.assertEqual(
-            response.body, b'{"detail":"Platform database is temporarily unavailable"}'
+            response.body,
+            b'{"detail":"Platform database is temporarily unavailable","code":"dependency_unavailable"}',
         )
 
 

@@ -8,7 +8,6 @@ from fastapi import Depends, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from ..identity import Principal
-from ..stores import catalog as stores
 from . import catalog, snapshot
 
 
@@ -28,7 +27,10 @@ class LifecycleAccepted(BaseModel):
 
 def scope(conn, control, name, action):
     current = catalog.project(conn, name)
-    inventory = stores.retirement_inventory(conn, name)
+    inventory = control.retirement_access_inventory(conn, name)
+    removal = control.current_retirement_scope(conn, name)
+    inventory["workloads"] = removal["removes"] if removal else []
+    inventory["retains"] = removal["retains"] if removal else {}
     history = {}
     for key, query, parameters in (
         (
@@ -55,6 +57,11 @@ def scope(conn, control, name, action):
     blockers = []
     if conn.execute(control.ACTIVE_OPERATION_SQL, (name,)).fetchone():
         blockers.append("application_operation_active")
+    control.ai_store.fail_interrupted_runs(conn, name)
+    if conn.execute(
+        "SELECT 1 FROM ai_runs WHERE project=%s AND state='running' LIMIT 1", (name,)
+    ).fetchone():
+        blockers.append("ai_run_active")
     if action == "restore":
         if current["status"] != "retired":
             blockers.append("project_not_retired")
@@ -112,7 +119,10 @@ def scope(conn, control, name, action):
 def install(app, control):
     caller = Depends(control.current_principal)
 
-    def administrator(principal):
+    def administrator(principal, project, action):
+        if action == "retire":
+            control.require_permission(principal, "retire", project)
+            return
         control.require_platform_admin(principal)
         with control.connect() as conn:
             if control.access_scope(conn, principal) is not None:
@@ -121,7 +131,7 @@ def install(app, control):
                 )
 
     def preview(project, action, principal):
-        administrator(principal)
+        administrator(principal, project, action)
         with control.connect() as conn, conn.transaction():
             conn.execute("SELECT pg_advisory_xact_lock(%s)", (catalog.LOCK,))
             result = scope(conn, control, project, action)
@@ -132,7 +142,7 @@ def install(app, control):
         }
 
     def accept(project, action, body, principal):
-        administrator(principal)
+        administrator(principal, project, action)
         with control.connect() as conn, conn.transaction():
             conn.execute("SELECT pg_advisory_xact_lock(%s)", (catalog.LOCK,))
             result = scope(conn, control, project, action)

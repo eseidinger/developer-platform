@@ -56,7 +56,7 @@ class StoreApiTests(TestCase):
     def test_foreign_resource_administration_checks_owning_project(self):
         self.control.require_permission.side_effect = HTTPException(403, "Denied")
         with patch.object(catalog, "resource", return_value={"owner_project": "alpha"}):
-            response = self.client.get(f"/v1/resources/{self.resource_id}")
+            response = self.client.get(f"/v1/stores/{self.resource_id}")
         self.assertEqual(response.status_code, 403)
         self.control.require_permission.assert_called_once_with(
             self.principal, "manage", "alpha"
@@ -86,7 +86,7 @@ class StoreApiTests(TestCase):
                 patch.object(api.providers, "get") as selected,
             ):
                 selected.return_value.quota_enforcement = expected
-                response = self.client.get(f"/v1/resources/{self.resource_id}")
+                response = self.client.get(f"/v1/stores/{self.resource_id}")
                 self.assertEqual(response.status_code, 200)
                 self.assertEqual(response.json()["quota_enforcement"], expected)
 
@@ -121,7 +121,7 @@ class StoreApiTests(TestCase):
             patch.object(catalog, "issue") as issue,
         ):
             response = self.client.post(
-                "/v1/projects/alpha/resources",
+                "/v1/projects/alpha/stores",
                 json={"name": "db", "provider": "postgresql"},
             )
             credential = self.client.post(
@@ -151,7 +151,7 @@ class StoreApiTests(TestCase):
             ):
                 with self.subTest(provider=provider):
                     response = self.client.post(
-                        "/v1/projects/alpha/resources",
+                        "/v1/projects/alpha/stores",
                         json={"name": "legacy", "provider": provider},
                     )
                     self.assertEqual(response.status_code, 422)
@@ -175,7 +175,7 @@ class StoreApiTests(TestCase):
             ):
                 with self.subTest(provider=provider, extensions=extensions):
                     response = self.client.post(
-                        "/v1/projects/alpha/resources",
+                        "/v1/projects/alpha/stores",
                         json={
                             "name": "invalid",
                             "provider": provider,
@@ -250,7 +250,7 @@ class StoreApiTests(TestCase):
             patch.object(catalog, "change_mode") as change,
         ):
             response = self.client.put(
-                f"/v1/resource-grants/{self.grant_id}/mode",
+                f"/v1/store-grants/{self.grant_id}/mode",
                 json={"version": 1, "mode": "read-write"},
             )
         self.assertEqual(response.status_code, 409)

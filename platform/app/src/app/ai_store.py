@@ -2,6 +2,7 @@
 
 from uuid import uuid4
 
+from fastapi import HTTPException
 from psycopg.types.json import Jsonb
 
 CLASSES = {"public", "internal", "confidential", "restricted"}
@@ -54,6 +55,14 @@ def classification(conn, project: str) -> str | None:
 
 
 def create_run(conn, project, principal, kind, model, base_revision=None):
+    # Serialize run admission with lifecycle preview/acceptance. The running row
+    # remains a blocker while model tools and the final audit write are active.
+    conn.execute("SELECT pg_advisory_xact_lock(731904)")
+    if conn.execute(
+        "SELECT 1 FROM project_lifecycle_operations WHERE project=%s AND state IN ('queued','running','blocked')",
+        (project,),
+    ).fetchone():
+        raise HTTPException(409, "Project lifecycle blocks AI runs")
     run_id = uuid4()
     conn.execute(
         """INSERT INTO ai_runs(run_id,project,requester_issuer,requester_subject,kind,state,model,base_revision)

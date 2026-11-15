@@ -1,7 +1,7 @@
 """AI run completion must use the append-only audit contract."""
 
 import unittest
-from contextlib import ExitStack
+from contextlib import ExitStack, nullcontext
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -12,6 +12,12 @@ from app import main
 
 
 class Connection:
+    def transaction(self):
+        return nullcontext()
+
+    def execute(self, *args):
+        return None
+
     def __enter__(self):
         return self
 

@@ -1,5 +1,6 @@
 """Rebuild a retired project using retained data and newly issued credentials."""
 
+import copy
 import os
 from uuid import uuid4
 
@@ -66,28 +67,36 @@ def restore(conn, control, operation):
             "UPDATE projects SET status='empty' WHERE project_id=%s", (project_id,)
         )
         return True
-    # Namespace setup precedes secrets; workload creation is performed later by
-    # the regular apply worker once restored store credentials have reconciled.
-    namespace = component_resources(
-        project,
-        spec["components"],
-        "192.0.2.1",
-        "unused",
-        spec.get("configuration"),
-        os.environ["APPS_DOMAIN"],
-    )[0]
-    control.apply(namespace)
-    for secret in saved["secrets"]:
-        secret = dict(secret)
-        annotations = secret.pop("annotations", {})
-        secret["metadata"]["annotations"] = annotations
-        # Managed service credentials are regenerated, never resurrected.
-        secret["data"] = {
-            k: v
-            for k, v in secret.get("data", {}).items()
-            if not k.startswith("ACCESS_")
-        }
-        control.apply(secret)
+    # Preparation is durable: later polls must preserve newly issued managed
+    # credentials and any secret changes made by dependent reconcilers.
+    if not operation["result"].get("prepared"):
+        # Namespace setup precedes secrets; workload creation is performed later by
+        # the regular apply worker once restored store credentials have reconciled.
+        namespace = component_resources(
+            project,
+            spec["components"],
+            "192.0.2.1",
+            "unused",
+            spec.get("configuration"),
+            os.environ["APPS_DOMAIN"],
+        )[0]
+        control.apply(namespace)
+        for secret in saved["secrets"]:
+            secret = copy.deepcopy(secret)
+            annotations = secret.pop("annotations", {})
+            secret["metadata"]["annotations"] = annotations
+            # Managed service credentials are regenerated, never resurrected.
+            secret["data"] = {
+                k: v
+                for k, v in secret.get("data", {}).items()
+                if not k.startswith("ACCESS_")
+            }
+            control.apply(secret)
+        operation["result"]["prepared"] = True
+        conn.execute(
+            "UPDATE project_lifecycle_operations SET result=%s WHERE operation_id=%s",
+            (Jsonb(operation["result"]), operation["operation_id"]),
+        )
     from ..stores.worker import reconcile
 
     reconcile(conn, control)
@@ -109,7 +118,11 @@ def restore(conn, control, operation):
             "UPDATE project_lifecycle_operations SET result=%s WHERE operation_id=%s",
             (
                 Jsonb(
-                    {"deployment_operation_id": str(deployment), "revision": revision}
+                    {
+                        **operation["result"],
+                        "deployment_operation_id": str(deployment),
+                        "revision": revision,
+                    }
                 ),
                 operation["operation_id"],
             ),

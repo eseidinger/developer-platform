@@ -173,7 +173,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
         ):
             with self.subTest(run_id=run_id):
                 response = await self.client.get(
-                    "/platform/test-identities",
+                    "/v1/platform/test-identities",
                     params={"test_run_id": run_id} if run_id is not None else {},
                 )
                 self.assertEqual(response.status_code, 200)
@@ -193,7 +193,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
                     self.assertNotIn("provider_client_id", record)
         self.active_actor = self.consumer
         denied = await self.client.get(
-            "/platform/test-identities", params={"test_run_id": "run-1"}
+            "/v1/platform/test-identities", params={"test_run_id": "run-1"}
         )
         self.assertEqual(denied.status_code, 403)
 
@@ -506,7 +506,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
             )
             authorization.grant(conn, self.actor, "platform", None, "platform-admin")
         self.active_actor = self.actor
-        recovered = await self.client.post("/operator/application-access/recover")
+        recovered = await self.client.post("/v1/operator/application-access/recover")
         self.assertEqual(recovered.status_code, 202, recovered.text)
         with self.connect() as conn, store.locked(conn):
             self.assertNotEqual(
@@ -617,7 +617,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
                 "SELECT id::text FROM hosted_access_operations WHERE action='membership.grant'"
             ).fetchone()[0]
         denied = await self.client.post(
-            "/v1/access-operations/" + operation + "/retry",
+            "/v1/operations/" + operation + "/retry",
             headers={"If-Match": '"' + str(membership["version"]) + '"'},
         )
         self.assertEqual(denied.status_code, 403)
@@ -626,7 +626,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
                 conn, self.actor, "project", "provider", "project-admin"
             )
         retried = await self.client.post(
-            "/v1/access-operations/" + operation + "/retry",
+            "/v1/operations/" + operation + "/retry",
             headers={"If-Match": '"' + str(membership["version"]) + '"'},
         )
         self.assertEqual(retried.status_code, 202, retried.text)
@@ -694,10 +694,10 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
     async def test_snapshot_quarantine_recovery_and_changed_backend_fail_closed(self):
         policy, group = await self.policy()
         headers = {"Authorization": "Bearer " + derived_secret("platform", "internal")}
-        unauthorized = await self.client.get("/internal/application-access/snapshot")
+        unauthorized = await self.client.get("/v1/internal/application-access/snapshot")
         self.assertEqual(unauthorized.status_code, 401)
         current = await self.client.get(
-            "/internal/application-access/snapshot", headers=headers
+            "/v1/internal/application-access/snapshot", headers=headers
         )
         self.assertEqual(current.status_code, 200, current.text)
         self.assertEqual(len(current.json()["policies"]), 1)
@@ -712,14 +712,14 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
             store.bump(conn)
             authorization.grant(conn, self.actor, "platform", None, "platform-admin")
         quarantined = await self.client.get(
-            "/internal/application-access/snapshot", headers=headers
+            "/v1/internal/application-access/snapshot", headers=headers
         )
         self.assertTrue(quarantined.json()["recoveryRequired"])
         self.assertEqual(quarantined.json()["policies"], [])
-        recovered = await self.client.post("/operator/application-access/recover")
+        recovered = await self.client.post("/v1/operator/application-access/recover")
         self.assertEqual(recovered.status_code, 202, recovered.text)
         staged = await self.client.get(
-            "/internal/application-access/snapshot", headers=headers
+            "/v1/internal/application-access/snapshot", headers=headers
         )
         self.assertFalse(staged.json()["recoveryRequired"])
         self.assertEqual(staged.json()["policies"][0]["state"], "provisioning")
@@ -732,7 +732,7 @@ class AccessDatabaseTests(unittest.IsolatedAsyncioTestCase):
                 "UPDATE projects SET spec=jsonb_set(spec,'{components,0,ports,0,port}','9090') WHERE name='provider'"
             )
         changed = await self.client.get(
-            "/internal/application-access/snapshot", headers=headers
+            "/v1/internal/application-access/snapshot", headers=headers
         )
         self.assertEqual(changed.json()["policies"], [])
 

@@ -254,6 +254,7 @@ class BackupTests(unittest.TestCase):
                 "data_store_state",
                 side_effect=lambda bundle: events.append("stopped-volume-capture"),
             ),
+            patch.object(self.job, "project_ids", return_value=["test-project-uuid"]),
             patch.object(self.job, "dump", side_effect=dump),
             patch.object(
                 self.job,

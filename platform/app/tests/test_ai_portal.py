@@ -132,11 +132,12 @@ class PortalTests(unittest.TestCase):
             ):
                 for suffix in ("runs", "proposals", "context"):
                     self.assertEqual(
-                        client.get(f"/projects/demo/ai/{suffix}").status_code, 403
+                        client.get(f"/v1/projects/demo/ai/{suffix}").status_code, 403
                     )
                 for query in ("limit=0", "limit=51", "before=invalid"):
                     self.assertEqual(
-                        client.get(f"/projects/demo/ai/runs?{query}").status_code, 422
+                        client.get(f"/v1/projects/demo/ai/runs?{query}").status_code,
+                        422,
                     )
                 history.assert_not_called()
                 proposals.assert_not_called()

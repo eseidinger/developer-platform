@@ -1,6 +1,7 @@
 """Private host-worker bridge, invoked through Docker exec, never through HTTP."""
 
 import argparse
+import hmac
 import json
 import time
 from uuid import UUID
@@ -14,7 +15,7 @@ from . import catalog, erasure
 def inspect(identity):
     path = erasure.directory() / (identity + ".request.json")
     record = json.loads(path.read_text())
-    if record["signature"] != erasure.sign(record["payload"]):
+    if not hmac.compare_digest(record["signature"], erasure.sign(record["payload"])):
         raise ValueError("Invalid maintenance request")
     with main.connect() as conn:
         operation = catalog.read(conn, identity)

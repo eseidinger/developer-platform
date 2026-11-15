@@ -141,9 +141,16 @@ def clean_backups(root, identity, backup_config):
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         # A fresh verified full backup preserves the remaining projects before
         # snapshots containing the deleted project are forgotten and pruned.
+        previous_run = job.read("status.json", {}).get("run_id")
         job.run()
         status = job.read("status.json", {})
-        if status.get("running") or not status.get("last_verified_snapshot"):
+        if (
+            status.get("running")
+            or status.get("result") != "success"
+            or status.get("run_id") == previous_run
+            or status.get("last_verified_capture") != status.get("started")
+            or not status.get("last_verified_snapshot")
+        ):
             raise MaintenanceError("No verified clean backup")
         clean = status["last_verified_snapshot"]
         snapshots = json.loads(

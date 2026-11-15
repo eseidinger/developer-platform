@@ -1223,7 +1223,7 @@ class LifecycleTests(unittest.TestCase):
             403,
         )
 
-    def test_component_deployment_preserves_separately_managed_configuration(self):
+    def test_full_application_put_replaces_omitted_configuration(self):
         self.assertEqual(self.deploy().status_code, 202)
         configured = self.client.put(
             "/v1/projects/smoke/configuration",
@@ -1252,9 +1252,8 @@ class LifecycleTests(unittest.TestCase):
             headers=self.headers,
         )
         self.assertEqual(migrated.status_code, 202)
-        self.assertEqual(
-            self.catalog.revisions["application-smoke"][-1][1]["configuration"],
-            {"MODE": "fast"},
+        self.assertNotIn(
+            "configuration", self.catalog.revisions["application-smoke"][-1][1]
         )
 
     def test_secrets_are_write_only_audited_by_name_and_roll_the_pods(self):

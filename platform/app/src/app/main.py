@@ -1693,14 +1693,6 @@ def queue_deploy(
     conn.execute("SELECT pg_advisory_lock(731904)")
     try:
         with conn.transaction():
-            if (
-                not lifecycle
-                and conn.execute(
-                    "SELECT 1 FROM project_lifecycle_operations WHERE project=%s AND state IN ('queued','running','blocked')",
-                    (name,),
-                ).fetchone()
-            ):
-                raise HTTPException(409, "A project lifecycle operation is active")
             if expected is not None:
                 current = conn.execute(
                     """SELECT max(r.revision) FROM projects p
@@ -1715,6 +1707,14 @@ def queue_deploy(
                 )
                 if current_revision != expected:
                     raise RevisionConflict(current_revision)
+            if (
+                not lifecycle
+                and conn.execute(
+                    "SELECT 1 FROM project_lifecycle_operations WHERE project=%s AND state IN ('queued','running','blocked')",
+                    (name,),
+                ).fetchone()
+            ):
+                raise HTTPException(409, "A project lifecycle operation is active")
             if target is not None:
                 found = conn.execute(
                     """SELECT r.spec, p.status FROM projects p
@@ -2179,7 +2179,7 @@ def create_ai_run(
         raise HTTPException(503, "Eligible model is not configured") from None
     snapshot = current_spec(name)
     base_revision = snapshot[0] if snapshot else None
-    with connect() as conn:
+    with connect() as conn, conn.transaction():
         run_id = ai_store.create_run(
             conn, name, principal, body.kind, model.name, base_revision
         )
@@ -2201,7 +2201,8 @@ def create_ai_run(
             "tool_calls": 0,
             "estimated_cost_usd": None,
         }
-    with connect() as conn:
+    with connect() as conn, conn.transaction():
+        conn.execute("SELECT pg_advisory_xact_lock(731904)")
         finished = ai_store.finish_run(
             conn,
             run_id,
@@ -2222,20 +2223,20 @@ def create_ai_run(
                 "tool_calls": row[6],
                 "estimated_cost_usd": float(row[7]) if row[7] is not None else None,
             }
-    audit_result = "failed" if outcome["state"] == "failed" else "succeeded"
-    required_audit(
-        actor_for(principal),
-        "ai.run",
-        "ai-run",
-        str(run_id),
-        audit_result,
-        {"project": name},
-        {
-            "kind": body.kind,
-            "state": outcome["state"],
-            "tool_calls": outcome["tool_calls"],
-        },
-    )
+        audit_result = "failed" if outcome["state"] == "failed" else "succeeded"
+        required_audit(
+            actor_for(principal),
+            "ai.run",
+            "ai-run",
+            str(run_id),
+            audit_result,
+            {"project": name},
+            {
+                "kind": body.kind,
+                "state": outcome["state"],
+                "tool_calls": outcome["tool_calls"],
+            },
+        )
     return {"run_id": str(run_id), "project": name, **outcome}
 
 
@@ -4004,7 +4005,10 @@ def operation_status(
 
         lifecycle = read_lifecycle(conn, str(operation_id))
         if lifecycle:
-            require_platform_admin(principal)
+            if lifecycle["kind"] == "retire":
+                require_permission(principal, "view", lifecycle["project"])
+            else:
+                require_platform_admin(principal)
             return lifecycle
         row = conn.execute(
             """SELECT o.operation_id, o.revision, o.state, o.result_version,

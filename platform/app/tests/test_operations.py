@@ -414,8 +414,10 @@ class OperationWorkerTests(OperationWorkerFixture):
         self.assertEqual(
             [call.args[0] for call in self.apply.call_args_list],
             [
-                self.secret(),
-                _with_telemetry(self.deployment(), 1, self.conn.operation_id),
+                _with_telemetry(self.secret(), 1, self.conn.operation_id, "project-1"),
+                _with_telemetry(
+                    self.deployment(), 1, self.conn.operation_id, "project-1"
+                ),
             ],
         )
         self.publish_catalog.assert_called_once_with(self.conn)
@@ -526,7 +528,10 @@ class RestartOperationTests(OperationWorkerFixture):
         self.assertTrue(self.run_one())
 
         secret, deployment = [call.args[0] for call in self.apply.call_args_list]
-        self.assertEqual(secret, self.secret())
+        self.assertEqual(
+            secret,
+            _with_telemetry(self.secret(), 1, self.conn.operation_id, "project-1"),
+        )
         self.assertEqual(self.marker(deployment), "restart-operation-0")
         self.assertEqual(self.marker(self.deployment()), None)
 

@@ -195,6 +195,17 @@ class LifecycleExecutionTests(unittest.TestCase):
             ],
             "cHJpdmF0ZQ==",
         )
+        # Polling must preserve credentials issued after snapshot preparation.
+        self.runtime.objects[("Secret", "app-secrets", "project-demo")]["data"][
+            "ACCESS_NEW_TOKEN"
+        ] = "bmV3"
+        worker.process_one(main)
+        self.assertEqual(
+            self.runtime.objects[("Secret", "app-secrets", "project-demo")]["data"][
+                "ACCESS_NEW_TOKEN"
+            ],
+            "bmV3",
+        )
         with self.connect() as conn:
             conn.execute("UPDATE application_operations SET state='succeeded'")
             conn.execute("UPDATE projects SET status='applied'")
