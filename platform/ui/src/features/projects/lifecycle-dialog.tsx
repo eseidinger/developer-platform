@@ -91,7 +91,7 @@ export function LifecycleDialog({
             </DialogTitle>
             <DialogDescription>{descriptions[action]}</DialogDescription>
           </DialogHeader>
-          {preview.isPending && <p role="status">Loading project scope…</p>}
+          {preview.isFetching && <p role="status">Loading project scope…</p>}
           {preview.isError && <p role="alert">{preview.error.message}</p>}
           {preview.data && (
             <>
@@ -138,6 +138,8 @@ export function LifecycleDialog({
               color={action === 'restore' ? undefined : 'red'}
               disabled={
                 !preview.data ||
+                preview.isFetching ||
+                preview.isError ||
                 preview.data.blockers.length > 0 ||
                 confirmation !== name ||
                 mutation.isPending
