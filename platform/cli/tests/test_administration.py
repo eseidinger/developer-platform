@@ -65,18 +65,18 @@ def test_same_project_request_approval_and_wait(monkeypatch, tmp_path):
                 json={
                     **_resource("provisioning", 2),
                     "operation_id": "op-1",
-                    "status_url": "/v1/access-operations/op-1",
+                    "status_url": "/v1/operations/op-1",
                 },
             )
-        if request.url.path == "/v1/access-operations/op-1":
+        if request.url.path == "/v1/operations/op-1":
             return httpx.Response(
                 200,
                 json={
-                    "id": "op-1",
-                    "resourceId": "svc_1",
+                    "operation_id": "op-1",
+                    "resource_id": "svc_1",
                     "state": "succeeded",
                     "attempts": 1,
-                    "errorCode": None,
+                    "error_code": None,
                 },
             )
         if request.method == "GET" and request.url.path.endswith(
@@ -230,14 +230,14 @@ def test_unauthorized_admin_action_is_reported_without_replay(monkeypatch, tmp_p
 
 def test_failed_access_operation_has_durable_failure_exit(monkeypatch, tmp_path):
     def handler(request):
-        assert request.url.path == "/v1/access-operations/op-1"
+        assert request.url.path == "/v1/operations/op-1"
         return httpx.Response(
             200,
             json={
-                "id": "op-1",
-                "resourceId": "svc_1",
+                "operation_id": "op-1",
+                "resource_id": "svc_1",
                 "state": "failed",
-                "errorCode": "provider_unavailable",
+                "error_code": "provider_unavailable",
                 "attempts": 3,
             },
         )
@@ -280,7 +280,7 @@ def test_configuration_replacement_wait_accepts_operation_metadata(
     def handler(request):
         assert request.headers["authorization"] == "Bearer human-token"
         if request.method == "PUT":
-            assert request.url.path == "/projects/orders/configuration"
+            assert request.url.path == "/v1/projects/orders/configuration"
             assert request.headers["if-match"] == '"3"'
             assert json.loads(request.content) == {"values": {"MODE": "ready"}}
             return httpx.Response(
@@ -328,7 +328,7 @@ def test_configuration_replacement_wait_accepts_operation_metadata(
 
 def test_operator_audit_csv_export(monkeypatch, tmp_path):
     def handler(request):
-        assert request.url.path == "/operator/audit/events"
+        assert request.url.path == "/v1/operator/audit/events"
         assert request.url.params["format"] == "csv"
         assert request.url.params["limit"] == "20"
         return httpx.Response(
@@ -373,7 +373,7 @@ def test_profile_default_project_and_output(monkeypatch, tmp_path):
     )
 
     def handler(request):
-        assert request.url.path == "/projects"
+        assert request.url.path == "/v1/projects"
         return httpx.Response(200, json=[{"name": "orders", "status": "active"}])
 
     transport = httpx.Client(transport=httpx.MockTransport(handler))
@@ -404,15 +404,15 @@ def test_public_contract_has_a_domain_command_for_every_operation():
     [
         (
             ["metrics", "get", "--component", "web"],
-            "/projects/orders/application-metrics",
+            "/v1/projects/orders/application-metrics",
             {"component": "web"},
         ),
-        (["traces", "get", "a" * 32], "/projects/orders/traces/" + "a" * 32, {}),
-        (["ai", "policy", "get"], "/projects/orders/ai/policy", {}),
-        (["ai", "runs", "get", "run-1"], "/projects/orders/ai/runs/run-1", {}),
+        (["traces", "get", "a" * 32], "/v1/projects/orders/traces/" + "a" * 32, {}),
+        (["ai", "policy", "get"], "/v1/projects/orders/ai/policy", {}),
+        (["ai", "runs", "get", "run-1"], "/v1/projects/orders/ai/runs/run-1", {}),
         (
             ["ai", "proposals", "get", "proposal-1"],
-            "/projects/orders/ai/proposals/proposal-1",
+            "/v1/projects/orders/ai/proposals/proposal-1",
             {},
         ),
     ],
@@ -481,7 +481,7 @@ def test_ai_mutations_send_exact_reviewed_document(
 
     def handler(request):
         assert request.method == method
-        assert request.url.path == "/projects/orders/ai/" + suffix
+        assert request.url.path == "/v1/projects/orders/ai/" + suffix
         assert json.loads(request.content) == body
         return httpx.Response(200, json={"project": "orders", "state": "succeeded"})
 
@@ -524,8 +524,11 @@ def test_obsolete_database_issuance_commands_are_excluded():
     commands = {item.command for item in COMMANDS}
     assert "database-access grants create" not in commands
     assert "database-access credential issue" not in commands
-    assert ("POST", "/projects/{name}/database-access/grants") in EXCLUSIONS
-    assert ("POST", "/projects/{name}/database-access/me/credential") in EXCLUSIONS
+    assert ("POST", "/v1/projects/{project}/database-access/grants") in EXCLUSIONS
+    assert (
+        "POST",
+        "/v1/projects/{project}/database-access/me/credential",
+    ) in EXCLUSIONS
 
 
 @pytest.mark.parametrize("provider", ["postgresql", "s3"])
@@ -711,7 +714,7 @@ def test_tunnel_rejects_untrusted_endpoint_and_exposed_key(monkeypatch, tmp_path
 def test_runner_preflight_has_a_domain_command(monkeypatch, tmp_path):
     def handler(request):
         assert request.method == "GET"
-        assert request.url.path == "/platform/test-context"
+        assert request.url.path == "/v1/platform/test-context"
         return httpx.Response(200, json={"kind": "test-runner"})
 
     runner = _cli(monkeypatch, tmp_path, handler)

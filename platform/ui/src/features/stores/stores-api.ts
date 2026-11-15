@@ -93,7 +93,7 @@ export const getContext = async (project: string) =>
 export const getResources = async (project: string) =>
   z.object({ resources: z.array(resource) }).parse(
     checked(
-      await apiClient.GET('/v1/projects/{project}/resources', {
+      await apiClient.GET('/v1/projects/{project}/stores', {
         params: { path: { project } },
       }),
     ),
@@ -101,7 +101,7 @@ export const getResources = async (project: string) =>
 export const getBindings = async (project: string) =>
   z.object({ bindings: z.array(grant) }).parse(
     checked(
-      await apiClient.GET('/v1/projects/{project}/resource-bindings', {
+      await apiClient.GET('/v1/projects/{project}/store-bindings', {
         params: { path: { project } },
       }),
     ),
@@ -109,7 +109,7 @@ export const getBindings = async (project: string) =>
 export const getGrants = async (resource_id: string) =>
   z.object({ grants: z.array(grant) }).parse(
     checked(
-      await apiClient.GET('/v1/resources/{resource_id}/grants', {
+      await apiClient.GET('/v1/stores/{resource_id}/grants', {
         params: { path: { resource_id } },
       }),
     ),
@@ -123,7 +123,7 @@ export const createResource = async (
   body: Schema['ResourceCreate'],
 ) =>
   checked(
-    await apiClient.POST('/v1/projects/{project}/resources', {
+    await apiClient.POST('/v1/projects/{project}/stores', {
       params: { path: { project } },
       body,
     }),
@@ -133,21 +133,21 @@ export const renameResource = async (
   body: Schema['ResourceRename'],
 ) =>
   checked(
-    await apiClient.PATCH('/v1/resources/{resource_id}', {
+    await apiClient.PATCH('/v1/stores/{resource_id}', {
       params: { path: { resource_id } },
       body,
     }),
   )
 export const quota = async (resource_id: string, body: Schema['QuotaChange']) =>
   checked(
-    await apiClient.PUT('/v1/resources/{resource_id}/quota', {
+    await apiClient.PUT('/v1/stores/{resource_id}/quota', {
       params: { path: { resource_id } },
       body,
     }),
   )
 export const retireResource = async (resource_id: string, version: number) =>
   checked(
-    await apiClient.POST('/v1/resources/{resource_id}/retirement', {
+    await apiClient.POST('/v1/stores/{resource_id}/retirement', {
       params: { path: { resource_id } },
       body: { version },
     }),
@@ -155,14 +155,14 @@ export const retireResource = async (resource_id: string, version: number) =>
 export const getPreview = async (resource_id: string) =>
   preview.parse(
     checked(
-      await apiClient.GET('/v1/resources/{resource_id}/purge-preview', {
+      await apiClient.GET('/v1/stores/{resource_id}/purge-preview', {
         params: { path: { resource_id } },
       }),
     ),
   )
 export const purgeResource = async (row: Preview) =>
   checked(
-    await apiClient.POST('/v1/resources/{resource_id}/purge', {
+    await apiClient.POST('/v1/stores/{resource_id}/purge', {
       params: { path: { resource_id: row.resource_id } },
       body: {
         version: row.version,
@@ -176,7 +176,7 @@ export const createHuman = async (
   body: Schema['HumanGrant'],
 ) =>
   checked(
-    await apiClient.POST('/v1/resources/{resource_id}/human-grants', {
+    await apiClient.POST('/v1/stores/{resource_id}/human-grants', {
       params: { path: { resource_id } },
       body,
     }),
@@ -186,28 +186,28 @@ export const requestBinding = async (
   body: Schema['BindingRequest'],
 ) =>
   checked(
-    await apiClient.POST('/v1/projects/{project}/resource-bindings', {
+    await apiClient.POST('/v1/projects/{project}/store-bindings', {
       params: { path: { project } },
       body,
     }),
   )
 export const approve = async (row: Grant, approved: boolean) =>
   checked(
-    await apiClient.POST('/v1/resource-grants/{grant_id}/approval', {
+    await apiClient.POST('/v1/store-grants/{grant_id}/approval', {
       params: { path: { grant_id: row.grant_id } },
       body: { version: row.version, approve: approved },
     }),
   )
 export const revoke = async (row: Grant) =>
   checked(
-    await apiClient.POST('/v1/resource-grants/{grant_id}/revocation', {
+    await apiClient.POST('/v1/store-grants/{grant_id}/revocation', {
       params: { path: { grant_id: row.grant_id } },
       body: { version: row.version },
     }),
   )
 export const mode = async (row: Grant, next: Schema['GrantUpdate']['mode']) =>
   checked(
-    await apiClient.PUT('/v1/resource-grants/{grant_id}/mode', {
+    await apiClient.PUT('/v1/store-grants/{grant_id}/mode', {
       params: { path: { grant_id: row.grant_id } },
       body: { version: row.version, mode: next },
     }),

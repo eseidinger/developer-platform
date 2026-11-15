@@ -347,7 +347,7 @@ def _path(spec: CommandSpec, values: dict) -> str:
         val = require(
             values,
             "project"
-            if key in {"project", "name"} and spec.path != "/projects"
+            if key in {"project", "name"} and spec.path != "/v1/projects"
             else key,
         )
         if not re.fullmatch(r"[A-Za-z0-9._-]+", str(val)):
@@ -437,12 +437,12 @@ def watch_access(
     deadline = time.monotonic() + timeout
     while True:
         raw, _ = client.request_json(
-            "GET", "/v1/access-operations/" + quote(operation_id, safe="")
+            "GET", "/v1/operations/" + quote(operation_id, safe="")
         )
         status = AccessOperation.model_validate(raw)
         progress(status.state)
         if status.state in {"failed", "cancelled"}:
-            raise AccessOperationFailed(operation_id, status.errorCode or status.state)
+            raise AccessOperationFailed(operation_id, status.error_code or status.state)
         if status.state == "succeeded":
             return raw
         if time.monotonic() >= deadline:

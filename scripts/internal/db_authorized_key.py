@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 TOKEN_FILE = Path("/etc/developer-platform/db-bastion-token")
-URL = "http://127.0.0.1:8000/internal/database-access/authorized-key"
+URL = "http://127.0.0.1:8000/v1/internal/database-access/authorized-key"
 FINGERPRINT = re.compile(r"^SHA256:[A-Za-z0-9+/]{43}$")
 
 

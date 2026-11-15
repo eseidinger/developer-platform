@@ -122,7 +122,10 @@ class PlatformClient:
         if if_match is not None:
             headers["If-Match"] = if_match
         response = self._request(
-            "PUT", f"/projects/{project}", headers=headers, json=body
+            "PUT",
+            (f"/v1/projects/{project}") + "/application",
+            headers=headers,
+            json=body,
         )
         try:
             return OperationAccepted.model_validate(response.json())
@@ -191,8 +194,8 @@ class PlatformClient:
         attempts = 3 if method == "GET" else 1
         if (
             method == "POST"
-            and len(parsed.path.split("/")) == 5
-            and parsed.path.startswith("/projects/")
+            and len(parsed.path.split("/")) == 6
+            and parsed.path.startswith("/v1/projects/")
             and parsed.path.endswith("/ai/runs")
         ):
             # Synchronous AI investigations have a 90-second server budget.

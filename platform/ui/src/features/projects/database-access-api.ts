@@ -115,8 +115,8 @@ function parseCredential(value: unknown): OneTimeDatabaseCredential {
 
 async function listHumanDatabaseGrants(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/database-access/grants',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/database-access/grants',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   return parseGrants(data)
@@ -127,9 +127,9 @@ async function createHumanDatabaseGrant(
   grant: NewHumanDatabaseGrant,
 ) {
   const { data, error, response } = await apiClient.POST(
-    '/projects/{name}/database-access/grants',
+    '/v1/projects/{project}/database-access/grants',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
       body: {
         issuer: grant.issuer,
         subject: grant.subject,
@@ -146,9 +146,9 @@ async function revokeHumanDatabaseGrant(
   grant: Pick<HumanDatabaseGrant, 'issuer' | 'subject'>,
 ) {
   const { error, response } = await apiClient.DELETE(
-    '/projects/{name}/database-access/grants',
+    '/v1/projects/{project}/database-access/grants',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
       body: { issuer: grant.issuer, subject: grant.subject },
     },
   )
@@ -157,8 +157,8 @@ async function revokeHumanDatabaseGrant(
 
 async function getMyDatabaseAccess(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/database-access/me',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/database-access/me',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   return parseMyAccess(data)
@@ -166,9 +166,9 @@ async function getMyDatabaseAccess(name: string) {
 
 async function replaceMyDatabaseKey(name: string, publicKey: string) {
   const { data, error, response } = await apiClient.PUT(
-    '/projects/{name}/database-access/me/key',
+    '/v1/projects/{project}/database-access/me/key',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
       body: { public_key: publicKey },
     },
   )
@@ -178,9 +178,9 @@ async function replaceMyDatabaseKey(name: string, publicKey: string) {
 
 async function issueMyDatabaseCredential(name: string) {
   const { data, error, response } = await apiClient.POST(
-    '/projects/{name}/database-access/me/credential',
+    '/v1/projects/{project}/database-access/me/credential',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
     },
   )
   if (error) throw apiErrorFromResponse(response, error)

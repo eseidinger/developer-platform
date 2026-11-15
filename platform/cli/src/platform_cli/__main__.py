@@ -35,6 +35,7 @@ auth_app = typer.Typer(
 )
 app.add_typer(deploy_app, name="deploy")
 app.add_typer(auth_app, name="auth")
+app._devplat_children = {"deploy": deploy_app, "auth": auth_app}
 
 
 def _version_callback(value: bool):
@@ -473,12 +474,12 @@ def status(
                 raise ConfigurationError(
                     "Supply --project or select a profile with a default project."
                 )
-            projects, _ = client.request_json("GET", "/projects")
+            projects, _ = client.request_json("GET", "/v1/projects")
             row = next((item for item in projects if item.get("name") == project), None)
             if row is None:
                 raise ApiError(404, "Project not found in authorized project list.")
             components, _ = client.request_json(
-                "GET", "/projects/" + project + "/components"
+                "GET", "/v1/projects/" + project + "/components"
             )
             emit({"project": row, "components": components}, selected_output)
         finally:
@@ -505,7 +506,7 @@ def projects_show(
                 raise ConfigurationError(
                     "Supply --project or select a profile with a default project."
                 )
-            rows, _ = client.request_json("GET", "/projects")
+            rows, _ = client.request_json("GET", "/v1/projects")
             row = next((item for item in rows if item.get("name") == project), None)
             if row is None:
                 raise ApiError(404, "Project not found in authorized project list.")

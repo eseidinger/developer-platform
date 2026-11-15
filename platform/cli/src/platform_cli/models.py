@@ -30,10 +30,10 @@ class AccessResource(BaseModel):
 class AccessOperation(BaseModel):
     model_config = ConfigDict(extra="allow")
 
-    id: str = Field(min_length=1)
+    operation_id: str = Field(min_length=1)
     state: str = Field(min_length=1)
-    resourceId: str = Field(min_length=1)
-    errorCode: str | None = None
+    resource_id: str = Field(min_length=1)
+    error_code: str | None = None
 
 
 class OperationAccepted(BaseModel):

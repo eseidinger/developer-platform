@@ -10,11 +10,11 @@ import sys
 import threading
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
-from typing import Literal
+from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
 import psycopg
-from fastapi import Body, Depends, FastAPI, Header, HTTPException, Query, Request
+from fastapi import Body, Depends, FastAPI, Header, HTTPException, Path, Query, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
@@ -557,7 +557,7 @@ def require_test_identity_manager(principal: Principal) -> None:
 async def validation_error(request: Request, exc: RequestValidationError):
     actor = getattr(request.state, "audit_actor", None)
     if actor and request.method in {"POST", "PUT", "PATCH", "DELETE"}:
-        target_id = request.path_params.get("name")
+        target_id = request.path_params.get("project")
         if (
             best_effort_audit(
                 actor,
@@ -577,8 +577,8 @@ async def validation_error(request: Request, exc: RequestValidationError):
             )
     if (
         request.method == "PUT"
-        and request.url.path.startswith("/projects/")
-        and request.url.path.count("/") == 2
+        and request.url.path.startswith("/v1/projects/")
+        and request.url.path.endswith("/application")
     ):
         return JSONResponse(
             status_code=422,
@@ -696,7 +696,7 @@ def ready():
     return {"status": "ready"}
 
 
-@app.get("/projects")
+@app.get("/v1/projects")
 def projects(principal: Principal = Depends(current_principal)):
     with connect() as conn:
         rows = projects_for_principal(conn, principal)
@@ -705,7 +705,7 @@ def projects(principal: Principal = Depends(current_principal)):
     ]
 
 
-@app.post("/projects")
+@app.post("/v1/projects")
 def create_empty_project(
     body: EmptyProjectCreate, principal: Principal = Depends(current_principal)
 ):
@@ -769,7 +769,7 @@ def capabilities(principal: Principal = Depends(current_principal)):
             "hostedProbeSemantics": "access-boundary",
             "semanticReadiness": "kubernetes",
             "retainedLogs": {
-                "endpoint": "/projects/{name}/retained-logs",
+                "endpoint": "/v1/projects/{project}/retained-logs",
                 "requiresPermission": "view",
                 "format": "application-json-v1",
                 "retentionSeconds": 604800,
@@ -781,9 +781,9 @@ def capabilities(principal: Principal = Depends(current_principal)):
     }
 
 
-@app.post("/projects/{name}/deployment-credentials")
+@app.post("/v1/projects/{project}/deployment-credentials")
 def create_deployment_credential(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     body: DeploymentCredentialCreate,
     principal: Principal = Depends(current_principal),
 ):
@@ -858,9 +858,10 @@ def create_deployment_credential(
     return JSONResponse(status_code=201, content=jsonable_encoder(result))
 
 
-@app.get("/projects/{name}/deployment-credentials")
+@app.get("/v1/projects/{project}/deployment-credentials")
 def list_deployment_credentials(
-    name: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
 ):
     require_permission(principal, "grant", name)
     with connect() as conn:
@@ -886,9 +887,9 @@ def list_deployment_credentials(
     }
 
 
-@app.post("/projects/{name}/deployment-credentials/{credential_id}/rotate")
+@app.post("/v1/projects/{project}/deployment-credentials/{credential_id}/rotate")
 def rotate_deployment_credential(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     credential_id: UUID,
     body: DeploymentCredentialRotate,
     principal: Principal = Depends(current_principal),
@@ -994,9 +995,11 @@ def rotate_deployment_credential(
     return JSONResponse(status_code=201, content=jsonable_encoder(result))
 
 
-@app.delete("/projects/{name}/deployment-credentials/{credential_id}")
+@app.delete("/v1/projects/{project}/deployment-credentials/{credential_id}")
 def revoke_deployment_credential(
-    name: str, credential_id: UUID, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    credential_id: UUID,
+    principal: Principal = Depends(current_principal),
 ):
     """Deny platform access first, then remove the identity-provider client."""
     require_permission(principal, "grant", name)
@@ -1054,7 +1057,7 @@ def revoke_deployment_credential(
     return {"credential_id": str(credential_id), "status": "revoked"}
 
 
-@app.get("/platform/test-context")
+@app.get("/v1/platform/test-context")
 def test_context(principal: Principal = Depends(current_principal)):
     """Confirm suite authority without exposing or administering runner credentials."""
     require_test_identity_manager(principal)
@@ -1063,7 +1066,7 @@ def test_context(principal: Principal = Depends(current_principal)):
     return {"kind": "human" if machine is None else machine.kind}
 
 
-@app.post("/platform/test-runner-credentials")
+@app.post("/v1/platform/test-runner-credentials")
 def create_test_runner_credential(
     body: TestRunnerCredentialCreate, principal: Principal = Depends(current_principal)
 ):
@@ -1074,7 +1077,7 @@ def create_test_runner_credential(
     return JSONResponse(status_code=201, content=jsonable_encoder(result))
 
 
-@app.get("/platform/test-runner-credentials")
+@app.get("/v1/platform/test-runner-credentials")
 def list_test_runner_credentials(principal: Principal = Depends(current_principal)):
     require_human_platform_admin(principal)
     with connect() as conn:
@@ -1094,7 +1097,7 @@ def list_test_runner_credentials(principal: Principal = Depends(current_principa
     return {"credentials": [public_credential_record(row) for row in rows]}
 
 
-@app.post("/platform/test-runner-credentials/{credential_id}/rotate")
+@app.post("/v1/platform/test-runner-credentials/{credential_id}/rotate")
 def rotate_test_runner_credential(
     credential_id: UUID,
     body: DeploymentCredentialRotate,
@@ -1195,7 +1198,7 @@ def rotate_test_runner_credential(
     return JSONResponse(status_code=201, content=jsonable_encoder(result))
 
 
-@app.delete("/platform/test-runner-credentials/{credential_id}")
+@app.delete("/v1/platform/test-runner-credentials/{credential_id}")
 def revoke_test_runner_credential(
     credential_id: UUID, principal: Principal = Depends(current_principal)
 ):
@@ -1253,7 +1256,7 @@ def revoke_test_runner_credential(
     return {"credential_id": str(credential_id), "status": "revoked"}
 
 
-@app.post("/platform/test-identities")
+@app.post("/v1/platform/test-identities")
 def create_test_identity(
     body: TestIdentityCreate, principal: Principal = Depends(current_principal)
 ):
@@ -1343,7 +1346,7 @@ def create_test_identity(
     return JSONResponse(status_code=201, content=jsonable_encoder(result))
 
 
-@app.get("/platform/test-identities")
+@app.get("/v1/platform/test-identities")
 def list_test_identities(
     test_run_id: str | None = Query(None, max_length=64),
     principal: Principal = Depends(current_principal),
@@ -1376,7 +1379,7 @@ def list_test_identities(
     }
 
 
-@app.delete("/platform/test-identities/{credential_id}")
+@app.delete("/v1/platform/test-identities/{credential_id}")
 def revoke_test_identity(
     credential_id: UUID, principal: Principal = Depends(current_principal)
 ):
@@ -1452,9 +1455,10 @@ def _operator_audit(
     )
 
 
-@app.get("/operator/projects/{name}/permissions")
+@app.get("/v1/operator/projects/{project}/permissions")
 def inspect_project_permissions(
-    name: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
 ):
     """Inspect project grants; this is intentionally unavailable to project members."""
     _operator_audit(principal, "security.permissions.inspect", name, {"project": name})
@@ -1477,9 +1481,10 @@ def inspect_project_permissions(
     }
 
 
-@app.get("/operator/projects/{name}/security-configuration")
+@app.get("/v1/operator/projects/{project}/security-configuration")
 def inspect_project_security_configuration(
-    name: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
 ):
     """Return the safe, managed workload and network policy contract for a project."""
     _operator_audit(
@@ -1523,7 +1528,7 @@ def inspect_project_security_configuration(
     }
 
 
-@app.get("/operator/audit/events")
+@app.get("/v1/operator/audit/events")
 def export_audit_events(
     start: datetime,
     end: datetime,
@@ -1702,9 +1707,9 @@ def queue_deploy(
 # Deployment admission and asynchronous execution
 
 
-@app.put("/projects/{name}")
+@app.put("/v1/projects/{project}/application", status_code=202)
 def provision(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     body: ApplicationEnvelope,
     principal: Principal = Depends(current_principal),
     if_match: str | None = Header(None),
@@ -1873,8 +1878,11 @@ def provision(
     )
 
 
-@app.get("/projects/{name}/drift")
-def drift(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/drift")
+def drift(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Compare the live Deployment with the desired revision; report only, never repair."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
@@ -1912,9 +1920,9 @@ def drift(name: str, principal: Principal = Depends(current_principal)):
     return {"project": name, "revision": current[0], **result}
 
 
-@app.get("/projects/{name}/application-metrics")
+@app.get("/v1/projects/{project}/application-metrics")
 def project_application_metrics(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     component: str = Query(min_length=1, max_length=32),
     principal: Principal = Depends(current_principal),
 ):
@@ -1943,9 +1951,11 @@ def project_application_metrics(
     return application_metrics.observe(name, component)
 
 
-@app.get("/projects/{name}/traces/{trace_id}")
+@app.get("/v1/projects/{project}/traces/{trace_id}")
 def project_trace(
-    name: str, trace_id: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    trace_id: str,
+    principal: Principal = Depends(current_principal),
 ):
     require_permission(principal, "view", name)
     validate_name(name)
@@ -1960,9 +1970,11 @@ def project_trace(
     return result
 
 
-@app.put("/projects/{name}/ai/policy")
+@app.put("/v1/projects/{project}/ai/policy")
 def set_ai_policy(
-    name: str, body: AIProjectPolicy, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    body: AIProjectPolicy,
+    principal: Principal = Depends(current_principal),
 ):
     require_human_platform_admin(principal)
     validate_name(name)
@@ -1982,8 +1994,11 @@ def set_ai_policy(
     return {"project": name, "classification": body.classification}
 
 
-@app.get("/projects/{name}/ai/policy")
-def get_ai_policy(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/ai/policy")
+def get_ai_policy(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     require_permission(principal, "view", name)
     with connect() as conn:
         classification = ai_store.classification(conn, name)
@@ -1994,8 +2009,11 @@ def get_ai_policy(name: str, principal: Principal = Depends(current_principal)):
     }
 
 
-@app.get("/projects/{name}/ai/context")
-def ai_context(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/ai/context")
+def ai_context(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     require_permission(principal, "view", name)
     with connect() as conn:
         human = access_scope(conn, principal) is None
@@ -2012,9 +2030,9 @@ def ai_context(name: str, principal: Principal = Depends(current_principal)):
     }
 
 
-@app.get("/projects/{name}/ai/runs")
+@app.get("/v1/projects/{project}/ai/runs")
 def list_ai_runs(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     limit: int = Query(20, ge=1, le=50),
     before: UUID | None = None,
     principal: Principal = Depends(current_principal),
@@ -2044,9 +2062,9 @@ def list_ai_runs(
     }
 
 
-@app.get("/projects/{name}/ai/proposals")
+@app.get("/v1/projects/{project}/ai/proposals")
 def list_ai_proposals(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     limit: int = Query(20, ge=1, le=50),
     before: UUID | None = None,
     principal: Principal = Depends(current_principal),
@@ -2060,9 +2078,11 @@ def list_ai_proposals(
     }
 
 
-@app.post("/projects/{name}/ai/runs")
+@app.post("/v1/projects/{project}/ai/runs")
 def create_ai_run(
-    name: str, body: AIRunRequest, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    body: AIRunRequest,
+    principal: Principal = Depends(current_principal),
 ):
     require_permission(principal, "view", name)
     validate_name(name)
@@ -2140,9 +2160,11 @@ def create_ai_run(
     return {"run_id": str(run_id), "project": name, **outcome}
 
 
-@app.get("/projects/{name}/ai/runs/{run_id}")
+@app.get("/v1/projects/{project}/ai/runs/{run_id}")
 def get_ai_run(
-    name: str, run_id: UUID, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    run_id: UUID,
+    principal: Principal = Depends(current_principal),
 ):
     require_permission(principal, "view", name)
     with connect() as conn:
@@ -2203,9 +2225,9 @@ def _ai_runtime_failed(name, spec):
         return False
 
 
-@app.post("/projects/{name}/ai/proposals")
+@app.post("/v1/projects/{project}/ai/proposals")
 def create_ai_proposal(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     body: AIProposalRequest,
     principal: Principal = Depends(current_principal),
 ):
@@ -2248,9 +2270,11 @@ def create_ai_proposal(
     }
 
 
-@app.get("/projects/{name}/ai/proposals/{proposal_id}")
+@app.get("/v1/projects/{project}/ai/proposals/{proposal_id}")
 def get_ai_proposal(
-    name: str, proposal_id: UUID, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    proposal_id: UUID,
+    principal: Principal = Depends(current_principal),
 ):
     require_permission(principal, "view", name)
     with connect() as conn:
@@ -2277,9 +2301,9 @@ def get_ai_proposal(
     return result
 
 
-@app.post("/projects/{name}/ai/proposals/{proposal_id}/approval")
+@app.post("/v1/projects/{project}/ai/proposals/{proposal_id}/approval")
 def approve_ai_proposal(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     proposal_id: UUID,
     body: AIApprovalRequest,
     principal: Principal = Depends(current_principal),
@@ -2318,9 +2342,9 @@ def approve_ai_proposal(
     return get_ai_proposal(name, proposal_id, principal)
 
 
-@app.post("/projects/{name}/ai/proposals/{proposal_id}/execute")
+@app.post("/v1/projects/{project}/ai/proposals/{proposal_id}/execute")
 def execute_ai_proposal(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     proposal_id: UUID,
     body: AIApprovalRequest,
     principal: Principal = Depends(current_principal),
@@ -2380,8 +2404,11 @@ def execute_ai_proposal(
     }
 
 
-@app.get("/projects/{name}/components")
-def component_status(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/components")
+def component_status(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Live, per-component status for a v1alpha2 application revision."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
@@ -2430,8 +2457,11 @@ def current_spec(name: str):
         ).fetchone()
 
 
-@app.get("/projects/{name}/configuration")
-def get_configuration(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/configuration")
+def get_configuration(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Desired configuration values and whether the running deployment has activated them."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
@@ -2468,9 +2498,9 @@ def get_configuration(name: str, principal: Principal = Depends(current_principa
     }
 
 
-@app.put("/projects/{name}/configuration")
+@app.put("/v1/projects/{project}/configuration")
 def put_configuration(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     body: ConfigurationBody,
     principal: Principal = Depends(current_principal),
     if_match: str | None = Header(None),
@@ -2672,8 +2702,11 @@ def secrets_unavailable(actor, action: str, name: str):
     raise HTTPException(503, "Secrets are unavailable; retry the same request.")
 
 
-@app.get("/projects/{name}/secrets")
-def list_secrets(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/secrets")
+def list_secrets(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Secret names and change times, never values, plus whether the pods run the current version."""
     actor, _ = secrets_project(name, principal, "view", "project.secret.list")
     try:
@@ -2698,9 +2731,9 @@ def list_secrets(name: str, principal: Principal = Depends(current_principal)):
     }
 
 
-@app.put("/projects/{name}/secrets/{secret}")
+@app.put("/v1/projects/{project}/secrets/{secret}")
 def set_secret(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     secret: str,
     body: dict = Body(...),
     principal: Principal = Depends(current_principal),
@@ -2787,9 +2820,11 @@ def set_secret(
     )
 
 
-@app.delete("/projects/{name}/secrets/{secret}")
+@app.delete("/v1/projects/{project}/secrets/{secret}")
 def delete_secret(
-    name: str, secret: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    secret: str,
+    principal: Principal = Depends(current_principal),
 ):
     """Remove one secret; the pods restart so the variable disappears."""
     actor, _ = secrets_project(name, principal, "change", "project.secret.delete")
@@ -2828,9 +2863,11 @@ def delete_secret(
     )
 
 
-@app.post("/projects/{name}/secrets/{secret}/confirm")
+@app.post("/v1/projects/{project}/secrets/{secret}/confirm")
 def confirm_secret_rotation(
-    name: str, secret: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    secret: str,
+    principal: Principal = Depends(current_principal),
 ):
     """Revoke the previous value once the pods run the new one."""
     actor, _ = secrets_project(name, principal, "change", "project.secret.confirm")
@@ -2895,9 +2932,11 @@ def confirm_secret_rotation(
     return {"name": secret, "version": entry["version"], "state": "active"}
 
 
-@app.post("/projects/{name}/secrets/{secret}/revert")
+@app.post("/v1/projects/{project}/secrets/{secret}/revert")
 def revert_secret_rotation(
-    name: str, secret: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    secret: str,
+    principal: Principal = Depends(current_principal),
 ):
     """Make the previous value current again and restart the pods."""
     actor, _ = secrets_project(name, principal, "change", "project.secret.revert")
@@ -2941,8 +2980,11 @@ def revert_secret_rotation(
     )
 
 
-@app.get("/projects/{name}/revisions")
-def revisions(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/revisions")
+def revisions(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """List the retained desired revisions, newest first."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
@@ -3017,8 +3059,11 @@ def revisions(name: str, principal: Principal = Depends(current_principal)):
     }
 
 
-@app.get("/projects/{name}/resource-usage")
-def resource_usage(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/resource-usage")
+def resource_usage(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Current CPU and memory per pod; missing, stale and unavailable metrics are labelled in `state`."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
@@ -3052,8 +3097,11 @@ def resource_usage(name: str, principal: Principal = Depends(current_principal))
     return {"project": name, **usage}
 
 
-@app.get("/projects/{name}/resources")
-def resource_inventory(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/inventory")
+def resource_inventory(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Authorized deployed-resource inventory; unavailable provider data is explicit."""
     require_permission(principal, "view", name)
     actor = actor_for(principal)
@@ -3124,9 +3172,10 @@ def require_human_database_principal(principal: Principal, project: str) -> None
         raise HTTPException(403, "A human identity is required")
 
 
-@app.get("/projects/{name}/database-access/grants")
+@app.get("/v1/projects/{project}/database-access/grants")
 def list_human_database_grants(
-    name: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
 ):
     require_permission(principal, "grant", name)
     with connect() as conn:
@@ -3149,9 +3198,11 @@ def list_human_database_grants(
     return {"project": name, "grants": [_database_access_record(row) for row in rows]}
 
 
-@app.post("/projects/{name}/database-access/grants", status_code=201, deprecated=True)
+@app.post(
+    "/v1/projects/{project}/database-access/grants", status_code=201, deprecated=True
+)
 def grant_human_database_access(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     body: HumanDatabaseGrant,
     principal: Principal = Depends(current_principal),
 ):
@@ -3160,9 +3211,10 @@ def grant_human_database_access(
     )
 
 
-@app.get("/projects/{name}/database-access/me")
+@app.get("/v1/projects/{project}/database-access/me")
 def my_human_database_access(
-    name: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
 ):
     require_human_database_principal(principal, name)
     with connect() as conn:
@@ -3188,9 +3240,11 @@ def my_human_database_access(
     }
 
 
-@app.put("/projects/{name}/database-access/me/key")
+@app.put("/v1/projects/{project}/database-access/me/key")
 def update_my_human_database_key(
-    name: str, body: HumanDatabaseKey, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    body: HumanDatabaseKey,
+    principal: Principal = Depends(current_principal),
 ):
     require_human_database_principal(principal, name)
     key, fingerprint = human_database_access.parse_public_key(body.public_key)
@@ -3215,9 +3269,10 @@ def update_my_human_database_key(
     return _database_access_record(row)
 
 
-@app.post("/projects/{name}/database-access/me/credential", deprecated=True)
+@app.post("/v1/projects/{project}/database-access/me/credential", deprecated=True)
 def issue_my_human_database_credential(
-    name: str, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
 ):
     raise HTTPException(
         410,
@@ -3225,9 +3280,9 @@ def issue_my_human_database_credential(
     )
 
 
-@app.delete("/projects/{name}/database-access/grants")
+@app.delete("/v1/projects/{project}/database-access/grants")
 def revoke_human_database_access(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     reference: HumanDatabaseReference,
     principal: Principal = Depends(current_principal),
 ):
@@ -3264,7 +3319,7 @@ def revoke_human_database_access(
     return {"project": name, "revoked": True}
 
 
-@app.get("/internal/database-access/authorized-key", include_in_schema=False)
+@app.get("/v1/internal/database-access/authorized-key", include_in_schema=False)
 def lookup_human_database_key(
     fingerprint: str, x_database_bastion_token: str | None = Header(default=None)
 ):
@@ -3293,8 +3348,11 @@ def lookup_human_database_key(
     return PlainTextResponse(key + "\n", headers={"Cache-Control": "no-store"})
 
 
-@app.get("/projects/{name}/data-services")
-def data_services(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/data-services")
+def data_services(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Report named resources, component bindings and the latest recovery request."""
     require_permission(principal, "view", name)
     try:
@@ -3337,9 +3395,9 @@ def data_services(name: str, principal: Principal = Depends(current_principal)):
     }
 
 
-@app.post("/projects/{name}/data-services/recovery-requests", status_code=201)
+@app.post("/v1/projects/{project}/data-services/recovery-requests", status_code=201)
 def request_data_service_recovery(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     body: DataServiceRecoveryRequest,
     principal: Principal = Depends(current_principal),
 ):
@@ -3367,7 +3425,7 @@ def request_data_service_recovery(
     return {"project": name, **_recovery_record(row)}
 
 
-@app.get("/operator/data-service-recovery-requests")
+@app.get("/v1/operator/data-service-recovery-requests")
 def list_data_service_recovery_requests(
     principal: Principal = Depends(current_principal),
 ):
@@ -3395,7 +3453,7 @@ def list_data_service_recovery_requests(
     }
 
 
-@app.patch("/operator/data-service-recovery-requests/{request_id}")
+@app.patch("/v1/operator/data-service-recovery-requests/{request_id}")
 def review_data_service_recovery_request(
     request_id: UUID,
     body: DataServiceRecoveryReview,
@@ -3423,7 +3481,7 @@ def review_data_service_recovery_request(
     return {"project": row[0], **_recovery_record(row[1:])}
 
 
-@app.get("/operator/capacity")
+@app.get("/v1/operator/capacity")
 def operator_capacity(principal: Principal = Depends(current_principal)):
     require_platform_admin(principal)
     result = observe_cluster_capacity(runtime, log)
@@ -3440,9 +3498,9 @@ def operator_capacity(principal: Principal = Depends(current_principal)):
     return {**result, "admission": admission}
 
 
-@app.get("/projects/{name}/logs")
+@app.get("/v1/projects/{project}/logs")
 def project_logs(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     tail: int = Query(200, ge=1, le=1000),
     since_seconds: int | None = Query(None, ge=1, le=86400),
     component: str | None = Query(None, pattern=r"^[a-z][a-z0-9-]{0,31}$"),
@@ -3539,9 +3597,9 @@ def project_logs(
     return {"project": name, **result}
 
 
-@app.get("/projects/{name}/retained-logs")
+@app.get("/v1/projects/{project}/retained-logs")
 def retained_project_logs(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     tail: int = Query(200, ge=1, le=1000),
     since_seconds: int = Query(604800, ge=1, le=604800),
     component: str | None = Query(None, pattern=r"^[a-z][a-z0-9-]{0,31}$"),
@@ -3615,9 +3673,9 @@ def retained_project_logs(
     return {"project": name, **result}
 
 
-@app.post("/projects/{name}/rollback")
+@app.post("/v1/projects/{project}/rollback")
 def rollback(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     body: Rollback,
     principal: Principal = Depends(current_principal),
     if_match: str | None = Header(None),
@@ -3728,8 +3786,11 @@ def rollback(
     )
 
 
-@app.post("/projects/{name}/restart")
-def restart(name: str, principal: Principal = Depends(current_principal)):
+@app.post("/v1/projects/{project}/restart")
+def restart(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Queue a rolling restart of the current desired revision without changing the spec."""
     actor = actor_for(principal)
     require_permission(principal, "change", name)
@@ -3886,7 +3947,7 @@ def operation_status(
             "rejected",
             detail={"reason": "not_found"},
         )
-        raise HTTPException(404, "Unknown operation")
+        return app.state.read_access_operation(str(operation_id), principal)
     require_permission(principal, "view", row[6])
     required_audit(
         actor_for(principal),
@@ -3919,6 +3980,7 @@ def operation_status(
         )
     return {
         "operation_id": str(row[0]),
+        "kind": "deployment",
         "revision": row[1],
         "state": row[2],
         "result_version": row[3],
@@ -4125,8 +4187,11 @@ def delete_project_catalog(conn, name: str) -> None:
         conn.execute("DELETE FROM projects WHERE name=%s", (name,))
 
 
-@app.get("/operator/projects/{name}/retirement")
-def inspect_retirement(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/operator/projects/{project}/retirement")
+def inspect_retirement(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Inspect retained retirement inventory and fail-closed credential cleanup progress."""
     require_platform_admin(principal)
     with connect() as conn:
@@ -4156,8 +4221,11 @@ def inspect_retirement(name: str, principal: Principal = Depends(current_princip
     }
 
 
-@app.get("/operator/projects/{name}/purge-preview")
-def purge_preview(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/operator/projects/{project}/purge-preview")
+def purge_preview(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Show permanent-deletion scope for a retired project to a platform administrator."""
     require_platform_admin(principal)
     try:
@@ -4180,9 +4248,9 @@ def purge_preview(name: str, principal: Principal = Depends(current_principal)):
     return scope
 
 
-@app.post("/operator/projects/{name}/purge")
+@app.post("/v1/operator/projects/{project}/purge")
 def purge_project(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     confirmation: ProjectPurge,
     principal: Principal = Depends(current_principal),
 ):
@@ -4320,8 +4388,11 @@ def namespace_exists(name):
     return True
 
 
-@app.get("/projects/{name}/retirement-preview")
-def retirement_preview(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/retirement-preview")
+def retirement_preview(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """Show what retirement would remove and keep; the token pins this scope for confirmation."""
     actor = actor_for(principal)
     require_permission(principal, "retire", name)
@@ -4368,9 +4439,9 @@ def retirement_preview(name: str, principal: Principal = Depends(current_princip
     return {**scope, "status": status[0], "blockers": blockers}
 
 
-@app.post("/projects/{name}/retire")
+@app.post("/v1/projects/{project}/retire")
 def retire(
-    name: str,
+    name: Annotated[str, Path(alias="project")],
     confirmation: Retirement,
     principal: Principal = Depends(current_principal),
 ):
@@ -4588,8 +4659,11 @@ def retire(
 # Platform and project role administration
 
 
-@app.get("/projects/{name}/grants")
-def get_project_grants(name: str, principal: Principal = Depends(current_principal)):
+@app.get("/v1/projects/{project}/grants")
+def get_project_grants(
+    name: Annotated[str, Path(alias="project")],
+    principal: Principal = Depends(current_principal),
+):
     """List grants for a project administrator; operator inspection remains separate."""
     require_permission(principal, "grant", name)
     with connect() as conn:
@@ -4611,9 +4685,11 @@ def get_project_grants(name: str, principal: Principal = Depends(current_princip
     }
 
 
-@app.put("/projects/{name}/grants")
+@app.put("/v1/projects/{project}/grants")
 def put_project_grant(
-    name: str, grant: ProjectGrant, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    grant: ProjectGrant,
+    principal: Principal = Depends(current_principal),
 ):
     actor = actor_for(principal)
     require_permission(principal, "grant", name)
@@ -4656,9 +4732,11 @@ def put_project_grant(
     }
 
 
-@app.delete("/projects/{name}/grants")
+@app.delete("/v1/projects/{project}/grants")
 def delete_project_grant(
-    name: str, grant: GrantReference, principal: Principal = Depends(current_principal)
+    name: Annotated[str, Path(alias="project")],
+    grant: GrantReference,
+    principal: Principal = Depends(current_principal),
 ):
     actor = actor_for(principal)
     require_permission(principal, "grant", name)
@@ -4691,7 +4769,7 @@ def delete_project_grant(
     }
 
 
-@app.put("/platform/grants")
+@app.put("/v1/platform/grants")
 def put_platform_grant(
     grant: PlatformGrant, principal: Principal = Depends(current_principal)
 ):
@@ -4720,7 +4798,7 @@ def put_platform_grant(
     return {"issuer": issuer, "subject": subject, "role": grant.role}
 
 
-@app.get("/platform/grants")
+@app.get("/v1/platform/grants")
 def get_platform_grants(principal: Principal = Depends(current_principal)):
     """List platform administrators for platform-administration UI and automation."""
     require_platform_admin(principal)
@@ -4740,7 +4818,7 @@ def get_platform_grants(principal: Principal = Depends(current_principal)):
     }
 
 
-@app.delete("/platform/grants")
+@app.delete("/v1/platform/grants")
 def delete_platform_grant(
     grant: GrantReference, principal: Principal = Depends(current_principal)
 ):
@@ -4783,7 +4861,7 @@ def delete_platform_grant(
     return {"issuer": grant.issuer, "subject": grant.subject, "revoked": True}
 
 
-@app.get("/internal/tls", include_in_schema=False)
+@app.get("/v1/internal/tls", include_in_schema=False)
 def allow_certificate(domain: str = Query(max_length=253)):
     """Authorize only the exact public hostname generated from an applied spec."""
     suffix = "." + os.environ["APPS_DOMAIN"]
@@ -4831,3 +4909,7 @@ install_application_access_api(app, sys.modules[__name__])
 from .stores.api import install as install_store_api
 
 install_store_api(app, sys.modules[__name__])
+
+from .application_api import install as install_application_api
+
+install_application_api(app, sys.modules[__name__])

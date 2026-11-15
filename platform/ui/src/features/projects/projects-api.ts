@@ -227,7 +227,7 @@ function parseProjectRevisions(value: unknown): ProjectRevisions {
 }
 
 async function listProjects() {
-  const { data, error, response } = await apiClient.GET('/projects')
+  const { data, error, response } = await apiClient.GET('/v1/projects')
   if (error) {
     throw apiErrorFromResponse(response, error)
   }
@@ -236,7 +236,7 @@ async function listProjects() {
 }
 
 async function createEmptyProject(body: EmptyProjectCreate) {
-  const { error, response } = await apiClient.POST('/projects', { body })
+  const { error, response } = await apiClient.POST('/v1/projects', { body })
   if (error) {
     throw apiErrorFromResponse(response, error)
   }
@@ -244,9 +244,9 @@ async function createEmptyProject(body: EmptyProjectCreate) {
 
 async function getProjectRevisions(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/revisions',
+    '/v1/projects/{project}/revisions',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
     },
   )
   if (error) {
@@ -257,27 +257,30 @@ async function getProjectRevisions(name: string) {
 }
 
 async function deployProject(name: string, body: ProjectDeployment) {
-  const { data, error, response } = await apiClient.PUT('/projects/{name}', {
-    params: { path: { name } },
-    body: {
-      apiVersion: 'platform.eseidinger.de/v1',
-      kind: 'Application',
-      metadata: { name },
-      spec: {
-        components: [
-          {
-            name: 'web',
-            type: 'service',
-            replicas: 1,
-            exposure: 'private',
-            runtime: { type: 'container', image: body.image },
-            ports: [{ name: 'http', protocol: 'http', port: body.port }],
-            health: { readiness: { profile: body.probe_profile } },
-          },
-        ],
+  const { data, error, response } = await apiClient.PUT(
+    '/v1/projects/{project}/application',
+    {
+      params: { path: { project: name } },
+      body: {
+        apiVersion: 'platform.eseidinger.de/v1',
+        kind: 'Application',
+        metadata: { name },
+        spec: {
+          components: [
+            {
+              name: 'web',
+              type: 'service',
+              replicas: 1,
+              exposure: 'private',
+              runtime: { type: 'container', image: body.image },
+              ports: [{ name: 'http', protocol: 'http', port: body.port }],
+              health: { readiness: { profile: body.probe_profile } },
+            },
+          ],
+        },
       },
     },
-  })
+  )
   if (error) {
     throw apiErrorFromResponse(response, error)
   }
@@ -303,10 +306,10 @@ async function rollbackProject(
   expectedRevision: number,
 ) {
   const { data, error, response } = await apiClient.POST(
-    '/projects/{name}/rollback',
+    '/v1/projects/{project}/rollback',
     {
       params: {
-        path: { name },
+        path: { project: name },
         header: { 'if-match': String(expectedRevision) },
       },
       body: { revision },
@@ -331,8 +334,8 @@ async function rollbackProject(
 
 async function restartProject(name: string) {
   const { data, error, response } = await apiClient.POST(
-    '/projects/{name}/restart',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/restart',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -381,8 +384,8 @@ async function getOperation(operationId: string) {
 
 async function getResourceUsage(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/resource-usage',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/resource-usage',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -434,8 +437,8 @@ async function getResourceUsage(name: string) {
 
 async function getResourceInventory(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/resources',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/inventory',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -475,10 +478,10 @@ type ProjectLogFilters = {
 
 async function getProjectLogs(name: string, filters: ProjectLogFilters) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/logs',
+    '/v1/projects/{project}/logs',
     {
       params: {
-        path: { name },
+        path: { project: name },
         query: {
           tail: filters.tail,
           ...(filters.search ? { search: filters.search } : {}),
@@ -525,8 +528,8 @@ async function getProjectLogs(name: string, filters: ProjectLogFilters) {
 
 async function getProjectConfiguration(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/configuration',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/configuration',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -561,10 +564,10 @@ async function updateProjectConfiguration(
   expectedRevision: number,
 ) {
   const { data, error, response } = await apiClient.PUT(
-    '/projects/{name}/configuration',
+    '/v1/projects/{project}/configuration',
     {
       params: {
-        path: { name },
+        path: { project: name },
         header: { 'if-match': String(expectedRevision) },
       },
       body: { values },
@@ -589,8 +592,8 @@ async function updateProjectConfiguration(
 
 async function getProjectSecrets(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/secrets',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/secrets',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -631,9 +634,9 @@ async function getProjectSecrets(name: string) {
 
 async function setProjectSecret(name: string, secret: string, value: string) {
   const { error, response } = await apiClient.PUT(
-    '/projects/{name}/secrets/{secret}',
+    '/v1/projects/{project}/secrets/{secret}',
     {
-      params: { path: { name, secret } },
+      params: { path: { project: name, secret } },
       body: { value },
     },
   )
@@ -642,32 +645,32 @@ async function setProjectSecret(name: string, secret: string, value: string) {
 
 async function confirmProjectSecretRotation(name: string, secret: string) {
   const { error, response } = await apiClient.POST(
-    '/projects/{name}/secrets/{secret}/confirm',
-    { params: { path: { name, secret } } },
+    '/v1/projects/{project}/secrets/{secret}/confirm',
+    { params: { path: { project: name, secret } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function revertProjectSecretRotation(name: string, secret: string) {
   const { error, response } = await apiClient.POST(
-    '/projects/{name}/secrets/{secret}/revert',
-    { params: { path: { name, secret } } },
+    '/v1/projects/{project}/secrets/{secret}/revert',
+    { params: { path: { project: name, secret } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function deleteProjectSecret(name: string, secret: string) {
   const { error, response } = await apiClient.DELETE(
-    '/projects/{name}/secrets/{secret}',
-    { params: { path: { name, secret } } },
+    '/v1/projects/{project}/secrets/{secret}',
+    { params: { path: { project: name, secret } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function getRetirementPreview(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/retirement-preview',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/retirement-preview',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -726,8 +729,8 @@ async function getRetirementPreview(name: string) {
 
 async function getDataServices(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/data-services',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/data-services',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -817,16 +820,16 @@ async function requestDataServiceRecovery(
   reason: 'unavailable' | 'access' | 'data_integrity' | 'other',
 ) {
   const { error, response } = await apiClient.POST(
-    '/projects/{name}/data-services/recovery-requests',
-    { params: { path: { name } }, body: { reason } },
+    '/v1/projects/{project}/data-services/recovery-requests',
+    { params: { path: { project: name } }, body: { reason } },
   )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
 async function getDeploymentCredentials(name: string) {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/deployment-credentials',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/deployment-credentials',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -864,8 +867,8 @@ async function getDeploymentCredentials(name: string) {
 
 async function getProjectGrants(name: string): Promise<ProjectGrants> {
   const { data, error, response } = await apiClient.GET(
-    '/projects/{name}/grants',
-    { params: { path: { name } } },
+    '/v1/projects/{project}/grants',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -902,16 +905,19 @@ async function putProjectGrant(
   name: string,
   grant: Omit<ProjectGrant, 'grantedAt'> & { preferredUsername?: string },
 ) {
-  const { error, response } = await apiClient.PUT('/projects/{name}/grants', {
-    params: { path: { name } },
-    body: {
-      ...(grant.preferredUsername
-        ? { preferred_username: grant.preferredUsername }
-        : { issuer: grant.issuer, subject: grant.subject }),
-      display_name: grant.displayName,
-      role: grant.role,
+  const { error, response } = await apiClient.PUT(
+    '/v1/projects/{project}/grants',
+    {
+      params: { path: { project: name } },
+      body: {
+        ...(grant.preferredUsername
+          ? { preferred_username: grant.preferredUsername }
+          : { issuer: grant.issuer, subject: grant.subject }),
+        display_name: grant.displayName,
+        role: grant.role,
+      },
     },
-  })
+  )
   if (error) throw apiErrorFromResponse(response, error)
 }
 
@@ -920,9 +926,9 @@ async function deleteProjectGrant(
   grant: Pick<ProjectGrant, 'issuer' | 'subject'>,
 ) {
   const { error, response } = await apiClient.DELETE(
-    '/projects/{name}/grants',
+    '/v1/projects/{project}/grants',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
       body: grant,
     },
   )
@@ -930,7 +936,7 @@ async function deleteProjectGrant(
 }
 
 async function getPlatformGrants(): Promise<PlatformGrant[]> {
-  const { data, error, response } = await apiClient.GET('/platform/grants')
+  const { data, error, response } = await apiClient.GET('/v1/platform/grants')
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
   if (!record || !Array.isArray(record.grants))
@@ -962,7 +968,7 @@ async function putPlatformGrant(
     preferredUsername?: string
   },
 ) {
-  const { error, response } = await apiClient.PUT('/platform/grants', {
+  const { error, response } = await apiClient.PUT('/v1/platform/grants', {
     body: {
       ...(grant.preferredUsername
         ? { preferred_username: grant.preferredUsername }
@@ -977,7 +983,7 @@ async function putPlatformGrant(
 async function deletePlatformGrant(
   grant: Pick<PlatformGrant, 'issuer' | 'subject'>,
 ) {
-  const { error, response } = await apiClient.DELETE('/platform/grants', {
+  const { error, response } = await apiClient.DELETE('/v1/platform/grants', {
     body: grant,
   })
   if (error) throw apiErrorFromResponse(response, error)
@@ -988,9 +994,9 @@ async function createDeploymentCredential(
   body: { name: string; expiresInDays: number },
 ): Promise<OneTimeDeploymentCredential> {
   const { data, error, response } = await apiClient.POST(
-    '/projects/{name}/deployment-credentials',
+    '/v1/projects/{project}/deployment-credentials',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
       body: { name: body.name, expires_in_days: body.expiresInDays },
     },
   )
@@ -1012,8 +1018,8 @@ async function createDeploymentCredential(
 
 async function revokeDeploymentCredential(name: string, credentialId: string) {
   const { error, response } = await apiClient.DELETE(
-    '/projects/{name}/deployment-credentials/{credential_id}',
-    { params: { path: { name, credential_id: credentialId } } },
+    '/v1/projects/{project}/deployment-credentials/{credential_id}',
+    { params: { path: { project: name, credential_id: credentialId } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
 }
@@ -1024,9 +1030,9 @@ async function rotateDeploymentCredential(
   body: { expiresInDays: number; overlapHours: number },
 ): Promise<OneTimeDeploymentCredential> {
   const { data, error, response } = await apiClient.POST(
-    '/projects/{name}/deployment-credentials/{credential_id}/rotate',
+    '/v1/projects/{project}/deployment-credentials/{credential_id}/rotate',
     {
-      params: { path: { name, credential_id: credentialId } },
+      params: { path: { project: name, credential_id: credentialId } },
       body: {
         expires_in_days: body.expiresInDays,
         overlap_hours: body.overlapHours,
@@ -1053,9 +1059,9 @@ async function rotateDeploymentCredential(
 
 async function retireProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST(
-    '/projects/{name}/retire',
+    '/v1/projects/{project}/retire',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
       body: { confirm_name: name, scope_token: scopeToken },
     },
   )
@@ -1068,8 +1074,8 @@ async function retireProject(name: string, scopeToken: string) {
 
 async function getPurgePreview(name: string): Promise<PurgePreview> {
   const { data, error, response } = await apiClient.GET(
-    '/operator/projects/{name}/purge-preview',
-    { params: { path: { name } } },
+    '/v1/operator/projects/{project}/purge-preview',
+    { params: { path: { project: name } } },
   )
   if (error) throw apiErrorFromResponse(response, error)
   const record = asRecord(data)
@@ -1099,9 +1105,9 @@ async function getPurgePreview(name: string): Promise<PurgePreview> {
 
 async function purgeProject(name: string, scopeToken: string) {
   const { data, error, response } = await apiClient.POST(
-    '/operator/projects/{name}/purge',
+    '/v1/operator/projects/{project}/purge',
     {
-      params: { path: { name } },
+      params: { path: { project: name } },
       body: { confirm_name: name, scope_token: scopeToken },
     },
   )

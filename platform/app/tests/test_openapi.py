@@ -20,9 +20,9 @@ class OpenApiContract(unittest.TestCase):
         )
 
     def test_put_accepts_only_the_v1_declaration(self):
-        schema = app.openapi()["paths"]["/projects/{name}"]["put"]["requestBody"][
-            "content"
-        ]["application/json"]["schema"]
+        schema = app.openapi()["paths"]["/v1/projects/{project}/application"]["put"][
+            "requestBody"
+        ]["content"]["application/json"]["schema"]
         self.assertEqual(schema, {"$ref": "#/components/schemas/ApplicationEnvelope"})
 
 

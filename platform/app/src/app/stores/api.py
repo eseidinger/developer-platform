@@ -166,7 +166,7 @@ def install(app, control):
                 }
             )
 
-    @app.get("/v1/projects/{project}/resources")
+    @app.get("/v1/projects/{project}/stores")
     def list_resources(project: str, principal: Principal = caller):
         control.require_permission(principal, "manage", project)
         with control.connect() as conn:
@@ -184,7 +184,7 @@ def install(app, control):
             }
         )
 
-    @app.post("/v1/projects/{project}/resources", status_code=202)
+    @app.post("/v1/projects/{project}/stores", status_code=202)
     def create_resource(
         project: str, body: ResourceCreate, principal: Principal = caller
     ):
@@ -201,7 +201,7 @@ def install(app, control):
             audit(conn, principal, "create", row)
         return reply(row, 202)
 
-    @app.get("/v1/resources/{resource_id}")
+    @app.get("/v1/stores/{resource_id}")
     def get_resource(resource_id: UUID, principal: Principal = caller):
         with mutation(principal) as conn:
             row = owner(conn, resource_id, principal)
@@ -213,7 +213,7 @@ def install(app, control):
                 }
             )
 
-    @app.patch("/v1/resources/{resource_id}")
+    @app.patch("/v1/stores/{resource_id}")
     def rename_resource(
         resource_id: UUID, body: ResourceRename, principal: Principal = caller
     ):
@@ -231,7 +231,7 @@ def install(app, control):
             audit(conn, principal, "rename", row)
         return reply(row)
 
-    @app.put("/v1/resources/{resource_id}/quota")
+    @app.put("/v1/stores/{resource_id}/quota")
     def set_quota(resource_id: UUID, body: QuotaChange, principal: Principal = caller):
         control.require_platform_admin(principal)
         with mutation(principal) as conn:
@@ -251,7 +251,7 @@ def install(app, control):
             audit(conn, principal, "quota", row)
         return reply(row, 202)
 
-    @app.post("/v1/resources/{resource_id}/retirement", status_code=202)
+    @app.post("/v1/stores/{resource_id}/retirement", status_code=202)
     def retire_resource(
         resource_id: UUID, body: Version, principal: Principal = caller
     ):
@@ -262,7 +262,7 @@ def install(app, control):
             audit(conn, principal, "retire", row)
         return reply(row, 202)
 
-    @app.get("/v1/resources/{resource_id}/purge-preview")
+    @app.get("/v1/stores/{resource_id}/purge-preview")
     def purge_preview(resource_id: UUID, principal: Principal = caller):
         with mutation(principal) as conn:
             row = owner(conn, resource_id, principal)
@@ -279,14 +279,14 @@ def install(app, control):
                 }
             )
 
-    @app.post("/v1/resources/{resource_id}/purge", status_code=202)
+    @app.post("/v1/stores/{resource_id}/purge", status_code=202)
     def purge_resource(resource_id: UUID, body: Purge, principal: Principal = caller):
         with mutation(principal) as conn:
             row = catalog.request_purge(conn, owner(conn, resource_id, principal), body)
             audit(conn, principal, "purge-request", row)
         return reply(row, 202)
 
-    @app.get("/v1/resources/{resource_id}/grants")
+    @app.get("/v1/stores/{resource_id}/grants")
     def list_grants(resource_id: UUID, principal: Principal = caller):
         with mutation(principal) as conn:
             owner(conn, resource_id, principal)
@@ -296,7 +296,7 @@ def install(app, control):
             ).fetchall()
         return reply({"grants": [r[0] for r in rows]})
 
-    @app.post("/v1/resources/{resource_id}/human-grants", status_code=202)
+    @app.post("/v1/stores/{resource_id}/human-grants", status_code=202)
     def create_human_grant(
         resource_id: UUID, body: HumanGrant, principal: Principal = caller
     ):
@@ -314,7 +314,7 @@ def install(app, control):
             audit(conn, principal, "human-grant", row)
         return reply(row, 202)
 
-    @app.post("/v1/projects/{project}/resource-bindings", status_code=202)
+    @app.post("/v1/projects/{project}/store-bindings", status_code=202)
     def request_binding(
         project: str, body: BindingRequest, principal: Principal = caller
     ):
@@ -324,7 +324,7 @@ def install(app, control):
             audit(conn, principal, "binding-request", row)
         return reply(row, 202)
 
-    @app.get("/v1/projects/{project}/resource-bindings")
+    @app.get("/v1/projects/{project}/store-bindings")
     def list_bindings(project: str, principal: Principal = caller):
         control.require_permission(principal, "manage", project)
         with control.connect() as conn:
@@ -334,7 +334,7 @@ def install(app, control):
             ).fetchall()
         return reply({"bindings": [r[0] for r in rows]})
 
-    @app.post("/v1/resource-grants/{grant_id}/approval", status_code=202)
+    @app.post("/v1/store-grants/{grant_id}/approval", status_code=202)
     def approve_binding(grant_id: UUID, body: Approval, principal: Principal = caller):
         with mutation(principal) as conn:
             row = catalog.grant(conn, grant_id, lock=True)
@@ -343,7 +343,7 @@ def install(app, control):
             audit(conn, principal, "binding-approval", row)
         return reply(row, 202)
 
-    @app.put("/v1/resource-grants/{grant_id}/mode", status_code=202)
+    @app.put("/v1/store-grants/{grant_id}/mode", status_code=202)
     def change_mode(grant_id: UUID, body: GrantUpdate, principal: Principal = caller):
         with mutation(principal) as conn:
             row = catalog.grant(conn, grant_id, lock=True)
@@ -361,7 +361,7 @@ def install(app, control):
             audit(conn, principal, "grant-mode", row)
         return reply(row, 202)
 
-    @app.post("/v1/resource-grants/{grant_id}/revocation", status_code=202)
+    @app.post("/v1/store-grants/{grant_id}/revocation", status_code=202)
     def revoke_grant(grant_id: UUID, body: Version, principal: Principal = caller):
         with mutation(principal) as conn:
             row = catalog.grant(conn, grant_id, lock=True)

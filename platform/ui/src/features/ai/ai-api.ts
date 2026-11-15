@@ -134,11 +134,11 @@ function parse<T>(schema: z.ZodType<T>, result: ResponseResult): T {
     )
   return value.data
 }
-const path = (name: string) => ({ name })
+const path = (project: string) => ({ project })
 export async function getContext(project: string, signal?: AbortSignal) {
   return parse(
     contextSchema,
-    await apiClient.GET('/projects/{name}/ai/context', {
+    await apiClient.GET('/v1/projects/{project}/ai/context', {
       params: { path: path(project) },
       signal,
     }),
@@ -154,7 +154,7 @@ export async function getRuns(
       items: z.array(summarySchema),
       next_cursor: z.uuid().nullable(),
     }),
-    await apiClient.GET('/projects/{name}/ai/runs', {
+    await apiClient.GET('/v1/projects/{project}/ai/runs', {
       params: { path: path(project), query: { before, limit: 20 } },
       signal,
     }),
@@ -167,8 +167,8 @@ export async function getRun(
 ) {
   return parse(
     runSchema,
-    await apiClient.GET('/projects/{name}/ai/runs/{run_id}', {
-      params: { path: { name: project, run_id } },
+    await apiClient.GET('/v1/projects/{project}/ai/runs/{run_id}', {
+      params: { path: { project: project, run_id } },
       signal,
     }),
   )
@@ -183,7 +183,7 @@ export async function getProposals(
       items: z.array(proposalSchema),
       next_cursor: z.uuid().nullable(),
     }),
-    await apiClient.GET('/projects/{name}/ai/proposals', {
+    await apiClient.GET('/v1/projects/{project}/ai/proposals', {
       params: { path: path(project), query: { before, limit: 20 } },
       signal,
     }),
@@ -196,8 +196,8 @@ export async function getProposal(
 ) {
   return parse(
     proposalSchema,
-    await apiClient.GET('/projects/{name}/ai/proposals/{proposal_id}', {
-      params: { path: { name: project, proposal_id } },
+    await apiClient.GET('/v1/projects/{project}/ai/proposals/{proposal_id}', {
+      params: { path: { project: project, proposal_id } },
       signal,
     }),
   )
@@ -206,7 +206,7 @@ export async function getProposal(
 export async function createRun(project: string, kind: RunKind) {
   return parse(
     z.object({ run_id: z.uuid() }),
-    await apiClient.POST('/projects/{name}/ai/runs', {
+    await apiClient.POST('/v1/projects/{project}/ai/runs', {
       params: { path: path(project) },
       body: { kind },
       signal: AbortSignal.timeout(120_000),
@@ -216,7 +216,7 @@ export async function createRun(project: string, kind: RunKind) {
 export async function createProposal(project: string, run_id: string) {
   return parse(
     z.object({ proposal_id: z.uuid() }),
-    await apiClient.POST('/projects/{name}/ai/proposals', {
+    await apiClient.POST('/v1/projects/{project}/ai/proposals', {
       params: { path: path(project) },
       body: { run_id },
       signal: AbortSignal.timeout(120_000),
@@ -226,9 +226,11 @@ export async function createProposal(project: string, run_id: string) {
 export async function approveProposal(project: string, proposal: Proposal) {
   checked(
     await apiClient.POST(
-      '/projects/{name}/ai/proposals/{proposal_id}/approval',
+      '/v1/projects/{project}/ai/proposals/{proposal_id}/approval',
       {
-        params: { path: { name: project, proposal_id: proposal.proposal_id } },
+        params: {
+          path: { project: project, proposal_id: proposal.proposal_id },
+        },
         body: { diff_sha256: proposal.diff_sha256 },
         signal: AbortSignal.timeout(120_000),
       },
@@ -238,9 +240,11 @@ export async function approveProposal(project: string, proposal: Proposal) {
 export async function executeProposal(project: string, proposal: Proposal) {
   checked(
     await apiClient.POST(
-      '/projects/{name}/ai/proposals/{proposal_id}/execute',
+      '/v1/projects/{project}/ai/proposals/{proposal_id}/execute',
       {
-        params: { path: { name: project, proposal_id: proposal.proposal_id } },
+        params: {
+          path: { project: project, proposal_id: proposal.proposal_id },
+        },
         body: { diff_sha256: proposal.diff_sha256 },
         signal: AbortSignal.timeout(120_000),
       },
@@ -252,7 +256,7 @@ export async function setPolicy(
   classification: (typeof classifications)[number],
 ) {
   checked(
-    await apiClient.PUT('/projects/{name}/ai/policy', {
+    await apiClient.PUT('/v1/projects/{project}/ai/policy', {
       params: { path: path(project) },
       body: { classification },
       signal: AbortSignal.timeout(120_000),

@@ -31,14 +31,14 @@ def add(command, method, path, description, **kwargs):
     COMMANDS.append(CommandSpec(command, method, path, description, **kwargs))
 
 
-P = "/projects/{name}"
+P = "/v1/projects/{project}"
 A = "/v1/projects/{project}"
 add("capabilities get", "GET", "/v1/capabilities", "Discover supported capabilities.")
-add("projects list", "GET", "/projects", "List authorized projects.")
+add("projects list", "GET", "/v1/projects", "List authorized projects.")
 add(
     "projects create",
     "POST",
-    "/projects",
+    "/v1/projects",
     "Create an empty project (requires platform authority).",
     body="project",
     fields=("project",),
@@ -46,14 +46,14 @@ add(
 add(
     "deploy apply",
     "PUT",
-    P,
+    P + "/application",
     "Apply a complete application declaration.",
     body="file",
     family="deployment",
 )
 for command, suffix, description in (
     ("components list", "components", "Inspect component status."),
-    ("resources", "resources", "Inspect resource inventory."),
+    ("inventory", "inventory", "Inspect resource inventory."),
     ("usage", "resource-usage", "Inspect usage and resource limits."),
     ("drift", "drift", "Inspect desired and observed drift."),
     ("revisions list", "revisions", "List retained deployment revisions."),
@@ -469,14 +469,14 @@ for action, method in (
 add(
     "access operations get",
     "GET",
-    "/v1/access-operations/{operation_id}",
+    "/v1/operations/{operation_id}",
     "Inspect an access reconciliation operation.",
     family="access",
 )
 add(
     "access operations retry",
     "POST",
-    "/v1/access-operations/{operation_id}/retry",
+    "/v1/operations/{operation_id}/retry",
     "Retry a failed operation using its resource ETag.",
     version="required",
     family="access",
@@ -484,19 +484,19 @@ add(
 )
 
 for command, path in (
-    ("operator capacity", "/operator/capacity"),
-    ("operator permissions", "/operator/projects/{name}/permissions"),
+    ("operator capacity", "/v1/operator/capacity"),
+    ("operator permissions", "/v1/operator/projects/{project}/permissions"),
     (
         "operator security-configuration",
-        "/operator/projects/{name}/security-configuration",
+        "/v1/operator/projects/{project}/security-configuration",
     ),
-    ("operator retirement", "/operator/projects/{name}/retirement"),
-    ("operator purge preview", "/operator/projects/{name}/purge-preview"),
-    ("operator recovery-requests list", "/operator/data-service-recovery-requests"),
-    ("operator grants list", "/platform/grants"),
-    ("operator test-context get", "/platform/test-context"),
-    ("operator test-identities list", "/platform/test-identities"),
-    ("operator test-runner-credentials list", "/platform/test-runner-credentials"),
+    ("operator retirement", "/v1/operator/projects/{project}/retirement"),
+    ("operator purge preview", "/v1/operator/projects/{project}/purge-preview"),
+    ("operator recovery-requests list", "/v1/operator/data-service-recovery-requests"),
+    ("operator grants list", "/v1/platform/grants"),
+    ("operator test-context get", "/v1/platform/test-context"),
+    ("operator test-identities list", "/v1/platform/test-identities"),
+    ("operator test-runner-credentials list", "/v1/platform/test-runner-credentials"),
 ):
     add(
         command,
@@ -508,14 +508,14 @@ for command, path in (
 add(
     "operator audit export",
     "GET",
-    "/operator/audit/events",
+    "/v1/operator/audit/events",
     "Export redacted audit events.",
     query=("start", "end", "format", "limit"),
 )
 add(
     "operator recovery-requests review",
     "PATCH",
-    "/operator/data-service-recovery-requests/{request_id}",
+    "/v1/operator/data-service-recovery-requests/{request_id}",
     "Acknowledge or resolve a recovery request.",
     body="file",
     fields=("status",),
@@ -523,14 +523,14 @@ add(
 add(
     "operator application-access recover",
     "POST",
-    "/operator/application-access/recover",
+    "/v1/operator/application-access/recover",
     "Reconcile restored access state; invalidate sessions and uncertain credentials.",
     destructive=True,
 )
 add(
     "operator purge apply",
     "POST",
-    "/operator/projects/{name}/purge",
+    "/v1/operator/projects/{project}/purge",
     "Permanently purge a retired project using its preview scope.",
     body="retirement",
     fields=("scope_token",),
@@ -540,7 +540,7 @@ for action, method in (("set", "PUT"), ("delete", "DELETE")):
     add(
         "operator grants " + action,
         method,
-        "/platform/grants",
+        "/v1/platform/grants",
         "Manage platform administrator grants.",
         body="grant",
         fields=("preferred_username", "issuer", "subject", "role", "display_name")
@@ -551,12 +551,12 @@ for action, method in (("set", "PUT"), ("delete", "DELETE")):
 for family, collection, fields in (
     (
         "test-identities",
-        "/platform/test-identities",
+        "/v1/platform/test-identities",
         ("name", "role", "test_run_id", "project", "expires_in_hours"),
     ),
     (
         "test-runner-credentials",
-        "/platform/test-runner-credentials",
+        "/v1/platform/test-runner-credentials",
         ("name", "expires_in_days"),
     ),
 ):
@@ -580,7 +580,7 @@ for family, collection, fields in (
 add(
     "operator test-runner-credentials rotate",
     "POST",
-    "/platform/test-runner-credentials/{credential_id}/rotate",
+    "/v1/platform/test-runner-credentials/{credential_id}/rotate",
     "Rotate a test runner credential.",
     body="credential",
     fields=("expires_in_days", "overlap_hours"),
@@ -607,15 +607,15 @@ EXCLUSIONS = {
 
 
 # Named store resources use body versions and explicit UUID scope confirmations.
-add("stores list", "GET", A + "/resources", "List independent named resources.")
+add("stores list", "GET", A + "/stores", "List independent named resources.")
 add(
     "stores create",
     "POST",
-    A + "/resources",
+    A + "/stores",
     "Create a named store resource from JSON.",
     body="file",
 )
-S = "/v1/resources/{resource_id}"
+S = "/v1/stores/{resource_id}"
 add("stores get", "GET", S, "Inspect resource provisioning and quota enforcement.")
 add(
     "stores rename",
@@ -669,17 +669,17 @@ add(
 add(
     "stores bindings list",
     "GET",
-    A + "/resource-bindings",
+    A + "/store-bindings",
     "List outgoing component bindings.",
 )
 add(
     "stores bindings request",
     "POST",
-    A + "/resource-bindings",
+    A + "/store-bindings",
     "Request explicit component access.",
     body="file",
 )
-G = "/v1/resource-grants/{grant_id}"
+G = "/v1/store-grants/{grant_id}"
 add(
     "stores grants approve",
     "POST",
@@ -760,4 +760,18 @@ add(
     P + "/ai/proposals",
     "List project-scoped AI change proposals.",
     query=("limit", "before"),
+)
+
+add(
+    "deploy get",
+    "GET",
+    P + "/application",
+    "Export the current v1 application declaration.",
+)
+add(
+    "deploy validate",
+    "POST",
+    P + "/application/validate",
+    "Validate a v1 application without deploying.",
+    body="file",
 )

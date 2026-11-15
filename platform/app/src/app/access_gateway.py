@@ -286,7 +286,7 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
     async def refresh():
         headers = {"Authorization": "Bearer " + internal_key}
         result = await transport.get(
-            api_url + "/internal/application-access/snapshot", headers=headers
+            api_url + "/v1/internal/application-access/snapshot", headers=headers
         )
         result.raise_for_status()
         try:
@@ -296,7 +296,7 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
             raise
         ack = await transport.post(
             api_url
-            + "/internal/application-access/replicas/"
+            + "/v1/internal/application-access/replicas/"
             + os.environ.get("APPLICATION_ACCESS_REPLICA", "local"),
             headers=headers,
             json={"generation": snapshot.value["generation"]},
@@ -580,7 +580,7 @@ def create_gateway(api_url=None, internal_key=None, session_key=None, client=Non
             pending = None
             if mode == "browser-session":
                 enrolled = await transport.post(
-                    api_url + "/internal/application-access/enroll",
+                    api_url + "/v1/internal/application-access/enroll",
                     json={"policyId": policy["id"], "accessToken": token},
                     headers={"Authorization": "Bearer " + internal_key},
                 )

@@ -263,8 +263,8 @@ export async function getAccessReadiness(
       ),
     }),
     checked(
-      await apiClient.GET('/projects/{name}/components', {
-        params: { path: { name: project } },
+      await apiClient.GET('/v1/projects/{project}/components', {
+        params: { path: { project: project } },
         signal,
       }),
     ),
@@ -584,7 +584,7 @@ export async function retryAccessOperation(
   version: number,
 ) {
   const data = checked(
-    await apiClient.POST('/v1/access-operations/{operation_id}/retry', {
+    await apiClient.POST('/v1/operations/{operation_id}/retry', {
       params: {
         path: { operation_id: operationId },
         header: { 'If-Match': etag(version) },

@@ -3,7 +3,7 @@
 
 	# Issue certificates only for hosts approved by the platform API.
 	on_demand_tls {
-		ask http://platform-api:8000/internal/tls
+		ask http://platform-api:8000/v1/internal/tls
 	}
 }
 

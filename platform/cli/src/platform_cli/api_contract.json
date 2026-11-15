@@ -1721,6 +1721,39 @@
         "title": "ValidationError",
         "type": "object"
       },
+      "ValidationResult": {
+        "additionalProperties": false,
+        "properties": {
+          "capacity": {
+            "additionalProperties": true,
+            "title": "Capacity",
+            "type": "object"
+          },
+          "images": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Images",
+            "type": "object"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "valid": {
+            "title": "Valid",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "valid",
+          "revision",
+          "images",
+          "capacity"
+        ],
+        "title": "ValidationResult",
+        "type": "object"
+      },
       "Version": {
         "additionalProperties": false,
         "properties": {
@@ -1801,9 +1834,141 @@
         "summary": "Health"
       }
     },
-    "/operator/application-access/recover": {
+    "/readyz": {
+      "get": {
+        "operationId": "ready_readyz_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Ready"
+      }
+    },
+    "/v1/capabilities": {
+      "get": {
+        "description": "Declare what a deployment spec may request in each environment.",
+        "operationId": "capabilities_v1_capabilities_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Capabilities"
+      }
+    },
+    "/v1/operations/{operation_id}": {
+      "get": {
+        "operationId": "operation_status_v1_operations__operation_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Operation Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Operation Status"
+      }
+    },
+    "/v1/operations/{operation_id}/retry": {
       "post": {
-        "operationId": "recover_operator_application_access_recover_post",
+        "operationId": "retry_operation_v1_operations__operation_id__retry_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "operation_id",
+            "required": true,
+            "schema": {
+              "title": "Operation Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "If-Match",
+            "required": true,
+            "schema": {
+              "title": "If-Match",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retry Operation"
+      }
+    },
+    "/v1/operator/application-access/recover": {
+      "post": {
+        "operationId": "recover_v1_operator_application_access_recover_post",
         "responses": {
           "202": {
             "content": {
@@ -1822,10 +1987,10 @@
         "summary": "Recover"
       }
     },
-    "/operator/audit/events": {
+    "/v1/operator/audit/events": {
       "get": {
         "description": "Export a bounded UTC audit window without secret values.",
-        "operationId": "export_audit_events_operator_audit_events_get",
+        "operationId": "export_audit_events_v1_operator_audit_events_get",
         "parameters": [
           {
             "in": "query",
@@ -1902,9 +2067,9 @@
         "summary": "Export Audit Events"
       }
     },
-    "/operator/capacity": {
+    "/v1/operator/capacity": {
       "get": {
-        "operationId": "operator_capacity_operator_capacity_get",
+        "operationId": "operator_capacity_v1_operator_capacity_get",
         "responses": {
           "200": {
             "content": {
@@ -1923,9 +2088,9 @@
         "summary": "Operator Capacity"
       }
     },
-    "/operator/data-service-recovery-requests": {
+    "/v1/operator/data-service-recovery-requests": {
       "get": {
-        "operationId": "list_data_service_recovery_requests_operator_data_service_recovery_requests_get",
+        "operationId": "list_data_service_recovery_requests_v1_operator_data_service_recovery_requests_get",
         "responses": {
           "200": {
             "content": {
@@ -1944,9 +2109,9 @@
         "summary": "List Data Service Recovery Requests"
       }
     },
-    "/operator/data-service-recovery-requests/{request_id}": {
+    "/v1/operator/data-service-recovery-requests/{request_id}": {
       "patch": {
-        "operationId": "review_data_service_recovery_request_operator_data_service_recovery_requests__request_id__patch",
+        "operationId": "review_data_service_recovery_request_v1_operator_data_service_recovery_requests__request_id__patch",
         "parameters": [
           {
             "in": "path",
@@ -1997,17 +2162,17 @@
         "summary": "Review Data Service Recovery Request"
       }
     },
-    "/operator/projects/{name}/permissions": {
+    "/v1/operator/projects/{project}/permissions": {
       "get": {
         "description": "Inspect project grants; this is intentionally unavailable to project members.",
-        "operationId": "inspect_project_permissions_operator_projects__name__permissions_get",
+        "operationId": "inspect_project_permissions_v1_operator_projects__project__permissions_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2040,17 +2205,17 @@
         "summary": "Inspect Project Permissions"
       }
     },
-    "/operator/projects/{name}/purge": {
+    "/v1/operator/projects/{project}/purge": {
       "post": {
         "description": "Permanently remove a retired project's SQL resources and catalog, retaining audit evidence.",
-        "operationId": "purge_project_operator_projects__name__purge_post",
+        "operationId": "purge_project_v1_operator_projects__project__purge_post",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2093,17 +2258,17 @@
         "summary": "Purge Project"
       }
     },
-    "/operator/projects/{name}/purge-preview": {
+    "/v1/operator/projects/{project}/purge-preview": {
       "get": {
         "description": "Show permanent-deletion scope for a retired project to a platform administrator.",
-        "operationId": "purge_preview_operator_projects__name__purge_preview_get",
+        "operationId": "purge_preview_v1_operator_projects__project__purge_preview_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2136,17 +2301,17 @@
         "summary": "Purge Preview"
       }
     },
-    "/operator/projects/{name}/retirement": {
+    "/v1/operator/projects/{project}/retirement": {
       "get": {
         "description": "Inspect retained retirement inventory and fail-closed credential cleanup progress.",
-        "operationId": "inspect_retirement_operator_projects__name__retirement_get",
+        "operationId": "inspect_retirement_v1_operator_projects__project__retirement_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2179,17 +2344,17 @@
         "summary": "Inspect Retirement"
       }
     },
-    "/operator/projects/{name}/security-configuration": {
+    "/v1/operator/projects/{project}/security-configuration": {
       "get": {
         "description": "Return the safe, managed workload and network policy contract for a project.",
-        "operationId": "inspect_project_security_configuration_operator_projects__name__security_configuration_get",
+        "operationId": "inspect_project_security_configuration_v1_operator_projects__project__security_configuration_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2222,9 +2387,9 @@
         "summary": "Inspect Project Security Configuration"
       }
     },
-    "/platform/grants": {
+    "/v1/platform/grants": {
       "delete": {
-        "operationId": "delete_platform_grant_platform_grants_delete",
+        "operationId": "delete_platform_grant_v1_platform_grants_delete",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2264,7 +2429,7 @@
       },
       "get": {
         "description": "List platform administrators for platform-administration UI and automation.",
-        "operationId": "get_platform_grants_platform_grants_get",
+        "operationId": "get_platform_grants_v1_platform_grants_get",
         "responses": {
           "200": {
             "content": {
@@ -2283,7 +2448,7 @@
         "summary": "Get Platform Grants"
       },
       "put": {
-        "operationId": "put_platform_grant_platform_grants_put",
+        "operationId": "put_platform_grant_v1_platform_grants_put",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2322,10 +2487,10 @@
         "summary": "Put Platform Grant"
       }
     },
-    "/platform/test-context": {
+    "/v1/platform/test-context": {
       "get": {
         "description": "Confirm suite authority without exposing or administering runner credentials.",
-        "operationId": "test_context_platform_test_context_get",
+        "operationId": "test_context_v1_platform_test_context_get",
         "responses": {
           "200": {
             "content": {
@@ -2344,9 +2509,9 @@
         "summary": "Test Context"
       }
     },
-    "/platform/test-identities": {
+    "/v1/platform/test-identities": {
       "get": {
-        "operationId": "list_test_identities_platform_test_identities_get",
+        "operationId": "list_test_identities_v1_platform_test_identities_get",
         "parameters": [
           {
             "in": "query",
@@ -2395,7 +2560,7 @@
       },
       "post": {
         "description": "Create a short-lived service-account persona tied to one test run.",
-        "operationId": "create_test_identity_platform_test_identities_post",
+        "operationId": "create_test_identity_v1_platform_test_identities_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2434,9 +2599,9 @@
         "summary": "Create Test Identity"
       }
     },
-    "/platform/test-identities/{credential_id}": {
+    "/v1/platform/test-identities/{credential_id}": {
       "delete": {
-        "operationId": "revoke_test_identity_platform_test_identities__credential_id__delete",
+        "operationId": "revoke_test_identity_v1_platform_test_identities__credential_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -2477,9 +2642,9 @@
         "summary": "Revoke Test Identity"
       }
     },
-    "/platform/test-runner-credentials": {
+    "/v1/platform/test-runner-credentials": {
       "get": {
-        "operationId": "list_test_runner_credentials_platform_test_runner_credentials_get",
+        "operationId": "list_test_runner_credentials_v1_platform_test_runner_credentials_get",
         "responses": {
           "200": {
             "content": {
@@ -2499,7 +2664,7 @@
       },
       "post": {
         "description": "Create the reusable suite identity; automation identities cannot invoke this endpoint.",
-        "operationId": "create_test_runner_credential_platform_test_runner_credentials_post",
+        "operationId": "create_test_runner_credential_v1_platform_test_runner_credentials_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2538,9 +2703,9 @@
         "summary": "Create Test Runner Credential"
       }
     },
-    "/platform/test-runner-credentials/{credential_id}": {
+    "/v1/platform/test-runner-credentials/{credential_id}": {
       "delete": {
-        "operationId": "revoke_test_runner_credential_platform_test_runner_credentials__credential_id__delete",
+        "operationId": "revoke_test_runner_credential_v1_platform_test_runner_credentials__credential_id__delete",
         "parameters": [
           {
             "in": "path",
@@ -2581,9 +2746,9 @@
         "summary": "Revoke Test Runner Credential"
       }
     },
-    "/platform/test-runner-credentials/{credential_id}/rotate": {
+    "/v1/platform/test-runner-credentials/{credential_id}/rotate": {
       "post": {
-        "operationId": "rotate_test_runner_credential_platform_test_runner_credentials__credential_id__rotate_post",
+        "operationId": "rotate_test_runner_credential_v1_platform_test_runner_credentials__credential_id__rotate_post",
         "parameters": [
           {
             "in": "path",
@@ -2634,9 +2799,9 @@
         "summary": "Rotate Test Runner Credential"
       }
     },
-    "/projects": {
+    "/v1/projects": {
       "get": {
-        "operationId": "projects_projects_get",
+        "operationId": "projects_v1_projects_get",
         "responses": {
           "200": {
             "content": {
@@ -2656,7 +2821,7 @@
       },
       "post": {
         "description": "Create an authorization and credential scope before its first deployment.",
-        "operationId": "create_empty_project_projects_post",
+        "operationId": "create_empty_project_v1_projects_post",
         "requestBody": {
           "content": {
             "application/json": {
@@ -2695,85 +2860,16 @@
         "summary": "Create Empty Project"
       }
     },
-    "/projects/{name}": {
-      "put": {
-        "description": "Accept the platform.eseidinger.de/v1 Application declaration.\n\nAn optional `If-Match: <revision>` header makes the update conditional on the\ncurrent desired revision; a stale value returns 409 with the current revision.",
-        "operationId": "provision_projects__name__put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "if-match",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "If-Match"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ApplicationEnvelope"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Provision"
-      }
-    },
-    "/projects/{name}/ai/context": {
+    "/v1/projects/{project}/ai/context": {
       "get": {
-        "operationId": "ai_context_projects__name__ai_context_get",
+        "operationId": "ai_context_v1_projects__project__ai_context_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2806,16 +2902,16 @@
         "summary": "Ai Context"
       }
     },
-    "/projects/{name}/ai/policy": {
+    "/v1/projects/{project}/ai/policy": {
       "get": {
-        "operationId": "get_ai_policy_projects__name__ai_policy_get",
+        "operationId": "get_ai_policy_v1_projects__project__ai_policy_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2848,14 +2944,14 @@
         "summary": "Get Ai Policy"
       },
       "put": {
-        "operationId": "set_ai_policy_projects__name__ai_policy_put",
+        "operationId": "set_ai_policy_v1_projects__project__ai_policy_put",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -2898,16 +2994,16 @@
         "summary": "Set Ai Policy"
       }
     },
-    "/projects/{name}/ai/proposals": {
+    "/v1/projects/{project}/ai/proposals": {
       "get": {
-        "operationId": "list_ai_proposals_projects__name__ai_proposals_get",
+        "operationId": "list_ai_proposals_v1_projects__project__ai_proposals_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           },
@@ -2969,14 +3065,14 @@
         "summary": "List Ai Proposals"
       },
       "post": {
-        "operationId": "create_ai_proposal_projects__name__ai_proposals_post",
+        "operationId": "create_ai_proposal_v1_projects__project__ai_proposals_post",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -3019,16 +3115,16 @@
         "summary": "Create Ai Proposal"
       }
     },
-    "/projects/{name}/ai/proposals/{proposal_id}": {
+    "/v1/projects/{project}/ai/proposals/{proposal_id}": {
       "get": {
-        "operationId": "get_ai_proposal_projects__name__ai_proposals__proposal_id__get",
+        "operationId": "get_ai_proposal_v1_projects__project__ai_proposals__proposal_id__get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           },
@@ -3071,16 +3167,16 @@
         "summary": "Get Ai Proposal"
       }
     },
-    "/projects/{name}/ai/proposals/{proposal_id}/approval": {
+    "/v1/projects/{project}/ai/proposals/{proposal_id}/approval": {
       "post": {
-        "operationId": "approve_ai_proposal_projects__name__ai_proposals__proposal_id__approval_post",
+        "operationId": "approve_ai_proposal_v1_projects__project__ai_proposals__proposal_id__approval_post",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           },
@@ -3133,16 +3229,16 @@
         "summary": "Approve Ai Proposal"
       }
     },
-    "/projects/{name}/ai/proposals/{proposal_id}/execute": {
+    "/v1/projects/{project}/ai/proposals/{proposal_id}/execute": {
       "post": {
-        "operationId": "execute_ai_proposal_projects__name__ai_proposals__proposal_id__execute_post",
+        "operationId": "execute_ai_proposal_v1_projects__project__ai_proposals__proposal_id__execute_post",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           },
@@ -3195,16 +3291,16 @@
         "summary": "Execute Ai Proposal"
       }
     },
-    "/projects/{name}/ai/runs": {
+    "/v1/projects/{project}/ai/runs": {
       "get": {
-        "operationId": "list_ai_runs_projects__name__ai_runs_get",
+        "operationId": "list_ai_runs_v1_projects__project__ai_runs_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           },
@@ -3266,14 +3362,14 @@
         "summary": "List Ai Runs"
       },
       "post": {
-        "operationId": "create_ai_run_projects__name__ai_runs_post",
+        "operationId": "create_ai_run_v1_projects__project__ai_runs_post",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -3316,16 +3412,16 @@
         "summary": "Create Ai Run"
       }
     },
-    "/projects/{name}/ai/runs/{run_id}": {
+    "/v1/projects/{project}/ai/runs/{run_id}": {
       "get": {
-        "operationId": "get_ai_run_projects__name__ai_runs__run_id__get",
+        "operationId": "get_ai_run_v1_projects__project__ai_runs__run_id__get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           },
@@ -3368,27 +3464,16 @@
         "summary": "Get Ai Run"
       }
     },
-    "/projects/{name}/application-metrics": {
+    "/v1/projects/{project}/application": {
       "get": {
-        "operationId": "project_application_metrics_projects__name__application_metrics_get",
+        "operationId": "get_application_v1_projects__project__application_get",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "component",
-            "required": true,
-            "schema": {
-              "maxLength": 32,
-              "minLength": 1,
-              "title": "Component",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -3397,7 +3482,9 @@
           "200": {
             "content": {
               "application/json": {
-                "schema": {}
+                "schema": {
+                  "$ref": "#/components/schemas/ApplicationEnvelope"
+                }
               }
             },
             "description": "Successful Response"
@@ -3418,104 +3505,18 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Project Application Metrics"
-      }
-    },
-    "/projects/{name}/components": {
-      "get": {
-        "description": "Live, per-component status for a v1alpha2 application revision.",
-        "operationId": "component_status_projects__name__components_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Component Status"
-      }
-    },
-    "/projects/{name}/configuration": {
-      "get": {
-        "description": "Desired configuration values and whether the running deployment has activated them.",
-        "operationId": "get_configuration_projects__name__configuration_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Configuration"
+        "summary": "Get Application"
       },
       "put": {
-        "description": "Replace the configuration values: adds, updates and removes in one validated revision.\n\nThe change is a new desired revision (conditional on `If-Match`) that rolls the pods.",
-        "operationId": "put_configuration_projects__name__configuration_put",
+        "description": "Accept the platform.eseidinger.de/v1 Application declaration.\n\nAn optional `If-Match: <revision>` header makes the update conditional on the\ncurrent desired revision; a stale value returns 409 with the current revision.",
+        "operationId": "provision_v1_projects__project__application_put",
         "parameters": [
           {
             "in": "path",
-            "name": "name",
+            "name": "project",
             "required": true,
             "schema": {
-              "title": "Name",
+              "title": "Project",
               "type": "string"
             }
           },
@@ -3540,1835 +3541,12 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ConfigurationBody"
+                "$ref": "#/components/schemas/ApplicationEnvelope"
               }
             }
           },
           "required": true
         },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Put Configuration"
-      }
-    },
-    "/projects/{name}/data-services": {
-      "get": {
-        "description": "Report named resources, component bindings and the latest recovery request.",
-        "operationId": "data_services_projects__name__data_services_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Data Services"
-      }
-    },
-    "/projects/{name}/data-services/recovery-requests": {
-      "post": {
-        "description": "Create a bounded operator-reviewable recovery request without incident details or credentials.",
-        "operationId": "request_data_service_recovery_projects__name__data_services_recovery_requests_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DataServiceRecoveryRequest"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Request Data Service Recovery"
-      }
-    },
-    "/projects/{name}/database-access/grants": {
-      "delete": {
-        "operationId": "revoke_human_database_access_projects__name__database_access_grants_delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HumanDatabaseReference"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Revoke Human Database Access"
-      },
-      "get": {
-        "operationId": "list_human_database_grants_projects__name__database_access_grants_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "List Human Database Grants"
-      },
-      "post": {
-        "deprecated": true,
-        "operationId": "grant_human_database_access_projects__name__database_access_grants_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HumanDatabaseGrant"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Grant Human Database Access"
-      }
-    },
-    "/projects/{name}/database-access/me": {
-      "get": {
-        "operationId": "my_human_database_access_projects__name__database_access_me_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "My Human Database Access"
-      }
-    },
-    "/projects/{name}/database-access/me/credential": {
-      "post": {
-        "deprecated": true,
-        "operationId": "issue_my_human_database_credential_projects__name__database_access_me_credential_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Issue My Human Database Credential"
-      }
-    },
-    "/projects/{name}/database-access/me/key": {
-      "put": {
-        "operationId": "update_my_human_database_key_projects__name__database_access_me_key_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HumanDatabaseKey"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Update My Human Database Key"
-      }
-    },
-    "/projects/{name}/deployment-credentials": {
-      "get": {
-        "operationId": "list_deployment_credentials_projects__name__deployment_credentials_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "List Deployment Credentials"
-      },
-      "post": {
-        "description": "Create a project-scoped OIDC client and return its secret exactly once.",
-        "operationId": "create_deployment_credential_projects__name__deployment_credentials_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeploymentCredentialCreate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Create Deployment Credential"
-      }
-    },
-    "/projects/{name}/deployment-credentials/{credential_id}": {
-      "delete": {
-        "description": "Deny platform access first, then remove the identity-provider client.",
-        "operationId": "revoke_deployment_credential_projects__name__deployment_credentials__credential_id__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "credential_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Credential Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Revoke Deployment Credential"
-      }
-    },
-    "/projects/{name}/deployment-credentials/{credential_id}/rotate": {
-      "post": {
-        "description": "Create a linked replacement and bound how long the predecessor remains usable.",
-        "operationId": "rotate_deployment_credential_projects__name__deployment_credentials__credential_id__rotate_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "credential_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Credential Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/DeploymentCredentialRotate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Rotate Deployment Credential"
-      }
-    },
-    "/projects/{name}/drift": {
-      "get": {
-        "description": "Compare the live Deployment with the desired revision; report only, never repair.",
-        "operationId": "drift_projects__name__drift_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Drift"
-      }
-    },
-    "/projects/{name}/grants": {
-      "delete": {
-        "operationId": "delete_project_grant_projects__name__grants_delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GrantReference"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Delete Project Grant"
-      },
-      "get": {
-        "description": "List grants for a project administrator; operator inspection remains separate.",
-        "operationId": "get_project_grants_projects__name__grants_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Get Project Grants"
-      },
-      "put": {
-        "operationId": "put_project_grant_projects__name__grants_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProjectGrant"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Put Project Grant"
-      }
-    },
-    "/projects/{name}/logs": {
-      "get": {
-        "description": "Authorized log snapshot; repeat with `after=next_cursor` to follow new entries.",
-        "operationId": "project_logs_projects__name__logs_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "tail",
-            "required": false,
-            "schema": {
-              "default": 200,
-              "maximum": 1000,
-              "minimum": 1,
-              "title": "Tail",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "since_seconds",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maximum": 86400,
-                  "minimum": 1,
-                  "type": "integer"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Since Seconds"
-            }
-          },
-          {
-            "in": "query",
-            "name": "component",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "pattern": "^[a-z][a-z0-9-]{0,31}$",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Component"
-            }
-          },
-          {
-            "in": "query",
-            "name": "instance",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "pattern": "^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Instance"
-            }
-          },
-          {
-            "in": "query",
-            "name": "search",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 256,
-                  "minLength": 1,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Search"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 64,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
-          },
-          {
-            "in": "query",
-            "name": "before",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 64,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Before"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Project Logs"
-      }
-    },
-    "/projects/{name}/resource-usage": {
-      "get": {
-        "description": "Current CPU and memory per pod; missing, stale and unavailable metrics are labelled in `state`.",
-        "operationId": "resource_usage_projects__name__resource_usage_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Resource Usage"
-      }
-    },
-    "/projects/{name}/resources": {
-      "get": {
-        "description": "Authorized deployed-resource inventory; unavailable provider data is explicit.",
-        "operationId": "resource_inventory_projects__name__resources_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Resource Inventory"
-      }
-    },
-    "/projects/{name}/restart": {
-      "post": {
-        "description": "Queue a rolling restart of the current desired revision without changing the spec.",
-        "operationId": "restart_projects__name__restart_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Restart"
-      }
-    },
-    "/projects/{name}/retained-logs": {
-      "get": {
-        "description": "Read minimized seven-day operational logs, including retired pod instances.\n\nCentral storage is operator-only; this endpoint fixes the project selector\nafter platform authorization. It never accepts arbitrary LogQL.",
-        "operationId": "retained_project_logs_projects__name__retained_logs_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "query",
-            "name": "tail",
-            "required": false,
-            "schema": {
-              "default": 200,
-              "maximum": 1000,
-              "minimum": 1,
-              "title": "Tail",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "since_seconds",
-            "required": false,
-            "schema": {
-              "default": 604800,
-              "maximum": 604800,
-              "minimum": 1,
-              "title": "Since Seconds",
-              "type": "integer"
-            }
-          },
-          {
-            "in": "query",
-            "name": "component",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "pattern": "^[a-z][a-z0-9-]{0,31}$",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Component"
-            }
-          },
-          {
-            "in": "query",
-            "name": "instance",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "pattern": "^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$",
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Instance"
-            }
-          },
-          {
-            "in": "query",
-            "name": "after",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 64,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "After"
-            }
-          },
-          {
-            "in": "query",
-            "name": "before",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "maxLength": 64,
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "Before"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Retained Project Logs"
-      }
-    },
-    "/projects/{name}/retire": {
-      "post": {
-        "description": "Retire a project, keeping its catalog entry, database and role.\n\nWith the `scope_token` from the preview the platform deletes the project namespace itself; a\nnamespace that is still terminating answers 202 and the identical request is retried. Without\na token the namespace must already have been removed manually.",
-        "operationId": "retire_projects__name__retire_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Retirement"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Retire"
-      }
-    },
-    "/projects/{name}/retirement-preview": {
-      "get": {
-        "description": "Show what retirement would remove and keep; the token pins this scope for confirmation.",
-        "operationId": "retirement_preview_projects__name__retirement_preview_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Retirement Preview"
-      }
-    },
-    "/projects/{name}/revisions": {
-      "get": {
-        "description": "List the retained desired revisions, newest first.",
-        "operationId": "revisions_projects__name__revisions_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Revisions"
-      }
-    },
-    "/projects/{name}/rollback": {
-      "post": {
-        "description": "Re-apply a retained revision as a new revision; databases are never rolled back.",
-        "operationId": "rollback_projects__name__rollback_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "if-match",
-            "required": false,
-            "schema": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ],
-              "title": "If-Match"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Rollback"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Rollback"
-      }
-    },
-    "/projects/{name}/secrets": {
-      "get": {
-        "description": "Secret names and change times, never values, plus whether the pods run the current version.",
-        "operationId": "list_secrets_projects__name__secrets_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "List Secrets"
-      }
-    },
-    "/projects/{name}/secrets/{secret}": {
-      "delete": {
-        "description": "Remove one secret; the pods restart so the variable disappears.",
-        "operationId": "delete_secret_projects__name__secrets__secret__delete",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "secret",
-            "required": true,
-            "schema": {
-              "title": "Secret",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Delete Secret"
-      },
-      "put": {
-        "description": "Create or rotate one write-only secret; the pods restart to pick it up.",
-        "operationId": "set_secret_projects__name__secrets__secret__put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "secret",
-            "required": true,
-            "schema": {
-              "title": "Secret",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "additionalProperties": true,
-                "title": "Body",
-                "type": "object"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Set Secret"
-      }
-    },
-    "/projects/{name}/secrets/{secret}/confirm": {
-      "post": {
-        "description": "Revoke the previous value once the pods run the new one.",
-        "operationId": "confirm_secret_rotation_projects__name__secrets__secret__confirm_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "secret",
-            "required": true,
-            "schema": {
-              "title": "Secret",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Confirm Secret Rotation"
-      }
-    },
-    "/projects/{name}/secrets/{secret}/revert": {
-      "post": {
-        "description": "Make the previous value current again and restart the pods.",
-        "operationId": "revert_secret_rotation_projects__name__secrets__secret__revert_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "secret",
-            "required": true,
-            "schema": {
-              "title": "Secret",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Revert Secret Rotation"
-      }
-    },
-    "/projects/{name}/traces/{trace_id}": {
-      "get": {
-        "operationId": "project_trace_projects__name__traces__trace_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "name",
-            "required": true,
-            "schema": {
-              "title": "Name",
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "trace_id",
-            "required": true,
-            "schema": {
-              "title": "Trace Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Project Trace"
-      }
-    },
-    "/readyz": {
-      "get": {
-        "operationId": "ready_readyz_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "summary": "Ready"
-      }
-    },
-    "/v1/access-operations/{operation_id}": {
-      "get": {
-        "operationId": "access_operation_v1_access_operations__operation_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "operation_id",
-            "required": true,
-            "schema": {
-              "title": "Operation Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Access Operation"
-      }
-    },
-    "/v1/access-operations/{operation_id}/retry": {
-      "post": {
-        "operationId": "retry_operation_v1_access_operations__operation_id__retry_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "operation_id",
-            "required": true,
-            "schema": {
-              "title": "Operation Id",
-              "type": "string"
-            }
-          },
-          {
-            "in": "header",
-            "name": "If-Match",
-            "required": true,
-            "schema": {
-              "title": "If-Match",
-              "type": "string"
-            }
-          }
-        ],
         "responses": {
           "202": {
             "content": {
@@ -5394,72 +3572,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Retry Operation"
-      }
-    },
-    "/v1/capabilities": {
-      "get": {
-        "description": "Declare what a deployment spec may request in each environment.",
-        "operationId": "capabilities_v1_capabilities_get",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Capabilities"
-      }
-    },
-    "/v1/operations/{operation_id}": {
-      "get": {
-        "operationId": "operation_status_v1_operations__operation_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "operation_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Operation Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Operation Status"
+        "summary": "Provision"
       }
     },
     "/v1/projects/{project}/application-access-context": {
@@ -6102,7 +4215,10 @@
           "required": true
         },
         "responses": {
-          "202": {
+          "200": {
+            "description": "Idempotent replay"
+          },
+          "201": {
             "content": {
               "application/json": {
                 "schema": {}
@@ -6187,6 +4303,129 @@
           }
         ],
         "summary": "Delete Group"
+      }
+    },
+    "/v1/projects/{project}/application-metrics": {
+      "get": {
+        "operationId": "project_application_metrics_v1_projects__project__application_metrics_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "component",
+            "required": true,
+            "schema": {
+              "maxLength": 32,
+              "minLength": 1,
+              "title": "Component",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Project Application Metrics"
+      }
+    },
+    "/v1/projects/{project}/application/validate": {
+      "post": {
+        "operationId": "validate_application_v1_projects__project__application_validate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApplicationEnvelope"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ValidationResult"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Validate Application"
       }
     },
     "/v1/projects/{project}/applications/{application}/access-policy": {
@@ -6426,6 +4665,787 @@
         "summary": "Rollback Policy"
       }
     },
+    "/v1/projects/{project}/components": {
+      "get": {
+        "description": "Live, per-component status for a v1alpha2 application revision.",
+        "operationId": "component_status_v1_projects__project__components_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Component Status"
+      }
+    },
+    "/v1/projects/{project}/configuration": {
+      "get": {
+        "description": "Desired configuration values and whether the running deployment has activated them.",
+        "operationId": "get_configuration_v1_projects__project__configuration_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Configuration"
+      },
+      "put": {
+        "description": "Replace the configuration values: adds, updates and removes in one validated revision.\n\nThe change is a new desired revision (conditional on `If-Match`) that rolls the pods.",
+        "operationId": "put_configuration_v1_projects__project__configuration_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConfigurationBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Put Configuration"
+      }
+    },
+    "/v1/projects/{project}/data-services": {
+      "get": {
+        "description": "Report named resources, component bindings and the latest recovery request.",
+        "operationId": "data_services_v1_projects__project__data_services_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Data Services"
+      }
+    },
+    "/v1/projects/{project}/data-services/recovery-requests": {
+      "post": {
+        "description": "Create a bounded operator-reviewable recovery request without incident details or credentials.",
+        "operationId": "request_data_service_recovery_v1_projects__project__data_services_recovery_requests_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DataServiceRecoveryRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Data Service Recovery"
+      }
+    },
+    "/v1/projects/{project}/database-access/grants": {
+      "delete": {
+        "operationId": "revoke_human_database_access_v1_projects__project__database_access_grants_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanDatabaseReference"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Human Database Access"
+      },
+      "get": {
+        "operationId": "list_human_database_grants_v1_projects__project__database_access_grants_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Human Database Grants"
+      },
+      "post": {
+        "deprecated": true,
+        "operationId": "grant_human_database_access_v1_projects__project__database_access_grants_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanDatabaseGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Grant Human Database Access"
+      }
+    },
+    "/v1/projects/{project}/database-access/me": {
+      "get": {
+        "operationId": "my_human_database_access_v1_projects__project__database_access_me_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "My Human Database Access"
+      }
+    },
+    "/v1/projects/{project}/database-access/me/credential": {
+      "post": {
+        "deprecated": true,
+        "operationId": "issue_my_human_database_credential_v1_projects__project__database_access_me_credential_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Issue My Human Database Credential"
+      }
+    },
+    "/v1/projects/{project}/database-access/me/key": {
+      "put": {
+        "operationId": "update_my_human_database_key_v1_projects__project__database_access_me_key_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanDatabaseKey"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Update My Human Database Key"
+      }
+    },
+    "/v1/projects/{project}/deployment-credentials": {
+      "get": {
+        "operationId": "list_deployment_credentials_v1_projects__project__deployment_credentials_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Deployment Credentials"
+      },
+      "post": {
+        "description": "Create a project-scoped OIDC client and return its secret exactly once.",
+        "operationId": "create_deployment_credential_v1_projects__project__deployment_credentials_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentCredentialCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Deployment Credential"
+      }
+    },
+    "/v1/projects/{project}/deployment-credentials/{credential_id}": {
+      "delete": {
+        "description": "Deny platform access first, then remove the identity-provider client.",
+        "operationId": "revoke_deployment_credential_v1_projects__project__deployment_credentials__credential_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Deployment Credential"
+      }
+    },
+    "/v1/projects/{project}/deployment-credentials/{credential_id}/rotate": {
+      "post": {
+        "description": "Create a linked replacement and bound how long the predecessor remains usable.",
+        "operationId": "rotate_deployment_credential_v1_projects__project__deployment_credentials__credential_id__rotate_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "credential_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Credential Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeploymentCredentialRotate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rotate Deployment Credential"
+      }
+    },
+    "/v1/projects/{project}/drift": {
+      "get": {
+        "description": "Compare the live Deployment with the desired revision; report only, never repair.",
+        "operationId": "drift_v1_projects__project__drift_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Drift"
+      }
+    },
     "/v1/projects/{project}/governance": {
       "get": {
         "operationId": "get_governance_v1_projects__project__governance_get",
@@ -6534,9 +5554,60 @@
         "summary": "Governance"
       }
     },
-    "/v1/projects/{project}/resource-bindings": {
+    "/v1/projects/{project}/grants": {
+      "delete": {
+        "operationId": "delete_project_grant_v1_projects__project__grants_delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantReference"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Project Grant"
+      },
       "get": {
-        "operationId": "list_bindings_v1_projects__project__resource_bindings_get",
+        "description": "List grants for a project administrator; operator inspection remains separate.",
+        "operationId": "get_project_grants_v1_projects__project__grants_get",
         "parameters": [
           {
             "in": "path",
@@ -6573,10 +5644,10 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "List Bindings"
+        "summary": "Get Project Grants"
       },
-      "post": {
-        "operationId": "request_binding_v1_projects__project__resource_bindings_post",
+      "put": {
+        "operationId": "put_project_grant_v1_projects__project__grants_put",
         "parameters": [
           {
             "in": "path",
@@ -6592,14 +5663,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/BindingRequest"
+                "$ref": "#/components/schemas/ProjectGrant"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "202": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {}
@@ -6623,12 +5694,13 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Request Binding"
+        "summary": "Put Project Grant"
       }
     },
-    "/v1/projects/{project}/resources": {
+    "/v1/projects/{project}/inventory": {
       "get": {
-        "operationId": "list_resources_v1_projects__project__resources_get",
+        "description": "Authorized deployed-resource inventory; unavailable provider data is explicit.",
+        "operationId": "resource_inventory_v1_projects__project__inventory_get",
         "parameters": [
           {
             "in": "path",
@@ -6665,10 +5737,13 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "List Resources"
-      },
-      "post": {
-        "operationId": "create_resource_v1_projects__project__resources_post",
+        "summary": "Resource Inventory"
+      }
+    },
+    "/v1/projects/{project}/logs": {
+      "get": {
+        "description": "Authorized log snapshot; repeat with `after=next_cursor` to follow new entries.",
+        "operationId": "project_logs_v1_projects__project__logs_get",
         "parameters": [
           {
             "in": "path",
@@ -6678,20 +5753,126 @@
               "title": "Project",
               "type": "string"
             }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ResourceCreate"
-              }
+          },
+          {
+            "in": "query",
+            "name": "tail",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Tail",
+              "type": "integer"
             }
           },
-          "required": true
-        },
+          {
+            "in": "query",
+            "name": "since_seconds",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 86400,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Since Seconds"
+            }
+          },
+          {
+            "in": "query",
+            "name": "component",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Component"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instance",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instance"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 256,
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Search"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          }
+        ],
         "responses": {
-          "202": {
+          "200": {
             "content": {
               "application/json": {
                 "schema": {}
@@ -6715,7 +5896,697 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Create Resource"
+        "summary": "Project Logs"
+      }
+    },
+    "/v1/projects/{project}/resource-usage": {
+      "get": {
+        "description": "Current CPU and memory per pod; missing, stale and unavailable metrics are labelled in `state`.",
+        "operationId": "resource_usage_v1_projects__project__resource_usage_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Resource Usage"
+      }
+    },
+    "/v1/projects/{project}/restart": {
+      "post": {
+        "description": "Queue a rolling restart of the current desired revision without changing the spec.",
+        "operationId": "restart_v1_projects__project__restart_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Restart"
+      }
+    },
+    "/v1/projects/{project}/retained-logs": {
+      "get": {
+        "description": "Read minimized seven-day operational logs, including retired pod instances.\n\nCentral storage is operator-only; this endpoint fixes the project selector\nafter platform authorization. It never accepts arbitrary LogQL.",
+        "operationId": "retained_project_logs_v1_projects__project__retained_logs_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tail",
+            "required": false,
+            "schema": {
+              "default": 200,
+              "maximum": 1000,
+              "minimum": 1,
+              "title": "Tail",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "since_seconds",
+            "required": false,
+            "schema": {
+              "default": 604800,
+              "maximum": 604800,
+              "minimum": 1,
+              "title": "Since Seconds",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "component",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z][a-z0-9-]{0,31}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Component"
+            }
+          },
+          {
+            "in": "query",
+            "name": "instance",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^[a-z0-9]([-a-z0-9.]{0,251}[a-z0-9])?$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Instance"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "After"
+            }
+          },
+          {
+            "in": "query",
+            "name": "before",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 64,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Before"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retained Project Logs"
+      }
+    },
+    "/v1/projects/{project}/retire": {
+      "post": {
+        "description": "Retire a project, keeping its catalog entry, database and role.\n\nWith the `scope_token` from the preview the platform deletes the project namespace itself; a\nnamespace that is still terminating answers 202 and the identical request is retried. Without\na token the namespace must already have been removed manually.",
+        "operationId": "retire_v1_projects__project__retire_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Retirement"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retire"
+      }
+    },
+    "/v1/projects/{project}/retirement-preview": {
+      "get": {
+        "description": "Show what retirement would remove and keep; the token pins this scope for confirmation.",
+        "operationId": "retirement_preview_v1_projects__project__retirement_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retirement Preview"
+      }
+    },
+    "/v1/projects/{project}/revisions": {
+      "get": {
+        "description": "List the retained desired revisions, newest first.",
+        "operationId": "revisions_v1_projects__project__revisions_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revisions"
+      }
+    },
+    "/v1/projects/{project}/rollback": {
+      "post": {
+        "description": "Re-apply a retained revision as a new revision; databases are never rolled back.",
+        "operationId": "rollback_v1_projects__project__rollback_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "header",
+            "name": "if-match",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "If-Match"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Rollback"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rollback"
+      }
+    },
+    "/v1/projects/{project}/secrets": {
+      "get": {
+        "description": "Secret names and change times, never values, plus whether the pods run the current version.",
+        "operationId": "list_secrets_v1_projects__project__secrets_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Secrets"
+      }
+    },
+    "/v1/projects/{project}/secrets/{secret}": {
+      "delete": {
+        "description": "Remove one secret; the pods restart so the variable disappears.",
+        "operationId": "delete_secret_v1_projects__project__secrets__secret__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "secret",
+            "required": true,
+            "schema": {
+              "title": "Secret",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Delete Secret"
+      },
+      "put": {
+        "description": "Create or rotate one write-only secret; the pods restart to pick it up.",
+        "operationId": "set_secret_v1_projects__project__secrets__secret__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "secret",
+            "required": true,
+            "schema": {
+              "title": "Secret",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "title": "Body",
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Secret"
+      }
+    },
+    "/v1/projects/{project}/secrets/{secret}/confirm": {
+      "post": {
+        "description": "Revoke the previous value once the pods run the new one.",
+        "operationId": "confirm_secret_rotation_v1_projects__project__secrets__secret__confirm_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "secret",
+            "required": true,
+            "schema": {
+              "title": "Secret",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Confirm Secret Rotation"
+      }
+    },
+    "/v1/projects/{project}/secrets/{secret}/revert": {
+      "post": {
+        "description": "Make the previous value current again and restart the pods.",
+        "operationId": "revert_secret_rotation_v1_projects__project__secrets__secret__revert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "secret",
+            "required": true,
+            "schema": {
+              "title": "Secret",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revert Secret Rotation"
       }
     },
     "/v1/projects/{project}/service-access-requests": {
@@ -6792,7 +6663,10 @@
           "required": true
         },
         "responses": {
-          "202": {
+          "200": {
+            "description": "Idempotent replay"
+          },
+          "201": {
             "content": {
               "application/json": {
                 "schema": {}
@@ -7199,6 +7073,98 @@
         "summary": "Rotate Service"
       }
     },
+    "/v1/projects/{project}/store-bindings": {
+      "get": {
+        "operationId": "list_bindings_v1_projects__project__store_bindings_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Bindings"
+      },
+      "post": {
+        "operationId": "request_binding_v1_projects__project__store_bindings_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project",
+            "required": true,
+            "schema": {
+              "title": "Project",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BindingRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Request Binding"
+      }
+    },
     "/v1/projects/{project}/store-context": {
       "get": {
         "operationId": "context_v1_projects__project__store_context_get",
@@ -7241,176 +7207,16 @@
         "summary": "Context"
       }
     },
-    "/v1/resource-grants/{grant_id}/approval": {
-      "post": {
-        "operationId": "approve_binding_v1_resource_grants__grant_id__approval_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "grant_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Grant Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/app__stores__contract__Approval"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Approve Binding"
-      }
-    },
-    "/v1/resource-grants/{grant_id}/mode": {
-      "put": {
-        "operationId": "change_mode_v1_resource_grants__grant_id__mode_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "grant_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Grant Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/GrantUpdate"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Change Mode"
-      }
-    },
-    "/v1/resource-grants/{grant_id}/revocation": {
-      "post": {
-        "operationId": "revoke_grant_v1_resource_grants__grant_id__revocation_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "grant_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Grant Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Version"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Revoke Grant"
-      }
-    },
-    "/v1/resources/{resource_id}": {
+    "/v1/projects/{project}/stores": {
       "get": {
-        "operationId": "get_resource_v1_resources__resource_id__get",
+        "operationId": "list_resources_v1_projects__project__stores_get",
         "parameters": [
           {
             "in": "path",
-            "name": "resource_id",
+            "name": "project",
             "required": true,
             "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -7440,18 +7246,17 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Get Resource"
+        "summary": "List Resources"
       },
-      "patch": {
-        "operationId": "rename_resource_v1_resources__resource_id__patch",
+      "post": {
+        "operationId": "create_resource_v1_projects__project__stores_post",
         "parameters": [
           {
             "in": "path",
-            "name": "resource_id",
+            "name": "project",
             "required": true,
             "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
+              "title": "Project",
               "type": "string"
             }
           }
@@ -7460,14 +7265,14 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResourceRename"
+                "$ref": "#/components/schemas/ResourceCreate"
               }
             }
           },
           "required": true
         },
         "responses": {
-          "200": {
+          "202": {
             "content": {
               "application/json": {
                 "schema": {}
@@ -7491,20 +7296,28 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "Rename Resource"
+        "summary": "Create Resource"
       }
     },
-    "/v1/resources/{resource_id}/grants": {
+    "/v1/projects/{project}/traces/{trace_id}": {
       "get": {
-        "operationId": "list_grants_v1_resources__resource_id__grants_get",
+        "operationId": "project_trace_v1_projects__project__traces__trace_id__get",
         "parameters": [
           {
             "in": "path",
-            "name": "resource_id",
+            "name": "project",
             "required": true,
             "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
+              "title": "Project",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "trace_id",
+            "required": true,
+            "schema": {
+              "title": "Trace Id",
               "type": "string"
             }
           }
@@ -7534,262 +7347,7 @@
             "HTTPBearer": []
           }
         ],
-        "summary": "List Grants"
-      }
-    },
-    "/v1/resources/{resource_id}/human-grants": {
-      "post": {
-        "operationId": "create_human_grant_v1_resources__resource_id__human_grants_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "resource_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/HumanGrant"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Create Human Grant"
-      }
-    },
-    "/v1/resources/{resource_id}/purge": {
-      "post": {
-        "operationId": "purge_resource_v1_resources__resource_id__purge_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "resource_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Purge"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Purge Resource"
-      }
-    },
-    "/v1/resources/{resource_id}/purge-preview": {
-      "get": {
-        "operationId": "purge_preview_v1_resources__resource_id__purge_preview_get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "resource_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Purge Preview"
-      }
-    },
-    "/v1/resources/{resource_id}/quota": {
-      "put": {
-        "operationId": "set_quota_v1_resources__resource_id__quota_put",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "resource_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/QuotaChange"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Set Quota"
-      }
-    },
-    "/v1/resources/{resource_id}/retirement": {
-      "post": {
-        "operationId": "retire_resource_v1_resources__resource_id__retirement_post",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "resource_id",
-            "required": true,
-            "schema": {
-              "format": "uuid",
-              "title": "Resource Id",
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Version"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "202": {
-            "content": {
-              "application/json": {
-                "schema": {}
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "security": [
-          {
-            "HTTPBearer": []
-          }
-        ],
-        "summary": "Retire Resource"
+        "summary": "Project Trace"
       }
     },
     "/v1/store-access/credentials/{credential_id}": {
@@ -8022,6 +7580,557 @@
           }
         ],
         "summary": "Issue Credential"
+      }
+    },
+    "/v1/store-grants/{grant_id}/approval": {
+      "post": {
+        "operationId": "approve_binding_v1_store_grants__grant_id__approval_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/app__stores__contract__Approval"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Approve Binding"
+      }
+    },
+    "/v1/store-grants/{grant_id}/mode": {
+      "put": {
+        "operationId": "change_mode_v1_store_grants__grant_id__mode_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/GrantUpdate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Change Mode"
+      }
+    },
+    "/v1/store-grants/{grant_id}/revocation": {
+      "post": {
+        "operationId": "revoke_grant_v1_store_grants__grant_id__revocation_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "grant_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Grant Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Revoke Grant"
+      }
+    },
+    "/v1/stores/{resource_id}": {
+      "get": {
+        "operationId": "get_resource_v1_stores__resource_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Get Resource"
+      },
+      "patch": {
+        "operationId": "rename_resource_v1_stores__resource_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResourceRename"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Rename Resource"
+      }
+    },
+    "/v1/stores/{resource_id}/grants": {
+      "get": {
+        "operationId": "list_grants_v1_stores__resource_id__grants_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "List Grants"
+      }
+    },
+    "/v1/stores/{resource_id}/human-grants": {
+      "post": {
+        "operationId": "create_human_grant_v1_stores__resource_id__human_grants_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HumanGrant"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Create Human Grant"
+      }
+    },
+    "/v1/stores/{resource_id}/purge": {
+      "post": {
+        "operationId": "purge_resource_v1_stores__resource_id__purge_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Purge"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Purge Resource"
+      }
+    },
+    "/v1/stores/{resource_id}/purge-preview": {
+      "get": {
+        "operationId": "purge_preview_v1_stores__resource_id__purge_preview_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Purge Preview"
+      }
+    },
+    "/v1/stores/{resource_id}/quota": {
+      "put": {
+        "operationId": "set_quota_v1_stores__resource_id__quota_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/QuotaChange"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Set Quota"
+      }
+    },
+    "/v1/stores/{resource_id}/retirement": {
+      "post": {
+        "operationId": "retire_resource_v1_stores__resource_id__retirement_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "resource_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Resource Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "summary": "Retire Resource"
       }
     }
   }

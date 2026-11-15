@@ -42,7 +42,7 @@ def test_existing_deploy_apply_works_with_environment_auth_and_broken_profile(
     def handler(request):
         seen.append(request)
         assert request.method == "PUT"
-        assert request.url.path == "/projects/orders"
+        assert request.url.path == "/v1/projects/orders/application"
         assert request.headers["authorization"] == "Bearer existing-token"
         assert request.headers["if-match"] == '"2"'
         assert json.loads(request.content) == {"name": "orders", "components": []}

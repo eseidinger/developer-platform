@@ -113,7 +113,7 @@ def test_ai_run_waits_for_server_budget_and_never_retries_post():
     )
     try:
         client.request_json(
-            "POST", "/projects/demo/ai/runs", body={"kind": "investigate_incident"}
+            "POST", "/v1/projects/demo/ai/runs", body={"kind": "investigate_incident"}
         )
     except ApiError:
         pass

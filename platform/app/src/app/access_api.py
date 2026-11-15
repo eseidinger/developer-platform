@@ -27,7 +27,7 @@ def response(row, operation=None, status=200):
     payload = dict(row)
     if operation:
         payload["operation_id"] = operation
-        payload["status_url"] = "/v1/access-operations/" + operation
+        payload["status_url"] = "/v1/operations/" + operation
     return JSONResponse(
         jsonable_encoder(payload),
         status_code=status,
@@ -188,7 +188,11 @@ def install(app, control):
             {"items": items, "limit": 100}, headers={"Cache-Control": "no-store"}
         )
 
-    @app.post("/v1/projects/{project}/application-groups", status_code=202)
+    @app.post(
+        "/v1/projects/{project}/application-groups",
+        status_code=201,
+        responses={200: {"description": "Idempotent replay"}},
+    )
     def create_group(
         project: str,
         body: GroupCreate,
@@ -573,7 +577,11 @@ def install(app, control):
             audit(principal, "membership.revoke", row)
         return response(row, op, 202)
 
-    @app.post("/v1/projects/{project}/service-access-requests", status_code=202)
+    @app.post(
+        "/v1/projects/{project}/service-access-requests",
+        status_code=201,
+        responses={200: {"description": "Idempotent replay"}},
+    )
     def request_service(
         project: str,
         body: ServiceRequest,
@@ -808,7 +816,6 @@ def install(app, control):
             audit(principal, "service.confirm", row)
         return response(row, op, 202)
 
-    @app.get("/v1/access-operations/{operation_id}")
     def access_operation(operation_id: str, principal: Principal = caller):
         with control.connect() as conn:
             op = conn.execute(
@@ -828,16 +835,19 @@ def install(app, control):
                     principal, "view", row["spec"]["providerProject"]
                 )
             return {
-                "id": operation_id,
-                "resourceId": op[0],
+                "operation_id": operation_id,
+                "kind": "access",
+                "resource_id": op[0],
                 "state": op[1],
                 "attempts": op[2],
-                "errorCode": op[3],
-                "createdAt": op[4],
-                "updatedAt": op[5],
+                "error_code": op[3],
+                "created_at": op[4],
+                "updated_at": op[5],
             }
 
-    @app.post("/v1/access-operations/{operation_id}/retry", status_code=202)
+    app.state.read_access_operation = access_operation
+
+    @app.post("/v1/operations/{operation_id}/retry", status_code=202)
     def retry_operation(
         operation_id: str,
         principal: Principal = caller,
@@ -869,7 +879,7 @@ def install(app, control):
             audit(principal, "operation.retry", row)
         return response(row, new_op, 202)
 
-    @app.post("/operator/application-access/recover", status_code=202)
+    @app.post("/v1/operator/application-access/recover", status_code=202)
     def recover(principal: Principal = caller):
         control.require_human_platform_admin(principal)
         operations = []
@@ -934,7 +944,7 @@ def install(app, control):
             store.bump(conn)
         return {"operationIds": operations, "browserSessionsInvalidated": True}
 
-    @app.get("/internal/application-access/snapshot", include_in_schema=False)
+    @app.get("/v1/internal/application-access/snapshot", include_in_schema=False)
     def snapshot(authorization: str | None = Header(None)):
         internal_authorization(authorization)
         with control.connect() as conn, conn.transaction():
@@ -1017,7 +1027,7 @@ def install(app, control):
             }
 
     @app.post(
-        "/internal/application-access/replicas/{replica_id}", include_in_schema=False
+        "/v1/internal/application-access/replicas/{replica_id}", include_in_schema=False
     )
     def replica(
         replica_id: str,
@@ -1037,7 +1047,7 @@ def install(app, control):
             )
         return {"acknowledged": True}
 
-    @app.post("/internal/application-access/enroll", include_in_schema=False)
+    @app.post("/v1/internal/application-access/enroll", include_in_schema=False)
     def enroll(body: dict = Body(...), authorization: str | None = Header(None)):
         internal_authorization(authorization)
         from .access_tokens import TokenVerifier
