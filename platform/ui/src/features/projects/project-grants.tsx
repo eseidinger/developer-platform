@@ -159,9 +159,14 @@ function GrantDialog({
   onClose: () => void
 }) {
   const [draft, setDraft] = React.useState(initial)
+  const [preferredUsername, setPreferredUsername] = React.useState('')
   const queryClient = useQueryClient()
   const save = useMutation({
-    mutationFn: () => putProjectGrant(name, draft),
+    mutationFn: () =>
+      putProjectGrant(name, {
+        ...draft,
+        ...(!initial.issuer && { preferredUsername: preferredUsername.trim() }),
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({
         queryKey: ['projects', name, 'grants'],
@@ -170,7 +175,9 @@ function GrantDialog({
     },
   })
   const isExisting = Boolean(initial.issuer)
-  const valid = Boolean(draft.issuer.trim() && draft.subject.trim())
+  const valid = isExisting
+    ? Boolean(draft.issuer.trim() && draft.subject.trim())
+    : Boolean(preferredUsername.trim())
   return (
     <Dialog
       open
@@ -196,30 +203,45 @@ function GrantDialog({
             if (valid) save.mutate()
           }}
         >
-          <div className={styles.stackSmall}>
-            <Label htmlFor="grant-issuer">Issuer</Label>
-            <Input
-              id="grant-issuer"
-              autoComplete="off"
-              value={draft.issuer}
-              disabled={isExisting || save.isPending}
-              onChange={(event) =>
-                setDraft({ ...draft, issuer: event.target.value })
-              }
-            />
-          </div>
-          <div className={styles.stackSmall}>
-            <Label htmlFor="grant-subject">Subject ID</Label>
-            <Input
-              id="grant-subject"
-              autoComplete="off"
-              value={draft.subject}
-              disabled={isExisting || save.isPending}
-              onChange={(event) =>
-                setDraft({ ...draft, subject: event.target.value })
-              }
-            />
-          </div>
+          {isExisting ? (
+            <>
+              <div className={styles.stackSmall}>
+                <Label htmlFor="grant-issuer">Issuer</Label>
+                <Input
+                  id="grant-issuer"
+                  autoComplete="off"
+                  value={draft.issuer}
+                  disabled={isExisting || save.isPending}
+                  onChange={(event) =>
+                    setDraft({ ...draft, issuer: event.target.value })
+                  }
+                />
+              </div>
+              <div className={styles.stackSmall}>
+                <Label htmlFor="grant-subject">Subject ID</Label>
+                <Input
+                  id="grant-subject"
+                  autoComplete="off"
+                  value={draft.subject}
+                  disabled={isExisting || save.isPending}
+                  onChange={(event) =>
+                    setDraft({ ...draft, subject: event.target.value })
+                  }
+                />
+              </div>
+            </>
+          ) : (
+            <div className={styles.stackSmall}>
+              <Label htmlFor="grant-preferred-username">Username</Label>
+              <Input
+                id="grant-preferred-username"
+                autoComplete="off"
+                value={preferredUsername}
+                disabled={save.isPending}
+                onChange={(event) => setPreferredUsername(event.target.value)}
+              />
+            </div>
+          )}
           <div className={styles.stackSmall}>
             <Label htmlFor="grant-display-name">Display name (optional)</Label>
             <Input

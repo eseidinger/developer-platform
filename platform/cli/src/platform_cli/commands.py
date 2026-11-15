@@ -309,10 +309,15 @@ def _body(spec: CommandSpec, values: dict) -> dict | None:
             "scope_token": require(values, "scope_token"),
         }
     if kind == "grant":
-        result = {
-            "issuer": require(values, "issuer"),
-            "subject": require(values, "subject"),
-        }
+        if spec.method == "PUT" and values.get("preferred_username"):
+            result = {"preferred_username": values["preferred_username"]}
+            if values.get("issuer") or values.get("subject"):
+                raise ValueError("Choose preferred username or issuer and subject")
+        else:
+            result = {
+                "issuer": require(values, "issuer"),
+                "subject": require(values, "subject"),
+            }
         if spec.method == "PUT":
             result["role"] = require(values, "role")
             if values.get("display_name"):

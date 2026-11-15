@@ -883,13 +883,14 @@ async function getProjectGrants(name: string): Promise<ProjectGrants> {
 
 async function putProjectGrant(
   name: string,
-  grant: Omit<ProjectGrant, 'grantedAt'>,
+  grant: Omit<ProjectGrant, 'grantedAt'> & { preferredUsername?: string },
 ) {
   const { error, response } = await apiClient.PUT('/projects/{name}/grants', {
     params: { path: { name } },
     body: {
-      issuer: grant.issuer,
-      subject: grant.subject,
+      ...(grant.preferredUsername
+        ? { preferred_username: grant.preferredUsername }
+        : { issuer: grant.issuer, subject: grant.subject }),
       display_name: grant.displayName,
       role: grant.role,
     },
@@ -940,12 +941,15 @@ async function getPlatformGrants(): Promise<PlatformGrant[]> {
 }
 
 async function putPlatformGrant(
-  grant: Omit<PlatformGrant, 'grantedAt' | 'role'>,
+  grant: Omit<PlatformGrant, 'grantedAt' | 'role'> & {
+    preferredUsername?: string
+  },
 ) {
   const { error, response } = await apiClient.PUT('/platform/grants', {
     body: {
-      issuer: grant.issuer,
-      subject: grant.subject,
+      ...(grant.preferredUsername
+        ? { preferred_username: grant.preferredUsername }
+        : { issuer: grant.issuer, subject: grant.subject }),
       display_name: grant.displayName,
       role: 'platform-admin',
     },

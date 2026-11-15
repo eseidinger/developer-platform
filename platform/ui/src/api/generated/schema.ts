@@ -2174,14 +2174,16 @@ export interface components {
         /** HumanGrant */
         HumanGrant: {
             /** Issuer */
-            issuer: string;
+            issuer?: string | null;
             /**
              * Mode
              * @enum {string}
              */
             mode: "read-only" | "read-write";
+            /** Preferred Username */
+            preferred_username?: string | null;
             /** Subject */
-            subject: string;
+            subject?: string | null;
         };
         /** IdentityAttributes */
         IdentityAttributes: {
@@ -2241,14 +2243,16 @@ export interface components {
             /** Display Name */
             display_name?: string | null;
             /** Issuer */
-            issuer: string;
+            issuer?: string | null;
+            /** Preferred Username */
+            preferred_username?: string | null;
             /**
              * Role
              * @constant
              */
             role: "platform-admin";
             /** Subject */
-            subject: string;
+            subject?: string | null;
         };
         /** PolicyCreate */
         PolicyCreate: {
@@ -2303,14 +2307,16 @@ export interface components {
             /** Display Name */
             display_name?: string | null;
             /** Issuer */
-            issuer: string;
+            issuer?: string | null;
+            /** Preferred Username */
+            preferred_username?: string | null;
             /**
              * Role
              * @enum {string}
              */
             role: "viewer" | "developer" | "project-admin";
             /** Subject */
-            subject: string;
+            subject?: string | null;
         };
         /**
          * ProjectPurge

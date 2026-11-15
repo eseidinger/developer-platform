@@ -14,6 +14,14 @@ issuer, signature, audience, and lifetime, then evaluates platform-owned grants.
 Human and machine identities use the same authorization boundary but have
 different credential lifecycles.
 
+For human project, platform, and named-store grants, send
+`preferred_username` to resolve an enabled user in the installation's Keycloak
+`platform` realm. The API requires an exact match and stores the resulting
+immutable issuer and subject. Existing clients may continue to send `issuer`
+and `subject` instead. Do not send both forms in one request. A missing user
+returns 404; an unavailable identity provider returns 503. Credential IDs still
+identify individual credentials and leases.
+
 The main resources are projects, declarations and revisions, durable operations,
 grants, deployment credentials, named-store resources/bindings/leases, AI
 runs/proposals, diagnostics, and bounded operator surfaces. Project routes are

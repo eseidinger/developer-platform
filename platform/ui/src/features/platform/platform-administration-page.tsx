@@ -168,15 +168,20 @@ function GrantPlatformAccessDialog({ onClose }: { onClose: () => void }) {
     subject: '',
     displayName: null,
   })
+  const [preferredUsername, setPreferredUsername] = React.useState('')
   const queryClient = useQueryClient()
   const grant = useMutation({
-    mutationFn: () => putPlatformGrant(draft),
+    mutationFn: () =>
+      putPlatformGrant({
+        ...draft,
+        preferredUsername: preferredUsername.trim(),
+      }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['platform', 'grants'] })
       onClose()
     },
   })
-  const valid = Boolean(draft.issuer.trim() && draft.subject.trim())
+  const valid = Boolean(preferredUsername.trim())
   return (
     <Dialog
       open
@@ -200,27 +205,13 @@ function GrantPlatformAccessDialog({ onClose }: { onClose: () => void }) {
           }}
         >
           <div className={styles.stackSmall}>
-            <Label htmlFor="platform-grant-issuer">Issuer</Label>
+            <Label htmlFor="platform-grant-username">Username</Label>
             <Input
-              id="platform-grant-issuer"
+              id="platform-grant-username"
               autoComplete="off"
-              value={draft.issuer}
+              value={preferredUsername}
               disabled={grant.isPending}
-              onChange={(event) =>
-                setDraft({ ...draft, issuer: event.target.value })
-              }
-            />
-          </div>
-          <div className={styles.stackSmall}>
-            <Label htmlFor="platform-grant-subject">Subject ID</Label>
-            <Input
-              id="platform-grant-subject"
-              autoComplete="off"
-              value={draft.subject}
-              disabled={grant.isPending}
-              onChange={(event) =>
-                setDraft({ ...draft, subject: event.target.value })
-              }
+              onChange={(event) => setPreferredUsername(event.target.value)}
             />
           </div>
           <div className={styles.stackSmall}>

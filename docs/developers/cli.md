@@ -72,6 +72,17 @@ forward for an active store lease; see the
 `stores purge` require `--confirm-resource-id UUID` matching the target
 resource. `stores grants revoke` requires `--confirm-grant-id UUID` matching the
 target grant.
+
+For a human project grant, use:
+
+```bash
+devplat grants set --project orders \
+  --preferred-username alice --role developer
+```
+
+The API resolves the name to a stable identity. Existing `--issuer` and
+`--subject` arguments remain supported.
+
 `operator audit export --start TIMESTAMP --end TIMESTAMP --format csv` writes
 the bounded CSV response to stdout; the default JSON format uses normal output
 modes.

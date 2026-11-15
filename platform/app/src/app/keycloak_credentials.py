@@ -72,6 +72,8 @@ def resolve_username(username: str) -> str | None:
         + urllib.parse.urlencode({"username": username, "exact": "true", "max": 2}),
         token=token,
     )
+    if not isinstance(users, list) or any(not isinstance(user, dict) for user in users):
+        raise ProviderError("Identity provider returned invalid user data")
     matches = [
         user
         for user in users or []

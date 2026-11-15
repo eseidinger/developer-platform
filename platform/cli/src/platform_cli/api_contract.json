@@ -732,10 +732,17 @@
         "additionalProperties": false,
         "properties": {
           "issuer": {
-            "maxLength": 512,
-            "minLength": 1,
-            "title": "Issuer",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 512,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
           },
           "mode": {
             "enum": [
@@ -745,16 +752,34 @@
             "title": "Mode",
             "type": "string"
           },
+          "preferred_username": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Username"
+          },
           "subject": {
-            "maxLength": 256,
-            "minLength": 1,
-            "title": "Subject",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
           }
         },
         "required": [
-          "issuer",
-          "subject",
           "mode"
         ],
         "title": "HumanGrant",
@@ -921,10 +946,30 @@
             "title": "Display Name"
           },
           "issuer": {
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Issuer",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "preferred_username": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Username"
           },
           "role": {
             "const": "platform-admin",
@@ -932,15 +977,20 @@
             "type": "string"
           },
           "subject": {
-            "maxLength": 1024,
-            "minLength": 1,
-            "title": "Subject",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
           }
         },
         "required": [
-          "issuer",
-          "subject",
           "role"
         ],
         "title": "PlatformGrant",
@@ -1104,10 +1154,30 @@
             "title": "Display Name"
           },
           "issuer": {
-            "maxLength": 2048,
-            "minLength": 1,
-            "title": "Issuer",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 2048,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Issuer"
+          },
+          "preferred_username": {
+            "anyOf": [
+              {
+                "maxLength": 256,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferred Username"
           },
           "role": {
             "enum": [
@@ -1119,15 +1189,20 @@
             "type": "string"
           },
           "subject": {
-            "maxLength": 1024,
-            "minLength": 1,
-            "title": "Subject",
-            "type": "string"
+            "anyOf": [
+              {
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
           }
         },
         "required": [
-          "issuer",
-          "subject",
           "role"
         ],
         "title": "ProjectGrant",

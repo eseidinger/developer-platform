@@ -774,20 +774,19 @@ function Grants({
           submit={(d) =>
             action(() =>
               api.createHuman(resource.resource_id, {
-                issuer: text(d, 'issuer').trim(),
-                subject: text(d, 'subject').trim(),
+                preferred_username: text(d, 'preferred_username').trim(),
                 mode: text(d, 'mode') as 'read-only' | 'read-write',
               }),
             )
           }
         >
           <label>
-            Issuer
-            <input className={styles.field} name="issuer" type="url" required />
-          </label>
-          <label>
-            Subject ID
-            <input className={styles.field} name="subject" required />
+            Username
+            <input
+              className={styles.field}
+              name="preferred_username"
+              required
+            />
           </label>
           <Mode fullAccess={resource.provider === 'neo4j'} />
           <Button type="submit">Grant human access</Button>

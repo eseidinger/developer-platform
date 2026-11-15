@@ -23,7 +23,15 @@ def test_username_resolves_to_stable_subject(monkeypatch):
 
 
 @pytest.mark.parametrize(
-    "users", [[], [{"username": "alice", "enabled": False, "id": "id"}]]
+    "users",
+    [
+        [],
+        [{"username": "alice", "enabled": False, "id": "id"}],
+        [
+            {"username": "alice", "enabled": True, "id": "first"},
+            {"username": "alice", "enabled": True, "id": "second"},
+        ],
+    ],
 )
 def test_unknown_or_disabled_username_is_rejected(monkeypatch, users):
     monkeypatch.setattr(keycloak_credentials, "_admin_token", lambda: "token")
@@ -38,3 +46,13 @@ def test_legacy_identity_and_mixed_input(monkeypatch):
     with pytest.raises(HTTPException) as error:
         human_identity.resolve("issuer", "subject", "alice")
     assert error.value.status_code == 422
+
+
+def test_provider_failure_does_not_resolve_username(monkeypatch):
+    def fail(_username):
+        raise keycloak_credentials.ProviderError("unavailable")
+
+    monkeypatch.setattr(human_identity, "resolve_username", fail)
+    with pytest.raises(HTTPException) as error:
+        human_identity.resolve(None, None, "alice")
+    assert error.value.status_code == 503

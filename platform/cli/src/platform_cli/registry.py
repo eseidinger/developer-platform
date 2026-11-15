@@ -227,7 +227,7 @@ for action, method in (("set", "PUT"), ("delete", "DELETE")):
         P + "/grants",
         "Manage a project role grant.",
         body="grant",
-        fields=("issuer", "subject", "role", "display_name")
+        fields=("preferred_username", "issuer", "subject", "role", "display_name")
         if action == "set"
         else ("issuer", "subject"),
         destructive=action == "delete",
@@ -543,7 +543,7 @@ for action, method in (("set", "PUT"), ("delete", "DELETE")):
         "/platform/grants",
         "Manage platform administrator grants.",
         body="grant",
-        fields=("issuer", "subject", "role", "display_name")
+        fields=("preferred_username", "issuer", "subject", "role", "display_name")
         if action == "set"
         else ("issuer", "subject"),
         destructive=True,

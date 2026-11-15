@@ -408,19 +408,11 @@ test('Neo4j human grants expose full access and never offer a read-only downgrad
       name: 'Full instance access (data, schema and native accounts)',
     }),
   ).toBeInTheDocument()
-  await user.type(
-    within(form).getByLabelText('Issuer'),
-    'https://fixture.invalid',
-  )
-  await user.type(
-    within(form).getByLabelText('Subject ID'),
-    '  native-writer  ',
-  )
+  await user.type(within(form).getByLabelText('Username'), '  native-writer  ')
   await user.click(button)
   await waitFor(() =>
     expect(api.createHuman).toHaveBeenCalledWith(resource.resource_id, {
-      issuer: 'https://fixture.invalid',
-      subject: 'native-writer',
+      preferred_username: 'native-writer',
       mode: 'read-write',
     }),
   )

@@ -3,7 +3,17 @@ import json
 import httpx
 from platform_cli.__main__ import app
 from platform_cli.client import PlatformClient
+from platform_cli.commands import _body
+from platform_cli.registry import COMMANDS
 from typer.testing import CliRunner
+
+
+def test_project_grant_accepts_username_without_issuer_or_subject():
+    spec = next(command for command in COMMANDS if command.command == "grants set")
+    assert _body(spec, {"preferred_username": "alice", "role": "developer"}) == {
+        "preferred_username": "alice",
+        "role": "developer",
+    }
 
 
 def test_auth_status_reports_environment_source_without_token(monkeypatch):

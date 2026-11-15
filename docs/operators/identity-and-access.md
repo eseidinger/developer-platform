@@ -72,6 +72,11 @@ docker compose logs --tail=100 keycloak proxy platform-api
    person's initial password, and copy the user's immutable **ID** (the OIDC
    `sub`). Do not use a mutable username or email address.
 
+   Routine human grants can use the account's `preferred_username`; the API
+   resolves it through this Keycloak realm before storing the immutable ID.
+   The one-time bootstrap subject still requires the ID because it runs before
+   the platform administrator grant is available.
+
 1. In a privileged editor, add exactly this value to the host `.env`:
 
    ```dotenv
