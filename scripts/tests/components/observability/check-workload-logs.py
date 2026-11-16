@@ -29,6 +29,7 @@ ALLOY = "grafana/alloy:v1.19.2"
 LOKI = "grafana/loki:3.7.8"
 CORRELATION = "a" * 32
 OPERATION = "12345678-1234-1234-1234-123456789abc"
+PROJECT_ID = str(uuid4())
 
 # Exercise real framework schemas, escaping, MDC correlation and input rejection.
 FRAMEWORK_LOGS = [
@@ -143,6 +144,7 @@ def pod(namespace, name, component):
             "labels": {
                 "app.kubernetes.io/name": "demo",
                 "platform.example/component": component,
+                "platform.eseidinger.de/project-id": PROJECT_ID,
             },
             "annotations": {
                 "platform.example/revision": "1",
@@ -476,7 +478,11 @@ def main():
                     {"query": '{job="kubernetes-workloads"}', "limit": 100}
                 )
                 with urllib.request.urlopen(
-                    loki_url + "/loki/api/v1/query_range?" + params, timeout=3
+                    urllib.request.Request(
+                        loki_url + "/loki/api/v1/query_range?" + params,
+                        headers={"X-Scope-OrgID": PROJECT_ID},
+                    ),
+                    timeout=3,
                 ) as response:
                     return json.load(response)["data"]["result"]
 
@@ -510,7 +516,11 @@ def main():
             assert "MUST-NOT-STORE" not in json.dumps(streams)
             params = urllib.parse.urlencode({"match[]": '{job="kubernetes-workloads"}'})
             with urllib.request.urlopen(
-                loki_url + "/loki/api/v1/series?" + params, timeout=3
+                urllib.request.Request(
+                    loki_url + "/loki/api/v1/series?" + params,
+                    headers={"X-Scope-OrgID": PROJECT_ID},
+                ),
+                timeout=3,
             ) as response:
                 indexed = json.load(response)["data"]
             assert indexed and all(
@@ -589,7 +599,10 @@ def main():
             os.environ["LOKI_URL"] = loki_url
             try:
                 result = observe_retained_logs(
-                    "demo", logging.getLogger("fixture"), component="api"
+                    "demo",
+                    logging.getLogger("fixture"),
+                    component="api",
+                    tenant=PROJECT_ID,
                 )
                 assert (
                     result["state"] == "ok"
@@ -603,7 +616,10 @@ def main():
                 deadline = time.monotonic() + 45
                 while time.monotonic() < deadline:
                     result = observe_retained_logs(
-                        "demo", logging.getLogger("fixture"), component="api"
+                        "demo",
+                        logging.getLogger("fixture"),
+                        component="api",
+                        tenant=PROJECT_ID,
                     )
                     if result["state"] == "ok" and retained_timestamps <= {
                         line["timestamp"] for line in result["lines"]

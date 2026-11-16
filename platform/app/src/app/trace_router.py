@@ -6,12 +6,14 @@ Tempo stores each project in an independently erasable tenant.
 """
 
 import os
+import zlib
 from collections import defaultdict
 from uuid import UUID
 
 import httpx2 as httpx
 import psycopg
 from fastapi import FastAPI, HTTPException, Request, Response
+from google.protobuf.message import DecodeError
 from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
     ExportTraceServiceRequest,
 )
@@ -95,11 +97,29 @@ async def traces(request: Request):
         body.extend(chunk)
         if len(body) > MAX_BODY:
             raise HTTPException(413, "Trace batch is too large")
-    batches = partition(bytes(body))
+    encoding = request.headers.get("content-encoding", "identity").lower()
+    if encoding == "gzip":
+        # Alloy compresses OTLP by default. Bound the expanded payload as well
+        # as the wire body so a small compressed request cannot exhaust memory.
+        decoder = zlib.decompressobj(16 + zlib.MAX_WBITS)
+        try:
+            body = decoder.decompress(bytes(body), MAX_BODY + 1)
+        except zlib.error:
+            raise HTTPException(400, "Invalid gzip trace batch") from None
+        if len(body) > MAX_BODY or decoder.unconsumed_tail:
+            raise HTTPException(413, "Trace batch is too large")
+        if not decoder.eof or decoder.unused_data:
+            raise HTTPException(400, "Invalid gzip trace batch")
+    elif encoding != "identity":
+        raise HTTPException(415, "Unsupported trace content encoding")
+    try:
+        batches = partition(bytes(body))
+    except DecodeError:
+        raise HTTPException(400, "Invalid trace protobuf") from None
     with httpx.Client(timeout=3, trust_env=False, follow_redirects=False) as client:
         for tenant, value in batches.items():
             response = client.post(
-                "http://tempo:4318/v1/traces",
+                os.environ.get("TEMPO_OTLP_URL", "http://tempo:4318") + "/v1/traces",
                 content=value,
                 headers={
                     "Content-Type": "application/x-protobuf",

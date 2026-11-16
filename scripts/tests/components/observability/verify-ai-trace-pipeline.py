@@ -9,6 +9,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import tempfile
 import time
 import urllib.error
@@ -33,6 +34,9 @@ from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
 from opentelemetry.sdk.trace.export import SpanExporter
 
 ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(ROOT))
+from scripts.tests.support.trace_router_fixture import free_port, router
+
 MARKER = "synthetic-private-prompt-password-provider-response"
 TEMPO_IMAGE = "grafana/tempo@sha256:3076b8dcdfb32fd6bc5ccef85e7b7313e6199b9cb84366257fc17ecb696db5fd"
 
@@ -57,7 +61,7 @@ def wait(callback, seconds=45):
     raise AssertionError("Disposable trace readiness/readback timed out")
 
 
-def verify_workload_trace(endpoint, query_port, opener):
+def verify_workload_trace(endpoint, query_port, opener, tenant):
     """Actual gateway sanitizer -> production Alloy -> Tempo -> scoped API read."""
     request = ExportTraceServiceRequest()
     resource = request.resource_spans.add()
@@ -144,7 +148,7 @@ def verify_workload_trace(endpoint, query_port, opener):
     def stored():
         request = urllib.request.Request(
             f"http://127.0.0.1:{query_port}/api/v2/traces/{trace_id.hex()}",
-            headers={"Accept": "application/json"},
+            headers={"Accept": "application/json", "X-Scope-OrgID": tenant},
         )
         with opener.open(request, timeout=3) as response:
             data = json.load(response)
@@ -189,19 +193,19 @@ def verify_workload_trace(endpoint, query_port, opener):
                     request.full_url.replace(
                         "http://tempo:3200", f"http://127.0.0.1:{query_port}"
                     ),
-                    headers={"Accept": "application/json"},
+                    headers=dict(request.header_items()),
                 ),
                 timeout=timeout,
             )
 
-    project = read_project_trace("fixture-ai", trace_id.hex(), Tempo())
+    project = read_project_trace("fixture-ai", trace_id.hex(), Tempo(), tenant=tenant)
     assert len(project["spans"]) == 9
     assert {s["name"] for s in project["spans"]} == {s["name"] for s in spans}
     assert any(
         s.get("attributes", {}).get("platform.ai.framework") == "langchain4j"
         for s in project["spans"]
     )
-    assert read_project_trace("foreign", trace_id.hex(), Tempo()) is None
+    assert read_project_trace("foreign", trace_id.hex(), Tempo(), tenant=tenant) is None
     assert MARKER not in json.dumps(project)
     for expression in (
         '{ resource.service.name = "fixture-ai.web" && span.gen_ai.request.model = "fixture-model" }',
@@ -217,7 +221,11 @@ def verify_workload_trace(endpoint, query_port, opener):
                 }
             )
             with opener.open(
-                f"http://127.0.0.1:{query_port}/api/search?" + params, timeout=5
+                urllib.request.Request(
+                    f"http://127.0.0.1:{query_port}/api/search?" + params,
+                    headers={"X-Scope-OrgID": tenant},
+                ),
+                timeout=5,
             ) as response:
                 found = json.load(response)
             return any(
@@ -248,12 +256,16 @@ def run():
         def shutdown(self):
             self.delegate.shutdown()
 
-    with tempfile.TemporaryDirectory(prefix="platform-ai-traces-") as directory:
+    query_port, tempo_port, otlp_port = free_port(), free_port(), free_port()
+    with (
+        tempfile.TemporaryDirectory(prefix="platform-ai-traces-") as directory,
+        router(f"http://127.0.0.1:{tempo_port}") as (router_url, tenant),
+    ):
         os.chmod(directory, 0o755)
         target = Path(directory)
         config = (ROOT / "infrastructure/monitoring/config.alloy").read_text()
         # Keep production trace processors/exporter; omit unrelated logs, metrics
-        # and Kubernetes discovery. Both containers share this isolated namespace.
+        # and Kubernetes discovery. Only fixture transport addresses change.
         config = config[
             config.index("// Private platform spans") : config.index(
                 "// Direct metrics are independent"
@@ -266,12 +278,18 @@ def run():
             "",
             config,
         )
-        config = config.replace("http://tempo:4318", "http://127.0.0.1:4319")
+        assert "http://trace-router:4318" in config
+        config = config.replace("http://trace-router:4318", router_url)
+        config = config.replace("0.0.0.0:4318", f"127.0.0.1:{otlp_port}")
         (target / "config.alloy").write_text(config)
         tempo_config = (
             (ROOT / "infrastructure/monitoring/tempo.yaml")
             .read_text()
-            .replace("0.0.0.0:4318", "0.0.0.0:4319")
+            .replace("0.0.0.0:4318", f"127.0.0.1:{tempo_port}")
+            .replace(
+                "http_listen_port: 3200",
+                f"http_listen_port: {query_port}\n  grpc_listen_port: {free_port()}",
+            )
         )
         (target / "tempo.yaml").write_text(tempo_config)
         try:
@@ -294,21 +312,13 @@ def run():
                 "/data/tempo:rw,uid=10001,gid=10001,size=128m",
                 "--tmpfs",
                 "/var/tempo:rw,uid=10001,gid=10001,size=128m",
-                "-p",
-                "127.0.0.1::3200",
-                "-p",
-                "127.0.0.1::4318",
+                "--network",
+                "host",
                 "-v",
                 f"{target}/tempo.yaml:/etc/tempo/tempo.yaml:ro",
                 TEMPO_IMAGE,
                 "-target=all",
                 "-config.file=/etc/tempo/tempo.yaml",
-            )
-            query_port = int(
-                command("docker", "port", tempo, "3200/tcp").rsplit(":", 1)[1]
-            )
-            otlp_port = int(
-                command("docker", "port", tempo, "4318/tcp").rsplit(":", 1)[1]
             )
             command(
                 "docker",
@@ -321,12 +331,13 @@ def run():
                 "--cpus",
                 "1",
                 "--network",
-                "container:" + tempo,
+                "host",
                 "-v",
                 f"{target}/config.alloy:/etc/alloy/config.alloy:ro",
                 "grafana/alloy:v1.19.2",
                 "run",
                 "/etc/alloy/config.alloy",
+                f"--server.http.listen-addr=127.0.0.1:{free_port()}",
             )
 
             def ready():
@@ -345,7 +356,7 @@ def run():
                             alloy,
                             "/usr/bin/bash",
                             "-c",
-                            "exec 3<>/dev/tcp/127.0.0.1/4318",
+                            f"exec 3<>/dev/tcp/127.0.0.1/{otlp_port}",
                         ],
                         capture_output=True,
                         timeout=3,
@@ -355,7 +366,7 @@ def run():
                 )
             )
             endpoint = f"http://127.0.0.1:{otlp_port}/v1/traces"
-            verify_workload_trace(endpoint, query_port, opener)
+            verify_workload_trace(endpoint, query_port, opener, tenant)
             with (
                 patch.dict(
                     os.environ,
@@ -424,13 +435,13 @@ def run():
                     http_client=httpx.Client(transport=httpx.MockTransport(respond)),
                 )
 
-                @main.app.get("/synthetic-ai-trace-fixture")
+                @main.app.get("/synthetic-ai-trace-fixture", include_in_schema=False)
                 async def fixture(fail: bool = False):
                     trace.get_current_span().set_attribute(
                         "unreviewed.private.attribute", MARKER
                     )
                     with (
-                        obs.scope("fixture", "explain_application"),
+                        obs.scope("fixture-ai", "explain_application"),
                         tracing.span("platform.ai.run"),
                     ):
                         with tracing.span(
@@ -495,13 +506,28 @@ def run():
                 identity = f"{root.context.trace_id:032x}"
 
                 def readback(identity=identity, root=root):
-                    request = urllib.request.Request(
-                        f"http://127.0.0.1:{query_port}/api/v2/traces/{identity}",
-                        headers={"Accept": "application/json"},
-                    )
-                    with opener.open(request, timeout=3) as response:
-                        data = json.load(response)
-                    resources = data.get("trace", {}).get("resourceSpans", [])
+                    # HTTP roots and project-attributed AI children intentionally
+                    # occupy separate erasable tenants in the production router.
+                    resources = []
+                    for partition in ("platform", tenant):
+                        request = urllib.request.Request(
+                            f"http://127.0.0.1:{query_port}/api/v2/traces/{identity}",
+                            headers={
+                                "Accept": "application/json",
+                                "X-Scope-OrgID": partition,
+                            },
+                        )
+                        try:
+                            with opener.open(request, timeout=3) as response:
+                                resources.extend(
+                                    json.load(response)
+                                    .get("trace", {})
+                                    .get("resourceSpans", [])
+                                )
+                        except urllib.error.HTTPError as error:
+                            if error.code != 404:
+                                raise
+                    data = {"trace": {"resourceSpans": resources}}
                     found = [
                         s
                         for resource in resources
