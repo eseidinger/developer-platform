@@ -242,46 +242,60 @@ def remove_secret(runtime: Any, project: str, name: str) -> str:
 
 
 def roll_pods(runtime: Any, project: str, version: str) -> bool:
-    """Stamp the Secret version on the pod template; False when no Deployment exists yet."""
+    """Stamp the Secret version on every service pod template."""
     body = {
         "spec": {
             "template": {"metadata": {"annotations": {VERSION_ANNOTATION: version}}}
         }
     }
     try:
-        _api(runtime, "Deployment", "apps/v1").patch(
-            body=body,
-            name=project,
-            namespace="project-" + project,
-            content_type=_MERGE,
-            field_manager="developer-platform-secrets",
+        resource = _api(runtime, "Deployment", "apps/v1")
+        namespace = "project-" + project
+        deployments = _field(
+            resource.get(
+                namespace=namespace, label_selector="platform.example/component"
+            ),
+            "items",
+            [],
         )
-    except ApiException as exc:
-        if exc.status == 404:
-            return False
+        for deployment in deployments:
+            resource.patch(
+                body=body,
+                name=_field(_field(deployment, "metadata", {}), "name"),
+                namespace=namespace,
+                content_type=_MERGE,
+                field_manager="developer-platform-secrets",
+            )
+    except ApiException:
         raise SecretsUnavailable() from None
-    return True
+    return bool(deployments)
 
 
 def observe_secret_activation(
     runtime: Any, project: str, version: str | None
 ) -> dict[str, Any]:
-    """Whether the pods run with the current Secret version."""
+    """Whether all service pods run with the current Secret version."""
     try:
-        deployment = _plain(
+        deployments = _field(
             _api(runtime, "Deployment", "apps/v1").get(
-                name=project, namespace="project-" + project
-            )
+                namespace="project-" + project,
+                label_selector="platform.example/component",
+            ),
+            "items",
+            [],
         )
-    except ApiException as exc:
-        return {
-            "state": "unknown",
-            "reason": "not_found" if exc.status == 404 else "unavailable",
-        }
+    except ApiException:
+        return {"state": "unknown", "reason": "unavailable"}
     except Exception:  # noqa: BLE001 - Translate unexpected dependency failures to a safe state.
         return {"state": "unknown", "reason": "unavailable"}
-    template = _field(_field(deployment, "spec", {}), "template", {})
-    annotations = _field(_field(template, "metadata", {}), "annotations", {}) or {}
-    if annotations.get(VERSION_ANNOTATION) != version:
-        return {"state": "pending", "reason": "deployment_not_updated"}
-    return rollout_state(deployment)
+    if not deployments:
+        return {"state": "unknown", "reason": "not_found"}
+    for deployment in deployments:
+        template = _field(_field(deployment, "spec", {}), "template", {})
+        annotations = _field(_field(template, "metadata", {}), "annotations", {}) or {}
+        if annotations.get(VERSION_ANNOTATION) != version:
+            return {"state": "pending", "reason": "deployment_not_updated"}
+        state = rollout_state(deployment)
+        if state["state"] != "active":
+            return state
+    return {"state": "active", "reason": None}

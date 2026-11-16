@@ -17,6 +17,7 @@ class FakeCluster:
         self.secrets = {}
         self.version = 0
         self.deployment = {
+            "metadata": {"name": "web"},
             "spec": {"replicas": 1, "template": {"metadata": {}}},
             "status": {"updatedReplicas": 1, "readyReplicas": 1, "replicas": 1},
         }
@@ -74,9 +75,13 @@ class FakeCluster:
 
     def deployment_api(self):
         api = Mock()
-        api.get.side_effect = lambda name, namespace: self.deployment
+        api.get.side_effect = lambda namespace, label_selector: {
+            "items": [self.deployment]
+        }
 
         def patch(body, name, namespace, content_type, field_manager):
+            if name != "web":
+                raise ApiException(status=404)
             self.deployment["spec"]["template"]["metadata"].setdefault(
                 "annotations", {}
             ).update(body["spec"]["template"]["metadata"]["annotations"])
@@ -177,9 +182,43 @@ class SecretStoreTests(unittest.TestCase):
         fake.resources.get.side_effect = lambda api_version, kind: (
             fake.secret_api()
             if kind == "Secret"
-            else Mock(patch=Mock(side_effect=ApiException(status=404)))
+            else Mock(get=Mock(return_value={"items": []}))
         )
         self.assertFalse(secrets.roll_pods(fake, "smoke", version))
+        self.assertEqual(
+            secrets.observe_secret_activation(fake, "smoke", version),
+            {"state": "unknown", "reason": "not_found"},
+        )
+
+    def test_activation_waits_for_every_service(self):
+        fake = cluster()
+        second = json.loads(json.dumps(fake.deployment))
+        second["metadata"]["name"] = "worker"
+        deployments = [fake.deployment, second]
+        resource = Mock()
+        resource.get.return_value = {"items": deployments}
+
+        def patch(body, name, namespace, content_type, field_manager):
+            deployment = next(
+                item for item in deployments if item["metadata"]["name"] == name
+            )
+            deployment["spec"]["template"]["metadata"].setdefault(
+                "annotations", {}
+            ).update(body["spec"]["template"]["metadata"]["annotations"])
+
+        resource.patch.side_effect = patch
+        fake.resources.get.side_effect = lambda api_version, kind: resource
+        self.assertTrue(secrets.roll_pods(fake, "smoke", "42"))
+        self.assertEqual(resource.patch.call_count, 2)
+        self.assertEqual(
+            secrets.observe_secret_activation(fake, "smoke", "42"),
+            {"state": "active", "reason": None},
+        )
+        second["status"]["readyReplicas"] = 0
+        self.assertEqual(
+            secrets.observe_secret_activation(fake, "smoke", "42")["state"],
+            "rolling_out",
+        )
 
     def test_unavailable_cluster_is_reported_not_leaked(self):
         with self.assertRaises(secrets.SecretsUnavailable):
