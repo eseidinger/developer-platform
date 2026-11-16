@@ -164,7 +164,20 @@ def verify(binary, snapshot, source_image, alpha, beta, purging, old_credential)
             )
             provider = Postgres(connect)
             provider.endpoint = lambda: ("127.0.0.1", port)
-            with connect("postgres") as conn:
+            with connect("platform") as conn:
+                project_ids = {
+                    str(row[0])
+                    for row in conn.execute("SELECT project_id FROM projects")
+                }
+                assert set(manifest["project_ids"]) == project_ids
+                assert (
+                    conn.execute(
+                        "SELECT count(*) FROM project_lifecycle_operations"
+                    ).fetchone()[0]
+                    == 1
+                )
+                assert not conn.execute("""SELECT 1 FROM project_lifecycle_operations l
+                    WHERE NOT EXISTS(SELECT 1 FROM projects p WHERE p.project_id=l.project_id)""").fetchone()
                 with conn.transaction():
                     recovery.quarantine(conn)
                 assert recovery.required(conn)

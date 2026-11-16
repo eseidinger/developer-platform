@@ -137,40 +137,24 @@ def main():
                 "/etc/prometheus/prometheus.yml",
             )
         )
-        print(
-            run(
-                "docker",
-                "run",
-                "--rm",
-                "--entrypoint",
-                "/bin/promtool",
-                "-v",
-                f"{config}:/work:ro",
-                "-w",
-                "/work",
-                PROMETHEUS,
-                "test",
-                "rules",
-                "tests/alerts.test.yaml",
+        for rule_test in ("alerts", "capacity", "native-stores"):
+            print(
+                run(
+                    "docker",
+                    "run",
+                    "--rm",
+                    "--entrypoint",
+                    "/bin/promtool",
+                    "-v",
+                    f"{config}:/work:ro",
+                    "-w",
+                    "/work",
+                    PROMETHEUS,
+                    "test",
+                    "rules",
+                    f"tests/{rule_test}.test.yaml",
+                )
             )
-        )
-        print(
-            run(
-                "docker",
-                "run",
-                "--rm",
-                "--entrypoint",
-                "/bin/promtool",
-                "-v",
-                f"{config}:/work:ro",
-                "-w",
-                "/work",
-                PROMETHEUS,
-                "test",
-                "rules",
-                "tests/capacity.test.yaml",
-            )
-        )
         tls = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
         tls.load_cert_chain(temp / "cert.pem", temp / "key.pem")
         tls_server.socket = tls.wrap_socket(tls_server.socket, server_side=True)

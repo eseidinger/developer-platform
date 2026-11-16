@@ -11,9 +11,13 @@ from uuid import uuid4
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 import psycopg
+from app.authorization import upsert_principal
 from app.identity import Principal
 from app.lifecycle import catalog, erasure, worker
+from app.operations import process_one as deploy_one
 from app.spec import to_flat
+from app.stores.contract import ResourceCreate
+from app.stores.postgres import Postgres
 from fastapi.testclient import TestClient
 from kubernetes.client.exceptions import ApiException
 from psycopg.types.json import Jsonb
@@ -261,6 +265,124 @@ class LifecycleExecutionTests(unittest.TestCase):
         erasure.atomic(erasure.directory() / (identity + ".final.json"), payload)
         worker.process_one(main)
         self.assertEqual(self.operation(identity)["state"], "succeeded")
+
+    def test_retire_restore_purge_with_native_store_preserves_foreign_data(self):
+        """Exercise the full sequence with actual provider DDL and stored data.
+
+        Audit writes, Kubernetes and host receipts remain fixture boundaries; the
+        API, SQL catalog, lifecycle/deployment workers and PostgreSQL are real.
+        """
+        provider = Postgres(
+            lambda database: psycopg.connect(
+                os.environ["LIFECYCLE_TEST_DSN"], dbname=database, autocommit=True
+            )
+        )
+        with self.connect() as conn:
+            conn.execute("INSERT INTO projects(name,status) VALUES('foreign','empty')")
+            upsert_principal(conn, self.principal)
+            conn.execute("""INSERT INTO platform_grants(issuer,subject,scope_kind,scope_id,role)
+                VALUES('issuer','admin','platform','*','platform-admin')""")
+            own = main.store_catalog.create_resource(
+                conn, "demo", ResourceCreate(name="owned", provider="postgresql")
+            )
+            foreign = main.store_catalog.create_resource(
+                conn, "foreign", ResourceCreate(name="retained", provider="postgresql")
+            )
+            for resource in (own, foreign):
+                provider.provision(resource)
+                self.addCleanup(provider.purge, resource)
+                conn.execute(
+                    "UPDATE store_resources SET observed_state='active' WHERE resource_id=%s",
+                    (resource["resource_id"],),
+                )
+                with provider.connection(
+                    main.store_catalog.identifier(resource["resource_id"])
+                ) as data:
+                    data.execute("CREATE TABLE sentinel(value TEXT)")
+                    data.execute("INSERT INTO sentinel VALUES('retained data')")
+
+        def advance(identity):
+            for _ in range(12):
+                with self.connect() as conn:
+                    main.store_worker.reconcile(conn, main)
+                worker.process_one(main)
+                deploy_one(
+                    main.connect,
+                    main.password_for,
+                    main.provision_database,
+                    main.apply,
+                    main.resources,
+                    main.publish_catalog,
+                    main.log,
+                    main.remove,
+                    main.prepare_store_resources,
+                )
+                if self.operation(identity)["state"] == "succeeded":
+                    return
+            self.fail(str(self.operation(identity)))
+
+        with (
+            patch("app.stores.providers.get", return_value=provider),
+            patch("app.operations.record_event", side_effect=main.required_audit),
+            patch.dict(os.environ, {"POSTGRES_IP": "127.0.0.1"}),
+        ):
+            advance(self.start("retire"))
+            advance(self.start("restore"))
+            for resource in (own, foreign):
+                with provider.connection(
+                    main.store_catalog.identifier(resource["resource_id"])
+                ) as data:
+                    self.assertEqual(
+                        data.execute("SELECT value FROM sentinel").fetchone()[0],
+                        "retained data",
+                    )
+            purge = self.start("purge")
+            for _ in range(4):
+                worker.process_one(main)
+            operation = self.operation(purge)
+            self.assertEqual(operation["step"], "external_erasure")
+            with self.connect() as conn:
+                self.assertIsNone(
+                    conn.execute(
+                        "SELECT 1 FROM pg_database WHERE datname=%s",
+                        (main.store_catalog.identifier(own["resource_id"]),),
+                    ).fetchone()
+                )
+            receipt = {
+                key: operation[key] for key in ("operation_id", "project_id", "project")
+            }
+            receipt["verified"] = True
+            erasure.atomic(erasure.directory() / (purge + ".receipt.json"), receipt)
+            worker.process_one(main)
+            self.assertEqual(self.operation(purge)["step"], "catalog_removed")
+            erasure.atomic(erasure.directory() / (purge + ".final.json"), receipt)
+            worker.process_one(main)
+            self.assertEqual(self.operation(purge)["state"], "succeeded")
+        with self.connect() as conn:
+            self.assertIsNone(
+                conn.execute("SELECT 1 FROM projects WHERE name='demo'").fetchone()
+            )
+            self.assertIsNone(
+                conn.execute(
+                    "SELECT 1 FROM project_recovery_points WHERE project_id=%s",
+                    (self.identity,),
+                ).fetchone()
+            )
+            self.assertIsNone(
+                conn.execute(
+                    "SELECT 1 FROM store_resources WHERE owner_project='demo'"
+                ).fetchone()
+            )
+            self.assertIsNotNone(
+                conn.execute("SELECT 1 FROM projects WHERE name='foreign'").fetchone()
+            )
+        with provider.connection(
+            main.store_catalog.identifier(foreign["resource_id"])
+        ) as data:
+            self.assertEqual(
+                data.execute("SELECT value FROM sentinel").fetchone()[0],
+                "retained data",
+            )
 
     def test_failed_restore_can_be_retried_with_current_operation_version(self):
         self.start("retire")

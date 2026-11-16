@@ -19,6 +19,7 @@ from unittest.mock import patch
 from uuid import uuid4
 
 import psycopg
+from app.lifecycle.catalog import initialize as initialize_lifecycle
 from app.stores import catalog, worker
 from app.stores.contract import BindingRequest, HumanGrant, ResourceCreate
 from app.stores.postgres import Postgres
@@ -52,6 +53,8 @@ def main():
             "1",
             "-e",
             "POSTGRES_PASSWORD=" + password,
+            "-e",
+            "POSTGRES_DB=platform",
             "-p",
             "127.0.0.1::5432",
             "--tmpfs",
@@ -81,12 +84,29 @@ def main():
             raise AssertionError("Disposable PostgreSQL did not start")
         provider = Postgres(connect)
         provider.endpoint = lambda: ("127.0.0.1", port)
-        with connect("postgres") as conn:
-            conn.execute("CREATE TABLE projects(name TEXT PRIMARY KEY,status TEXT)")
+        with connect("platform") as conn:
+            conn.execute("""CREATE TABLE projects(name TEXT PRIMARY KEY,status TEXT,
+                project_id UUID NOT NULL UNIQUE DEFAULT gen_random_uuid())""")
             conn.execute(
                 "INSERT INTO projects VALUES ('alpha','applied'),('beta','applied')"
             )
             catalog.initialize(conn)
+            initialize_lifecycle(conn)
+            # A completed purge receipt outlives its deleted project. The clean
+            # backup must retain live project history but omit this orphan UUID.
+            project_id = conn.execute(
+                "SELECT project_id FROM projects WHERE name='alpha'"
+            ).fetchone()[0]
+            for project, identity, action in (
+                ("alpha", project_id, "restore"),
+                ("erased", uuid4(), "purge"),
+            ):
+                conn.execute(
+                    """INSERT INTO project_lifecycle_operations
+                    (operation_id,project_id,project,action,state,actor,intent,completed_at)
+                    VALUES(%s,%s,%s,%s,'succeeded','{}','{}',now())""",
+                    (uuid4(), identity, project, action),
+                )
             with conn.transaction():
                 catalog.lock(conn)
                 alpha = catalog.create_resource(
@@ -984,14 +1004,16 @@ def main():
                         def execute(connection):
                             cursor = connection.execute(arguments[-1])
                             if cursor.description:
-                                value = cursor.fetchone()[0]
-                                return (
-                                    "t"
-                                    if value is True
-                                    else "f"
-                                    if value is False
-                                    else json.dumps(value)
-                                ).encode()
+                                return b"\n".join(
+                                    (
+                                        "t"
+                                        if value is True
+                                        else "f"
+                                        if value is False
+                                        else json.dumps(value)
+                                    ).encode()
+                                    for (value,) in cursor.fetchall()
+                                )
                             return b""
 
                         if target == "platform":
@@ -1005,19 +1027,17 @@ def main():
                             "exec",
                             "-i",
                             name,
-                            *(
-                                "postgres" if value == "platform" else value
-                                for value in arguments
-                            ),
+                            *arguments,
                         ]
 
                     def capture_database_intent(bundle):
                         with job.catalog_snapshot():
-                            with connect("postgres") as competitor:
+                            with connect("platform") as competitor:
                                 assert not competitor.execute(
                                     "SELECT pg_try_advisory_lock(731904)"
                                 ).fetchone()[0]
                             job.check_graph_sources()
+                            job.captured_project_ids = job.project_ids()
                             job.dump(bundle)
                             job.store_recovery_manifest(bundle)
                         assert conn.execute(

@@ -11,6 +11,8 @@ import urllib.parse
 from pathlib import Path
 from uuid import uuid4
 
+from app.stores.s3 import client
+
 ROOT = Path(__file__).resolve().parents[4]
 
 
@@ -84,7 +86,9 @@ def main():
                 "--name",
                 prom,
                 "--network",
-                "none",
+                "bridge",
+                "-p",
+                "127.0.0.1::9000",
                 "--memory",
                 "256m",
                 "-v",
@@ -163,34 +167,24 @@ def main():
                     is not None
                 )
             )
-            # Application container performs signed native I/O; no host-published store/collector port.
-            code = """import os,boto3
-from botocore.config import Config
-c=boto3.client('s3',endpoint_url='http://127.0.0.1:9000',aws_access_key_id=os.environ['RUSTFS_ACCESS_KEY'],aws_secret_access_key=os.environ['RUSTFS_SECRET_KEY'],region_name='us-east-1',config=Config(s3={'addressing_style':'path'}))
-c.create_bucket(Bucket='fixture-metrics')
-for _ in range(8):
- c.put_object(Bucket='fixture-metrics',Key='private-fixture-marker',Body=b'synthetic')
- c.get_object(Bucket='fixture-metrics',Key='private-fixture-marker')['Body'].close()
-"""
-            run(
-                "docker",
-                "run",
-                "--rm",
-                "--network",
-                "container:" + prom,
-                "--memory",
-                "256m",
-                "--entrypoint",
-                "python",
-                "-e",
-                "RUSTFS_ACCESS_KEY",
-                "-e",
-                "RUSTFS_SECRET_KEY",
-                "developer-platform-api:phase7-review",
-                "-c",
-                code,
-                env=env,
+            # Sign actual I/O against the disposable backend. Only its fixture
+            # port is published on loopback; no prebuilt local API image is needed.
+            store_port = int(run("docker", "port", prom, "9000/tcp").rsplit(":", 1)[1])
+            native = client(
+                f"http://127.0.0.1:{store_port}",
+                env["RUSTFS_ACCESS_KEY"],
+                env["RUSTFS_SECRET_KEY"],
             )
+            native.create_bucket(Bucket="fixture-metrics")
+            for _ in range(8):
+                native.put_object(
+                    Bucket="fixture-metrics",
+                    Key="private-fixture-marker",
+                    Body=b"synthetic",
+                )
+                native.get_object(
+                    Bucket="fixture-metrics", Key="private-fixture-marker"
+                )["Body"].close()
             observed = wait(
                 lambda: query('rustfs_http_server_requests_total{provider="s3"}')
             )
