@@ -2,6 +2,7 @@
 
 import unittest
 from contextlib import ExitStack
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, Mock, patch
 from uuid import uuid4
 
@@ -9,7 +10,7 @@ from app.identity import Principal
 from fastapi import HTTPException
 from fastapi.testclient import TestClient
 
-from app import ai_changes, ai_store, main
+from app import ai_changes, ai_store, main, response_models
 
 HUMAN = Principal("https://issuer.example", "human")
 
@@ -174,3 +175,52 @@ class PortalTests(unittest.TestCase):
         self.assertEqual(len(result["items"]), 2)
         self.assertNotIn("result", result["items"][0])
         self.assertNotIn("evidence", result["items"][0])
+
+    def test_histories_serialize_database_timestamps_for_http_responses(self):
+        now = datetime.now(UTC)
+        run_id = uuid4()
+        proposal_id = uuid4()
+        run = (
+            run_id,
+            "explain_application",
+            "completed",
+            "model",
+            1,
+            0.01,
+            now,
+            now,
+            2,
+        )
+        proposal = (
+            proposal_id,
+            run_id,
+            2,
+            1,
+            {
+                "action": "rollback",
+                "project": "demo",
+                "base_revision": 2,
+                "target_revision": 1,
+                "changed_paths": [],
+            },
+            "a" * 64,
+            "proposed",
+            now,
+            None,
+            None,
+            None,
+            None,
+        )
+        with (
+            patch.object(main, "require_permission"),
+            patch.object(main, "connect"),
+            patch.object(ai_store, "history", return_value=[run]),
+            patch.object(ai_store, "fail_interrupted_runs"),
+            patch.object(ai_changes, "history", return_value=[proposal]),
+        ):
+            runs = main.list_ai_runs("demo", 20, None, HUMAN)
+            proposals = main.list_ai_proposals("demo", 20, None, HUMAN)
+        response_models.Page.model_validate(runs)
+        response_models.Page.model_validate(proposals)
+        self.assertEqual(runs["items"][0]["created_at"], now.isoformat())
+        self.assertEqual(proposals["items"][0]["created_at"], now.isoformat())

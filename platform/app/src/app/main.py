@@ -2154,7 +2154,7 @@ def list_ai_runs(
         for r in rows[:limit]
     ]
     return {
-        "items": items,
+        "items": jsonable_encoder(items),
         "next_cursor": str(rows[limit - 1][0]) if len(rows) > limit else None,
     }
 
@@ -2170,7 +2170,7 @@ def list_ai_proposals(
     with connect() as conn:
         rows = ai_changes.history(conn, name, limit, before)
     return {
-        "items": [_ai_proposal_view(name, r) for r in rows[:limit]],
+        "items": jsonable_encoder([_ai_proposal_view(name, r) for r in rows[:limit]]),
         "next_cursor": str(rows[limit - 1][0]) if len(rows) > limit else None,
     }
 
