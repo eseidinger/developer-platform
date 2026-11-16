@@ -1,58 +1,138 @@
 ---
 name: validate
-"on": [push, pull_request]
+"on":
+  workflow_call:
+    inputs:
+      components:
+        type: boolean
+        default: true
+
+defaults:
+  run:
+    shell: bash
+
 jobs:
   static:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      ANSIBLE_LOCAL_TEMP: /tmp/ci-ansible
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
         with:
-          python-version: "3.12"
-      - run: python3 scripts/init.py
-      - run: docker compose config --quiet
-      - run: python3 scripts/generate/generate-dashboards.py --check
+          python-version: "3.14"
       - uses: astral-sh/setup-uv@v7
-      - run: uv sync --project platform/app --locked
-      - run: uv pip install --system 'ansible-core>=2.16,<2.22'
-      - run: >-
-          uv run --project platform/app
-          --with 'ansible-core>=2.16,<2.22' python -m unittest discover
-          -s scripts/tests/unit -v
-      - run: >-
-          uv run --project platform/app
-          --with 'ansible-core>=2.16,<2.22' --with pyyaml python
-          -m unittest discover -s ansible/tests/unit -v
-      - run: python3 -m unittest discover -s operations/backup/tests -v
-      - run: python3 -m unittest discover -s operations/heartbeat/tests -v
-      - run: python3 scripts/tests/components/networking/verify-local-https.py
-      - run: >-
-          uv run --project platform/app python
-          scripts/tests/components/observability/check-monitoring.py
-      - run: >-
-          uv run --project platform/app python
-          scripts/tests/components/observability/check-application-metrics.py
-      - run: >-
-          uv run --project platform/app python
-          scripts/tests/components/observability/check-postgres-monitoring.py
-      - run: >-
-          uv run --project platform/app python
-          scripts/tests/components/observability/check-workload-logs.py
+      - run: uv pip install --system -r requirements.txt
+      - name: Check GitHub Actions syntax and embedded shell scripts
+        env:
+          ACTIONLINT_SHA256: 8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+        run: |
+          curl --fail --location --silent --show-error \
+            https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz \
+            --output "$RUNNER_TEMP/actionlint.tar.gz"
+          printf '%s  %s\n' "$ACTIONLINT_SHA256" "$RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint"
+      - name: Lint and format all tracked current source
+        run: python3 scripts/checks/check-quality.py
+      - run: python3 scripts/init.py
+      - name: Validate default and S3 Compose configurations
+        run: |
+          docker compose config --quiet
+          COMPOSE_PROFILES=s3 docker compose --profile s3 config --quiet
+      - run: python3 scripts/generate/generate-dashboards.py --check
       - run: python3 scripts/checks/check-doc-links.py
       - run: python3 -m compileall -q scripts operations
-      - run: bash -n scripts/up.sh scripts/down.sh
-      - name: Validate platform Ansible playbooks
+      - name: Validate all Ansible playbooks without contacting hosts
         run: |
-          for playbook in \
-            ansible/deploy.yml \
-            ansible/operations/*.yml \
+          for playbook in ansible/deploy.yml ansible/operations/*.yml \
             ansible/tests/platform/*.yml; do
             ansible-playbook -i ansible/inventory.example.yml \
               "$playbook" --syntax-check
           done
+          for component in alertmanager backup heartbeat watchdog; do
+            directory="operations/$component/ansible"
+            for playbook in "$directory"/*.yml; do
+              case "$playbook" in
+                */inventory.*|*/backup-secrets.yml|*/smtp-secrets.yml) continue ;;
+              esac
+              ansible-playbook -i "$directory/inventory.$component.example.yml" \
+                "$playbook" --syntax-check
+            done
+          done
+
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - run: >-
+          uv run --project platform/app --group test --with 'ansible-core>=2.16,<2.22'
+          python -m unittest discover -s scripts/tests/unit -v
+      - run: >-
+          uv run --project platform/app --group test --with 'ansible-core>=2.16,<2.22'
+          --with pyyaml python -m unittest discover -s ansible/tests/unit -v
+      - run: python3 -m unittest discover -s operations/heartbeat/tests -v
       - run: php operations/watchdog/tests/watchdog.php
       - run: php operations/watchdog/tests/backup.php
       - run: >-
           php -d curl.cainfo="$RUNNER_TEMP/watchdog-smtp-cert.pem"
-          -d sendmail_path=/bin/true
-          operations/watchdog/tests/watchdog-mail.php
+          -d sendmail_path=/bin/true operations/watchdog/tests/watchdog-mail.php
+
+  backup:
+    if: inputs.components
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.14"
+      - run: sudo apt-get update && sudo apt-get install -y restic
+      - name: Test backups including a real encrypted local repository
+        env:
+          RESTIC_TEST_BINARY: /usr/bin/restic
+        run: python3 -m unittest discover -s operations/backup/tests -v
+
+  components:
+    if: inputs.components
+    name: component (${{ matrix.check }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - networking/verify-local-https
+          - observability/check-monitoring
+          - observability/check-application-metrics
+          - observability/check-postgres-monitoring
+          - observability/check-workload-logs
+          - observability/verify-store-metric-pipeline
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.14"
+      - uses: astral-sh/setup-uv@v7
+      - run: uv sync --project platform/app --locked
+      - name: Exercise disposable services and preserve diagnostics
+        env:
+          CHECK: ${{ matrix.check }}
+        run: |
+          mkdir -p .runtime/ci
+          uv run --project platform/app python \
+            "scripts/tests/components/$CHECK.py" 2>&1 | tee .runtime/ci/component.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: component-${{ strategy.job-index }}-failure
+          path: .runtime/ci/
+          retention-days: 7
+          if-no-files-found: ignore

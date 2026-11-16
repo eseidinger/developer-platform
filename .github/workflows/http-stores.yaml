@@ -1,5 +1,11 @@
+---
 name: S3 object storage
-on: [push, pull_request]
+"on":
+  workflow_call:
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   rustfs-lifecycle:
@@ -9,11 +15,22 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
       - uses: astral-sh/setup-uv@v7
       - run: uv sync --project platform/app --group analytics-fixtures --locked
       - run: docker pull rustfs/rustfs:1.0.2@sha256:7e948dad4748bda48f8985fda7195f8cf2e4259427011f6120acc2c9acf51587
-      - run: >-
-          STORE_ANALYTICS_FIXTURE=1 uv run --project platform/app --group
-          analytics-fixtures python
-          scripts/tests/components/stores/verify-rustfs.py
+      - name: Verify native object storage and analytical round trips
+        env:
+          STORE_ANALYTICS_FIXTURE: "1"
+        run: |
+          mkdir -p .runtime/ci
+          uv run --project platform/app --group analytics-fixtures python \
+            scripts/tests/components/stores/verify-rustfs.py \
+            2>&1 | tee .runtime/ci/s3.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: s3-failure
+          path: .runtime/ci/
+          retention-days: 7
+          if-no-files-found: ignore

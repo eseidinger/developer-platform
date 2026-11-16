@@ -1,0 +1,36 @@
+---
+name: production platform image
+"on":
+  workflow_call:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: docker/setup-buildx-action@v4
+      - name: Build the actual API, UI and reviewed store-console distribution
+        uses: docker/build-push-action@v7
+        with:
+          context: platform
+          file: platform/Dockerfile
+          load: true
+          tags: developer-platform-api:ci
+          cache-from: type=gha,scope=platform-api
+          cache-to: type=gha,mode=max,scope=platform-api
+      - name: Smoke-test production runtime and packaged assets
+        run: >-
+          docker run --rm --network none --read-only --tmpfs /tmp
+          --cap-drop ALL --security-opt no-new-privileges:true
+          developer-platform-api:ci python -c
+          'import os, sys; from importlib.metadata import version; from pathlib import Path; from app.main import app;
+          assert sys.version_info[:2] == (3, 14);
+          assert os.getuid() == 10001;
+          assert app.openapi()["info"]["version"] == version("developer-platform-api");
+          assert Path("src/app/static/index.html").is_file();
+          assert Path("store-consoles/rustfs/platform-console-pin.json").is_file()'

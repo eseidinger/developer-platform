@@ -34,6 +34,10 @@ offline regression tests under `unit/`. Their shared implementations live in
 `support/`; live Ansible callers pass credentials over private stdin. CI also
 checks deployment, operations, and platform-test Ansible playbooks.
 
+The [CI guide](../../docs/maintainers/continuous-integration.md) documents
+triggers, required checks, release gates, native component coverage and retained
+failure evidence. Required API integration phases fail if tests are skipped.
+
 ## Disposable component tests
 
 Store checks cover different contracts: production Compose wiring, provider

@@ -13,6 +13,7 @@ or implementation documentation. Application users should start in the
 - [CLI](cli.md)
 - [UI](ui.md)
 - [Monitoring](monitoring.md)
+- [Continuous integration](continuous-integration.md)
 
 Source-adjacent READMEs describe repository layout and commands. These
 maintainer pages explain cross-component ownership and validation expectations.

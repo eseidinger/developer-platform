@@ -1,9 +1,20 @@
+---
 name: platform app
-on: [push, pull_request]
+"on":
+  workflow_call:
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   test:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.12", "3.14"]
     services:
       postgres:
         image: postgres:18.6-trixie
@@ -15,38 +26,48 @@ jobs:
           --health-cmd "pg_isready -U postgres"
           --health-interval 5s --health-timeout 5s --health-retries 12
     env:
+      LIFECYCLE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
       ACCESS_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
       ACCESS_FIXTURE_TEST_DSN: host=127.0.0.1 port=5432 user=postgres dbname=postgres
     steps:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
       - uses: astral-sh/setup-uv@v7
-      - run: uv sync --project platform/app --locked
-      - run: uv run --project platform/app python -m unittest discover -s platform/app/tests -v
+      - run: uv sync --project platform/app --group test --locked
+      - run: mkdir -p .runtime/ci
+      - name: Test API and real SQL without optional identity-provider cases
+        run: >-
+          uv run --project platform/app --group test python -m pytest
+          platform/app/tests --ignore=platform/app/tests/test_application_access_keycloak.py
+          -p tests.support.pytest_ci --fail-on-skip --junitxml=.runtime/ci/api.xml -v
+      - name: Test privileged host erasure without deployment
+        run: >-
+          uv run --project platform/app --group test python -m pytest
+          operations/maintenance/tests/unit -v
       - name: Test platform runners without deploying the platform
         run: >-
-          uv run --project platform/app python -m unittest discover
+          uv run --project platform/app --group test python -m unittest discover
           -s tests/platform/unit -v
       - run: >-
-          uv run --project platform/app python -m compileall -q
+          uv run --project platform/app --group test python -m compileall -q
           platform/app/src/app tests/platform tests/fixtures tests/support
           scripts/tests/platform/check-hosted-access.py
       - name: Verify offline acceptance plan
         run: >-
-          uv run --project platform/app python scripts/tests/platform/check-hosted-access.py plan --run-id 0123456789ab
+          uv run --project platform/app --group test python scripts/tests/platform/check-hosted-access.py plan --run-id 0123456789ab
           --fixture-image ghcr.io/example/fixture@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
       - name: Verify real AI approval SQL and history pagination
         env:
           AI_FIXTURE_TEST_DSN: >-
             host=127.0.0.1 port=5432 user=postgres dbname=postgres
         run: >-
-          uv run --project platform/app python
+          uv run --project platform/app --group test python
           scripts/tests/components/ai/verify-ai-sql.py
       - name: Verify real database driver diagnostics without network access
         run: >-
-          uv run --project platform/app --with sqlalchemy==2.0.46 python
+          uv run --project platform/app --group test --with sqlalchemy==2.0.46 python
           scripts/tests/components/ai/verify-ai-database-diagnostics.py
       - name: Build neutral acceptance fixture
         run: >-
@@ -74,7 +95,17 @@ jobs:
         env:
           ACCESS_TEST_KEYCLOAK_URL: http://127.0.0.1:18080
           ACCESS_PROXY_CONFIG_TEST: "1"
-        run: uv run --project platform/app python -m unittest discover -s platform/app/tests -p test_application_access_keycloak.py -v
+        run: >-
+          uv run --project platform/app --group test python -m pytest platform/app/tests/test_application_access_keycloak.py
+          -p tests.support.pytest_ci --fail-on-skip
+          --junitxml=.runtime/ci/keycloak.xml -v
       - name: Remove disposable identity provider
         if: always()
         run: docker stop access-test-keycloak || true
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: api-${{ matrix.python }}-failure
+          path: .runtime/ci/
+          retention-days: 7
+          if-no-files-found: ignore

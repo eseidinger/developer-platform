@@ -1,0 +1,37 @@
+---
+name: publish CLI
+"on":
+  workflow_call:
+    secrets:
+      PYPI_API_TOKEN:
+        required: true
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  publish:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/cli-v')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: pypi
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.14"
+      - name: Validate release tag against package metadata
+        run: python3 scripts/release/cli-release.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: cli-distributions
+          path: dist
+      - name: Publish the tested distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages-dir: dist/

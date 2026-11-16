@@ -1,0 +1,108 @@
+---
+name: CI
+"on":
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["cli-v*", "v*"]
+  workflow_dispatch:
+  schedule:
+    - cron: "17 3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  changes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      components: ${{ steps.changes.outputs.components }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          fetch-depth: 0
+      - id: changes
+        run: python3 scripts/checks/ci-changes.py
+
+  validate:
+    needs: changes
+    uses: ./.github/workflows/validate.yaml
+    with:
+      components: ${{ needs.changes.outputs.components == 'true' }}
+
+  api:
+    needs: changes
+    if: needs.changes.outputs.components == 'true'
+    uses: ./.github/workflows/platform-app.yaml
+
+  cli:
+    needs: changes
+    if: needs.changes.outputs.components == 'true'
+    uses: ./.github/workflows/cli.yaml
+
+  ui:
+    needs: changes
+    if: needs.changes.outputs.components == 'true'
+    uses: ./.github/workflows/ui.yaml
+
+  observability:
+    needs: changes
+    if: needs.changes.outputs.components == 'true'
+    uses: ./.github/workflows/ai-observability.yaml
+
+  s3:
+    needs: changes
+    if: needs.changes.outputs.components == 'true'
+    uses: ./.github/workflows/http-stores.yaml
+
+  postgres:
+    needs: changes
+    if: needs.changes.outputs.components == 'true'
+    uses: ./.github/workflows/named-stores.yaml
+
+  image:
+    needs: changes
+    if: needs.changes.outputs.components == 'true'
+    uses: ./.github/workflows/platform-image.yaml
+
+  required:
+    name: Required CI
+    if: always()
+    needs: [changes, validate, api, cli, ui, observability, s3, postgres, image]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require successful checks, allowing only deliberate documentation skips
+        env:
+          RESULTS: ${{ toJSON(needs) }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          jobs = json.loads(os.environ["RESULTS"])
+          selection = jobs["changes"]["outputs"].get("components")
+          if selection not in {"true", "false"}:
+              raise SystemExit("CI component selection is missing or invalid")
+          full = selection == "true"
+          failed = [name for name, job in jobs.items()
+                    if job["result"] != "success"
+                    and (full or name in {"changes", "validate"}
+                         or job["result"] != "skipped")]
+          if failed:
+              raise SystemExit("Required CI did not pass: " + ", ".join(failed))
+          PY
+
+  publish-cli:
+    needs: [required]
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/cli-v')
+    uses: ./.github/workflows/cli-release.yaml
+    secrets:
+      PYPI_API_TOKEN: ${{ secrets.PYPI_API_TOKEN }}

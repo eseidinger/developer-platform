@@ -1,5 +1,11 @@
+---
 name: named stores
-on: [push, pull_request]
+"on":
+  workflow_call:
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   postgres-access-recovery:
@@ -9,7 +15,7 @@ jobs:
       - uses: actions/checkout@v7.0.1
       - uses: actions/setup-python@v7.0.0
         with:
-          python-version: "3.12"
+          python-version: "3.14"
       - uses: astral-sh/setup-uv@v7
       - uses: actions/setup-node@v4
         with:
@@ -37,6 +43,24 @@ jobs:
           NAMED_POSTGRES_CONSOLE: "1"
           RESTIC_TEST_BINARY: /usr/bin/restic
           STORE_ANALYTICS_FIXTURE: "1"
-        run: >-
-          uv run --project platform/app --group analytics-fixtures python
-          scripts/tests/components/stores/verify-named-postgres.py
+        run: |
+          mkdir -p .runtime/ci
+          uv run --project platform/app --group analytics-fixtures python \
+            scripts/tests/components/stores/verify-named-postgres.py \
+            2>&1 | tee .runtime/ci/postgres-recovery.log
+      - name: Verify every advertised PostgreSQL extension and dump/restore
+        env:
+          NAMED_POSTGRES_IMAGE: developer-platform-postgres:18.6-vector0.8.7-age1.8.0
+        run: |
+          uv run --project platform/app python \
+            scripts/tests/components/stores/verify-postgres-extension-expansion.py \
+            2>&1 | tee .runtime/ci/postgres-extensions.log
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: postgres-failure
+          path: |
+            .runtime/ci/
+            platform/ui/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

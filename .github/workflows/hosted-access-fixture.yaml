@@ -1,3 +1,4 @@
+---
 name: hosted access fixture
 
 on:
@@ -21,6 +22,10 @@ permissions:
 concurrency:
   group: hosted-access-fixture-${{ github.ref }}
   cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
   test:

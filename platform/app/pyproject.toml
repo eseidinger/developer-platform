@@ -28,6 +28,9 @@ dependencies = [
 packages = ["src/app"]
 
 [dependency-groups]
+test = [
+    "pytest>=8.3,<9",
+]
 analytics-fixtures = [
     "duckdb==1.5.6",
 ]
