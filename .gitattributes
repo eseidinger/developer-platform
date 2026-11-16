@@ -1,0 +1,2 @@
+# Keep checks and supported shell invocations independent of host Git settings.
+* text=auto eol=lf

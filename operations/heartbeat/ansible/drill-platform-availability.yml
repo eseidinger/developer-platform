@@ -68,6 +68,7 @@
           - "{{ platform_availability_docker_outage_seconds }}"
       async: 2100
       poll: 10
+      changed_when: true
       register: availability_run
       failed_when: false
     - name: Fetch drill report

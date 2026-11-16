@@ -107,7 +107,9 @@
 
     - name: Configure private backup job
       ansible.builtin.copy:
-        content: "{{ {'platform_dir': backup_platform_dir, 'instance': backup_instance, 'source_revision': backup_source_revision, 'watchdog_url': backup_watchdog_url, 'watchdog_token': backup_watchdog_token} | to_nice_json }}\n"
+        content: |
+          {{ {'platform_dir': backup_platform_dir, 'instance': backup_instance, 'source_revision': backup_source_revision, 'watchdog_url':
+          backup_watchdog_url, 'watchdog_token': backup_watchdog_token} | to_nice_json }}
         dest: /etc/developer-platform/backup/job.json
         owner: root
         group: root

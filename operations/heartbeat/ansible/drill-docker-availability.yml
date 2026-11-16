@@ -1,4 +1,5 @@
 ---
-- import_playbook: drill-platform-availability.yml
+- name: Run the Docker availability drill
+  import_playbook: drill-platform-availability.yml
   vars:
     platform_availability_mode: docker

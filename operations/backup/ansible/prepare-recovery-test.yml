@@ -47,6 +47,7 @@
           - --marker
           - "{{ recovery_test_directory.path }}/marker.json"
       no_log: true
+      changed_when: true
     - name: Preserve marker receipt independently before backup
       ansible.builtin.fetch:
         src: "{{ recovery_test_directory.path }}/marker.json"
@@ -66,6 +67,7 @@
         argv: [systemctl, start, platform-backup.service]
       async: 7500
       poll: 10
+      changed_when: true
       register: recovery_test_backup
       failed_when: false
     - name: Preserve backup status independently
@@ -95,6 +97,10 @@
         msg:
           - "Verified snapshot: {{ recovery_test_snapshot.stdout }}"
           - "Project: {{ recovery_test_project }}"
-          - "Controller marker: {{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/{{ recovery_test_directory.path | basename }}/marker.json"
+          - >-
+            Controller marker: {{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/{{ recovery_test_directory.path
+            | basename }}/marker.json
           - "Set recovery_snapshot and recovery_marker_file to these values in the recovery inventory. Restore into a fresh VM."
-          - "Backup service exit code: {{ recovery_test_backup.rc }}. A nonzero result can indicate a pending notification; inspect saved status and source service journal."
+          - >-
+            Backup service exit code: {{ recovery_test_backup.rc }}. A nonzero result can indicate a pending notification; inspect saved
+            status and source service journal.

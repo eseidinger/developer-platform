@@ -100,9 +100,6 @@ class NetworkBootstrapTests(unittest.TestCase):
         ):
             network_addresses.check()
 
-
-
-
     def test_daemon_failure_never_forwards_arbitrary_diagnostics(self):
         with (
             patch.object(

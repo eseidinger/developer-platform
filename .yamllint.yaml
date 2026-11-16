@@ -1,0 +1,17 @@
+---
+extends: default
+rules:
+  # Match the readable line budget used for Ansible/Jinja configuration.
+  line-length:
+    max: 160
+  truthy:
+    # GitHub uses YAML 1.2's `on` key; flag ambiguous values, not mapping keys.
+    check-keys: false
+  comments:
+    min-spaces-from-content: 1
+  comments-indentation: false
+  braces:
+    max-spaces-inside: 1
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: true

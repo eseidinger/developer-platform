@@ -49,6 +49,7 @@
           - "{{ backup_drill_directory.path }}/report.json"
       async: 18000
       poll: 10
+      changed_when: true
       register: backup_drill_run
       failed_when: false
     - name: Fetch drill evidence

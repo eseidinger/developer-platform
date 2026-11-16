@@ -41,9 +41,13 @@
     - name: Build local SSH and SCP commands
       ansible.builtin.set_fact:
         watchdog_remote: "{{ watchdog_ssh_user }}@{{ watchdog_ssh_host }}"
-        watchdog_ssh_command: "{{ ['sshpass', '-e', 'ssh', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'PubkeyAuthentication=no', '-p', watchdog_ssh_port | string] }}"
+        watchdog_ssh_command: >-
+          {{ ['sshpass', '-e', 'ssh', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'PubkeyAuthentication=no', '-p',
+          watchdog_ssh_port | string] }}
         # OpenSSH 9+ otherwise uses SFTP even when invoking scp.
-        watchdog_scp_command: "{{ ['sshpass', '-e', 'scp', '-O', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'PubkeyAuthentication=no', '-P', watchdog_ssh_port | string] }}"
+        watchdog_scp_command: >-
+          {{ ['sshpass', '-e', 'scp', '-O', '-o', 'PreferredAuthentications=password,keyboard-interactive', '-o', 'PubkeyAuthentication=no',
+          '-P', watchdog_ssh_port | string] }}
 
     - name: Check local sshpass availability
       ansible.builtin.command:
@@ -54,7 +58,11 @@
     - name: Check local release files and optional configuration
       ansible.builtin.stat:
         path: "{{ item }}"
-      loop: "{{ [watchdog_source_dir ~ '/common.php', watchdog_source_dir ~ '/backup.php', watchdog_source_dir ~ '/public/backup.php', watchdog_source_dir ~ '/cron.php', watchdog_source_dir ~ '/mail.php', watchdog_source_dir ~ '/schema.sql', watchdog_source_dir ~ '/import-schema.php', watchdog_source_dir ~ '/config.example.php', watchdog_source_dir ~ '/public/index.php', watchdog_source_dir ~ '/public/heartbeat.php'] + ([watchdog_config_file] if watchdog_config_file | length > 0 else []) }}"
+      loop: >-
+        {{ [watchdog_source_dir ~ '/common.php', watchdog_source_dir ~ '/backup.php', watchdog_source_dir ~ '/public/backup.php',
+        watchdog_source_dir ~ '/cron.php', watchdog_source_dir ~ '/mail.php', watchdog_source_dir ~ '/schema.sql', watchdog_source_dir ~
+        '/import-schema.php', watchdog_source_dir ~ '/config.example.php', watchdog_source_dir ~ '/public/index.php', watchdog_source_dir
+        ~ '/public/heartbeat.php'] + ([watchdog_config_file] if watchdog_config_file | length > 0 else []) }}
       register: watchdog_local_files
 
     - name: Require readable local files
@@ -103,7 +111,9 @@
 
         - name: Prepare private remote configuration permissions before upload
           ansible.builtin.command:
-            argv: "{{ watchdog_ssh_command + [watchdog_remote, 'umask 077; touch ' ~ ((watchdog_install_dir ~ '/config.local.php') | quote) ~ ' && chmod 600 ' ~ ((watchdog_install_dir ~ '/config.local.php') | quote)] }}"
+            argv: >-
+              {{ watchdog_ssh_command + [watchdog_remote, 'umask 077; touch ' ~ ((watchdog_install_dir ~ '/config.local.php') | quote) ~ ' &&
+              chmod 600 ' ~ ((watchdog_install_dir ~ '/config.local.php') | quote)] }}
           when: watchdog_config_file | length > 0
           changed_when: true
 

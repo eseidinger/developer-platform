@@ -68,9 +68,7 @@ class HostCapacityTests(unittest.TestCase):
             result["nodes"],
             {"k3d-workloads-agent-0": {"cpu_millicores": 16000, "memory_mib": 4096}},
         )
-        self.assertEqual(
-            [s["name"] for s in result["services"]], ["shared"]
-        )
+        self.assertEqual([s["name"] for s in result["services"]], ["shared"])
         self.assertEqual(sum(s["memory_mib"] for s in result["services"]), 512)
         self.assertTrue(result["services"][0]["cpu_unbounded"])
         self.assertNotIn("MUST_NOT_APPEAR", json.dumps(result))

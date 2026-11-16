@@ -43,7 +43,8 @@
           - recovery_preflight_wrong_password != backup_restic_password
       no_log: true
   tasks:
-    - block:
+    - name: Check recovery prerequisites and collect private evidence
+      block:
         - name: Install read-only recovery-preflight prerequisites
           ansible.builtin.apt:
             name: [ca-certificates, restic]
@@ -128,7 +129,9 @@
         - name: Fetch non-secret preflight evidence
           ansible.builtin.fetch:
             src: "{{ recovery_preflight_private.path }}/report.json"
-            dest: "{{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/preflight-{{ ansible_facts['date_time']['iso8601_basic_short'] }}.json"
+            dest: >-
+              {{ playbook_dir }}/../../../.runtime/recovery-evidence/{{ inventory_hostname }}/preflight-{{
+              ansible_facts['date_time']['iso8601_basic_short'] }}.json
             flat: true
       always:
         - name: Remove temporary recovery credentials

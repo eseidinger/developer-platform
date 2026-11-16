@@ -1,4 +1,5 @@
 ---
-- import_playbook: drill-backup-freshness.yml
+- name: Run the overdue backup notification drill
+  import_playbook: drill-backup-freshness.yml
   vars:
     backup_drill_mode: overdue

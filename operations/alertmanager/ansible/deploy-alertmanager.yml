@@ -83,7 +83,9 @@
               - --entrypoint=/bin/amtool
               - --volume
               - "{{ alertmanager_candidate.path }}:/etc/alertmanager:ro"
-              - "{{ (lookup('ansible.builtin.file', playbook_dir ~ '/../../../infrastructure/monitoring/compose.yaml') | from_yaml).services.alertmanager.image }}"
+              - >-
+                {{ (lookup('ansible.builtin.file', playbook_dir ~ '/../../../infrastructure/monitoring/compose.yaml') |
+                from_yaml).services.alertmanager.image }}
               - check-config
               - /etc/alertmanager/alertmanager.yaml
           changed_when: false
