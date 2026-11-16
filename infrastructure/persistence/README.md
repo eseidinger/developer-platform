@@ -21,10 +21,9 @@ managed roles and representative SQL:
 
 ```bash
 docker pull eseidinger/platform-postgres:18.6-extensions-20261112
-DEVELOPER_PLATFORM_ROOT=$PWD \
 NAMED_POSTGRES_IMAGE=eseidinger/platform-postgres:18.6-extensions-20261112 \
   platform/app/.venv/bin/python \
-  ../platform-postgres/tests/verify-postgres-extension-expansion.py
+  scripts/tests/components/stores/verify-postgres-extension-expansion.py
 ```
 
 `pg_duckdb` is preloaded but its execution role is granted only to writers of
@@ -32,17 +31,9 @@ resources that select it. External file and network access, including S3, is
 disabled at server startup. The image limits DuckDB to 128 MiB and two threads
 per connection. Review these controls with host capacity before changing them.
 
-The same-major image rollback rehearsal uses a separate disposable volume:
-
-```bash
-platform/app/.venv/bin/python \
-  ../platform-postgres/tests/verify-postgres-image-rollback.py
-```
-
-It validates old → new → old with existing pgvector data and no newly selected
-extensions. Once new extension data is written, the old image lacks the
-required binaries; recovery then requires the verified pre-upgrade backup and
-the new image rather than a simple image switch.
+Once new extension data is written, the old image lacks the required binaries;
+recovery then requires the verified pre-upgrade backup and the new image rather
+than a simple image switch.
 
 Run static checks from the repository root:
 
