@@ -4713,7 +4713,6 @@ with their own date, revision and environment; preserve these result limits.
     cannot be loaded by an ordinary role. Zero harness exit acknowledges these
     explicit limitations. No full regression, upgrade, isolation/binding or
     RPO/RTO acceptance.
-    [Fixture output](../../infrastructure/persistence/compatibility/results-2026-10-17.txt).
 - **Evidence ID / tasks:** EV-49 · PLAN-034/035 (local source evidence)
   - **Check:** October 17, 2026: focused OpenLIT 1.45.0 with the actual platform
     HTTP middleware, synthetic LangChain/OpenAI Responses calls, production
@@ -4742,9 +4741,7 @@ with their own date, revision and environment; preserve these result limits.
     isolation passed. Actual encrypted SQL/catalog backup restored into an empty
     second server: quarantine, all recovered grant/key revocations, purge
     replay, two native graph rebuilds, retained SQL/outbox/vector data and fresh
-    reader approval passed.
-    [Recovery evidence](../../infrastructure/persistence/compatibility/projection-rebuild-2026-10-17.md),
-    [CI](../../.github/workflows/named-stores.yaml).
+    reader approval passed. [CI](../../.github/workflows/named-stores.yaml).
   - **What it establishes:** Local fixture only: deployed application/Kubernetes
     reconnection, console HTTPS/network paths, off-host recovery
     throughput/RPO/RTO and external ODIP → VEF acceptance remain open. No live

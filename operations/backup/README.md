@@ -1005,7 +1005,7 @@ PostgreSQL image from the restored source files.
 
 For a reviewed extension upgrade rehearsal, load the candidate image archive
 and also set `recovery_postgres_image_override` to its exact local image tag,
-for example `developer-platform-postgres:18.6-extensions-20261112`. The
+for example `eseidinger/platform-postgres:18.6-extensions-20261112`. The
 restore still uses the source backup's platform code and data, but starts
 PostgreSQL from that candidate image. Verify the loaded image ID and the SQL
 report before treating this as compatibility evidence. Use another fresh VM

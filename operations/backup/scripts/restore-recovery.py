@@ -272,7 +272,10 @@ def configure_compose(preloaded_postgres, postgres_image_override=""):
         image = (
             postgres_image_override or source_compose["services"]["postgres"]["image"]
         )
-        if not re.fullmatch(r"developer-platform-postgres:[a-zA-Z0-9._-]+", image):
+        if not re.fullmatch(
+            r"(?:developer-platform-postgres|eseidinger/platform-postgres):[a-zA-Z0-9._-]+",
+            image,
+        ):
             raise RuntimeError("Recovery PostgreSQL image has an unexpected name")
         run(["docker", "image", "inspect", image])
         postgres_override = "  postgres:\n    build: !reset null\n" + (

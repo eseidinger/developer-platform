@@ -47,6 +47,13 @@ python3 scripts/generate/generate-dashboards.py
 
 # --- PostgreSQL and selected persistent stores ---
 
+# Compose uses the published image; the deploy command pulls it before stopping
+# services. A direct startup needs the image available locally too.
+if ! docker image inspect eseidinger/platform-postgres:18.6-extensions-20261112 >/dev/null 2>&1; then
+  echo "Pull eseidinger/platform-postgres:18.6-extensions-20261112 before starting services." >&2
+  exit 1
+fi
+
 # PostgreSQL must be healthy before reconciling its monitoring login.
 echo "Starting PostgreSQL and waiting for it to become healthy..."
 docker compose up -d --wait --wait-timeout 120 postgres

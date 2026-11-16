@@ -60,12 +60,14 @@ sudo kubectl --kubeconfig /opt/developer-platform/.runtime/admin.kubeconfig \
 ## Reapplying an installation
 
 Rerunning the playbook reapplies sources and endpoints and reconciles the
-running platform. Endpoint/policy defaults come from `.env.example`; the Ansible
-filter plugin and local configuration command use the same validators and Tempo
-renderer. Ansible passes non-secret settings to the configuration command on
-stdin and preserves the existing inventory interface. It writes the selected
-`platform_trace_sample_rate` to `PLATFORM_TRACE_SAMPLE_RATE`, defaulting to
-`1.0` even when a previous `.env` selected 10% sampling. Existing
+running platform. Deployment pulls the reviewed PostgreSQL image from Docker
+Hub before the controlled outage. Endpoint and policy defaults come from
+`.env.example`; the Ansible filter plugin and local configuration command use
+the same validators and Tempo renderer. Ansible passes non-secret settings to
+the configuration command on stdin and preserves the existing inventory
+interface. It writes the selected `platform_trace_sample_rate` to
+`PLATFORM_TRACE_SAMPLE_RATE`,
+defaulting to `1.0` even when a previous `.env` selected 10% sampling. Existing
 tracing-enabled application declarations must be reapplied so their sampler
 environment changes too; an API restart alone cannot change a running
 application's sampler. An already installed `/usr/local/sbin/platform-backup` is

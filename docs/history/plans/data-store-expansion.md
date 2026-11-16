@@ -173,10 +173,8 @@ independent issued-secret verification, session fencing, instance capacity
 limits, monitoring and stopped-volume recovery are implemented with disposable
 evidence. The prior shared-instance incompatibility remains valid; this resource
 mapping and access exception replace that deployment. Opt-in configuration
-readiness is not deployed operational acceptance. See the
-[compatibility record](../../../infrastructure/persistence/compatibility/neo4j-2026-10-17.md)
-and
-operator workflow in pre-removal Git commit `632b921`.
+readiness is not deployed operational acceptance. See the operator workflow in
+pre-removal Git commit `632b921`.
 
 ## HugeGraph shared-service provisioning decision
 
@@ -642,17 +640,13 @@ The logical restore command succeeded; subsequent Cypher queries failed. The
 fixture repair updated label references and graph IDs together, temporarily
 removing and then restoring the graph foreign-key constraint in one transaction.
 Cypher queries then returned the expected two-node count in both fixtures. The
-exact diagnostic/repair SQL and test sequence are retained in the
-[check script](../../../infrastructure/persistence/compatibility/check.sh);
-observed errors, OID values and repair results are in the
-[fixture output](../../../infrastructure/persistence/compatibility/results-2026-10-17.txt).
-These observations match the mechanism reported in
+historical fixture recorded the diagnostic/repair SQL, observed errors, OID
+values and repair results. These observations match the mechanism reported in
 [upstream #2503](https://github.com/apache/age/issues/2503).
 
-A later
-[source-projection recovery fixture](../../../infrastructure/persistence/compatibility/projection-rebuild-2026-10-17.md)
-now reproduces this failure and rebuilds two graphs from protected source
-snapshots using normal AGE graph/label APIs. Ordinary SQL, pgvector data and
+A later source-projection recovery fixture reproduced this failure and rebuilt
+two graphs from protected source snapshots using normal AGE graph/label APIs.
+Ordinary SQL, pgvector data and
 declared graph indexes survive. No manual OID catalog repair is used. This is
 local implementation evidence; deployed recovery/reconnection and RPO/RTO
 acceptance remain open.
@@ -719,24 +713,12 @@ or full platform acceptance. TimescaleDB's default source build includes TSL;
 the deployment edition/license choice remains open. Its source build needed ICU
 headers in addition to the other build dependencies.
 
-Reproduction uses the pinned-base/source
-[Dockerfile](../../../infrastructure/persistence/compatibility/Dockerfile)
-and
-[check script](../../../infrastructure/persistence/compatibility/check.sh):
-
-```bash
-docker build -t developer-platform-postgres-compat:20261017 infrastructure/persistence/compatibility
-docker run --rm --network none --user postgres --memory 2g --cpus 2 \
-  --tmpfs /tmp:rw,size=768m,mode=1777 \
-  --mount "type=bind,src=$PWD/infrastructure/persistence/compatibility,\
-dst=/check,readonly" \
-  --entrypoint bash developer-platform-postgres-compat:20261017 /check/check.sh
-```
-
-The harness prints `LIMITATION` for the specifically reproduced AGE failures; a
-zero exit means the smoke matrix completed, not that these limitations passed.
-It rejects unexpected errors. Retained fixture output is linked from EV-48 in
-the backlog. Upstream references:
+The historical smoke matrix reported the reproduced AGE failures as
+limitations; its successful exit did not mean those limitations passed. For
+current image validation, use the extension expansion and named-resource
+fixtures described in the
+[persistence README](../../../infrastructure/persistence/README.md). Upstream
+references:
 [pgvector 0.8.7](https://github.com/pgvector/pgvector/tree/v0.8.7),
 [AGE PG18 release](https://github.com/apache/age/releases/tag/PG18%2Fv1.8.0-rc0),
 and

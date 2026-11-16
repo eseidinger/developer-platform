@@ -55,7 +55,7 @@ class RestoreRecoveryTests(unittest.TestCase):
                 ) as run,
             ):
                 restore.configure_compose(
-                    True, "developer-platform-postgres:18.6-extensions-20261112"
+                    True, "eseidinger/platform-postgres:18.6-extensions-20261112"
                 )
             self.assertEqual(
                 run.call_args_list[1].args[0],
@@ -63,18 +63,18 @@ class RestoreRecoveryTests(unittest.TestCase):
                     "docker",
                     "image",
                     "inspect",
-                    "developer-platform-postgres:18.6-extensions-20261112",
+                    "eseidinger/platform-postgres:18.6-extensions-20261112",
                 ],
             )
             self.assertIn(
-                "image: developer-platform-postgres:18.6-extensions-20261112",
+                "image: eseidinger/platform-postgres:18.6-extensions-20261112",
                 (root / "compose.override.yaml").read_text(),
             )
 
     def test_candidate_image_requires_explicit_preload(self):
         with self.assertRaisesRegex(RuntimeError, "preloaded image"):
             restore.configure_compose(
-                False, "developer-platform-postgres:18.6-extensions-20261112"
+                False, "eseidinger/platform-postgres:18.6-extensions-20261112"
             )
 
     def test_retained_s3_archive_required_and_legacy_live_data_needs_pinned_release(

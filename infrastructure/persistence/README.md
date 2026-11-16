@@ -2,32 +2,29 @@
 
 Run Compose from the repository root. `compose.yaml` owns the shared PostgreSQL
 server and pgAdmin console; `shared-stores.yaml` owns optional RustFS object
-storage.
+storage. Pull the published PostgreSQL image before starting Compose.
 
-- `Dockerfile` builds the reviewed AGE, pgvector, TimescaleDB, pgmq, and
-  pg_duckdb sources in a separate stage. The runtime installs pinned PostGIS
-  packages and copies the other installed extension files from the build stage.
+- The separate `platform-postgres` repository builds the reviewed AGE, pgvector,
+  TimescaleDB, pgmq, and pg_duckdb sources in a separate stage. The runtime
+  installs pinned PostGIS packages and copies the other installed extension
+  files from the build stage.
 - `console/` owns pgAdmin authentication and session policy.
-- `compatibility/` contains a disposable PostgreSQL coexistence/restore harness,
-  its build image, and dated compatibility evidence. Preserve historical records
-  when changing the harness; they describe the source tested on that date.
 
-Build dependencies use explicit APT versions in both PostgreSQL Dockerfiles.
-Review these pins together when updating the base image or dependencies, and
-verify package availability and dependency resolution. Upstream repositories may
-remove superseded versions, requiring a reviewed pin update.
+Build dependencies use explicit APT versions in the image Dockerfile. Review
+these pins together when updating the base image or dependencies, and verify
+package availability and dependency resolution. Upstream repositories may remove
+superseded versions, requiring a reviewed pin update.
 
-The compatibility harness creates temporary databases, restarts its own server,
-and tests logical restore. Its AGE OID repair applies only to disposable fixture
-databases. Never run it inside a live PostgreSQL container.
-
-PLAN-040's component check runs every six-extension subset in a disposable
-PostgreSQL image, then exercises managed roles and representative SQL:
+Pull the image and run PLAN-040's component check from the repository root. It
+runs every six-extension subset in a disposable PostgreSQL image, then exercises
+managed roles and representative SQL:
 
 ```bash
-NAMED_POSTGRES_IMAGE=developer-platform-postgres:plan040 \
+docker pull eseidinger/platform-postgres:18.6-extensions-20261112
+DEVELOPER_PLATFORM_ROOT=$PWD \
+NAMED_POSTGRES_IMAGE=eseidinger/platform-postgres:18.6-extensions-20261112 \
   platform/app/.venv/bin/python \
-  scripts/tests/components/stores/verify-postgres-extension-expansion.py
+  ../platform-postgres/tests/verify-postgres-extension-expansion.py
 ```
 
 `pg_duckdb` is preloaded but its execution role is granted only to writers of
@@ -39,7 +36,7 @@ The same-major image rollback rehearsal uses a separate disposable volume:
 
 ```bash
 platform/app/.venv/bin/python \
-  scripts/tests/components/stores/verify-postgres-image-rollback.py
+  ../platform-postgres/tests/verify-postgres-image-rollback.py
 ```
 
 It validates old → new → old with existing pgvector data and no newly selected
@@ -50,11 +47,8 @@ the new image rather than a simple image switch.
 Run static checks from the repository root:
 
 ```bash
-hadolint infrastructure/persistence/Dockerfile \
-  infrastructure/persistence/compatibility/Dockerfile
 yamllint infrastructure/persistence
-shellcheck infrastructure/persistence/*.sh \
-  infrastructure/persistence/compatibility/*.sh
+shellcheck infrastructure/persistence/*.sh
 ruff check infrastructure/persistence
 ruff format --check infrastructure/persistence
 docker compose --profile '*' config --quiet

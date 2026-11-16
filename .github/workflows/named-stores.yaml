@@ -27,22 +27,19 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: platform/ui
       - run: sudo apt-get update && sudo apt-get install -y restic
-      - uses: docker/setup-buildx-action@v4
-      - name: Build reviewed PostgreSQL extension image
-        uses: docker/build-push-action@v7
+      - uses: actions/checkout@v7.0.1
         with:
-          context: infrastructure/persistence
-          load: true
-          tags: developer-platform-postgres:18.6-vector0.8.7-age1.8.0
-          cache-from: type=gha,scope=platform-postgres
-          cache-to: type=gha,mode=max,scope=platform-postgres
+          repository: eseidinger/platform-postgres
+          path: platform-postgres
+      - name: Pull reviewed PostgreSQL extension image
+        run: docker pull eseidinger/platform-postgres:18.6-extensions-20261112
       - name: Fetch pinned console fixture images
         run: |
           docker pull quay.io/keycloak/keycloak:26.4.1
           docker pull dpage/pgadmin4:9.18@sha256:c332c5f6dfba995d9ebc4af261d93506d6876085d712eaaa3defc8dd1a3f26de
       - name: Verify isolation, expiry, rotation, SSO, encrypted intent and AGE rebuild
         env:
-          NAMED_POSTGRES_IMAGE: developer-platform-postgres:18.6-vector0.8.7-age1.8.0
+          NAMED_POSTGRES_IMAGE: eseidinger/platform-postgres:18.6-extensions-20261112
           NAMED_POSTGRES_EXTENSIONS: "1"
           NAMED_POSTGRES_CONSOLE: "1"
           RESTIC_TEST_BINARY: /usr/bin/restic
@@ -54,10 +51,11 @@ jobs:
             2>&1 | tee .runtime/ci/postgres-recovery.log
       - name: Verify every advertised PostgreSQL extension and dump/restore
         env:
-          NAMED_POSTGRES_IMAGE: developer-platform-postgres:18.6-vector0.8.7-age1.8.0
+          NAMED_POSTGRES_IMAGE: eseidinger/platform-postgres:18.6-extensions-20261112
+          DEVELOPER_PLATFORM_ROOT: ${{ github.workspace }}
         run: |
           uv run --project platform/app python \
-            scripts/tests/components/stores/verify-postgres-extension-expansion.py \
+            platform-postgres/tests/verify-postgres-extension-expansion.py \
             2>&1 | tee .runtime/ci/postgres-extensions.log
       - uses: actions/upload-artifact@v4
         if: failure()

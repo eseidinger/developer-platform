@@ -87,9 +87,11 @@ class PlatformDeploymentTests(unittest.TestCase):
             if "scripts/setup/configure-platform.py" in args
         )
         stop = calls.index(["docker", "compose", "stop", "--timeout", "60"])
+        pull = calls.index(["docker", "pull", deployment.POSTGRES_IMAGE])
         remove = calls.index(["docker", "compose", "rm", "--force"])
         bootstrap = calls.index(["bash", "scripts/up.sh"])
         self.assertLess(configure, stop)
+        self.assertLess(pull, stop)
         self.assertLess(stop, remove)
         self.assertLess(remove, bootstrap)
         self.assertLess(bootstrap, calls.index(["ready", 15]))
@@ -108,6 +110,20 @@ class PlatformDeploymentTests(unittest.TestCase):
         with self.assertRaises(deployment.DeploymentError):
             deployment.deploy()
         self.assertFalse(any("stop" in args for args in calls))
+
+    def test_failed_postgres_image_pull_does_not_stop_services(self):
+        calls = []
+
+        def command(args, **kwargs):
+            calls.append(args)
+            if args[:2] == ["docker", "pull"]:
+                raise deployment.DeploymentError("fixture image pull failure")
+            return ""
+
+        self.preflight_patches(command)
+        with self.assertRaises(deployment.DeploymentError):
+            deployment.deploy()
+        self.assertFalse(any("stop" in args or "rm" in args for args in calls))
 
     def test_private_command_failure_does_not_expose_diagnostics(self):
         with (

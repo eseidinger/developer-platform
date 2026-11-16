@@ -13,6 +13,7 @@ from pathlib import Path
 
 # Prefer the same project-local tools as up.sh, including when run by Ansible.
 ROOT = Path(__file__).resolve().parents[2]
+POSTGRES_IMAGE = "eseidinger/platform-postgres:18.6-extensions-20261112"
 SYSTEMD = Path("/run/systemd/system")
 MAINTENANCE_UNITS = (
     "platform-backup.service",
@@ -113,6 +114,8 @@ def deploy(*, check=False, readiness_timeout=300):
 
     # Validate shared settings before the service outage.
     command([sys.executable, "scripts/setup/configure-platform.py", "--runtime"])
+    # Pull before the outage so registry or image failures leave services up.
+    command(["docker", "pull", POSTGRES_IMAGE])
     print(
         "Stopping and recreating Compose containers; persistent data and k3d are retained.",
         flush=True,

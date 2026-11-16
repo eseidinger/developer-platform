@@ -174,7 +174,7 @@ the current restore refuses them before mutating the host. See the
 Run the PostgreSQL component fixture against a disposable database and the
 application, CLI, backup, and UI test suites before a controlled deployment.
 For PLAN-040, also run
-`scripts/tests/components/stores/verify-postgres-extension-expansion.py`
+`../platform-postgres/tests/verify-postgres-extension-expansion.py`
 against the reviewed image. It tests all selectable extension subsets and the
 managed writer/reader contract. The
 [PLAN-040 evidence](validation/postgresql-extensions-2026-11-12.md) records
