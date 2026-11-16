@@ -95,7 +95,7 @@ const envelope = z.object({
   version: z.number().int().positive(),
   created_at: z.string(),
   updated_at: z.string(),
-  operation_id: z.string().optional(),
+  operation_id: z.string().nullable().optional(),
 })
 const resourceSchemas = {
   group: envelope.extend({ kind: z.literal('group'), spec: groupSchema }),

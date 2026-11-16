@@ -3,6 +3,8 @@ import { ApiError } from '@/api/errors'
 import {
   createGroup,
   getGovernance,
+  getGroups,
+  getHumanRequests,
   getPolicy,
   IdempotentIntent,
   parseAccessResource,
@@ -27,6 +29,57 @@ const base = {
 }
 afterEach(() => vi.resetAllMocks())
 describe('access contract and redaction', () => {
+  it('accepts null operation metadata in group lists', async () => {
+    requests.GET.mockResolvedValueOnce({
+      data: {
+        items: [
+          {
+            ...base,
+            id: 'grp_test',
+            kind: 'group',
+            operation_id: null,
+            status_url: null,
+            spec: { displayName: 'Readers' },
+          },
+        ],
+      },
+      response: new Response(null, { status: 200 }),
+    })
+
+    await expect(getGroups('test-project')).resolves.toMatchObject([
+      { id: 'grp_test', spec: { displayName: 'Readers' } },
+    ])
+  })
+
+  it('accepts human requests with null operation metadata', async () => {
+    requests.GET.mockResolvedValueOnce({
+      data: {
+        items: [
+          {
+            ...base,
+            id: 'req_test',
+            kind: 'human-request',
+            operation_id: null,
+            status_url: null,
+            spec: {
+              policyId: 'pol_test',
+              principalId: 'prn_test',
+              issuer: 'https://identity.example',
+              subject: 'subject-test',
+              expiresAt: '2026-12-16T12:26:00+00:00',
+              displayName: 'Test user',
+            },
+          },
+        ],
+      },
+      response: new Response(null, { status: 200 }),
+    })
+
+    await expect(getHumanRequests('test-project')).resolves.toMatchObject([
+      { id: 'req_test', spec: { displayName: 'Test user' } },
+    ])
+  })
+
   it('retains optional human display names alongside stable identity fields', () => {
     const request = {
       ...base,
