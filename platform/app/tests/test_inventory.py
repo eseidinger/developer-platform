@@ -4,9 +4,12 @@ import unittest
 from pathlib import Path
 from unittest.mock import Mock, patch
 
+from kubernetes.dynamic.resource import ResourceField
+
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 from app.identity import Principal
 from app.inventory import observe_cluster_capacity, observe_inventory
+from app.response_models import ProjectObservation
 
 from app import main
 
@@ -123,6 +126,57 @@ class InventoryTests(unittest.TestCase):
             result, {"state": "unavailable", "reason": "KubernetesApiUnavailable"}
         )
 
+    def test_kubernetes_quantity_fields_are_json_serializable(self):
+        runtime = Mock()
+        values = {
+            "Deployment": [
+                item(
+                    "web",
+                    {
+                        "replicas": 2,
+                        "template": {
+                            "spec": {
+                                "containers": [
+                                    {
+                                        "name": "web",
+                                        "resources": ResourceField(
+                                            {
+                                                "requests": ResourceField(
+                                                    {"cpu": "100m"}
+                                                ),
+                                                "limits": ResourceField(
+                                                    {"memory": "256Mi"}
+                                                ),
+                                            }
+                                        ),
+                                    }
+                                ]
+                            }
+                        },
+                    },
+                )
+            ],
+            "ResourceQuota": [
+                item("project", status={"hard": ResourceField({"requests.cpu": "1"})})
+            ],
+            "Pod": [],
+            "Service": [],
+            "Ingress": [],
+            "LimitRange": [],
+        }
+        runtime.resources.get.side_effect = lambda api_version, kind: Mock(
+            get=Mock(return_value={"items": values[kind]})
+        )
+
+        result = observe_inventory(runtime, "smoke", logging.getLogger("test"))
+        self.assertEqual(
+            result["deployments"][0]["containers"][0]["requests"], {"cpu": "100m"}
+        )
+        self.assertEqual(result["quotas"][0]["hard"], {"requests.cpu": "1"})
+        ProjectObservation.model_validate({"project": "smoke", **result}).model_dump(
+            mode="json"
+        )
+
     def test_cluster_capacity_reports_allocatable_nodes(self):
         runtime = Mock()
         values = {
@@ -158,6 +212,32 @@ class InventoryTests(unittest.TestCase):
         self.assertEqual(
             result,
             {"state": "unavailable", "reason": "KubernetesApiUnavailable", "nodes": []},
+        )
+
+    def test_cluster_capacity_quantities_are_json_serializable(self):
+        runtime = Mock()
+        values = {
+            "Node": [
+                item(
+                    "agent",
+                    status={
+                        "capacity": ResourceField({"cpu": "4"}),
+                        "allocatable": ResourceField({"cpu": "3900m"}),
+                    },
+                )
+            ],
+            "NodeMetrics": [
+                {"metadata": {"name": "agent"}, "usage": ResourceField({"cpu": "120m"})}
+            ],
+        }
+        runtime.resources.get.side_effect = lambda api_version, kind: Mock(
+            get=Mock(return_value={"items": values[kind]})
+        )
+
+        result = observe_cluster_capacity(runtime, logging.getLogger("test"))
+        self.assertEqual(result["nodes"][0]["usage"], {"cpu": "120m"})
+        ProjectObservation.model_validate({"project": "platform", **result}).model_dump(
+            mode="json"
         )
 
     def test_operator_capacity_includes_request_admission_accounting(self):

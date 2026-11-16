@@ -29,13 +29,20 @@ def _name(item: Any) -> str:
     return _get(_get(item, "metadata", {}), "name", "")
 
 
+def _quantities(value: Any) -> dict[str, str]:
+    """Convert Kubernetes quantity maps to JSON values at the API boundary."""
+    return {str(name): str(quantity) for name, quantity in dict(value or {}).items()}
+
+
 def _allocation(item: Any) -> list[dict]:
     template = _get(_get(_get(item, "spec", {}), "template", {}), "spec", {})
     return [
         {
             "name": _get(container, "name", ""),
-            "requests": _get(_get(container, "resources", {}), "requests", {}),
-            "limits": _get(_get(container, "resources", {}), "limits", {}),
+            "requests": _quantities(
+                _get(_get(container, "resources", {}), "requests", {})
+            ),
+            "limits": _quantities(_get(_get(container, "resources", {}), "limits", {})),
         }
         for container in (_get(template, "containers", []) or [])
     ]
@@ -74,7 +81,7 @@ def _quota_comparisons(quotas: list[Any], declared: dict) -> list[dict]:
     }
     comparisons = []
     for quota in quotas:
-        hard = _get(_get(quota, "status", {}), "hard", {}) or {}
+        hard = _quantities(_get(_get(quota, "status", {}), "hard", {}))
         resources = {}
         for resource, (section, unit, parser) in quantities.items():
             if resource not in hard:
@@ -173,7 +180,10 @@ def observe_inventory(runtime: Any, project: str, log) -> dict:
         "routes": [_name(item) for item in ingresses],
         "public_endpoints": _public_endpoints(ingresses),
         "quotas": [
-            {"name": _name(item), "hard": _get(_get(item, "status", {}), "hard", {})}
+            {
+                "name": _name(item),
+                "hard": _quantities(_get(_get(item, "status", {}), "hard", {})),
+            }
             for item in quotas
         ],
         "quota_comparisons": _quota_comparisons(quotas, declared),
@@ -207,9 +217,15 @@ def observe_cluster_capacity(runtime: Any, log) -> dict:
         "nodes": [
             {
                 "name": _name(node),
-                "capacity": _get(_get(node, "status", {}), "capacity", {}),
-                "allocatable": _get(_get(node, "status", {}), "allocatable", {}),
-                "usage": by_name.get(_name(node)),
+                "capacity": _quantities(_get(_get(node, "status", {}), "capacity", {})),
+                "allocatable": _quantities(
+                    _get(_get(node, "status", {}), "allocatable", {})
+                ),
+                "usage": (
+                    _quantities(by_name[_name(node)])
+                    if _name(node) in by_name
+                    else None
+                ),
                 "usage_state": "ok" if _name(node) in by_name else "missing",
             }
             for node in nodes
