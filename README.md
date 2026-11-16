@@ -59,8 +59,8 @@ uv run --project platform/app python scripts/tests/platform/smoke.py plan \
 `init.py` creates a private `.env` without replacing existing values. The smoke
 plan is offline. A live run uses a unique project and retires it afterward; SQL
 data remains retained. See the [test guide](scripts/tests/README.md) for
-execution. The Python API and CLI packages require Python 3.12 or newer when run
-outside their containers. AI runs additionally require configured provider
+execution. The Python API and separate CLI package require Python 3.12 or newer
+when run outside their containers. AI runs additionally require configured provider
 credentials, processing eligibility, and project classification. For
 prerequisites, identity bootstrap, checks, and cleanup, follow the complete
 [local installation guide](docs/operators/install-local.md).
@@ -95,10 +95,10 @@ source .venv/bin/activate
 python3 -m pip install -r requirements.txt
 ```
 
-This includes editable API and CLI packages, Ruff for linting and formatting,
-and pytest with coverage support. Run `ruff check scripts`,
-`ruff format --check scripts`, or
-`python3 -m pytest platform/cli/tests --cov=platform_cli` as needed.
+This includes the editable API package, Ruff for linting and formatting,
+and pytest with coverage support. Run `ruff check scripts` or
+`ruff format --check scripts` as needed. The CLI is built in the
+[platform-cli repository](https://github.com/eseidinger/platform-cli).
 
 ```bash
 docker compose config --quiet

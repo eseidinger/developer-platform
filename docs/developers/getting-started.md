@@ -66,8 +66,9 @@ is available:
 devplat --help
 ```
 
-For repository development instead, install the local package with
-`python3 -m pip install -e 'platform/cli[dev]'` from the repository root.
+For CLI development, clone the
+[platform-cli repository](https://github.com/eseidinger/platform-cli) and run
+`python3 -m pip install -e '.[dev]'` from that repository root.
 
 ## Declare the application
 

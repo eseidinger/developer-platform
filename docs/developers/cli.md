@@ -7,10 +7,13 @@ administration acceptance have not yet been recorded.
 Platform API. Install the Python package and inspect the commands:
 
 ```bash
-python3 -m pip install -e 'platform/cli[dev]'
+python3 -m pip install -e '.[dev]'
 devplat --help
 devplat contract check --output json
 ```
+
+Run the editable install from the
+[platform-cli repository](https://github.com/eseidinger/platform-cli).
 
 The existing CI deployment invocation remains supported:
 

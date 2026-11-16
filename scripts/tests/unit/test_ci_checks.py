@@ -21,23 +21,8 @@ def module(name, path):
     return result
 
 
-release = module("cli_release", "scripts/release/cli-release.py")
 changes = module("ci_changes", "scripts/checks/ci-changes.py")
 quality = module("ci_quality", "scripts/checks/check-quality.py")
-
-
-class ReleaseTests(unittest.TestCase):
-    def test_only_matching_strict_version_tags_can_publish(self):
-        self.assertEqual(release.validate("tag", "cli-v1.2.3", "1.2.3"), "1.2.3")
-        for kind, tag, version in (
-            ("branch", "cli-v1.2.3", "1.2.3"),
-            ("tag", "cli-v1.2.4", "1.2.3"),
-            ("tag", "cli-v01.2.3", "1.2.3"),
-            ("tag", "cli-v1.2.3\ninjected", "1.2.3"),
-            ("tag", "cli-v1.2.3rc1", "1.2.3"),
-        ):
-            with self.subTest(tag=tag), self.assertRaises(ValueError):
-                release.validate(kind, tag, version)
 
 
 class SelectionTests(unittest.TestCase):
@@ -75,7 +60,7 @@ class SelectionTests(unittest.TestCase):
 
     def test_tags_new_branches_manual_and_scheduled_runs_cannot_skip_components(self):
         for name, event in (
-            ("push", {"ref": "refs/tags/cli-v1.0.0", "before": "a" * 40}),
+            ("push", {"ref": "refs/tags/v1.0.0", "before": "a" * 40}),
             ("push", {"before": "0" * 40}),
             ("schedule", {}),
             ("workflow_dispatch", {}),
@@ -164,9 +149,8 @@ class ReleaseGateTests(unittest.TestCase):
     def test_every_ci_job_must_gate_publishing(self):
         self.assertEqual(
             set(self.gate["needs"]),
-            set(self.workflow["jobs"]) - {"required", "publish-cli"},
+            set(self.workflow["jobs"]) - {"required"},
         )
-        self.assertEqual(self.workflow["jobs"]["publish-cli"]["needs"], ["required"])
         self.evaluate()
 
     def test_saved_logs_cannot_hide_component_test_failures(self):

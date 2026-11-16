@@ -161,8 +161,9 @@ should reuse that setup rather than require another manual bootstrap.
 
 The [API workflow](../../.github/workflows/platform-app.yaml) runs broad Python
 tests, a PostgreSQL service, and selected real Keycloak checks. The
-[CLI workflow](../../.github/workflows/cli.yaml) checks its generated contract,
-mocked command behavior, and package build. The
+[CLI workflow](https://github.com/eseidinger/platform-cli/blob/main/.github/workflows/ci.yaml)
+in the separate repository checks its packaged contract, mocked command behavior,
+and package build. The
 [UI workflow](../../.github/workflows/ui.yaml) runs static checks, component
 tests, and Playwright against local Vite with API fixtures. Separate workflows
 exercise disposable named-store and telemetry dependencies. These are useful

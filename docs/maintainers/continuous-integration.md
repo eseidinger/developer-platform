@@ -3,8 +3,8 @@
 Status: current. Last reviewed November 16, 2026.
 
 The [CI workflow](../../.github/workflows/ci.yaml) coordinates reusable validation,
-API, CLI, UI, telemetry, store and production-image workflows. It runs on pull
-requests, pushes to `main`, `cli-v*` and `v*` tags, manual invocation and a daily
+API, UI, telemetry, store and production-image workflows. It runs on pull
+requests, pushes to `main` and `v*` tags, manual invocation and a daily
 03:17 UTC schedule. Component jobs use disposable local dependencies; they do
 not contact or deploy an installed platform.
 
@@ -17,13 +17,10 @@ Changes to shared code, tests, dependency locks, workflows and configuration run
 all components. Tags, schedules and manual runs always run the full suite.
 Machine-readable contracts under `docs/` also trigger the full suite.
 
-CLI publishing depends on that aggregate result. A stable
-`cli-vMAJOR.MINOR.PATCH` tag must match `platform/cli/pyproject.toml`. CI builds
-the wheel and source distribution once, installs and tests the wheel, checks the
-distribution metadata and uploads both artifacts. The protected `pypi` job
-downloads those artifacts from the same workflow run and publishes them without
-rebuilding. Repository/environment publishing credentials are available only to
-that job.
+The [platform-cli repository](https://github.com/eseidinger/platform-cli)
+builds and publishes the CLI in its own workflow. A `vMAJOR.MINOR.PATCH` tag
+must match its `pyproject.toml`. That workflow tests the source and installed
+wheel before the protected `pypi` job publishes the tested artifacts.
 
 The hosted-access fixture has a separate, narrowly triggered workflow and
 protected Docker Hub release environment. It publishes a neutral test
@@ -36,7 +33,6 @@ application, not the platform, and does not run installed-platform acceptance.
 | Static quality | Source linters, Compose and Ansible syntax       |
 | API            | SQL and identity checks on Python 3.12/3.14      |
 | Lifecycle      | Retire/restore/purge with real PostgreSQL stores |
-| CLI            | Contract, installed wheel and package metadata   |
 | UI             | Quality, unit tests, build and browser fixtures  |
 | Components     | TLS, telemetry, stores, SSO and backup/recovery  |
 | Image          | Actual Dockerfile, runtime and bundled assets    |

@@ -179,7 +179,6 @@ hadolint platform/Dockerfile platform/Dockerfile.access \
 yamllint platform/compose.yaml
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
 uv run --project platform/app python scripts/generate/export_openapi.py --check
-python3 scripts/generate/generate-cli-contract.py --check
 python3 scripts/checks/check-doc-links.py
 uv run --project platform/app python -m compileall -q platform/app/src/app scripts
 bash -n scripts/up.sh scripts/down.sh
@@ -192,7 +191,8 @@ READMEs, excluding local virtual environments and `node_modules`.
 
 Some tests require explicitly configured disposable dependencies and otherwise
 skip. See [test boundaries](../docs/maintainers/testing-requirements.md), the
-[CLI README](cli/README.md), [UI README](ui/README.md) and CI workflows.
+[CLI repository](https://github.com/eseidinger/platform-cli),
+[UI README](ui/README.md) and CI workflows.
 
 Rebuild through `bash scripts/up.sh` only when updating the intended lab. Live
 smoke creates or updates a retained project; follow

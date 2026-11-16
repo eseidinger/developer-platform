@@ -3,8 +3,7 @@
 
 # Scripts import app modules; reuse the API's declared runtime dependencies.
 -e ./platform/app
-# Includes pytest and respx for the CLI tests, plus httpx used by scripts.
--e ./platform/cli[dev]
+httpx>=0.28,<1
 
 # Additional script and fixture dependencies.
 PyYAML>=6,<7

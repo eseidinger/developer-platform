@@ -25,12 +25,14 @@ Minimum local validation for API changes:
 uv sync --project platform/app
 uv run --project platform/app python -m unittest discover -s platform/app/tests -v
 uv run --project platform/app python scripts/generate/export_openapi.py --check
-python3 scripts/generate/generate-cli-contract.py --check
 uv run --project platform/app python -m compileall -q \
   platform/app/src/app scripts operations
 ```
 
 Regenerate and check `docs/api/openapi.json` whenever the public schema changes.
+Update the packaged contract and affected commands in the sibling
+[platform-cli repository](https://github.com/eseidinger/platform-cli) when the
+CLI consumes the changed API.
 Update the application declaration reference and compatibility notes in the same
 change. New endpoints or persisted state also require scoped authorization,
 revocation behavior, audit/redaction tests, and backup/recovery review.

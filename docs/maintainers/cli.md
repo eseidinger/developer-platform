@@ -8,16 +8,19 @@ secrets remain in memory; human renewable sessions use the OS keyring bound to
 the selected profile, issuer, client ID and subject. Standard output is reserved
 for requested results so machine-readable output remains safe for CI.
 
-Run from the repository root:
+Run from the [platform-cli repository](https://github.com/eseidinger/platform-cli)
+root:
 
 ```bash
-python3 -m pip install -e 'platform/cli[dev]'
-python3 scripts/generate/generate-cli-contract.py --check
+python3 -m pip install -e '.[dev]'
+python3 scripts/generate-cli-contract.py \
+  --source ../developer-platform/docs/api/openapi.json --check
 devplat contract check --output json
-python3 -m pytest platform/cli/tests
+python3 -m pytest tests
 ```
 
-See the source-adjacent [CLI README](../../platform/cli/README.md) for its
-minimal runtime example and the [implementation plan](../history/plans/cli.md) for
-active increments. Stable commands and authentication behavior belong in the
+See the [CLI README](https://github.com/eseidinger/platform-cli/blob/main/README.md)
+for its minimal runtime example and the
+[implementation plan](../history/plans/cli.md) for active increments. Stable
+commands and authentication behavior belong in the
 [developer CLI guide](../developers/cli.md), not only in the plan.
