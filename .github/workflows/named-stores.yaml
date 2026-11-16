@@ -27,11 +27,15 @@ jobs:
       - run: npx playwright install --with-deps chromium
         working-directory: platform/ui
       - run: sudo apt-get update && sudo apt-get install -y restic
+      - uses: docker/setup-buildx-action@v4
       - name: Build reviewed PostgreSQL extension image
-        run: >-
-          docker build
-          -t developer-platform-postgres:18.6-vector0.8.7-age1.8.0
-          infrastructure/persistence
+        uses: docker/build-push-action@v7
+        with:
+          context: infrastructure/persistence
+          load: true
+          tags: developer-platform-postgres:18.6-vector0.8.7-age1.8.0
+          cache-from: type=gha,scope=platform-postgres
+          cache-to: type=gha,mode=max,scope=platform-postgres
       - name: Fetch pinned console fixture images
         run: |
           docker pull quay.io/keycloak/keycloak:26.4.1

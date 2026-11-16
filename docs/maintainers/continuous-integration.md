@@ -52,6 +52,8 @@ UUID labels and tenant-aware Loki reads. Tracing exercises the production router
 with its real read-only PostgreSQL views, Alloy gzip transport and multitenant
 Tempo; synthetic provider responses avoid model requests. Store checks include
 all advertised PostgreSQL extensions and real empty-server backup restoration.
+Production platform and PostgreSQL image builds retain separate BuildKit caches
+in GitHub Actions; a cold PostgreSQL extension build can take about 20 minutes.
 
 Browser scenarios use synthetic API fixtures and authentication contexts. API
 lifecycle integration uses fixture audit writes, a Kubernetes double and signed
