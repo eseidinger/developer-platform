@@ -50,6 +50,11 @@ purpose-separated key derived from `DATABASE_KEY` and binds ciphertext
 to the project UUID. Preserve that key in recovery configuration.
 Exported application declarations never expose secrets.
 
+Operator Grafana keeps the project's Loki and Tempo data sources during
+retirement because retained telemetry remains available. The host
+reconciliation timer removes these sources only after complete purge removes
+the project's catalog identity.
+
 ## Restoration
 
 Restoration rebuilds the same UUID and name from the retained recovery

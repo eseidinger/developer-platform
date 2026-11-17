@@ -67,5 +67,8 @@
         - name: Install project lifecycle maintenance
           ansible.builtin.import_tasks: tasks/deploy/lifecycle-maintenance.yml
 
+        - name: Install Grafana project data-source reconciliation
+          ansible.builtin.import_tasks: tasks/deploy/grafana-datasources.yml
+
         - name: Record source and runtime versions after startup
           ansible.builtin.import_tasks: tasks/deploy/installation-record.yml

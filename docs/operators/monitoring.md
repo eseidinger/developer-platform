@@ -60,6 +60,23 @@ Operators open Grafana through Caddy at `https://<GRAFANA_DOMAIN>/` and sign in
 with a Grafana account. The direct `127.0.0.1:3000` port remains available on
 the host. Public account signup and anonymous access are disabled.
 
+Grafana provisions `Loki project <name>` and `Tempo project <name>` for every
+catalog project. Select either source in Explore to query that project's
+immutable UUID tenant; the shared `Loki` and `Tempo` sources still show only
+the `platform` tenant. The host reconciliation command is
+`python3 scripts/operations/reconcile-grafana-datasources.py`. It derives
+`.runtime/grafana-datasources/default.yaml` from the catalog through the API
+container's restricted telemetry role. It restarts Grafana only when the
+generated file changes. Remote installations run it every minute through
+`platform-grafana-datasources.timer`; local `scripts/up.sh` generates the file
+before starting Grafana. On local installations without that timer, rerun the
+reconciliation command after project changes. A retired project's sources
+remain available while telemetry is retained. Complete purge removes the
+catalog identity and the next reconciliation removes its sources. The source
+names and UUIDs change if a purged project name is later reused. All Grafana
+users with data-source query access can see these operator sources; project
+authorization remains enforced only by the scoped Platform API.
+
 Application metrics require opt-in instrumentation; tracing uses an
 authenticated Pod-local forwarder. See
 [trace setup](../../infrastructure/monitoring/TRACING.md),

@@ -216,6 +216,10 @@ echo "Starting fixed-address identity and Platform API services first..."
 docker compose up -d local-application-edge
 docker compose up -d --build --wait --wait-timeout 180 platform-api
 
+# Grafana reads the generated provisioning directory at startup. Project IDs
+# come from the catalog, including retired projects with retained telemetry.
+python3 scripts/operations/reconcile-grafana-datasources.py --no-restart
+
 # The local identity issuer uses Caddy's internal CA. Export its public root
 # before the isolated PostgreSQL console attempts verified OIDC discovery.
 docker compose up -d proxy local-application-edge

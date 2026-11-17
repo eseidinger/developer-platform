@@ -8,6 +8,9 @@ The main entry points remain `scripts/init.py`, `scripts/up.sh`, and
 `scripts/down.sh`. Local setup and Ansible share configuration validation and
 controlled deployment; see the
 [configuration and deployment guide](../docs/operators/configuration-and-deployment.md).
+The Grafana project data-source reconciler lives under `scripts/operations/`;
+`scripts/up.sh` runs it before Grafana starts and remote installations run it
+periodically through systemd.
 
 ## Operational commands
 

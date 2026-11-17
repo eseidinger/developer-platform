@@ -1,0 +1,44 @@
+---
+- name: Install the Grafana project data-source reconciliation service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/platform-grafana-datasources.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Reconcile operator Grafana project data sources
+      After=docker.service
+      Requires=docker.service
+
+      [Service]
+      Type=oneshot
+      User=root
+      WorkingDirectory={{ platform_install_dir }}
+      ExecStart=/usr/bin/python3 \
+        scripts/operations/reconcile-grafana-datasources.py
+      TimeoutStartSec=120
+
+- name: Install the Grafana project data-source reconciliation timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/platform-grafana-datasources.timer
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Reconcile Grafana project data sources after catalog changes
+
+      [Timer]
+      OnBootSec=3min
+      OnUnitInactiveSec=1min
+
+      [Install]
+      WantedBy=timers.target
+
+- name: Enable the Grafana project data-source reconciliation timer
+  ansible.builtin.systemd_service:
+    name: platform-grafana-datasources.timer
+    daemon_reload: true
+    enabled: true
+    state: started

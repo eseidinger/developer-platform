@@ -1,7 +1,9 @@
 """A narrow, read-only view for workload telemetry admission."""
 
+import json
 import os
 
+import psycopg
 from psycopg import sql
 
 
@@ -42,3 +44,22 @@ def initialize(conn):
     conn.execute(
         "REVOKE ALL ON telemetry_project_partitions,telemetry_project_identities FROM PUBLIC"
     )
+
+
+def grafana_projects():
+    """Return catalog identities for operator data-source reconciliation."""
+    with psycopg.connect(
+        host=os.environ["POSTGRES_HOST"],
+        dbname="platform",
+        user="telemetry_catalog",
+        password=os.environ["TELEMETRY_CATALOG_PASSWORD"],
+        connect_timeout=3,
+    ) as conn:
+        return conn.execute(
+            "SELECT project, project_id::text "
+            "FROM telemetry_project_identities ORDER BY project"
+        ).fetchall()
+
+
+if __name__ == "__main__":
+    print(json.dumps(grafana_projects()))

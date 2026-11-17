@@ -23,6 +23,10 @@ implementation ownership.
 - **`alertmanager.yaml`:** Local receiver defaults; delivery requires operator
   configuration.
 - **`datasources.yaml`, `dashboards.yaml`:** Grafana provisioning.
+- **Project data sources:** `scripts/operations/reconcile-grafana-datasources.py`
+  combines the static sources with catalog-derived Loki and Tempo sources in
+  `.runtime/grafana-datasources/default.yaml`. Grafana mounts that generated
+  directory; the remote systemd timer reconciles project changes.
 - **`dashboards/`:** Generated JSON; edit the dashboard generator, then
   regenerate.
 
