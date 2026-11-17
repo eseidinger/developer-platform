@@ -51,6 +51,10 @@ the [human database access guide](../../docs/developers/database-access.md).
   - **Default:** `identity.localhost`
   - **Purpose:** Keycloak/OIDC issuer domain; configure its DNS to the platform
     host
+- **`platform_grafana_domain`**
+  - **Default:** `grafana.localhost`
+  - **Purpose:** Operator Grafana HTTPS domain; configure its DNS to the platform
+    host for remote access
 - **`platform_tls_email`**
   - **Default:** `admin@example.com`
   - **Purpose:** ACME contact email

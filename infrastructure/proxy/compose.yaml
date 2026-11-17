@@ -28,6 +28,7 @@ services:
     environment:
       PLATFORM_DOMAIN: ${PLATFORM_DOMAIN:-platform.localhost}
       IDENTITY_DOMAIN: ${IDENTITY_DOMAIN:-identity.localhost}
+      GRAFANA_DOMAIN: ${GRAFANA_DOMAIN:-grafana.localhost}
       APPS_DOMAIN: ${APPS_DOMAIN:-apps.localhost}
       TLS_EMAIL: ${TLS_EMAIL:-admin@example.com}
     volumes:

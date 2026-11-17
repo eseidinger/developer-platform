@@ -98,6 +98,8 @@ services:
     environment:
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:?Run scripts/init.py}
       GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_SERVER_ROOT_URL: https://${GRAFANA_DOMAIN:-grafana.localhost}/
     volumes:
       - grafana:/var/lib/grafana
       - ./datasources.yaml:/etc/grafana/provisioning/datasources/default.yaml:ro

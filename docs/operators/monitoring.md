@@ -55,6 +55,11 @@ PostgreSQL, application HTTP, Micrometer JVM, telemetry security, AI,
 named-store and eight store performance dashboards. Shared
 Grafana/Prometheus/Loki/Tempo remain operator-only; a dashboard selector is not
 project authorization. Project users read fixed API metric/trace views.
+
+Operators open Grafana through Caddy at `https://<GRAFANA_DOMAIN>/` and sign in
+with a Grafana account. The direct `127.0.0.1:3000` port remains available on
+the host. Public account signup and anonymous access are disabled.
+
 Application metrics require opt-in instrumentation; tracing uses an
 authenticated Pod-local forwarder. See
 [trace setup](../../infrastructure/monitoring/TRACING.md),

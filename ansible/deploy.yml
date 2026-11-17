@@ -11,6 +11,7 @@
       PLATFORM_DOMAIN: "{{ platform_domain }}"
       APPS_DOMAIN: "{{ platform_apps_domain }}"
       IDENTITY_DOMAIN: "{{ platform_identity_domain }}"
+      GRAFANA_DOMAIN: "{{ platform_grafana_domain }}"
       TLS_EMAIL: "{{ platform_tls_email }}"
       EDGE_BIND_IP: "{{ platform_edge_bind_ip }}"
       IMAGE_REGISTRIES: "{{ platform_image_registries }}"

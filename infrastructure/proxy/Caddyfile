@@ -27,6 +27,11 @@
 	reverse_proxy keycloak:8080
 }
 
+# Grafana authenticates operators; Caddy terminates TLS at its own hostname.
+{$GRAFANA_DOMAIN} {
+	reverse_proxy grafana:3000
+}
+
 # Local application domains use HTTP; other domains redirect to HTTPS.
 http://*.{$APPS_DOMAIN} {
 	@local host *.apps.localhost

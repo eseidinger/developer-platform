@@ -79,7 +79,10 @@ class PlatformConfigurationTests(unittest.TestCase):
             "network": {"subnet": "10.55.8.0/24"},
         }
         specification = {
-            "environment": {"PLATFORM_DOMAIN": "platform.fixture.example"},
+            "environment": {
+                "PLATFORM_DOMAIN": "platform.fixture.example",
+                "GRAFANA_DOMAIN": "grafana.fixture.example",
+            },
             "options": options,
             "tracing": {"sample_rate": 0.25, "retention": "168h"},
         }
@@ -142,6 +145,7 @@ class PlatformConfigurationTests(unittest.TestCase):
         for specification in [
             {"environment": {"DATABASE_KEY": "must-not-be-accepted"}},
             {"environment": {"PLATFORM_DOMAIN": "bad\nSECRET=leak"}},
+            {"environment": {"GRAFANA_DOMAIN": "bad\nSECRET=leak"}},
             {"environment": {"CAPACITY_RESERVE_MEMORY_MIB": "invalid"}},
             {"environment": {"CAPACITY_ADMISSION_ENABLED": "sometimes"}},
             {"environment": {"ALLOWED_EGRESS_PORTS": "443;anything"}},

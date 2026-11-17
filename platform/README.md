@@ -48,13 +48,13 @@ After [bootstrap](../docs/operators/install-local.md):
   - **Purpose:** PostgreSQL and Kubernetes connectivity
 - **Endpoint:** `http://identity.localhost`
   - **Purpose:** Keycloak reference identity provider
-- **Endpoint:** `http://localhost:3000`
-  - **Purpose:** Operator Grafana
+- **Endpoint:** `https://grafana.localhost`
+  - **Purpose:** Operator Grafana through Caddy
 - **Endpoint:** `http://localhost:9090`
   - **Purpose:** Operator Prometheus
 
 API and monitoring host ports bind to loopback. Caddy serves the
-configured platform and identity domains; public deployments use
+configured platform, identity, and Grafana domains; public deployments use
 HTTPS. Protected `v1` application traffic follows Caddy → k3d/Traefik
 → hosted-access boundary → application Service. Separate store console
 routes expose only authorized human leases. Local `.localhost` HTTP

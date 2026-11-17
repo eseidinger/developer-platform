@@ -69,7 +69,8 @@ metrics-enabled applications after a control-plane PodCIDR change.
   - **State and responsibility:** Metrics, rules, and generated discovery
     targets
 - **Component:** Grafana
-  - **Default operator endpoint:** `127.0.0.1:3000`
+  - **Default operator endpoint:** `https://grafana.localhost` through Caddy;
+    direct access on `127.0.0.1:3000`
   - **State and responsibility:** Dashboards; administrator password comes from
     `.env`
 - **Component:** Alloy and Loki

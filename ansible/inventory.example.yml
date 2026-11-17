@@ -10,6 +10,7 @@ all:
         platform_domain: platform.example.com
         platform_apps_domain: apps.example.com
         platform_identity_domain: identity.example.com
+        platform_grafana_domain: grafana.example.com
         platform_tls_email: admin@example.com
         platform_edge_bind_ip: 0.0.0.0
         platform_image_registries: docker.io,ghcr.io,quay.io  # optional

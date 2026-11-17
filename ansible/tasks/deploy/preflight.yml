@@ -22,6 +22,9 @@
     platform_identity_domain: >-
       {{ platform_identity_domain |
       default(platform_environment_defaults.IDENTITY_DOMAIN) }}
+    platform_grafana_domain: >-
+      {{ platform_grafana_domain |
+      default(platform_environment_defaults.GRAFANA_DOMAIN) }}
     platform_tls_email: >-
       {{ platform_tls_email |
       default(platform_environment_defaults.TLS_EMAIL) }}
